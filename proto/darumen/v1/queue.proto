@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package darumen.v1;
+
+option csharp_namespace = "Darumen.Contracts.V1";
+
+import "darumen/v1/common.proto";
+
+// Queue Intelligence: ожидание плановой госпитализации, риск отказа, альтернативы.
+service QueueIntelligence {
+  rpc PredictWait(PredictWaitRequest) returns (PredictWaitResponse);
+  rpc PredictRefusal(PredictWaitRequest) returns (PredictRefusalResponse);
+  rpc Alternatives(AlternativesRequest) returns (AlternativesResponse);
+}
+
+message PredictWaitRequest {
+  RegionRef region = 1;
+  string mo_code = 2;
+  string profile_code = 3;      // код профиля койки, DH для дневного стационара
+  string icd10 = 4;
+  string referral_purpose = 5;
+  string territorial_type = 6;  // Город или Село
+  string finance_source = 7;
+  string registration_date = 8; // YYYY-MM-DD, дата постановки в очередь
+}
+
+message PredictWaitResponse {
+  double p50_days = 1;
+  double p90_days = 2;
+  double p_within_30_days = 3;
+  Explanation explanation = 4;
+  ModelInfo model = 5;
+}
+
+message PredictRefusalResponse {
+  double p_refusal = 1;
+  Explanation explanation = 2;
+  ModelInfo model = 3;
+}
+
+message AlternativesRequest {
+  PredictWaitRequest base = 1;
+  int32 limit = 2;
+  double max_distance_km = 3; // 0 означает без ограничения
+}
+
+message Alternative {
+  OrganizationRef organization = 1;
+  double p50_days = 2;
+  double p90_days = 3;
+  double p_refusal = 4;
+  double distance_km = 5;
+}
+
+message AlternativesResponse {
+  repeated Alternative alternatives = 1;
+  ModelInfo model = 2;
+}

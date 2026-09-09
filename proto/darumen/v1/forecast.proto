@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package darumen.v1;
+
+option csharp_namespace = "Darumen.Contracts.V1";
+
+import "darumen/v1/common.proto";
+
+// Load Forecasting: прогноз любого зарегистрированного потока.
+service LoadForecasting {
+  rpc Forecast(ForecastRequest) returns (ForecastResponse);
+}
+
+message ForecastRequest {
+  string stream_id = 1;               // например er_visits_daily
+  map<string, string> entity = 2;     // ключи сущности потока: region_kato, mo_code, profile_code
+  int32 horizon = 3;                  // число шагов гранулярности потока
+}
+
+message ForecastPoint {
+  string period = 1;                  // YYYY-MM-DD для дня, YYYY-MM для месяца
+  double yhat = 2;
+  double lo = 3;
+  double hi = 4;
+}
+
+message BacktestMetrics {
+  double smape = 1;
+  double mase = 2;
+  double baseline_smape = 3;
+}
+
+message ForecastResponse {
+  repeated ForecastPoint points = 1;
+  BacktestMetrics backtest = 2;
+  ModelInfo model = 3;
+}

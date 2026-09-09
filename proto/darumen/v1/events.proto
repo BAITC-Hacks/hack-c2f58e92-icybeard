@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package darumen.v1;
+
+option csharp_namespace = "Darumen.Contracts.V1";
+
+import "darumen/v1/common.proto";
+
+// intake.batch.loaded
+message BatchLoaded {
+  EventMeta meta = 1;
+  string dataset = 2;        // имя контракта, например bg_referrals
+  string batch_id = 3;
+  int64 rows_loaded = 4;
+  int64 rows_quarantined = 5;
+  repeated string partitions = 6;
+}
+
+// stream.updated
+message StreamUpdated {
+  EventMeta meta = 1;
+  string stream_id = 2;
+  string period_from = 3;
+  string period_to = 4;
+}
+
+// model.deployed
+message ModelDeployed {
+  EventMeta meta = 1;
+  ModelInfo model = 2;
+  string stage = 3;          // staging или production
+}
+
+// anomaly.detected
+message AnomalyDetected {
+  EventMeta meta = 1;
+  string stream_id = 2;
+  map<string, string> entity = 3;
+  string period = 4;
+  double observed = 5;
+  double expected = 6;
+  double score = 7;
+  string severity = 8;       // info, warning, critical
+}
+
+// decision.recorded
+message DecisionRecorded {
+  EventMeta meta = 1;
+  string decision_id = 2;
+  string actor_role = 3;     // doctor или regulator
+  string subject = 4;        // например referral или redistribution
+  string recommended = 5;
+  string chosen = 6;
+  string reason = 7;
+}
+
+// notification.requested
+message NotificationRequested {
+  EventMeta meta = 1;
+  string channel = 2;        // web, push, email
+  string audience = 3;       // роль, регион или организация
+  string title = 4;
+  string body = 5;
+}

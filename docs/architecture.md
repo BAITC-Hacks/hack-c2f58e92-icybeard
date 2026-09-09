@@ -145,7 +145,7 @@ flowchart TB
 - **Зоны:** bronze (неизменяемый оригинал плюс служебные колонки `_source_file`, `_ingested_at`, `_row_hash`), silver (типы, ключи, коды справочников, обезличивание), gold (витрины по ролям, таблицы признаков, ряды потоков).
 - **Партиционирование:** регион КАТО и месяц; крупные наборы дополнительно по организации.
 - **Каталог:** REST‑каталог Iceberg (Nessie или Polaris), lineage и качество в OpenMetadata.
-- **Движки:** DuckDB для разработки и малых объёмов, Trino для интерактивных запросов, Spark для тяжёлых батчей. Опционально ClickHouse как витрина для дашбордов с миллисекундным откликом.
+- **Движки:** DuckDB и Parquet на стороне Python для подготовки данных и обучения; ClickHouse как аналитическое хранилище витрин gold и рядов с семантическим слоем Cube для интерфейсов; PostgreSQL для OLTP. Trino и Spark подключаются на национальном масштабе.
 - **Оркестрация:** Dagster с активами и сенсорами; каждая таблица gold это актив с зависимостями и расписанием.
 - **Качество:** правила в контрактах исполняются на каждом батче; результаты видны в каталоге.
 
@@ -162,13 +162,27 @@ flowchart TB
 - **Мониторинг:** дрейф признаков и целевой переменной (Evidently), сравнение прогнозов с реализованными исходами по мере прихода данных, автоматические триггеры переобучения.
 
 ### L7. Доменные сервисы
-Сервисы из раздела 3. Синхронные API через gateway, асинхронные события через Kafka (новый батч данных, новая версия модели, сигнал аномалии, решение врача). Insight работает только через инструменты доменных сервисов и gold‑таблицы: LLM не видит сырых данных и не является моделью прогноза; ответы кэшируются, промпты и ответы проходят фильтр персональных данных и журналируются. Consultation Scribe работает внутри периметра: модель речи on‑prem, аудио удаляется после расшифровки, записи уходят в МИС только после утверждения врачом.
+Сервисы из раздела 3, реализованные как модульный монолит на .NET 10 по Clean Architecture (модели Python вызываются по gRPC). Синхронные API через YARP, асинхронные события через Kafka (новый батч данных, новая версия модели, сигнал аномалии, решение врача). Insight работает только через инструменты доменных сервисов и gold‑таблицы: LLM не видит сырых данных и не является моделью прогноза; ответы кэшируются, промпты и ответы проходят фильтр персональных данных и журналируются. Consultation Scribe работает внутри периметра: модель речи on‑prem, аудио удаляется после расшифровки, записи уходят в МИС только после утверждения врачом.
 
 ### L8. Experience
-Веб‑приложение по ролям (Next.js), BFF за API Gateway, двуязычие казахский и русский, доступность. Гражданин получает сервис там, где он уже есть: мини‑приложение eGov mobile, веб, бот. Встраивание ассистента направления в МИС через API на следующем этапе.
+Веб‑приложение по ролям (Vue 3, PrimeVue), BFF на YARP, двуязычие казахский и русский, доступность. Гражданин получает сервис там, где он уже есть: мини‑приложение eGov mobile, веб, бот. Встраивание ассистента направления в МИС через API на следующем этапе.
 
 ### L9. Платформа
 Kubernetes с GitOps (ArgoCD), образы из CI (GitHub Actions), IaC (Terraform, Helm), секреты в Vault, IAM в Keycloak с ролями и атрибутами (регион, организация), вход для госслужащих через ЭЦП (NCALayer), для граждан через eGov; наблюдаемость на OpenTelemetry, Prometheus, Grafana, Loki, Tempo; резервное копирование и DR; окружения dev, stage, prod.
+
+## 5.1. Технологии
+
+Решения зафиксированы в [tech-stack.md](tech-stack.md). Коротко:
+
+| Слой | Выбор |
+|---|---|
+| Сервисы продукта | .NET 10, модульный монолит, Clean Architecture, MediatR, Dapper, миграции EF Core, встроенный OpenAPI + Scalar, REST для клиентов и gRPC к моделям, Quartz.NET, YARP |
+| События | Apache Kafka, Protobuf + Confluent Schema Registry, Confluent.Kafka, transactional outbox и dead‑letter топики |
+| Данные | PostgreSQL 17 с PostGIS, pg_trgm, pgvector, pg_partman для OLTP; ClickHouse + Cube для витрин и аналитики; Valkey для кэша; MinIO для файлов; Parquet + DuckDB для подготовки данных |
+| Веб | Vue 3 + Vite + TypeScript, Pinia, PrimeVue 4, vue‑echarts, MapLibre GL, VeeValidate + zod, vue‑i18n, Vitest + Playwright |
+| Мобильные клиенты | Flutter, клиент из OpenAPI, FCM и APNs |
+| Python и ML | Dagster, Intake Fabric на DuckDB и pyarrow, LightGBM, statsforecast, SHAP, OR‑Tools, FastAPI + gRPC, MLflow, faster‑whisper |
+| Сквозные | Keycloak, OpenTelemetry + Prometheus + Grafana + Loki, Serilog, QuestPDF + ClosedXML, xUnit + Testcontainers + k6, Vault, OpenFeature, GitHub Actions |
 
 ## 6. Безопасность, приватность, соответствие
 
@@ -193,12 +207,12 @@ Kubernetes с GitOps (ArgoCD), образы из CI (GitHub Actions), IaC (Terra
 
 | | Фаза 0: кэмп | Фаза 1: пилот региона | Фаза 2: национальный масштаб |
 |---|---|---|---|
-| Хранилище | MinIO в Docker, Iceberg через pyiceberg, DuckDB | MinIO в Kubernetes, Trino | Кластер MinIO, Trino и Spark, ClickHouse для витрин |
+| Хранилище | MinIO и Parquet, DuckDB для подготовки, PostgreSQL и ClickHouse с Cube в Docker Compose | Те же в Kubernetes, реплики Postgres | Кластеры ClickHouse и MinIO, Trino и Spark для тяжёлых батчей |
 | Загрузка | Intake Fabric с контрактами и сенсором на папку | Плюс SFTP и API‑коннекторы | Плюс Kafka из ЕИСЗ и БГ, FHIR |
 | Оркестрация | Dagster в одном контейнере | Dagster в Kubernetes | То же, с очередями и приоритетами |
 | Признаки | Feast offline на Parquet | Плюс online store Redis | То же |
 | ML | MLflow локально, batch‑скоринг | Online serving, мониторинг дрейфа | Теневые запуски, автопереобучение |
-| Сервисы | Те же границы доменов, запуск через Docker Compose | Kubernetes, gateway, Kafka | Автомасштабирование, DR |
+| Сервисы | Модульный монолит .NET 10 и Python‑сервисы моделей в Docker Compose, Kafka с outbox | Kubernetes, YARP как шлюз, разнос модулей по контейнерам при необходимости | Автомасштабирование, DR |
 | Доступ | Роли в приложении, тестовые пользователи | Keycloak, ЭЦП для госслужащих | eGov для граждан, встраивание в МИС |
 | Наблюдаемость | Логи и метрики контейнеров | OpenTelemetry, Grafana | SLO, дежурства, инциденты |
 
@@ -206,28 +220,19 @@ Kubernetes с GitOps (ArgoCD), образы из CI (GitHub Actions), IaC (Terra
 
 ## 9. Структура репозитория
 
+Монорепо, подробная раскладка в [tech-stack.md](tech-stack.md):
+
 ```
-apps/
-  web/                  Next.js: регулятор, главврач, врач, стюард, гражданин
-services/
-  intake/               Data Intake Fabric: сенсоры, отпечатки, парсеры, валидация
-  refdata/              Reference Data / MDM и разрешение сущностей
-  queue/                Queue Intelligence
-  forecast/             Load Forecasting
-  anomaly/              Anomaly & Alerting
-  simulation/           Simulation & Optimization
-  index/                Access Index
-  insight/              Вопросы и отчёты
-  journal/              Decision Journal
-  notify/               Notifications
-platform/
-  lakehouse/            схемы Iceberg, активы Dagster, витрины gold
-  features/             определения признаков
-  ml/                   пайплайны обучения, оценка, реестр, карточки
-contracts/              контракты наборов данных (YAML)
-streams/                декларации потоков (YAML)
-refdata/                справочники и правила сопоставления
-infra/                  Docker Compose, Helm, Terraform, GitOps
+src/            решение .NET 10: Darumen.Api, Darumen.Modules (Queue, Forecast, Anomaly, Simulation,
+                Index, Insight, Journal, Notifications, Intake, RefData, Medicines, Scribe),
+                Darumen.Shared, Darumen.Migrations, Darumen.Tests
+ml/             Python: intake, lakehouse (Dagster), features, models, сервисы моделей (gRPC), scribe
+apps/web/       Vue 3
+apps/mobile/    Flutter
+proto/          контракты gRPC и событий Kafka
+contracts/      контракты наборов данных (YAML)
+streams/        декларации потоков (YAML)
+refdata/        справочники и правила сопоставления
+infra/          docker-compose, clickhouse, cube, keycloak, k8s
 docs/
-tests/
 ```

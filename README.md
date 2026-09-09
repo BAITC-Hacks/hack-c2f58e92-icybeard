@@ -26,6 +26,7 @@
 | [docs/mobile-and-doctor.md](docs/mobile-and-doctor.md) | Мобильные приложения для гражданина, врача и руководителя; ведение маршрута пациента врачом вместо медкарты, границы и что для этого нужно |
 | [docs/doctor-consult.md](docs/doctor-consult.md) | Сценарий приёма: AI‑скрайб с утверждением врачом, памятка пациенту, проверка рецепта на покрытие ОСМС и доступность в аптеках |
 | [docs/implementation-plan.md](docs/implementation-plan.md) | Детальный план на четыре недели: вехи, задачи по дням с владельцами и условиями готовности, зависимости, линии отсечения, риски по неделям |
+| [docs/tech-stack.md](docs/tech-stack.md) | Решения по стеку: .NET 10, Kafka, PostgreSQL, ClickHouse с Cube, Vue 3, Flutter, Python для данных и моделей; структура монорепо |
 | [docs/data-requests.md](docs/data-requests.md) | Что из данных есть, чего не хватает, приоритетный запрос организаторам, открытые источники, черновик письма |
 | [docs/tz.md](docs/tz.md) | Техническое задание программы (текст организаторов) |
 
@@ -62,6 +63,9 @@ python3 scripts/profile_datasets.py DataSets
 
 ```
 docs/       документация проекта
+proto/      контракты gRPC и событий Kafka (.NET и Python)
 scripts/    загрузка, проверка и профилирование данных
 DataSets/   локальные данные (в .gitignore)
 ```
+
+Целевая раскладка монорепо (`src/` .NET, `ml/` Python, `apps/web` Vue, `apps/mobile` Flutter) описана в [docs/tech-stack.md](docs/tech-stack.md).

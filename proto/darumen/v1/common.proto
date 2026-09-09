@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package darumen.v1;
+
+option csharp_namespace = "Darumen.Contracts.V1";
+
+import "google/protobuf/timestamp.proto";
+
+// Регион по КАТО, две цифры: 10 Абай ... 79 Шымкент.
+message RegionRef {
+  string kato = 1;
+}
+
+// Медицинская организация по четырёхсимвольному коду ИС БГ.
+message OrganizationRef {
+  string mo_code = 1;
+  string name = 2;
+  RegionRef region = 3;
+}
+
+// Вклад одного фактора в прогноз, уже переведённый в слова.
+message Factor {
+  string name = 1;
+  double contribution = 2;
+  string text_ru = 3;
+  string text_kz = 4;
+}
+
+message Explanation {
+  repeated Factor factors = 1;
+  string summary_ru = 2;
+  string summary_kz = 3;
+}
+
+message ModelInfo {
+  string name = 1;
+  string version = 2;
+  string trained_through = 3; // последняя дата обучающих данных, YYYY-MM-DD
+}
+
+// Конверт каждого события Kafka.
+message EventMeta {
+  string event_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  string producer = 3;
+  string trace_id = 4;
+}
