@@ -42,6 +42,11 @@ DATASETS = {
     "onco_first": "magda-ds-d5f48eaf-0094-488d-8bb1-f2b4529b098f",
     "onco_late": "magda-ds-2e65ac4e-0fb8-42b9-882f-23fba36bacb8",
     "onco_ext": "magda-ds-69b7691f-8bae-4cf9-9076-4392e7fcd392",
+    "prescriptions_issued": "magda-ds-e6cd5fc0-eaa0-4445-bcae-fd6be2d3c972",
+    "prescriptions_fulfilled": "magda-ds-3a2d309f-9880-45e0-9628-fa14967a3eb5",
+    "drug_specs": "magda-ds-e94d2147-5f53-47b1-84f1-57cea415effa",
+    "screenings": "magda-ds-bf74a4eb-4d9f-410e-ab84-09ceff6e6748",
+    "newborns_almaty": "magda-ds-3a875c52-a394-4978-a505-695ec4372056",
 }
 
 
@@ -51,7 +56,7 @@ def encoded(url: str) -> str:
 
 
 def registry(dataset_id: str) -> tuple[str, list[str]]:
-    with urlopen(Request(REGISTRY.format(id=dataset_id), headers={"User-Agent": "saulyq-downloader"})) as resp:
+    with urlopen(Request(REGISTRY.format(id=dataset_id), headers={"User-Agent": "darumen-downloader"})) as resp:
         record = json.load(resp)
     title = record["aspects"]["dcat-dataset-strings"]["title"].strip()
     dists = record["aspects"]["dataset-distributions"]["distributions"]
