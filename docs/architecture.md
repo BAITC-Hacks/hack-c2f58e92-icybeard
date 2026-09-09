@@ -176,8 +176,8 @@ Kubernetes с GitOps (ArgoCD), образы из CI (GitHub Actions), IaC (Terra
 
 | Слой | Выбор |
 |---|---|
-| Сервисы продукта | .NET 10, модульный монолит, Clean Architecture, MediatR, Dapper, миграции EF Core, встроенный OpenAPI + Scalar, REST для клиентов и gRPC к моделям, Quartz.NET, YARP |
-| События | Apache Kafka, Protobuf + Confluent Schema Registry, Confluent.Kafka, transactional outbox и dead‑letter топики |
+| Сервисы продукта | .NET 10, модульный монолит, Clean Architecture, Wolverine как медиатор и шина, Dapper, миграции EF Core, встроенный OpenAPI + Scalar, REST для клиентов и gRPC к моделям, Quartz.NET для cron‑задач, YARP |
+| События | Apache Kafka, Protobuf + Confluent Schema Registry, транспорт Kafka и durable outbox через Wolverine поверх Confluent.Kafka, dead‑letter топики |
 | Данные | PostgreSQL 17 с PostGIS, pg_trgm, pgvector, pg_partman для OLTP; ClickHouse + Cube для витрин и аналитики; Valkey для кэша; MinIO для файлов; Parquet + DuckDB для подготовки данных |
 | Веб | Vue 3 + Vite + TypeScript, Pinia, PrimeVue 4, vue‑echarts, MapLibre GL, VeeValidate + zod, vue‑i18n, Vitest + Playwright |
 | Мобильные клиенты | Flutter, клиент из OpenAPI, FCM и APNs |

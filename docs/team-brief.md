@@ -144,7 +144,7 @@ GovTech Camp 2026 · Кейс 1 · обновлено 9 сентября 2026
 | Прогноз 1–3 мес | Помесячно по региону и профилю на списке пролеченных с 2012 года | Из одного квартала сезонность не выучить |
 | Survival‑модель | Расширение для продакшена с живой очередью, одна фраза на защите | В когорте I квартала не даёт выигрыша |
 
-Стек: .NET 10 (модульный монолит, Clean Architecture, MediatR, Dapper, YARP), Kafka с Protobuf и outbox, PostgreSQL с PostGIS, ClickHouse с Cube, Valkey, Vue 3 с PrimeVue, Flutter; Python для intake и моделей (Dagster, DuckDB, LightGBM, MLflow, faster‑whisper). Решения в [tech-stack.md](tech-stack.md).
+Стек: .NET 10 (модульный монолит, Clean Architecture, Wolverine, Dapper, YARP), Kafka с Protobuf и outbox через Wolverine, PostgreSQL с PostGIS, ClickHouse с Cube, Valkey, Vue 3 с PrimeVue, Flutter; Python для intake и моделей (Dagster, DuckDB, LightGBM, MLflow, faster‑whisper). Решения в [tech-stack.md](tech-stack.md).
 
 ## Порядок сборки
 

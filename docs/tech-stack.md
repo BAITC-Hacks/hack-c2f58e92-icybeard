@@ -7,13 +7,13 @@
 | Решение | Выбор | Примечание |
 |---|---|---|
 | Форма кода | Модульный монолит, границы по доменам из архитектуры | Разнос по контейнерам на пилоте без переписывания |
-| Внутренняя архитектура | Clean Architecture: Domain, Application, Infrastructure, Presentation в каждом модуле | Домены не ссылаются друг на друга напрямую, только через Application‑контракты и события |
-| Медиатор | MediatR | С 2025 года коммерческая лицензия; для кэмпа допустимо, перед пилотом проверить условия для государственного заказчика |
+| Внутренняя архитектура | Clean Architecture: Domain, Application, Infrastructure, Presentation в каждом модуле | Presentation отправляет команду в Wolverine, обработчик в Application выполняет use case, доменные события уходят в outbox в той же транзакции; модули общаются только через события и Application‑контракты |
+| Медиатор и шина сообщений | Wolverine (JasperFx, MIT) | Один пакет закрывает медиатор, транзакционный outbox в Postgres, транспорт Kafka, локальные очереди и отложенные сообщения. MediatR отклонён из‑за коммерческой лицензии с 13‑й версии |
 | Доступ к данным | Dapper | Чтение витрин и запись OLTP простым SQL |
 | Миграции | EF Core Migrations | EF только для схемы, не для запросов |
 | OpenAPI | Встроенный `Microsoft.AspNetCore.OpenApi` + Scalar UI | |
 | Протоколы | REST для веб и мобильных клиентов, gRPC к модельным сервисам на Python | Контракты в `proto/` |
-| Фоновые задания | Quartz.NET | Публикация outbox, пересчёты, рассылки |
+| Фоновые задания | Quartz.NET | Cron‑задачи: пересчёты, рассылки, отчёты. Публикацию outbox делает Wolverine |
 | Шлюз и BFF | YARP | Один вход для Vue и Flutter, агрегация экранов |
 | Локальная оркестрация | Docker Compose как источник истины для всех сервисов; .NET Aspire опционально для цикла разработки .NET | Python‑сервисы, ClickHouse, Cube, Kafka и Keycloak живут в Compose |
 
@@ -22,9 +22,9 @@
 | Решение | Выбор |
 |---|---|
 | Брокер | Apache Kafka |
-| Сериализация | Protobuf + Confluent Schema Registry, субъекты `<topic>-value` |
-| Клиент .NET | Confluent.Kafka |
-| Надёжность | Transactional outbox в Postgres, публикация через Quartz; dead‑letter топик на каждый основной; идемпотентные потребители по `event_id` |
+| Сериализация | Protobuf + Confluent Schema Registry, субъекты `<topic>-value`. Готовой интеграции Schema Registry в Wolverine нет: пишем свой `IMessageSerializer` поверх сериализаторов Confluent, задача T0.11 |
+| Клиент .NET | Транспорт Kafka в Wolverine поверх Confluent.Kafka |
+| Надёжность | Durable outbox и inbox Wolverine в Postgres (сообщение сохраняется в той же транзакции, что и данные); dead‑letter топик на каждый основной; идемпотентные потребители по `event_id` |
 | Топики | `intake.batch.loaded`, `stream.updated`, `model.deployed`, `anomaly.detected`, `decision.recorded`, `notification.requested` |
 
 ## Данные
@@ -85,7 +85,7 @@ src/                        решение .NET 10, модульный моно�
   Darumen.Modules/          Queue, Forecast, Anomaly, Simulation, Index, Insight,
                             Journal, Notifications, Intake, RefData, Medicines, Scribe;
                             в каждом Domain / Application / Infrastructure / Presentation
-  Darumen.Shared/           outbox, Kafka, Dapper, аутентификация, наблюдаемость
+  Darumen.Shared/           Wolverine (outbox, Kafka), Dapper, аутентификация, наблюдаемость
   Darumen.Migrations/       миграции EF Core
   Darumen.Tests/            xUnit, Testcontainers
 ml/                         Python: intake, lakehouse (Dagster), features, models,
