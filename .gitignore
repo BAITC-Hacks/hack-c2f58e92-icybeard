@@ -1,0 +1,10 @@
+DataSets/
+ DataSets/
+*.csv
+*.parquet
+*.duckdb
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.download.lock
