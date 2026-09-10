@@ -2,7 +2,7 @@ name: darumen
 
 services:
   postgres:
-    image: postgis/postgis:17-3.5
+    image: imresamu/postgis:17-3.5  # multi-arch build; the official postgis/postgis image has no arm64 manifest
     environment:
       POSTGRES_USER: darumen
       POSTGRES_PASSWORD: darumen
