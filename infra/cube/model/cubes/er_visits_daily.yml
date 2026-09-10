@@ -1,0 +1,18 @@
+cubes:
+  - name: er_visits_daily
+    sql_table: er_visits_daily
+    title: Обращения в приёмный покой без госпитализации
+    dimensions:
+      - name: day
+        sql: day
+        type: time
+      - name: region_kato
+        sql: region_kato
+        type: string
+      - name: mo_key
+        sql: mo_key
+        type: string
+    measures:
+      - name: visits
+        sql: visits
+        type: sum

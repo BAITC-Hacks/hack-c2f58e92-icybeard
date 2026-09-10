@@ -108,6 +108,18 @@ services:
     ports: ["50051:50051"]
     profiles: [app]
 
+  scribe:
+    build:
+      context: ..
+      dockerfile: infra/models.Dockerfile
+    entrypoint: ["python", "-m", "darumen.scribe", "--host", "0.0.0.0", "--port", "8010"]
+    environment:
+      DARUMEN_SCRIBE_DIR: /scribe
+    volumes:
+      - scribedata:/scribe
+    ports: ["8010:8010"]
+    profiles: [app]
+
   api:
     build:
       context: ..
@@ -120,6 +132,7 @@ services:
       Messaging__SchemaRegistry: http://schema-registry:8081
       ModelServices__Address: http://models:50051
       Auth__Authority: http://keycloak:8080/realms/darumen
+      ReverseProxy__Clusters__scribe__Destinations__local__Address: http://scribe:8010/
     ports: ["8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
@@ -128,6 +141,7 @@ services:
     profiles: [app]
 
 volumes:
+  scribedata:
   pgdata:
   chdata:
   miniodata:

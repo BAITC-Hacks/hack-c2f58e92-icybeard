@@ -1,0 +1,21 @@
+cubes:
+  - name: rx_weekly
+    sql_table: rx_weekly
+    title: Рецепты по МНН, недели
+    dimensions:
+      - name: week
+        sql: week
+        type: time
+      - name: drug_mnn_id
+        sql: drug_mnn_id
+        type: string
+    measures:
+      - name: issued
+        sql: issued
+        type: sum
+      - name: fulfilled
+        sql: fulfilled
+        type: sum
+      - name: gap
+        sql: gap
+        type: sum

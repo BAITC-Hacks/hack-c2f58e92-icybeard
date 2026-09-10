@@ -11,6 +11,7 @@ const pages = [
   { role: 'doctor', path: '/doctor/referral', wait: 'Альтернативы в регионе' },
   { role: 'doctor', path: '/doctor/worklist', wait: 'Приоритет' },
   { role: 'doctor', path: '/doctor/decisions', wait: 'Журнал решений' },
+  { role: 'doctor', path: '/doctor/scribe', wait: 'AI-скрайб приёма' },
   { role: 'steward', path: '/steward', wait: 'Партии' },
   { role: null, path: '/wait', wait: 'В среднем по региону' },
   { role: null, path: '/medicines', wait: 'Покрытие' },

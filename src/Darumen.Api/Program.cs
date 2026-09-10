@@ -21,6 +21,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
 builder.Services.AddOutputCache();
+builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
 {
     var origins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
@@ -68,6 +69,7 @@ var v1 = app.MapGroup("/api/v1");
 v1.MapGet("/", () => Results.Ok(new { name = "Darumen Health", version = "0.2.0" }))
   .WithName("Root");
 v1.MapDarumenModules();
+app.MapReverseProxy(); // Python-сервисы за тем же хостом: скрайб /api/v1/scribe/*
 
 app.Run();
 

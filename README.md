@@ -103,7 +103,9 @@ make models-serve                                    # QueueIntelligence и Load
 grpcurl -plaintext localhost:50051 list              # проверить
 ```
 
-Карточки моделей в `docs/model-cards/` и `docs/access-index.md` генерируются командой `make train`, руками их не правят. Результаты лежат в `lakehouse/models/` и `lakehouse/gold/` (прогнозы, аномалии, индекс, перераспределение), метрики в MLflow.
+Карточки моделей в `docs/model-cards/` и `docs/access-index.md` генерируются командой `make train`, руками их не правят.
+
+AI-скрайб (демо, [docs/doctor-consult.md](docs/doctor-consult.md)): `make scribe-serve` поднимает FastAPI на :8010, API проксирует его через YARP под `/api/v1/scribe/*` (политика doctor, памятки публичны по токену). Стенограмма: faster-whisper (`make venv-scribe`, модель скачивается при первом запросе) или напечатанный текст; черновик записи по разделам: Claude при заданном `ANTHROPIC_API_KEY`, иначе правила по ключевым словам. Аудио удаляется при утверждении записи врачом. Графики: Cube над ClickHouse (`infra/cube`, dev-режим на :4000, `GET /cubejs-api/v1/meta`). Результаты лежат в `lakehouse/models/` и `lakehouse/gold/` (прогнозы, аномалии, индекс, перераспределение), метрики в MLflow.
 
 ## Структура
 

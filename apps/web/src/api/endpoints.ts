@@ -1,7 +1,7 @@
-import { api } from './client'
+import { api, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, Batch, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
-  Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, PredictResponse, Profile, RedistributeResponse, Region,
+  Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region,
   SimulateResponse, Stream, WorklistItem,
 } from './types'
 
@@ -59,6 +59,17 @@ export const medicines = {
 export const insight = {
   ask: (question: string, regionKato?: string) => api<AskResponse>('/api/v1/insight/ask', { body: { question, regionKato } }),
   status: () => api<{ available: boolean }>('/api/v1/insight/status'),
+}
+
+export const scribe = {
+  health: () => api<ScribeHealth>('/api/v1/scribe/health'),
+  createSession: (consent: boolean, language: string) => api<{ sessionId: string }>('/api/v1/scribe/sessions', { body: { consent, language } }),
+  uploadAudio: (sessionId: string, file: Blob, filename: string) => apiUpload<{ text: string }>(`/api/v1/scribe/sessions/${sessionId}/audio`, file, filename),
+  setTranscript: (sessionId: string, text: string) => api<unknown>(`/api/v1/scribe/sessions/${sessionId}/transcript`, { body: { text } }),
+  draft: (sessionId: string) => api<ScribeDraft>(`/api/v1/scribe/sessions/${sessionId}/draft`, { method: 'POST', body: {} }),
+  approve: (sessionId: string, sections: { name: string; text: string }[], patientLeaflet: string) =>
+    api<{ leafletToken: string }>(`/api/v1/scribe/sessions/${sessionId}/approve`, { body: { sections, patientLeaflet } }),
+  leaflet: (token: string) => api<{ text: string; language: string; approvedAt: string }>(`/api/v1/scribe/leaflets/${encodeURIComponent(token)}`),
 }
 
 export const intake = {

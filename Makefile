@@ -59,8 +59,14 @@ proto: venv ## Сгенерировать Python-код gRPC из proto/ в ml/s
 models-serve: proto ## gRPC-сервисы моделей (Queue Intelligence, Load Forecasting) на :50051
 	$(PY) -m darumen.services --lakehouse lakehouse --port 50051
 
+scribe-serve: venv ## Сервис AI-скрайба (FastAPI) на :8010; faster-whisper через make venv-scribe
+	$(PY) -m darumen.scribe --port 8010
+
+venv-scribe: venv ## Установить faster-whisper и anthropic для скрайба
+	$(UV) pip install --python $(PY) -q -e "ml[dev,scribe]"
+
 lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data intake-status refdata gold publish train eval serve down build test proto models-serve lint
+.PHONY: help venv data intake-status refdata gold publish train eval serve down build test proto models-serve scribe-serve venv-scribe lint

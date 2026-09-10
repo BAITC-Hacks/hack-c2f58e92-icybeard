@@ -78,6 +78,10 @@ export interface ChartSeries { name: string; data: (number | null)[] }
 export interface Chart { type: 'line' | 'bar'; title: string; x: string[]; series: ChartSeries[] }
 export interface AskResponse { answer: string; value: number | null; unit: string | null; chart: Chart | null; toolsUsed: string[]; sources: string[]; model: string }
 
+export interface ScribeHealth { status: string; transcriber: string; drafter: string }
+export interface ScribeSection { name: string; text: string; spans?: { t0: number; t1: number }[] }
+export interface ScribeDraft { sections: ScribeSection[]; leaflet: string; model: string; patientLeaflet: { text: string } }
+
 export interface Batch {
   batchId: string; dataset: string; status: string; rowsLoaded: number; rowsQuarantined: number
   partitions: string[]; occurredAt: string | null; receivedAt: string

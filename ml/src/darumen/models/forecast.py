@@ -77,7 +77,8 @@ def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict]:
             total += 1
             wins += int(np.mean(np.abs(part["y"] - part[name])) < np.mean(np.abs(part["y"] - part[baseline])))
         per_model[name]["series_better_than_baseline"] = wins / total if total else None
-    best = min((n for n in names if n != baseline), key=lambda n: per_model[n]["mase"], default=baseline)
+    # базовая модель тоже кандидат: если сезонный наив точнее, в прогноз идёт он, а не худшая модель
+    best = min(names, key=lambda n: per_model[n]["mase"])
     report = {"stream": stream.stream_id, "series": int(series["unique_id"].nunique()), "horizon": h, "season": season,
               "windows": int(cfg.get("backtest_windows", 3)), "baseline": baseline, "chosen": best, "models": per_model}
     return cv, report

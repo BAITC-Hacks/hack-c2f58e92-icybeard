@@ -67,3 +67,12 @@ def test_period_format_by_grain():
 
     assert period_format("day") == "%Y-%m-%d" and period_format("week") == "%Y-%m-%d" and period_format("month") == "%Y-%m"
     assert FREQ["week"] == "W-MON"
+
+
+def test_baseline_can_be_chosen_when_it_wins():
+    import inspect
+
+    from darumen.models import forecast
+
+    source = inspect.getsource(forecast.backtest)
+    assert 'best = min(names, key=lambda n: per_model[n]["mase"])' in source

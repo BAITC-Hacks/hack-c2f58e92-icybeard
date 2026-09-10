@@ -1,0 +1,34 @@
+cubes:
+  - name: queue_daily
+    sql_table: queue_daily
+    title: Очередь плановой госпитализации по дням
+    dimensions:
+      - name: day
+        sql: day
+        type: time
+      - name: region_kato
+        sql: region_kato
+        type: string
+      - name: mo_code
+        sql: mo_code
+        type: string
+      - name: profile_code
+        sql: profile_code
+        type: string
+    measures:
+      - name: queue_len
+        sql: queue_len
+        type: sum
+        title: Направлений в очереди
+      - name: registered
+        sql: registered
+        type: sum
+      - name: hospitalized
+        sql: hospitalized
+        type: sum
+      - name: refused
+        sql: refused
+        type: sum
+      - name: organisations
+        sql: mo_code
+        type: count_distinct

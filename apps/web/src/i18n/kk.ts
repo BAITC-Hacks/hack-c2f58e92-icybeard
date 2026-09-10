@@ -1,7 +1,7 @@
 export const kk = {
   nav: {
     home: 'Басты бет', gov: 'Өңірлер картасы', simulator: 'Симулятор', insight: 'Деректерге сұрақтар', referral: 'Жолдама көмекшісі',
-    worklist: 'Жұмыс тізімі', medicines: 'Рецепт тексеру', decisions: 'Шешімдер журналы', steward: 'Стюард консолі', wait: 'Азаматтар үшін күту',
+    worklist: 'Жұмыс тізімі', medicines: 'Рецепт тексеру', decisions: 'Шешімдер журналы', scribe: 'AI-скрайб', steward: 'Стюард консолі', wait: 'Азаматтар үшін күту',
   },
   auth: { role: 'Рөл', login: 'Кіру', logout: 'Шығу', guest: 'Қонақ', demo: 'демо-режим' },
   common: {

@@ -51,6 +51,20 @@ class Stream:
                    raw.get("forecast", {}), raw.get("anomaly", {}))
 
 
+def merge_stream_table(path: Path, frames: list[pd.DataFrame], processed: list[str]) -> None:
+    """Write a gold table of stream outputs: rows of the processed streams are replaced, other streams stay,
+    so a per-stream rerun never drops the rest of the table."""
+    kept = pd.DataFrame()
+    if path.exists():
+        existing = pd.read_parquet(path)
+        kept = existing[~existing["stream_id"].isin(processed)]
+    parts = [f for f in [kept, *frames] if len(f)]
+    if parts:
+        pd.concat(parts, ignore_index=True).to_parquet(path, index=False)
+    elif path.exists():
+        path.unlink()
+
+
 def load_streams(directory: Path = STREAMS_DIR) -> dict[str, Stream]:
     return {s.stream_id: s for s in (Stream.from_yaml(p) for p in sorted(directory.glob("*.yaml")))}
 

@@ -50,6 +50,20 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   })
+  return handle<T>(response)
+}
+
+/** Загрузка файла (multipart) с теми же заголовками входа. */
+export async function apiUpload<T>(path: string, file: Blob, filename: string): Promise<T> {
+  const auth = useAuthStore()
+  const form = new FormData()
+  form.append('file', file, filename)
+  const headers = new Headers({ Accept: 'application/json', ...(await auth.authHeaders()) })
+  const response = await fetch(buildUrl(path.replace(/^\//, '')), { method: 'POST', headers, body: form })
+  return handle<T>(response)
+}
+
+async function handle<T>(response: Response): Promise<T> {
   const text = await response.text()
   const body = text ? safeJson(text) : null
   if (!response.ok) {

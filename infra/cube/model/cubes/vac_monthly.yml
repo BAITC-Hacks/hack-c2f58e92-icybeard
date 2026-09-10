@@ -1,0 +1,18 @@
+cubes:
+  - name: vac_monthly
+    sql_table: vac_monthly
+    title: Дозы вакцин по региону и плану, месяцы
+    dimensions:
+      - name: month
+        sql: month
+        type: time
+      - name: region_kato
+        sql: region_kato
+        type: string
+      - name: vaccination_plan
+        sql: vaccination_plan
+        type: string
+    measures:
+      - name: doses
+        sql: doses
+        type: sum

@@ -1,0 +1,21 @@
+cubes:
+  - name: admissions_monthly
+    sql_table: admissions_monthly
+    title: Госпитализации по региону и профилю, месяцы (ЭРСБ)
+    dimensions:
+      - name: month
+        sql: month
+        type: time
+      - name: region_kato
+        sql: region_kato
+        type: string
+      - name: profile_code
+        sql: profile_code
+        type: string
+    measures:
+      - name: cases
+        sql: cases
+        type: sum
+      - name: bed_days
+        sql: bed_days
+        type: sum

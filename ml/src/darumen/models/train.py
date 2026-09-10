@@ -22,8 +22,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--lakehouse", default="lakehouse")
     parser.add_argument("--only", default="wait,forecast,anomaly,simulate,index", help="через запятую: wait, forecast, anomaly, simulate, index")
     parser.add_argument("--cards", default=str(CARDS_DIR))
+    parser.add_argument("--streams", default="", help="через запятую: только эти потоки для forecast и anomaly")
     args = parser.parse_args(argv)
     lake = Lakehouse(Path(args.lakehouse))
+    streams = [s for s in args.streams.split(",") if s] or None
     started = time.time()
     if "wait" in args.only:
         out = models_dir(lake) / "wait"
@@ -42,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
                   f"auc_within30 {m['auc_within30']:.3f} auc_refusal {m['auc_refusal']:.3f} (base {m['auc_refusal_baseline']:.3f})")
         print(f"saved to {out}, card {cards / 'wait.md'}, mlflow run {run_id}")
     if "forecast" in args.only:
-        for stream_id, report in forecast_all(lake).items():
+        for stream_id, report in forecast_all(lake, only=streams).items():
             if report.get("skipped"):
                 print(f"forecast {stream_id:20s} skipped: {report['skipped']}")
                 continue
@@ -55,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
             mlflow_log(f"forecast_{stream_id}", {"chosen": chosen, "series": report["series"]}, flat,
                        [lake.root / "models" / "forecast" / stream_id / "report.json"])
     if "anomaly" in args.only:
-        for stream_id, report in detect_all(lake).items():
+        for stream_id, report in detect_all(lake, only=streams).items():
             if report.get("skipped"):
                 print(f"anomaly  {stream_id:20s} skipped: {report['skipped']}")
                 continue

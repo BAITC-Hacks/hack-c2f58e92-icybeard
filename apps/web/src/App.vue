@@ -21,6 +21,7 @@ const links = computed(() => {
     { to: '/doctor/referral', label: t('nav.referral'), roles: ['doctor'] },
     { to: '/doctor/worklist', label: t('nav.worklist'), roles: ['doctor'] },
     { to: '/doctor/decisions', label: t('nav.decisions'), roles: ['doctor', 'regulator'] },
+    { to: '/doctor/scribe', label: t('nav.scribe'), roles: ['doctor'] },
     { to: '/steward', label: t('nav.steward'), roles: ['steward'] },
   ]
   return items.filter((item) => !item.roles || auth.hasRole(...item.roles))
