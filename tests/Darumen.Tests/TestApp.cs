@@ -63,6 +63,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
             services.AddSingleton<IDecisionRepository>(Decisions);
             services.RemoveAll<IRefDataRepository>();
             services.AddSingleton<IRefDataRepository, InMemoryRefData>();
+            services.RemoveAll<IWorklistRepository>();
+            services.AddSingleton<IWorklistRepository, InMemoryWorklist>();
             services.RemoveAll<IIntakeRepository>();
             services.AddSingleton<IIntakeRepository, InMemoryIntake>();
         });

@@ -61,7 +61,9 @@ public sealed class PostgresRepositoryTests
     {
         var refData = new RefDataRepository(Factory());
         Assert.Equal(20, (await refData.RegionsAsync("ru", CancellationToken.None)).Count);
-        Assert.NotEmpty(await refData.OrganizationsAsync("75", "глазн", 10, CancellationToken.None));
+        Assert.NotEmpty(await refData.OrganizationsAsync("75", "глазн", null, 10, CancellationToken.None));
+        var withQueue = await refData.OrganizationsAsync("75", null, "381", 5, CancellationToken.None);
+        Assert.Equal("028B", withQueue[0].MoCode);
         Assert.NotEmpty(await refData.ProfilesAsync(CancellationToken.None));
 
         // запись решений идёт через outbox и проверяется в KafkaIntegrationTests; здесь только чтение

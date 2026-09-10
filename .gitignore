@@ -35,3 +35,5 @@ apps/mobile/ios/Pods/
 .env
 .DS_Store
 .idea/
+apps/web/e2e/shots/
+apps/web/.env

@@ -16,8 +16,8 @@ public static class RefDataEndpoints
                 Results.Ok(new { items = await repository.RegionsAsync(Locale.From(http), ct) }))
             .WithName("Regions").WithSummary("Регионы (КАТО), столицы и координаты");
 
-        group.MapGet("/organizations", async (string? regionKato, string? q, int? limit, IRefDataRepository repository, CancellationToken ct) =>
-                Results.Ok(new { items = await repository.OrganizationsAsync(regionKato, q, Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit), ct) }))
+        group.MapGet("/organizations", async (string? regionKato, string? q, string? profileCode, int? limit, IRefDataRepository repository, CancellationToken ct) =>
+                Results.Ok(new { items = await repository.OrganizationsAsync(regionKato, q, profileCode, Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit), ct) }))
             .WithName("Organizations").WithSummary("Реестр медицинских организаций с поиском по названию");
 
         group.MapGet("/profiles", async (IRefDataRepository repository, CancellationToken ct) =>

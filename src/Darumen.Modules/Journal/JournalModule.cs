@@ -10,6 +10,7 @@ public sealed class JournalModule : IDarumenModule
     {
         services.AddScoped<IDecisionRepository, DecisionRepository>();
         services.AddScoped<IAuditRepository, AuditRepository>();
+        services.AddScoped<IWorklistRepository, WorklistRepository>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder api) => JournalEndpoints.Map(api);

@@ -15,19 +15,21 @@ public sealed class RefDataRepository(IDbConnectionFactory db) : IRefDataReposit
         return rows.Select(r => new RegionDto(r.RegionKato, lang == Locale.Kk ? r.NameKz ?? r.NameRu : r.NameRu, r.Capital, r.Lat, r.Lon, r.PopulationThousands)).ToList();
     }
 
-    public async Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, int limit, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, string? profileCode, int limit, CancellationToken cancellationToken)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
         var rows = await connection.QueryAsync<OrganizationItemDto>(new CommandDefinition(
             """
-            SELECT mo_code AS MoCode, name_canonical AS Name, region_kato AS RegionKato, mo_type AS MoType, size_bucket AS SizeBucket, lat AS Lat, lon AS Lon
-            FROM refdata.mo_registry
-            WHERE (@regionKato IS NULL OR region_kato = @regionKato)
-              AND (@query IS NULL OR name_canonical ILIKE '%' || @query || '%' OR mo_code = @query)
-            ORDER BY referrals_in DESC NULLS LAST, mo_code
+            SELECT r.mo_code AS MoCode, r.name_canonical AS Name, r.region_kato AS RegionKato, r.mo_type AS MoType, r.size_bucket AS SizeBucket, r.lat AS Lat, r.lon AS Lon
+            FROM refdata.mo_registry r
+            LEFT JOIN gold.queue_state s ON @profileCode IS NOT NULL AND s.mo_code = r.mo_code AND s.profile_code = @profileCode
+            WHERE (@regionKato IS NULL OR r.region_kato = @regionKato)
+              AND (@query IS NULL OR r.name_canonical ILIKE '%' || @query || '%' OR r.mo_code = @query)
+              AND (@profileCode IS NULL OR s.mo_code IS NOT NULL)
+            ORDER BY s.queue_len DESC NULLS LAST, r.referrals_in DESC NULLS LAST, r.mo_code
             LIMIT @limit
             """,
-            new { regionKato, query, limit }, cancellationToken: cancellationToken));
+            new { regionKato, query, profileCode, limit }, cancellationToken: cancellationToken));
         return rows.ToList();
     }
 

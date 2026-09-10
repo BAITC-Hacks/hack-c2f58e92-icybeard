@@ -50,6 +50,17 @@ public static class JournalEndpoints
             })
             .WithName("Decisions").WithSummary("Журнал решений").Produces<Paged<DecisionDto>>();
 
+        group.MapGet("/worklist", async (string? regionKato, string? flag, HttpContext http, IWorklistRepository repository, CancellationToken ct) =>
+            {
+                var user = CurrentUser.From(http);
+                var region = regionKato ?? user.RegionKato ?? "75";
+                var states = await repository.QueueStatesAsync(region, ct);
+                var asOf = states.Count > 0 ? states[0].AsOf.ToString("yyyy-MM-dd") : string.Empty;
+                return Results.Ok(new WorklistResponseDto(WorklistBuilder.Build(states, flag), true, asOf, region));
+            })
+            .RequireAuthorization(Policies.Doctor)
+            .WithName("Worklist").WithSummary("Рабочий список врача: синтетические пациенты на реальных очередях региона").Produces<WorklistResponseDto>();
+
         group.MapGet("/audit", async (string? actor, int? page, int? size, IAuditRepository repository, CancellationToken ct) =>
             {
                 var (p, s) = Paging.Normalize(page, size);

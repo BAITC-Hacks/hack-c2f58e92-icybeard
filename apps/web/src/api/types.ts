@@ -1,0 +1,71 @@
+export interface ModelInfo { name: string; version: string; trainedThrough: string }
+export interface Factor { name: string; contribution: number; text: string }
+export interface Explanation { summary: string; factors: Factor[] }
+export interface Paged<T> { items: T[]; page: number; size: number; total: number }
+
+export interface PredictRequest {
+  regionKato?: string | null
+  moCode?: string | null
+  profileCode: string
+  icd10?: string | null
+  referralPurpose?: string | null
+  territorialType?: string | null
+  financeSource?: string | null
+  registrationDate?: string | null
+}
+export interface QueueSnapshot { len: number; ageP50: number | null; throughputPerDay: number }
+export interface PredictResponse {
+  p50Days: number; p90Days: number; pWithin30Days: number; pRefusal: number
+  queue: QueueSnapshot | null; explanation: Explanation; model: ModelInfo
+}
+export interface Organization { moCode: string; name: string; regionKato: string }
+export interface Alternative { mo: Organization; p50Days: number; p90Days: number; pRefusal: number; distanceKm: number }
+export interface AlternativesResponse { items: Alternative[]; model: ModelInfo }
+export interface QueueDay { day: string; registered: number; hospitalized: number; refused: number; queueLen: number; queueAgeP50: number | null }
+export interface Throughput { day: string; throughputPerDay: number; refusalRate4w: number | null; waitP50Days: number | null; waitP90Days: number | null }
+export interface OrganizationSeries { moCode: string; profileCode: string; days: QueueDay[]; throughput: Throughput | null }
+
+export interface Stream { streamId: string; title: string; grain: string; entityKeys: string[]; horizons: number[] }
+export interface ForecastPoint { period: string; yhat: number; lo: number; hi: number }
+export interface HistoryPoint { period: string; y: number }
+export interface ForecastResponse {
+  streamId: string; entity: Record<string, string>; points: ForecastPoint[]; history: HistoryPoint[]
+  backtest: { smape: number; mase: number; baselineSmape: number }; model: ModelInfo
+}
+export interface Anomaly {
+  id: string; streamId: string; entity: Record<string, string>; period: string; observed: number; expected: number
+  score: number; peerScore: number; severity: string; kind: string; status: string; regionKato: string | null; comment: string | null
+}
+export interface IndexItem { regionKato: string; name: string; shareOver30: number; p90Days: number; indexValue: number; rank: number; n: number }
+export interface IndexResponse { month: string; profileCode: string; items: IndexItem[]; months: string[]; method: string }
+
+export interface SimulateResponse {
+  organisations: number; baseline: { meanWaitDays: number }; scenario: { meanWaitDays: number }
+  deltaDays: number; ci: number[]; assumptions: string[]; model: ModelInfo
+}
+export interface OrganizationRef { moCode: string; name: string; regionKato: string }
+export interface Move {
+  fromMo: OrganizationRef; toMo: OrganizationRef; sharePct: number; arrivalsPerDay: number
+  waitFromBefore: number; waitFromAfter: number; waitToBefore: number; waitToAfter: number
+}
+export interface RedistributeResponse { moves: Move[]; totalWaitDaysBefore: number; totalWaitDaysAfter: number; totalDeltaDays: number; horizonDays: number; model: ModelInfo }
+
+export interface DecisionRequest { subject: string; subjectId: string; recommended?: unknown; chosen?: unknown; reason?: string }
+export interface Decision {
+  decisionId: string; actor: string; role: string; subject: string; subjectId: string
+  recommended: unknown; chosen: unknown; reason: string | null; recordedAt: string
+}
+export interface DecisionCreated { decisionId: string; recordedAt: string }
+export interface WorklistItem {
+  patientRef: string; synthetic: boolean; stage: string; expectedDate: string | null; riskFlags: string[]
+  priority: number; nextAction: string; explanation: string; moCode: string; profileCode: string; regionKato: string; daysWaiting: number
+}
+
+export interface Region { regionKato: string; name: string; capital: string; lat: number | null; lon: number | null; populationThousands: number | null }
+export interface OrganizationItem { moCode: string; name: string; regionKato: string; moType: string | null; sizeBucket: string | null }
+export interface Profile { profileCode: string; name: string; isDayHospital: boolean; referrals: number }
+
+export interface Batch {
+  batchId: string; dataset: string; status: string; rowsLoaded: number; rowsQuarantined: number
+  partitions: string[]; occurredAt: string | null; receivedAt: string
+}

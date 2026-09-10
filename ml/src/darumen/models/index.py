@@ -19,6 +19,7 @@ VERSION = "1.0.0"
 MIN_COUNT = 5
 ALL_PROFILES = "all"
 LONG_WAIT_DAYS = 30
+UNKNOWN_REGION = "unknown"  # организации без сопоставленного региона не участвуют в рейтинге
 
 
 def _observed(lake: Lakehouse) -> pd.DataFrame:
@@ -28,7 +29,7 @@ def _observed(lake: Lakehouse) -> pd.DataFrame:
         return con.execute(f"""
             WITH base AS (
                 SELECT date_trunc('month', registration_date)::DATE AS month, region_kato, profile_code, wait_days
-                FROM {f} WHERE wait_days IS NOT NULL),
+                FROM {f} WHERE wait_days IS NOT NULL AND region_kato <> '{UNKNOWN_REGION}'),
             per_profile AS (
                 SELECT month, region_kato, profile_code, count(*) AS n,
                        avg((wait_days > {LONG_WAIT_DAYS})::int) AS share_over_30, quantile_cont(wait_days, 0.9) AS p90_days

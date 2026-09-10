@@ -34,7 +34,13 @@ public sealed class ForecastService(
 
         var response = await client.ForecastAsync(request, deadline: DateTime.UtcNow.AddSeconds(options.Value.TimeoutSeconds), cancellationToken: cancellationToken);
         var canonical = EntityJson.Canonical(stream.EntityKeys, entity);
-        var history = await repository.HistoryAsync(streamId, canonical, HistoryPeriods, cancellationToken);
+        var history = await repository.HistoryAsync(streamId, canonical, HistoryPeriods + response.Points.Count, cancellationToken);
+        var firstForecast = response.Points.FirstOrDefault()?.Period;
+        if (firstForecast is not null)
+        {
+            // хвост истории, который источник ещё догружает, модель отбросила; показываем ряд до первого прогнозного периода
+            history = history.Where(h => string.CompareOrdinal(h.Period, firstForecast) < 0).TakeLast(HistoryPeriods).ToList();
+        }
         var ordered = stream.EntityKeys.ToDictionary(k => k, k => entity[k]);
         return Results.Ok(new ForecastResponseDto(
             streamId, ordered,

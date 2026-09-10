@@ -4,7 +4,8 @@ public interface IRefDataRepository
 {
     Task<IReadOnlyList<RegionDto>> RegionsAsync(string lang, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, int limit, CancellationToken cancellationToken);
+    /// <summary>С profileCode остаются только организации с очередью по этому профилю, сначала самые загруженные.</summary>
+    Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, string? profileCode, int limit, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken);
 }

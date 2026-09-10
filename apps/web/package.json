@@ -8,15 +8,18 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "lint": "vue-tsc --noEmit"
+    "lint": "vue-tsc --noEmit",
+    "walk": "node e2e/walk.mjs ./e2e/shots"
   },
   "dependencies": {
     "@primevue/themes": "^4.5.4",
+    "@types/geojson": "^7946.0.16",
     "echarts": "^6.1.0",
+    "keycloak-js": "^26.2.4",
     "maplibre-gl": "^6.9.0",
     "pinia": "^4.0.3",
     "primeicons": "^8.0.1",
-    "primevue": "^5.0.1",
+    "primevue": "^4.5.4",
     "vee-validate": "^4.15.1",
     "vue": "^3.5.42",
     "vue-echarts": "^8.3.0",

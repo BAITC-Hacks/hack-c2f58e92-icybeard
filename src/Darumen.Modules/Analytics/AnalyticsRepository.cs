@@ -61,7 +61,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
                    coalesce(k.status, a.status) AS Status, a.region_kato AS RegionKato, k.comment AS Comment
             FROM gold.anomalies a LEFT JOIN journal.anomaly_acks k ON k.anomaly_id = a.id
             {where}
-            ORDER BY abs(a.score) DESC, a.period DESC
+            ORDER BY a.period DESC, abs(a.score) DESC
             LIMIT @size OFFSET @offset
             """,
             parameters, cancellationToken: cancellationToken));

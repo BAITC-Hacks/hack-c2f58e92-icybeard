@@ -108,7 +108,7 @@ public sealed class InMemoryRefData : IRefDataRepository
     public Task<IReadOnlyList<RegionDto>> RegionsAsync(string lang, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<RegionDto>>([new("10", lang == Locale.Kk ? "Абай облысы" : "Область Абай", "Семей", 50.41, 80.23, 606)]);
 
-    public Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, int limit, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, string? profileCode, int limit, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<OrganizationItemDto>>(new List<OrganizationItemDto>
         {
             new("028B", "Казахский ордена институт глазных болезней", "75", "center", "L", null, null),
@@ -117,6 +117,19 @@ public sealed class InMemoryRefData : IRefDataRepository
 
     public Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ProfileDto>>([new("381", "Офтальмологические для взрослых", false, 12000), new("DH", "Дневной стационар", true, 300000)]);
+}
+
+public sealed class InMemoryWorklist : IWorklistRepository
+{
+    public static readonly DateOnly AsOf = new(2025, 3, 31);
+
+    public Task<IReadOnlyList<QueueStateRow>> QueueStatesAsync(string regionKato, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<QueueStateRow>>(regionKato != "75" ? [] :
+        [
+            new(AsOf, "028B", "Институт глазных болезней", "381", "75", 1784, 47, 90, 11.4, 0.32, 55, 66),
+            new(AsOf, "22GN", "Городская больница №2", "381", "75", 12, 3, 8, 4.0, 0.02, 9, 20),
+            new(AsOf, "027O", "Городская больница №7", "021", "75", 40, 6, 14, 6.0, 0.05, 7, 15),
+        ]);
 }
 
 public sealed class InMemoryIntake : IIntakeRepository
