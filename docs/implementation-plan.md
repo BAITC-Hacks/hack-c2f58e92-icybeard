@@ -51,7 +51,7 @@
 3. Регистрация схем: при старте `Darumen.Api` регистрирует схемы событий под субъектами `<topic>-value` с совместимостью `BACKWARD`; Python‑потребители используют `confluent-kafka` с `ProtobufDeserializer` по тем же субъектам.
 4. Dead‑letter: `<topic>.dlq` через политику ошибок Wolverine `MoveToDeadLetterQueue` после 3 попыток с экспоненциальной задержкой.
 5. Идемпотентность: таблица `inbox` Wolverine по `event_id` из `EventMeta`; обработчики без побочных эффектов вне транзакции.
-6. Тест: Testcontainers поднимает Postgres, Kafka и Schema Registry; тест публикует `BatchLoaded` в транзакции с записью в Postgres, откатывает вторую попытку, проверяет ровно одну доставку; второй тест читает то же сообщение Python‑скриптом из `ml/` по схеме из реестра.
+6. Тест: `tests/Darumen.Tests/KafkaIntegrationTests.cs` (запуск `DARUMEN_KAFKA_TEST=1`) против живых Postgres, Kafka и Schema Registry из `make serve` (локально) или сервисов CI вместо Testcontainers: первый тест записывает решение через outbox с Idempotency-Key дважды и проверяет ровно одно сообщение `decision.recorded` в формате реестра; второй тест отправляет `intake.batch.loaded` Python-скриптом `darumen.intake.events` по схеме из реестра и ждёт партию в `GET /api/v1/intake/batches`.
 7. Если за день 3 сериализатор не заводится: временно Protobuf без реестра (чистый байтовый payload с заголовком `schema-id`), реестр подключить на неделе 3. Это не меняет контракты.
 
 ## Неделя 2. Модели ядра

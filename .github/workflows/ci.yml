@@ -43,3 +43,54 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run test -- --run
+
+  integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: darumen
+          POSTGRES_PASSWORD: darumen
+          POSTGRES_DB: darumen
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U darumen" --health-interval 5s --health-timeout 5s --health-retries 10
+      kafka:
+        image: apache/kafka:3.9.0
+        env:
+          KAFKA_NODE_ID: 1
+          KAFKA_PROCESS_ROLES: broker,controller
+          KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+          KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+          KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+          KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+          KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+          KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+        ports: ["29092:29092"]
+      schema-registry:
+        image: confluentinc/cp-schema-registry:7.7.1
+        env:
+          SCHEMA_REGISTRY_HOST_NAME: schema-registry
+          SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+          SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+        ports: ["8081:8081"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: astral-sh/setup-uv@v6
+      - run: uv venv ml/.venv --python 3.12
+      - run: uv pip install --python ml/.venv/bin/python -e "ml[dev]"
+      - run: make proto
+      - run: dotnet build Darumen.slnx -c Release --nologo
+      - name: Wait for Schema Registry
+        run: for i in $(seq 1 45); do curl -sf http://localhost:8081/subjects && exit 0; sleep 2; done; echo "registry not ready"; exit 1
+      - run: dotnet test Darumen.slnx -c Release --no-build --nologo --filter "FullyQualifiedName~KafkaIntegrationTests"
+        env:
+          DARUMEN_KAFKA_TEST: "1"
+          KAFKA_BOOTSTRAP: localhost:29092
+          SCHEMA_REGISTRY_URL: http://localhost:8081

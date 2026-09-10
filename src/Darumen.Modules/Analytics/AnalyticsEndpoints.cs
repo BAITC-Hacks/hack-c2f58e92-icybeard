@@ -1,9 +1,8 @@
+using Darumen.Contracts.V1;
 using Darumen.Shared.Api;
 using Darumen.Shared.Messaging;
 
 namespace Darumen.Modules.Analytics;
-
-public sealed record AnomalyAcknowledged(string AnomalyId, string Status, string Actor, DateTimeOffset At);
 
 public static class AnalyticsEndpoints
 {
@@ -33,17 +32,23 @@ public static class AnalyticsEndpoints
             .WithName("Anomalies").WithSummary("Сигналы аномалий, по умолчанию открытые, отсортированы по силе")
             .Produces<Paged<AnomalyDto>>();
 
-        anomalies.MapPost("/{id}/ack", async (string id, AckRequestDto? body, HttpContext http, IAnalyticsRepository repository, IEventPublisher events, CancellationToken ct) =>
+        anomalies.MapPost("/{id}/ack", async (string id, AckRequestDto? body, HttpContext http, IAnalyticsRepository repository, CancellationToken ct) =>
             {
                 var status = string.IsNullOrWhiteSpace(body?.Status) ? "acknowledged" : body.Status;
                 var user = CurrentUser.From(http);
-                if (!await repository.AcknowledgeAsync(id, status, body?.Comment, user.Actor, ct))
-                {
-                    return Results.NotFound();
-                }
-
-                await events.PublishAsync(new AnomalyAcknowledged(id, status, user.Actor, DateTimeOffset.UtcNow), ct);
-                return Results.NoContent();
+                var acknowledged = await repository.AcknowledgeAsync(id, status, body?.Comment, user.Actor,
+                    () => new DecisionRecorded
+                    {
+                        Meta = Events.Meta(),
+                        DecisionId = id,
+                        ActorRole = user.Role,
+                        Subject = "anomaly",
+                        Recommended = "open",
+                        Chosen = status,
+                        Reason = body?.Comment ?? string.Empty,
+                    },
+                    ct);
+                return acknowledged ? Results.NoContent() : Results.NotFound();
             })
             .WithName("AcknowledgeAnomaly").WithSummary("Подтвердить или закрыть сигнал")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);

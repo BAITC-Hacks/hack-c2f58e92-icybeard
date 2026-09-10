@@ -1,4 +1,5 @@
 using Darumen.Modules.Analytics;
+using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
@@ -47,7 +48,9 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
         return Task.FromResult(new Paged<AnomalyDto>(items.Skip((page - 1) * size).Take(size).ToList(), page, size, items.Count));
     }
 
-    public Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, CancellationToken cancellationToken)
+    public List<object> Published { get; } = [];
+
+    public Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, Func<object> outboxEvent, CancellationToken cancellationToken)
     {
         if (Anomalies.All(a => a.Id != anomalyId))
         {
@@ -55,6 +58,7 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
         }
 
         _acks[anomalyId] = (status, comment);
+        Published.Add(outboxEvent());
         return Task.FromResult(true);
     }
 
@@ -73,7 +77,9 @@ public sealed class InMemoryDecisions : IDecisionRepository
 {
     private readonly List<(DecisionDto Decision, string? Key)> _rows = [];
 
-    public Task<(DecisionDto Decision, bool Created)> RecordAsync(NewDecision decision, CancellationToken cancellationToken)
+    public List<object> Published { get; } = [];
+
+    public Task<(DecisionDto Decision, bool Created)> RecordAsync(NewDecision decision, Func<DecisionDto, object> outboxEvent, CancellationToken cancellationToken)
     {
         if (decision.IdempotencyKey is not null)
         {
@@ -86,6 +92,7 @@ public sealed class InMemoryDecisions : IDecisionRepository
 
         var dto = new DecisionDto(Guid.NewGuid(), decision.Actor, decision.Role, decision.Subject, decision.SubjectId, null, null, decision.Reason, DateTimeOffset.UtcNow);
         _rows.Add((dto, decision.IdempotencyKey));
+        Published.Add(outboxEvent(dto));
         return Task.FromResult((dto, true));
     }
 
@@ -110,4 +117,16 @@ public sealed class InMemoryRefData : IRefDataRepository
 
     public Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ProfileDto>>([new("381", "Офтальмологические для взрослых", false, 12000), new("DH", "Дневной стационар", true, 300000)]);
+}
+
+public sealed class InMemoryIntake : IIntakeRepository
+{
+    public Task<Paged<BatchDto>> BatchesAsync(string? status, string? dataset, int page, int size, CancellationToken cancellationToken)
+    {
+        var items = new List<BatchDto>
+        {
+            new("b-1", "bg_referrals", "loaded", 767084, 46, ["region_kato=10/p_month=2025-01"], DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow),
+        }.Where(b => (status is null || b.Status == status) && (dataset is null || b.Dataset == dataset)).ToList();
+        return Task.FromResult(new Paged<BatchDto>(items, page, size, items.Count));
+    }
 }

@@ -1,4 +1,4 @@
-using System.Text.Json;
+using Darumen.Contracts.V1;
 using Darumen.Shared.Api;
 using Darumen.Shared.Messaging;
 
@@ -10,7 +10,7 @@ public static class JournalEndpoints
     {
         var group = api.MapGroup("/journal").WithTags("Journal");
 
-        group.MapPost("/decisions", async (DecisionRequestDto body, HttpContext http, IDecisionRepository repository, IEventPublisher events, CancellationToken ct) =>
+        group.MapPost("/decisions", async (DecisionRequestDto body, HttpContext http, IDecisionRepository repository, CancellationToken ct) =>
             {
                 var errors = new ValidationErrors().Require("subject", body.Subject).Require("subjectId", body.SubjectId);
                 if (errors.Any)
@@ -20,13 +20,19 @@ public static class JournalEndpoints
 
                 var user = CurrentUser.From(http);
                 var key = http.Request.Headers.TryGetValue("Idempotency-Key", out var k) && !string.IsNullOrWhiteSpace(k) ? k.ToString() : null;
-                var (decision, created) = await repository.RecordAsync(new NewDecision(
-                    user.Actor, user.Role, body.Subject!, body.SubjectId!,
-                    body.Recommended?.GetRawText(), body.Chosen?.GetRawText(), body.Reason, key), ct);
-                if (created)
-                {
-                    await events.PublishAsync(new DecisionRecorded(decision.DecisionId, decision.Actor, decision.Role, decision.Subject, decision.SubjectId, decision.RecordedAt), ct);
-                }
+                var (decision, created) = await repository.RecordAsync(
+                    new NewDecision(user.Actor, user.Role, body.Subject!, body.SubjectId!, body.Recommended?.GetRawText(), body.Chosen?.GetRawText(), body.Reason, key),
+                    dto => new DecisionRecorded
+                    {
+                        Meta = Events.Meta(),
+                        DecisionId = dto.DecisionId.ToString(),
+                        ActorRole = user.Role,
+                        Subject = body.Subject!,
+                        Recommended = body.Recommended?.GetRawText() ?? string.Empty,
+                        Chosen = body.Chosen?.GetRawText() ?? string.Empty,
+                        Reason = body.Reason ?? string.Empty,
+                    },
+                    ct);
 
                 var payload = new DecisionCreatedDto(decision.DecisionId, decision.RecordedAt);
                 return created ? Results.Created($"/api/v1/journal/decisions/{decision.DecisionId}", payload) : Results.Ok(payload);

@@ -10,8 +10,8 @@ public interface IAnalyticsRepository
 
     Task<Paged<AnomalyDto>> AnomaliesAsync(AnomalyFilter filter, int page, int size, CancellationToken cancellationToken);
 
-    /// <summary>false, когда такого сигнала нет.</summary>
-    Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, CancellationToken cancellationToken);
+    /// <summary>Подтверждение и событие в одной транзакции (outbox); false, когда такого сигнала нет.</summary>
+    Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, Func<object> outboxEvent, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<string>> IndexMonthsAsync(CancellationToken cancellationToken);
 

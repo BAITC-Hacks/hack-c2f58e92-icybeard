@@ -12,6 +12,8 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
 
     public DbSet<AnomalyAck> AnomalyAcks => Set<AnomalyAck>();
 
+    public DbSet<IntakeBatch> IntakeBatches => Set<IntakeBatch>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -44,6 +46,22 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
             e.Property(x => x.Comment).HasColumnName("comment");
             e.Property(x => x.Actor).HasColumnName("actor").HasMaxLength(200);
             e.Property(x => x.AckedAt).HasColumnName("acked_at").HasColumnType("timestamptz");
+        });
+
+        modelBuilder.Entity<IntakeBatch>(e =>
+        {
+            e.ToTable("batches", "intake");
+            e.HasKey(x => x.BatchId);
+            e.Property(x => x.BatchId).HasColumnName("batch_id").HasMaxLength(200);
+            e.Property(x => x.Dataset).HasColumnName("dataset").HasMaxLength(100);
+            e.Property(x => x.Status).HasColumnName("status").HasMaxLength(50);
+            e.Property(x => x.RowsLoaded).HasColumnName("rows_loaded");
+            e.Property(x => x.RowsQuarantined).HasColumnName("rows_quarantined");
+            e.Property(x => x.Partitions).HasColumnName("partitions");
+            e.Property(x => x.EventId).HasColumnName("event_id").HasMaxLength(64);
+            e.Property(x => x.OccurredAt).HasColumnName("occurred_at").HasColumnType("timestamptz");
+            e.Property(x => x.ReceivedAt).HasColumnName("received_at").HasColumnType("timestamptz");
+            e.HasIndex(x => new { x.Dataset, x.ReceivedAt });
         });
     }
 }
@@ -82,4 +100,26 @@ public sealed class AnomalyAck
     public string Actor { get; set; } = string.Empty;
 
     public DateTime AckedAt { get; set; }
+}
+
+/// <summary>Партия загрузки из Data Intake Fabric, приходит событием intake.batch.loaded из Python.</summary>
+public sealed class IntakeBatch
+{
+    public string BatchId { get; set; } = string.Empty;
+
+    public string Dataset { get; set; } = string.Empty;
+
+    public string Status { get; set; } = string.Empty;
+
+    public long RowsLoaded { get; set; }
+
+    public long RowsQuarantined { get; set; }
+
+    public string Partitions { get; set; } = string.Empty;
+
+    public string EventId { get; set; } = string.Empty;
+
+    public DateTime? OccurredAt { get; set; }
+
+    public DateTime ReceivedAt { get; set; }
 }

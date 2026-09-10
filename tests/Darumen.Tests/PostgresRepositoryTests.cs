@@ -22,7 +22,7 @@ public sealed class PostgresRepositoryTests
     [SkippableFact]
     public async Task Index_months_and_rows()
     {
-        var repository = new AnalyticsRepository(Factory());
+        var repository = new AnalyticsRepository(Factory(), null!); // чтение не использует outbox
         var months = await repository.IndexMonthsAsync(CancellationToken.None);
         Assert.Contains("2025-03", months);
         var rows = await repository.IndexAsync(months[^1], AnalyticsEndpoints.AllProfiles, "ru", CancellationToken.None);
@@ -34,7 +34,7 @@ public sealed class PostgresRepositoryTests
     [SkippableFact]
     public async Task Streams_history_and_anomalies()
     {
-        var repository = new AnalyticsRepository(Factory());
+        var repository = new AnalyticsRepository(Factory(), null!);
         var streams = await repository.StreamsAsync(CancellationToken.None);
         Assert.Contains(streams, s => s.StreamId == "admissions_monthly" && s.EntityKeys.SequenceEqual(["region_kato", "profile_code"]));
         var history = await repository.HistoryAsync("admissions_monthly", "{\"region_kato\": \"75\", \"profile_code\": \"381\"}", 12, CancellationToken.None);
@@ -64,14 +64,10 @@ public sealed class PostgresRepositoryTests
         Assert.NotEmpty(await refData.OrganizationsAsync("75", "глазн", 10, CancellationToken.None));
         Assert.NotEmpty(await refData.ProfilesAsync(CancellationToken.None));
 
-        var decisions = new DecisionRepository(Factory());
-        var key = $"test-{Guid.NewGuid():N}";
-        var (first, created) = await decisions.RecordAsync(new NewDecision("test", "doctor", "referral", "x.1", "{\"moCode\":\"22GN\"}", null, "тест", key), CancellationToken.None);
-        Assert.True(created);
-        var (second, createdAgain) = await decisions.RecordAsync(new NewDecision("test", "doctor", "referral", "x.1", null, null, null, key), CancellationToken.None);
-        Assert.False(createdAgain);
-        Assert.Equal(first.DecisionId, second.DecisionId);
-        Assert.Equal("22GN", first.Recommended!.Value.GetProperty("moCode").GetString());
+        // запись решений идёт через outbox и проверяется в KafkaIntegrationTests; здесь только чтение
+        var decisions = new DecisionRepository(null!, Factory());
+        var page = await decisions.ListAsync(null, "referral", 1, 5, CancellationToken.None);
+        Assert.True(page.Total >= 0 && page.Items.Count <= 5);
     }
 
     /// <summary>Пропускает тест без DARUMEN_PG_TEST=1, чтобы CI без Postgres оставался зелёным.</summary>

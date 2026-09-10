@@ -51,6 +51,7 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
         var after = await client.GetFromJsonAsync<Paged<AnomalyDto>>("/api/v1/anomalies?regionKato=75&status=acknowledged");
         Assert.Single(after!.Items);
         Assert.Equal("проверено, вспышка ОРВИ", after.Items[0].Comment);
+        Assert.Contains(app.Analytics.Published.OfType<Darumen.Contracts.V1.DecisionRecorded>(), e => e.Subject == "anomaly" && e.DecisionId == "a1" && e.Chosen == "acknowledged");
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/v1/anomalies/zzz/ack", new AckRequestDto(null, null))).StatusCode);
     }

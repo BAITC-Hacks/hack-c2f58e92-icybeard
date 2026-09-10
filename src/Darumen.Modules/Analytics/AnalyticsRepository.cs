@@ -1,10 +1,12 @@
 using Dapper;
+using Darumen.Migrations;
 using Darumen.Shared.Api;
 using Darumen.Shared.Data;
+using Wolverine.EntityFrameworkCore;
 
 namespace Darumen.Modules.Analytics;
 
-public sealed class AnalyticsRepository(IDbConnectionFactory db) : IAnalyticsRepository
+public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbox<DarumenDbContext> outbox) : IAnalyticsRepository
 {
     public async Task<IReadOnlyList<StreamDto>> StreamsAsync(CancellationToken cancellationToken)
     {
@@ -69,23 +71,32 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db) : IAnalyticsRep
         return new Paged<AnomalyDto>(items, page, size, total);
     }
 
-    public async Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, CancellationToken cancellationToken)
+    public async Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, Func<object> outboxEvent, CancellationToken cancellationToken)
     {
-        await using var connection = await db.OpenAsync(cancellationToken);
-        var exists = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
-            "SELECT EXISTS (SELECT 1 FROM gold.anomalies WHERE id = @anomalyId)", new { anomalyId }, cancellationToken: cancellationToken));
-        if (!exists)
+        await using (var connection = await db.OpenAsync(cancellationToken))
         {
-            return false;
+            var exists = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
+                "SELECT EXISTS (SELECT 1 FROM gold.anomalies WHERE id = @anomalyId)", new { anomalyId }, cancellationToken: cancellationToken));
+            if (!exists)
+            {
+                return false;
+            }
         }
 
-        await connection.ExecuteAsync(new CommandDefinition(
-            """
-            INSERT INTO journal.anomaly_acks (anomaly_id, status, comment, actor, acked_at)
-            VALUES (@anomalyId, @status, @comment, @actor, now())
-            ON CONFLICT (anomaly_id) DO UPDATE SET status = EXCLUDED.status, comment = EXCLUDED.comment, actor = EXCLUDED.actor, acked_at = now()
-            """,
-            new { anomalyId, status, comment, actor }, cancellationToken: cancellationToken));
+        var context = outbox.DbContext;
+        var ack = await context.AnomalyAcks.FindAsync([anomalyId], cancellationToken);
+        if (ack is null)
+        {
+            ack = new AnomalyAck { AnomalyId = anomalyId };
+            context.AnomalyAcks.Add(ack);
+        }
+
+        ack.Status = status;
+        ack.Comment = comment;
+        ack.Actor = actor;
+        ack.AckedAt = DateTime.UtcNow;
+        await outbox.PublishAsync(outboxEvent());
+        await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
         return true;
     }
 

@@ -1,6 +1,5 @@
 using Darumen.Shared.Api;
 using Darumen.Shared.Data;
-using Darumen.Shared.Messaging;
 using Darumen.Shared.Options;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,6 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<ModelServicesOptions>(configuration.GetSection(ModelServicesOptions.Section));
         services.AddDarumenPostgres(configuration);
-        services.AddSingleton<IEventPublisher, LoggingEventPublisher>();
         services.AddProblemDetails();
         services.AddExceptionHandler<UpstreamExceptionHandler>();
         return services;

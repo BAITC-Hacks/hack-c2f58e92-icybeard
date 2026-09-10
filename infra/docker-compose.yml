@@ -105,8 +105,9 @@ services:
       ASPNETCORE_URLS: http://0.0.0.0:8000
       ConnectionStrings__Postgres: Host=postgres;Database=darumen;Username=darumen;Password=darumen
       ConnectionStrings__ClickHouse: Host=clickhouse;Port=8123;Database=darumen;Username=darumen;Password=darumen
-      Kafka__BootstrapServers: kafka:9092
-      Kafka__SchemaRegistry: http://schema-registry:8081
+      Messaging__BootstrapServers: kafka:9092
+      Messaging__SchemaRegistry: http://schema-registry:8081
+      ModelServices__Address: http://models:50051
     ports: ["8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }

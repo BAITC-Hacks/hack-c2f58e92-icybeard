@@ -20,6 +20,7 @@
     <ProjectReference Include="..\Darumen.Modules\Simulation\Darumen.Modules.Simulation.csproj" />
     <ProjectReference Include="..\Darumen.Modules\Journal\Darumen.Modules.Journal.csproj" />
     <ProjectReference Include="..\Darumen.Modules\RefData\Darumen.Modules.RefData.csproj" />
+    <ProjectReference Include="..\Darumen.Modules\Intake\Darumen.Modules.Intake.csproj" />
   </ItemGroup>
 
 </Project>

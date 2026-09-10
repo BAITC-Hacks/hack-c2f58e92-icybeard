@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Darumen.Shared\Darumen.Shared.csproj" />
     <ProjectReference Include="..\..\Darumen.Contracts\Darumen.Contracts.csproj" />
+    <ProjectReference Include="..\..\Darumen.Migrations\Darumen.Migrations.csproj" />
   </ItemGroup>
 
 </Project>

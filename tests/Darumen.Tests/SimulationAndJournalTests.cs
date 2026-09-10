@@ -49,6 +49,19 @@ public sealed class SimulationAndJournalTests(TestApp app) : IClassFixture<TestA
         var mine = await client.GetFromJsonAsync<Paged<DecisionDto>>("/api/v1/journal/decisions?actor=me");
         Assert.Single(mine!.Items);
         Assert.Equal("doctor-1", mine.Items[0].Actor);
+
+        var published = Assert.Single(app.Decisions.Published.OfType<Darumen.Contracts.V1.DecisionRecorded>());
+        Assert.Equal(created.DecisionId.ToString(), published.DecisionId);
+        Assert.Equal("doctor", published.ActorRole);
+        Assert.False(string.IsNullOrEmpty(published.Meta.EventId));
+    }
+
+    [Fact]
+    public async Task Intake_batches_are_listed()
+    {
+        var body = await app.CreateClient().GetFromJsonAsync<Paged<Darumen.Modules.Intake.BatchDto>>("/api/v1/intake/batches?dataset=bg_referrals");
+        Assert.Single(body!.Items);
+        Assert.Equal(767084, body.Items[0].RowsLoaded);
     }
 
     [Fact]

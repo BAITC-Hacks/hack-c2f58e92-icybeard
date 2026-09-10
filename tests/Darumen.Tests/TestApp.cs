@@ -1,9 +1,11 @@
 using Darumen.Api;
 using Darumen.Contracts.V1;
 using Darumen.Modules.Analytics;
+using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
+using Darumen.Shared.Messaging;
 using Darumen.Tests.Fakes;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -28,6 +30,7 @@ public sealed class TestApp : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting(MigrationHostedService.Setting, "false");
+        builder.UseSetting($"{MessagingOptions.Section}:Mode", MessagingOptions.StubMode);
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<QueueIntelligence.QueueIntelligenceClient>();
@@ -44,6 +47,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
             services.AddSingleton<IDecisionRepository>(Decisions);
             services.RemoveAll<IRefDataRepository>();
             services.AddSingleton<IRefDataRepository, InMemoryRefData>();
+            services.RemoveAll<IIntakeRepository>();
+            services.AddSingleton<IIntakeRepository, InMemoryIntake>();
         });
     }
 }

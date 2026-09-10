@@ -1,12 +1,14 @@
 using Darumen.Api;
 using Darumen.Migrations;
 using Darumen.Modules.Analytics;
+using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
 using Darumen.Modules.Simulation;
 using Darumen.Shared;
 using Darumen.Shared.Data;
+using Darumen.Shared.Messaging;
 using Darumen.Shared.Modules;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -17,7 +19,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
 builder.Services.AddOutputCache();
 builder.Services.AddDarumenCore(builder.Configuration);
-builder.Services.AddDbContext<DarumenDbContext>(options => options.UseNpgsql(builder.Configuration.PostgresConnection()));
+builder.Services.AddDarumenDbContext<DarumenDbContext>(builder.Configuration, options => options.UseNpgsql(builder.Configuration.PostgresConnection()));
+builder.Host.AddDarumenMessaging(builder.Configuration, opts => opts.Discovery.IncludeAssembly(typeof(IntakeModule).Assembly));
 builder.Services.AddHostedService<MigrationHostedService>();
 builder.Services.AddDarumenModules(
     builder.Configuration,
@@ -25,7 +28,8 @@ builder.Services.AddDarumenModules(
     new AnalyticsModule(),
     new SimulationModule(),
     new JournalModule(),
-    new RefDataModule());
+    new RefDataModule(),
+    new IntakeModule());
 
 var app = builder.Build();
 

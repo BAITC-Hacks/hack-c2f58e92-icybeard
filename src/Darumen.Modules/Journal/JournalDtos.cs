@@ -12,5 +12,3 @@ public sealed record DecisionCreatedDto(Guid DecisionId, DateTimeOffset Recorded
 
 public sealed record NewDecision(
     string Actor, string Role, string Subject, string SubjectId, string? RecommendedJson, string? ChosenJson, string? Reason, string? IdempotencyKey);
-
-public sealed record DecisionRecorded(Guid DecisionId, string Actor, string Role, string Subject, string SubjectId, DateTimeOffset RecordedAt);

@@ -11,12 +11,14 @@ import sys
 from pathlib import Path
 
 from .contracts import load_contracts, match_signature
+from .events import TOPIC_BATCH_LOADED, EventPublisher
 from .fingerprint import fingerprint
 from .pipeline import STATUS_BLOCKED, STATUS_LOADED, Lakehouse, draft_contract, plan_batches, run_batch
 
 
 def cmd_add(args: argparse.Namespace) -> int:
     lake = Lakehouse(Path(args.lakehouse))
+    publisher = None if args.no_events else EventPublisher.from_env()
     exit_code = 0
     for plan in plan_batches(Path(args.path), Path(args.contracts)):
         first = plan.files[0]
@@ -39,6 +41,12 @@ def cmd_add(args: argparse.Namespace) -> int:
             print(f"          x {result.error}")
         if result.status == STATUS_BLOCKED:
             exit_code = 2
+        elif publisher is not None and result.status == STATUS_LOADED:
+            try:
+                event_id = publisher.batch_loaded(result.dataset, result.batch_id, result.rows_silver, result.rows_quarantine, result.partitions)
+                print(f"EVENT     {TOPIC_BATCH_LOADED} {event_id}")
+            except Exception as exc:  # noqa: BLE001 - загрузка важнее уведомления, ошибка видна в выводе
+                print(f"          ! событие не отправлено: {type(exc).__name__}: {exc}")
     return exit_code
 
 
@@ -74,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     add.add_argument("--contracts", default="contracts")
     add.add_argument("--lakehouse", default="lakehouse")
     add.add_argument("--allow-fuzzy", action="store_true", help="принимать нечёткие совпадения контракта")
+    add.add_argument("--no-events", action="store_true", help="не публиковать intake.batch.loaded в Kafka даже при заданных KAFKA_BOOTSTRAP и SCHEMA_REGISTRY_URL")
     add.set_defaults(func=cmd_add)
     inspect = sub.add_parser("inspect", help="отпечаток файла и подбор контракта")
     inspect.add_argument("path")
