@@ -37,7 +37,7 @@ privacy:
   direct_identifiers: []
   public_aggregates_min_count: 5
 rules:
-  - { level: block, reason: date_out_of_range, check: "vaccination_date between '2015-01-01' and now()" }
+  - { level: quarantine, reason: date_out_of_range, check: "vaccination_date between '1950-01-01' and now()", note: "в наборе есть исторические прививки с 1950-х годов" }
   - { level: quarantine, reason: implausible_age, check: "age is null or age between 0 and 120" }
   - { level: warn, reason: all_regions_present, check: "count(distinct region_kato) = 20" }
 partition: [region_kato, "year(vaccination_date)"]

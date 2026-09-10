@@ -1,6 +1,7 @@
 """Shared pieces for the tabular models: feature lists, loading, encoding and metrics."""
 from __future__ import annotations
 
+import itertools
 import json
 import os
 from pathlib import Path
@@ -90,7 +91,7 @@ def brier(y: np.ndarray, p: np.ndarray) -> float:
 def calibration_table(y: np.ndarray, p: np.ndarray, bins: int = 10) -> list[dict]:
     edges = np.linspace(0, 1, bins + 1)
     rows = []
-    for lo, hi in zip(edges[:-1], edges[1:], strict=True):
+    for lo, hi in itertools.pairwise(edges):
         mask = (p >= lo) & (p < hi if hi < 1 else p <= hi)
         if mask.sum():
             rows.append({"bin": f"{lo:.1f}-{hi:.1f}", "n": int(mask.sum()), "predicted": float(p[mask].mean()), "observed": float(y[mask].mean())})

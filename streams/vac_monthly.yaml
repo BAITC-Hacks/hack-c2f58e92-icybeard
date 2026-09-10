@@ -1,0 +1,10 @@
+stream: vac_monthly
+title: Дозы вакцин по региону и плану вакцинации, по месяцам
+from: silver.vac_facts
+gold: { table: vac_monthly, time: month, y: doses }
+entity: [region_kato, vaccination_plan]
+time: { column: vaccination_date, grain: month }
+measure: { agg: count }
+peer_group: [vaccination_plan]
+forecast: { horizons: [1, 2, 3], min_history: 24, season: 12, backtest_windows: 4, backtest_step: 3 }
+anomaly: { method: robust_z, window: 36, threshold: 4.5 }  # три года того же месяца; кампании вакцинации дают большие естественные скачки

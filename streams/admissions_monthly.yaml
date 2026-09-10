@@ -1,9 +1,10 @@
 stream: admissions_monthly
 title: Госпитализации по региону и профилю, по месяцам, из списка пролеченных с 2012 года
 from: silver.ersb_cases
+gold: { table: admissions_monthly, time: month, y: cases }
 entity: [region_kato, profile_code]
 time: { column: p_outdate, grain: month }
 measure: { agg: count }
 peer_group: [profile_code]
-forecast: { horizons: [1, 2, 3], min_history_months: 36 }
-anomaly: { method: robust_z, window_months: 12, threshold: 3.0 }
+forecast: { horizons: [1, 2, 3], min_history: 36, season: 12, backtest_windows: 4, backtest_step: 3 }
+anomaly: { method: robust_z, window: 36, threshold: 3.0 }  # три года того же месяца
