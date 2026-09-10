@@ -65,8 +65,11 @@ scribe-serve: venv ## Сервис AI-скрайба (FastAPI) на :8010; faste
 venv-scribe: venv ## Установить faster-whisper и anthropic для скрайба
 	$(UV) pip install --python $(PY) -q -e "ml[dev,scribe]"
 
+dagster: venv ## Dagster UI с линией активов silver → refdata → gold → models → published
+	$(PY) -m dagster dev -m darumen.orchestration.definitions
+
 lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data intake-status refdata gold publish train eval serve down build test proto models-serve scribe-serve venv-scribe lint
+.PHONY: help venv data intake-status refdata gold publish train eval serve down build test proto models-serve scribe-serve venv-scribe dagster lint

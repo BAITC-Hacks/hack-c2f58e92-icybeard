@@ -12,7 +12,7 @@ import pandas as pd
 
 from ..intake.pipeline import Lakehouse
 from .common import write_json
-from .streams import Stream, load_series, load_streams, period_format
+from .streams import Stream, load_series, load_streams, merge_stream_table, period_format
 
 VERSION = "1.0.0"
 MAD_TO_SIGMA = 1.4826
@@ -142,6 +142,5 @@ def detect_all(lake: Lakehouse, only: list[str] | None = None) -> dict[str, dict
             }))
     gold = lake.root / "gold"
     gold.mkdir(parents=True, exist_ok=True)
-    if frames:
-        pd.concat(frames, ignore_index=True).to_parquet(gold / "anomalies.parquet", index=False)
+    merge_stream_table(gold / "anomalies.parquet", frames, list(reports))
     return reports

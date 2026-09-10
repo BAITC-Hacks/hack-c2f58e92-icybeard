@@ -13,7 +13,7 @@ import pandas as pd
 
 from ..intake.pipeline import Lakehouse
 from .common import write_json
-from .streams import Stream, load_series, load_streams, period_format
+from .streams import Stream, load_series, load_streams, merge_stream_table, period_format
 
 VERSION = "1.0.0"
 LEVEL = 80
@@ -132,8 +132,7 @@ def forecast_all(lake: Lakehouse, only: list[str] | None = None) -> dict[str, di
         reports[stream_id] = report
         if len(frame):
             frames.append(frame)
-    if frames:
-        gold = lake.root / "gold"
-        gold.mkdir(parents=True, exist_ok=True)
-        pd.concat(frames, ignore_index=True).to_parquet(gold / "forecasts.parquet", index=False)
+    gold = lake.root / "gold"
+    gold.mkdir(parents=True, exist_ok=True)
+    merge_stream_table(gold / "forecasts.parquet", frames, list(reports))
     return reports

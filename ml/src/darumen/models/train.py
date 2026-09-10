@@ -49,10 +49,11 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"forecast {stream_id:20s} skipped: {report['skipped']}")
                 continue
             chosen = report["chosen"]
+            better = report['models'][chosen]['series_better_than_baseline']
             print(f"forecast {stream_id:20s} series={report['series']:>5} h={report['horizon']} chosen={chosen} "
                   f"mase {report['models'][chosen]['mase']:.3f} (baseline {report['models'][report['baseline']]['mase']:.3f}) "
                   f"smape {report['models'][chosen]['smape']:.3f} (baseline {report['models'][report['baseline']]['smape']:.3f}) "
-                  f"better on {report['models'][chosen]['series_better_than_baseline']:.0%} of series")
+                  + (f"better on {better:.0%} of series" if better is not None else "baseline kept: the naive model won the backtest"))
             flat = {k: v for k, v in report["models"][chosen].items() if isinstance(v, (int, float)) and v is not None}
             mlflow_log(f"forecast_{stream_id}", {"chosen": chosen, "series": report["series"]}, flat,
                        [lake.root / "models" / "forecast" / stream_id / "report.json"])
