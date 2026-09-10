@@ -1,0 +1,77 @@
+dataset: equipment
+title: Сведения о медицинской технике организаций здравоохранения
+source:
+  system: ЕИСЗ (медтехника)
+  publisher: МЗ РК
+  portal_id: magda-ds-aa44b972-17b6-4a6c-8c0b-cf13cfd9e3c3
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  parts: "_part_{n:03d}_of_{m:03d}"
+grain: одна единица техники на балансе организации
+keys: [identifier]
+signature:
+  - identifier
+  - mo_id
+  - inventory_number
+  - quantity
+  - release_date
+  - input_date
+  - finance_source_id
+  - decommission_date
+  - is_fixed_asset
+  - ownership_id
+  - condition_id
+  - serial_number
+  - finance_code
+  - finance_name_ru
+  - finance_name_kz
+  - finance_begin_date
+  - finance_end_date
+  - finance_is_active
+  - ownership_code
+  - ownership_name_ru
+  - ownership_name_kz
+  - ownership_begin_date
+  - ownership_end_date
+  - ownership_is_active
+  - sdu_load_date
+columns:
+  identifier: { type: string }
+  mo_id: { type: string, semantic: mo_code, nullable: true }
+  inventory_number: { type: string, nullable: true }
+  quantity: { type: decimal, nullable: true }
+  release_date: { type: timestamp, nullable: true }
+  input_date: { type: timestamp, nullable: true }
+  finance_source_id: { type: string, nullable: true }
+  decommission_date: { type: timestamp, nullable: true }
+  is_fixed_asset: { type: int, nullable: true }
+  ownership_id: { type: string, nullable: true }
+  condition_id: { type: string, nullable: true }
+  serial_number: { type: string, nullable: true }
+  finance_code: { type: string, nullable: true }
+  finance_name_ru: { type: string, nullable: true }
+  finance_name_kz: { type: string, nullable: true }
+  finance_begin_date: { type: timestamp, nullable: true }
+  finance_end_date: { type: timestamp, nullable: true }
+  finance_is_active: { type: bool, nullable: true }
+  ownership_code: { type: string, nullable: true }
+  ownership_name_ru: { type: string, nullable: true }
+  ownership_name_kz: { type: string, nullable: true }
+  ownership_begin_date: { type: timestamp, nullable: true }
+  ownership_end_date: { type: timestamp, nullable: true }
+  ownership_is_active: { type: bool, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: snapshot }
+derive:
+  mo_code: "mo_id"
+  is_active: "decommission_date is null"
+privacy:
+  class: aggregate
+  public_aggregates_min_count: 5
+rules:
+  - { level: quarantine, reason: negative_quantity, check: "quantity is null or quantity >= 0" }
+  - { level: quarantine, reason: missing_mo, check: "mo_id is not null" }
+partition: ["year(input_date)"]

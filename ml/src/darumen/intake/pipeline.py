@@ -152,23 +152,26 @@ def partition_columns(partition: tuple[str, ...]) -> tuple[list[str], list[str],
 
 
 def build_silver_sql(contract: Contract, source_sql: str) -> str:
-    typed = [f"{cast_expr(col, spec)} AS {_q(col)}" for col, spec in contract.columns.items()]
+    # dropped columns (direct identifiers) stay in bronze only; `as` renames a source column in silver
+    kept = {col: spec for col, spec in contract.columns.items() if not spec.get("drop", False)}
+    typed = [f"{cast_expr(col, spec)} AS {_q(spec.get('as', col))}" for col, spec in kept.items()]
     typed += [_q(col) for col in contract.signature if col not in contract.columns]
     typed += [_q("_source_file"), _q("_row_hash")]
     layer1 = f"SELECT {', '.join(typed)} FROM ({source_sql})"
 
     derived = ["*"]
-    for col, spec in contract.columns.items():
+    for col, spec in kept.items():
+        alias = spec.get("as", col)
         for name, rule in (spec.get("derive") or {}).items():
             if "split" in rule:
-                derived.append(f"split_part({_q(col)}, {_sql_str(rule['split'])}, {int(rule['index']) + 1}) AS {_q(name)}")
+                derived.append(f"split_part({_q(alias)}, {_sql_str(rule['split'])}, {int(rule['index']) + 1}) AS {_q(name)}")
         semantic = spec.get("semantic")
         if semantic == "region_name":
-            derived.append(f"to_kato({_q(col)}) AS {_q(col + '_kato')}")
+            derived.append(f"to_kato({_q(alias)}) AS {_q(spec.get('derive_as', alias + '_kato'))}")
         elif semantic == "mo_name":
-            derived.append(f"mo_name_key({_q(col)}) AS {_q(col + '_key')}")
+            derived.append(f"mo_name_key({_q(alias)}) AS {_q(spec.get('derive_as', alias + '_key'))}")
         elif semantic == "icd10":
-            derived.append(f"icd10_canon({_q(col)}) AS {_q(col + '_canon')}")
+            derived.append(f"icd10_canon({_q(alias)}) AS {_q(spec.get('derive_as', alias + '_canon'))}")
     layer2 = f"SELECT {', '.join(derived)} FROM ({layer1})"
 
     dataset_level = ["*"] + [f"({expr}) AS {_q(name)}" for name, expr in contract.derive.items()]

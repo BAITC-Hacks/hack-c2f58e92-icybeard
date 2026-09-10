@@ -1,0 +1,40 @@
+dataset: onco_late
+title: Запущенность злокачественных новообразований по локализациям
+source:
+  system: ЭРОБ
+  publisher: МЗ РК
+  portal_id: magda-ds-2e65ac4e-0fb8-42b9-882f-23fba36bacb8
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+grain: одна локализация, агрегат по стране
+keys: [localization_id, sdu_load_date]
+signature:
+  - localization_id
+  - localization_name
+  - icd_code
+  - total_patients
+  - advanced_stage_3_count
+  - advanced_stage_3_pct
+  - advanced_stage_4_count
+  - advanced_stage_4_pct
+  - sdu_load_date
+columns:
+  localization_id: { type: string }
+  localization_name: { type: string, nullable: true }
+  icd_code: { type: string, nullable: true }
+  total_patients: { type: int, nullable: true }
+  advanced_stage_3_count: { type: int, nullable: true }
+  advanced_stage_3_pct: { type: decimal, nullable: true }
+  advanced_stage_4_count: { type: int, nullable: true }
+  advanced_stage_4_pct: { type: decimal, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: snapshot }
+privacy:
+  class: aggregate
+  public_aggregates_min_count: 5
+rules:
+  - { level: quarantine, reason: counts_exceed_total, check: "total_patients is null or coalesce(advanced_stage_3_count, 0) + coalesce(advanced_stage_4_count, 0) <= total_patients" }
+partition: []

@@ -1,0 +1,64 @@
+dataset: onco_first
+title: Информация по онкобольным с впервые установленным диагнозом
+source:
+  system: ЭРОБ
+  publisher: МЗ РК
+  portal_id: magda-ds-d5f48eaf-0094-488d-8bb1-f2b4529b098f
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+grain: один пациент, взятый на учёт с впервые установленным диагнозом
+keys: [_row_hash]
+signature:
+  - clinic_name
+  - age
+  - number_card
+  - take_in_date
+  - take_of_date
+  - diagnosis_code
+  - diagnosis_date
+  - deregistration_cause
+  - death_cause
+  - death_date
+  - death_place
+  - social_position
+  - first_time_in_life_diagnosed
+  - first_time_in_year_diagnosed
+  - circumstances
+  - clinic_group_at_registration
+  - clinic_group_end_of_year
+  - cancer_circumstances
+  - invalidnost
+  - sdu_load_date
+columns:
+  clinic_name: { type: string, semantic: mo_name, resolve: refdata.mo_registry, nullable: true }
+  age: { type: int, nullable: true }
+  number_card: { type: string, drop: true, note: "номер карты: остаётся только в bronze" }
+  take_in_date: { type: timestamp, nullable: true }
+  take_of_date: { type: timestamp, nullable: true }
+  diagnosis_code: { type: string, semantic: icd10, nullable: true }
+  diagnosis_date: { type: timestamp, nullable: true }
+  deregistration_cause: { type: string, nullable: true }
+  death_cause: { type: string, nullable: true }
+  death_date: { type: date, nullable: true }
+  death_place: { type: string, nullable: true }
+  social_position: { type: string, nullable: true }
+  first_time_in_life_diagnosed: { type: string, nullable: true }
+  first_time_in_year_diagnosed: { type: string, nullable: true }
+  circumstances: { type: string, nullable: true }
+  clinic_group_at_registration: { type: string, nullable: true }
+  clinic_group_end_of_year: { type: string, nullable: true }
+  cancer_circumstances: { type: string, nullable: true }
+  invalidnost: { type: string, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: technical }
+privacy:
+  class: sensitive
+  direct_identifiers: [number_card]
+  public_aggregates_min_count: 10
+rules:
+  - { level: quarantine, reason: implausible_age, check: "age is null or age between 0 and 120" }
+  - { level: quarantine, reason: death_before_diagnosis, check: "death_date is null or diagnosis_date is null or death_date >= diagnosis_date::date" }
+partition: ["year(diagnosis_date)"]

@@ -65,8 +65,9 @@ class Contract:
         )
 
     def required_columns(self) -> list[str]:
-        """Columns that must not be NULL after typing; missing values are quarantined."""
-        return [name for name, spec in self.columns.items() if not spec.get("nullable", False)]
+        """Silver column names that must not be NULL after typing; missing values are quarantined."""
+        return [spec.get("as", name) for name, spec in self.columns.items()
+                if not spec.get("nullable", False) and not spec.get("drop", False)]
 
 
 def _parse_rule(raw: dict) -> Rule:

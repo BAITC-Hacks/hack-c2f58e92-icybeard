@@ -1,0 +1,33 @@
+dataset: vac_refusals
+title: Отказы от вакцинации и противопоказания
+source:
+  system: ИС Вакцинация
+  publisher: МЗ РК
+  portal_id: magda-ds-836fb474-c8fd-4bd1-9b4c-ad9f5c832483
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  note: "автоопределение диалекта DuckDB теряет 16 тыс. строк, кавычки заданы явно"
+grain: один отказ или противопоказание
+keys: [id]
+signature:
+  - id
+  - reason
+  - contraindication
+  - vaccination_plan_code
+  - sdu_load_date
+columns:
+  id: { type: string }
+  reason: { type: string, nullable: true }
+  contraindication: { type: string, nullable: true }
+  vaccination_plan_code: { type: string, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: technical }
+privacy:
+  class: aggregate
+  public_aggregates_min_count: 5
+rules:
+  - { level: warn, reason: plausible_row_count, check: "count(*) between 50000 and 100000" }
+partition: []

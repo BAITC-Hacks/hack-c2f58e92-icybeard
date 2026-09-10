@@ -13,12 +13,20 @@ venv: ## Python-окружение для ml/ через uv
 	@test -x $(PY) || $(UV) venv ml/.venv --python $(PYTHON_VERSION)
 	@$(UV) pip install --python $(PY) -q -e "ml[dev]"
 
-data: venv ## Проверить данные и загрузить их в lakehouse (bronze, silver, манифесты)
+data: venv ## Проверить данные, загрузить в lakehouse, собрать справочники и витрины gold
 	$(PY) scripts/download_datasets.py --verify-only referrals waiting refusals treated_count --base "$(DATASETS_DIR)"
 	$(PY) -m darumen.intake add "$(DATASETS_DIR)" --contracts contracts --lakehouse lakehouse
+	$(PY) -m darumen.refdata build --lakehouse lakehouse
+	$(PY) -m darumen.lakehouse build --lakehouse lakehouse
 
 intake-status: ## Манифесты загрузок
 	$(PY) -m darumen.intake status --lakehouse lakehouse
+
+refdata: venv ## Справочники и реестр организаций из silver
+	$(PY) -m darumen.refdata build --lakehouse lakehouse
+
+gold: venv ## Витрины gold из silver и refdata
+	$(PY) -m darumen.lakehouse build --lakehouse lakehouse
 
 train: venv ## Обучить модели и зарегистрировать в MLflow
 	$(PY) -m darumen.models.train
@@ -49,4 +57,4 @@ lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data intake-status train eval serve down build test proto lint
+.PHONY: help venv data intake-status refdata gold train eval serve down build test proto lint

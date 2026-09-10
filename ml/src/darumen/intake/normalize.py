@@ -68,6 +68,27 @@ def icd10_canon(code: str | None) -> str | None:
     return text if ICD10.match(text) else None
 
 
+ICD10_CHAPTERS = [
+    ("A00", "B99", "I"), ("C00", "D48", "II"), ("D50", "D89", "III"), ("E00", "E90", "IV"), ("F00", "F99", "V"),
+    ("G00", "G99", "VI"), ("H00", "H59", "VII"), ("H60", "H95", "VIII"), ("I00", "I99", "IX"), ("J00", "J99", "X"),
+    ("K00", "K93", "XI"), ("L00", "L99", "XII"), ("M00", "M99", "XIII"), ("N00", "N99", "XIV"), ("O00", "O99", "XV"),
+    ("P00", "P96", "XVI"), ("Q00", "Q99", "XVII"), ("R00", "R99", "XVIII"), ("S00", "T98", "XIX"), ("V01", "Y98", "XX"),
+    ("Z00", "Z99", "XXI"), ("U00", "U99", "XXII"),
+]
+
+
+def icd10_chapter(code: str | None) -> str | None:
+    """ICD-10 chapter (Roman numeral) for a code, or None."""
+    canon = icd10_canon(code)
+    if canon is None:
+        return None
+    block = canon[:3]
+    for low, high, chapter in ICD10_CHAPTERS:
+        if low <= block <= high:
+            return chapter
+    return None
+
+
 def _vectorized(fn: Callable[[str | None], str | None]) -> Callable:
     def wrapper(values):  # pyarrow array in, pyarrow array out
         import pyarrow as pa
@@ -83,6 +104,7 @@ UDFS: dict[str, Callable[[str | None], str | None]] = {
     "to_kato": to_kato,
     "mo_name_key": mo_name_key,
     "icd10_canon": icd10_canon,
+    "icd10_chapter": icd10_chapter,
 }
 
 

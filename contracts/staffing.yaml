@@ -1,0 +1,53 @@
+dataset: staffing
+title: Количество занимаемых ставок по медицинским организациям
+source:
+  system: ЕИСЗ (кадры)
+  publisher: МЗ РК
+  portal_id: magda-ds-f4253f1c-27ac-4430-aaa6-fce37c95889c
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  parts: "_part_{n:03d}_of_{m:03d}"
+grain: одна занимаемая ставка на отчётную дату
+keys: [post_id]
+signature:
+  - organization_name
+  - locality_category
+  - nomenclature
+  - legal_address
+  - position_category
+  - position_rate
+  - position_type
+  - post_id
+  - region_id
+  - region_name
+  - region_kato
+  - country_name
+  - subordination_type
+  - sdu_load_date
+columns:
+  organization_name: { type: string, semantic: mo_name, resolve: refdata.mo_registry }
+  locality_category: { type: string, nullable: true }
+  nomenclature: { type: string, nullable: true }
+  legal_address: { type: string, nullable: true }
+  position_category: { type: string, nullable: true }
+  position_rate: { type: decimal, nullable: true }
+  position_type: { type: string, nullable: true }
+  post_id: { type: string }
+  region_id: { type: string, nullable: true }
+  region_name: { type: string, nullable: true }
+  region_kato: { type: string, as: region_kato_full, semantic: region_name, derive_as: region_kato, nullable: true }
+  country_name: { type: string, nullable: true }
+  subordination_type: { type: string, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: snapshot }
+privacy:
+  class: aggregate
+  public_aggregates_min_count: 5
+rules:
+  - { level: quarantine, reason: implausible_rate, check: "position_rate is null or position_rate between 0 and 3" }
+  - { level: quarantine, reason: unknown_region, check: "region_kato is not null" }
+  - { level: warn, reason: all_regions_present, check: "count(distinct region_kato) = 20" }
+partition: [region_kato]

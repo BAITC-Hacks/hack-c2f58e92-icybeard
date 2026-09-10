@@ -1,0 +1,48 @@
+dataset: vac_facts
+title: Факты проведённых вакцинаций с возможностью представления в разрезе возрастов
+source:
+  system: ИС Вакцинация
+  publisher: МЗ РК
+  portal_id: magda-ds-5b5d3fb2-843e-4578-aa2d-7b0fd63f997e
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  parts: "_part_{n:03d}_of_{m:03d}"
+grain: один факт вакцинации
+keys: [id]
+signature:
+  - id
+  - vaccination_date
+  - age
+  - vaccination_plan
+  - medicine_organization_code
+  - region
+  - sdu_load_date
+columns:
+  id: { type: string }
+  vaccination_date: { type: timestamp }
+  age: { type: int, nullable: true }
+  vaccination_plan: { type: string, nullable: true }
+  medicine_organization_code: { type: string, semantic: mo_code, nullable: true }
+  region: { type: string, semantic: region_name, resolve: refdata.regions, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: technical }
+derive:
+  mo_code: "medicine_organization_code"
+  age_bucket: "case when age is null then null when age < 1 then '0' when age < 7 then '1-6' when age < 18 then '7-17' when age < 60 then '18-59' else '60+' end"
+privacy:
+  class: quasi_identifiers
+  direct_identifiers: []
+  public_aggregates_min_count: 5
+rules:
+  - { level: block, reason: date_out_of_range, check: "vaccination_date between '2015-01-01' and now()" }
+  - { level: quarantine, reason: implausible_age, check: "age is null or age between 0 and 120" }
+  - { level: warn, reason: all_regions_present, check: "count(distinct region_kato) = 20" }
+partition: [region_kato, "year(vaccination_date)"]
+streams:
+  - name: vac_monthly
+    entity: [region_kato, mo_code, vaccination_plan]
+    time: { column: vaccination_date, grain: month }
+    measure: { agg: count }

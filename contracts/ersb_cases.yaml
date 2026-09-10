@@ -1,0 +1,75 @@
+dataset: ersb_cases
+title: Список пролеченных случаев в стационарах
+source:
+  system: ЭРСБ
+  publisher: МЗ РК
+  portal_id: magda-ds-fe290577-78d8-4518-bd02-3cb0ec44fba5
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  parts: "_part_{n:03d}_of_{m:03d}"
+grain: один пролеченный случай (выписка из стационара)
+keys: [_row_hash]
+signature:
+  - region
+  - medicine_organization
+  - p_cardnumber
+  - p_hospitaldate
+  - p_outdate
+  - profile
+  - department
+  - icd10
+  - final_diagnosis
+  - icd9
+  - operation
+  - operation_type
+  - discharge_outcome
+  - treatment_outcome
+  - p_beddayscount
+  - finance_source
+  - help_type
+  - amount_of_funding
+  - sdu_load_date
+columns:
+  region: { type: string, semantic: region_name, resolve: refdata.regions }
+  medicine_organization: { type: string, semantic: mo_name, resolve: refdata.mo_registry }
+  p_cardnumber: { type: string, drop: true, note: "номер карты пациента, квазиидентификатор: остаётся только в bronze" }
+  p_hospitaldate: { type: timestamp }
+  p_outdate: { type: timestamp }
+  profile: { type: string, semantic: bed_profile_name, nullable: true }
+  department: { type: string, nullable: true }
+  icd10: { type: string, semantic: icd10, nullable: true }
+  final_diagnosis: { type: string, nullable: true }
+  icd9: { type: string, nullable: true }
+  operation: { type: string, nullable: true }
+  operation_type: { type: string, nullable: true }
+  discharge_outcome: { type: string, nullable: true }
+  treatment_outcome: { type: string, nullable: true }
+  p_beddayscount: { type: int, nullable: true }
+  finance_source: { type: string, nullable: true }
+  help_type: { type: string, nullable: true }
+  amount_of_funding: { type: decimal, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: technical }
+derive:
+  los_days: "p_beddayscount"
+  los_calendar_days: "date_diff('day', p_hospitaldate::date, p_outdate::date)"
+  is_death: "treatment_outcome = 'Смерть'"
+privacy:
+  class: quasi_identifiers
+  direct_identifiers: [p_cardnumber]
+  public_aggregates_min_count: 5
+rules:
+  - { level: block, reason: outdate_out_of_range, check: "p_outdate between '2010-01-01' and now()" }
+  - { level: quarantine, reason: discharge_before_admission, check: "p_hospitaldate is null or p_hospitaldate::date <= p_outdate::date" }
+  - { level: quarantine, reason: negative_los, check: "p_beddayscount is null or p_beddayscount >= 0" }
+  - { level: quarantine, reason: unknown_region, check: "region_kato is not null" }
+  - { level: warn, reason: all_regions_present, check: "count(distinct region_kato) = 20" }
+partition: [region_kato, "year(p_outdate)"]
+streams:
+  - name: admissions_monthly
+    entity: [region_kato, profile_code]
+    time: { column: p_outdate, grain: month }
+    measure: { agg: count }
