@@ -221,10 +221,9 @@ def load_calibration(lake: Lakehouse) -> dict[str, float]:
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"__default__": 1.0}
 
 
-def simulate_group(lake: Lakehouse, region_kato: str, profile_code: str, capacity_delta_pct: float = 0.0,
-                   redirect_share_pct: float = 0.0, horizon_days: int = 90) -> dict:
+def simulate_states(states: pd.DataFrame, region_kato: str, profile_code: str, capacity_delta_pct: float = 0.0,
+                    redirect_share_pct: float = 0.0, horizon_days: int = 90) -> dict:
     """Scenario for all organisations of a region and profile, aggregated with arrival weights."""
-    states = load_states(lake, calibration=load_calibration(lake))
     group = states[(states["region_kato"] == region_kato) & (states["profile_code"] == profile_code)]
     if group.empty:
         return {"error": "no organisations for this region and profile"}
@@ -239,3 +238,9 @@ def simulate_group(lake: Lakehouse, region_kato: str, profile_code: str, capacit
     return {"organisations": len(group), "baseline": {"mean_wait_days": baseline}, "scenario": {"mean_wait_days": scenario},
             "delta_days": scenario - baseline, "ci": [agg(r["ci"][0] for r in results), agg(r["ci"][1] for r in results)],
             "assumptions": results[0]["assumptions"], "model": f"fluid_queue@{VERSION}"}
+
+
+def simulate_group(lake: Lakehouse, region_kato: str, profile_code: str, capacity_delta_pct: float = 0.0,
+                   redirect_share_pct: float = 0.0, horizon_days: int = 90, as_of: str | None = None) -> dict:
+    states = load_states(lake, as_of=as_of, calibration=load_calibration(lake))
+    return simulate_states(states, region_kato, profile_code, capacity_delta_pct, redirect_share_pct, horizon_days)

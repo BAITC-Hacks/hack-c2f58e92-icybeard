@@ -28,6 +28,9 @@ refdata: venv ## Справочники и реестр организаций �
 gold: venv ## Витрины gold из silver и refdata
 	$(PY) -m darumen.lakehouse build --lakehouse lakehouse
 
+publish: venv ## Опубликовать gold и refdata в Postgres и ClickHouse (нужен make serve)
+	$(PY) -m darumen.lakehouse publish --lakehouse lakehouse
+
 train: venv ## Обучить модели и зарегистрировать в MLflow
 	$(PY) -m darumen.models.train
 
@@ -60,4 +63,4 @@ lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data intake-status refdata gold train eval serve down build test proto models-serve lint
+.PHONY: help venv data intake-status refdata gold publish train eval serve down build test proto models-serve lint

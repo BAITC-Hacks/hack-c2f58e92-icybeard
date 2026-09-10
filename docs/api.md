@@ -57,10 +57,10 @@
 ## Anomalies
 
 ### `GET /api/v1/anomalies?regionKato=&streamId=&severity=&status=open&page=&size=` (chief, regulator)
-Элемент: `{ "id", "streamId", "entity", "period", "observed", "expected", "score", "severity", "status", "peerGroup", "explanation" }`.
+Элемент: `{ "id", "streamId", "entity", "period", "observed", "expected", "score", "peerScore", "severity", "kind": "entity | shared", "status", "regionKato", "comment" }`. `id` детерминирован (md5 потока, сущности и периода), поэтому подтверждения переживают перепубликацию витрины.
 
 ### `POST /api/v1/anomalies/{id}/ack` (chief, regulator)
-Тело `{ "comment" }`. Ответ 204. Пишет `decision.recorded`.
+Тело `{ "comment", "status": "acknowledged | closed" }` (по умолчанию `acknowledged`). Ответ 204, 404 если сигнала нет. Публикует `anomaly.acknowledged`.
 
 ## Simulation
 
@@ -71,15 +71,15 @@
   "scenario": { "capacityDeltaPct": 15, "redistributeSharePct": 20, "horizonDays": 90 }
 }
 ```
-Ответ: `{ "baseline": { "p50Days", "p90Days", "shareOver30" }, "scenario": { ... }, "deltaDays": -9.4, "ci": [-12.1, -6.7], "assumptions": ["…"], "model" }`.
+Ответ: `{ "organisations": 12, "baseline": { "meanWaitDays": 31.2 }, "scenario": { "meanWaitDays": 21.8 }, "deltaDays": -9.4, "ci": [-12.1, -6.7], "assumptions": ["…"], "model": { "name": "fluid_queue", "version", "trainedThrough" } }`. Ожидание здесь среднее по жидкостной модели очереди (см. `docs/model-cards/simulate.md`), интервал по потоку направлений ±20 %.
 
 ### `POST /api/v1/redistribute` (regulator)
-Тело `{ "regionKato", "profileCode", "constraints": { "maxDistanceKm", "maxShareMovedPct" } }`. Ответ: `{ "moves": [ { "fromMo", "toMo", "share", "expectedDeltaDays" } ], "totalDeltaDays", "model" }`.
+Тело `{ "regionKato", "profileCode", "constraints": { "maxDistanceKm", "maxShareMovedPct", "horizonDays" } }`. Ответ: `{ "moves": [ { "fromMo": { "moCode", "name", "regionKato" }, "toMo": {...}, "sharePct", "arrivalsPerDay", "waitFromBefore", "waitFromAfter", "waitToBefore", "waitToAfter" } ], "totalWaitDaysBefore", "totalWaitDaysAfter", "totalDeltaDays", "horizonDays", "model" }`. `maxDistanceKm` начнёт действовать, когда в реестре появятся координаты организаций.
 
 ## Access index
 
 ### `GET /api/v1/index?month=2025-03&profileCode=` (публичный)
-`{ "items": [ { "regionKato", "name", "shareOver30", "p90Days", "indexValue", "rank" } ], "method": "…" }`.
+`{ "month", "profileCode", "items": [ { "regionKato", "name", "shareOver30", "p90Days", "indexValue", "rank", "n" } ], "months": ["2025-01", …], "method": "…" }`. Без `month` берётся последний доступный; `profileCode` по умолчанию `all`; 422 при месяце вне доступных.
 
 ## Medicines
 
@@ -105,7 +105,8 @@
 ```
 Ответ 201 `{ "decisionId", "recordedAt" }`. Публикует `decision.recorded`.
 
-### `GET /api/v1/journal/decisions?actor=me&page=` (doctor: свои; regulator: регион)
+### `GET /api/v1/journal/decisions?actor=me&subject=&page=&size=` (doctor: свои; regulator: регион)
+Ответ `{ items: [ { decisionId, actor, role, subject, subjectId, recommended, chosen, reason, recordedAt } ], page, size, total }`. До подключения Keycloak актор берётся из заголовков `X-Actor` и `X-Role`.
 
 ### `GET /api/v1/journal/worklist` (doctor)
 Рабочий список пациентов на маршруте (на кэмпе синтетический): `{ "items": [ { "patientRef", "synthetic": true, "stage", "expectedDate", "riskFlags": ["stuck_over_30"], "priority", "nextAction", "explanation" } ] }`.

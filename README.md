@@ -70,7 +70,9 @@ make build    # .NET и веб
 make test     # тесты .NET, Python и веб
 ```
 
-API: `dotnet run --project src/Darumen.Api`, документация на `/scalar`, здоровье на `/health`. Веб: `cd apps/web && npm run dev`. Мобильный клиент: `cd apps/mobile && flutter run`.
+API: `dotnet run --project src/Darumen.Api` (порт по умолчанию из launchSettings, в compose 8000), документация на `/scalar`, здоровье на `/health`. Перед первым запросом: `make serve`, `make publish` (витрины в Postgres и ClickHouse) и `make models-serve` (gRPC-сервисы моделей на :50051, адрес в `ModelServices:Address`). Миграции журнала применяются при старте API (`Database:MigrateOnStartup`), схему ведёт EF Core в `src/Darumen.Migrations` (`dotnet dotnet-ef migrations add <Name> --project src/Darumen.Migrations --startup-project src/Darumen.Migrations -o Migrations`). Без Postgres или сервиса моделей API отвечает problem+json 503, а не падает. Веб: `cd apps/web && npm run dev`. Мобильный клиент: `cd apps/mobile && flutter run`.
+
+Модули монолита (`src/Darumen.Modules/*`, каждый реализует `IDarumenModule`): Queue (ожидание, отказ, альтернативы, ряд организации), Analytics (потоки, прогноз с историей, аномалии с подтверждением, индекс доступности), Simulation (сценарии и перераспределение), Journal (решения человека с Idempotency-Key), RefData (регионы, организации, профили). Контракт: [docs/api.md](docs/api.md).
 
 Слепая загрузка данных (Data Intake Fabric, см. [docs/data-intake.md](docs/data-intake.md)):
 
@@ -88,6 +90,7 @@ make intake-status                                               # манифе�
 ```bash
 make train    # ожидание и отказ (LightGBM), прогнозы и аномалии по потокам streams/*.yaml, симулятор очереди, индекс доступности
 make eval     # оценка против baseline на отложенных выборках; падает, если модель хуже baseline
+make publish  # витрины gold и refdata в Postgres (таблицы API) и ClickHouse (ряды для графиков), идемпотентно
 ml/.venv/bin/python -m darumen.models.train --only simulate,index   # одна часть
 ```
 

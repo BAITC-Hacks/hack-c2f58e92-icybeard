@@ -13,6 +13,7 @@ import pandas as pd
 from ..intake.normalize import icd10_canon, icd10_chapter
 from ..intake.pipeline import Lakehouse
 from ..models.common import FEATURES
+from ..models.simulate import load_calibration, load_states
 from ..models.streams import Stream, load_streams
 from ..models.wait import WaitModel
 
@@ -83,6 +84,7 @@ class ModelState:
     registry: pd.DataFrame
     registry_by_code: dict[str, dict]
     forecasts: pd.DataFrame
+    sim_states: pd.DataFrame
     streams: dict[str, Stream]
     reports: dict[str, dict]
     backtests: dict[str, pd.DataFrame]
@@ -104,7 +106,10 @@ class ModelState:
             if (directory / "backtest.parquet").exists():
                 backtests[stream_id] = pd.read_parquet(directory / "backtest.parquet")
         by_code = {row["mo_code"]: row for row in registry.to_dict("records")}
-        return cls(wait, as_of, queue, registry, by_code, forecasts, streams, reports, backtests)
+        throughput = lake.root / "gold" / "throughput_4w.parquet"
+        sim_states = (load_states(lake, as_of=as_of.strftime("%Y-%m-%d"), calibration=load_calibration(lake)) if throughput.exists()
+                      else pd.DataFrame(columns=["mo_code", "profile_code", "region_kato", "arrivals_per_day", "admissions_per_day", "queue_len", "wait_p50_4w", "calibration"]))
+        return cls(wait, as_of, queue, registry, by_code, forecasts, sim_states, streams, reports, backtests)
 
     # ---------- lookups ----------
     @property

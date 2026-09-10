@@ -1,0 +1,113 @@
+using Darumen.Modules.Analytics;
+using Darumen.Modules.Journal;
+using Darumen.Modules.Queue;
+using Darumen.Modules.RefData;
+using Darumen.Shared.Api;
+
+namespace Darumen.Tests.Fakes;
+
+public sealed class InMemoryQueueStates : IQueueStateRepository
+{
+    public Task<QueueSnapshotDto?> SnapshotAsync(string moCode, string profileCode, CancellationToken cancellationToken) =>
+        Task.FromResult<QueueSnapshotDto?>(moCode == "028B" ? new QueueSnapshotDto(1784, 21, 6.1) : null);
+
+    public Task<OrganizationSeriesDto?> SeriesAsync(string moCode, string profileCode, int days, CancellationToken cancellationToken) =>
+        Task.FromResult<OrganizationSeriesDto?>(moCode == "028B"
+            ? new OrganizationSeriesDto(moCode, profileCode, [new QueueDayDto("2025-03-31", 3, 2, 0, 1784, 21)], new ThroughputDto("2025-03-31", 6.1, 0.03, 90, 130))
+            : null);
+}
+
+public sealed class InMemoryAnalytics : IAnalyticsRepository
+{
+    private readonly Dictionary<string, (string Status, string? Comment)> _acks = new();
+
+    public List<AnomalyDto> Anomalies { get; } =
+    [
+        new("a1", "er_visits_daily", new Dictionary<string, string> { ["region_kato"] = "75", ["mo_key"] = "org a" }, "2025-03-15", 120, 40, 6.1, 5.0, "critical", "entity", "open", "75", null),
+        new("a2", "admissions_monthly", new Dictionary<string, string> { ["region_kato"] = "10", ["profile_code"] = "381" }, "2025-02", 50, 80, -3.4, -1.0, "warning", "shared", "open", "10", null),
+    ];
+
+    public Task<IReadOnlyList<StreamDto>> StreamsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<StreamDto>>(
+    [
+        new("admissions_monthly", "Госпитализации", "month", ["region_kato", "profile_code"], [1, 2, 3]),
+        new("er_visits_daily", "Приёмный покой", "day", ["region_kato", "mo_key"], [7, 14, 30]),
+    ]);
+
+    public Task<IReadOnlyList<HistoryPointDto>> HistoryAsync(string streamId, string entityJson, int periods, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<HistoryPointDto>>(entityJson == "{\"region_kato\": \"75\", \"profile_code\": \"381\"}"
+            ? [new("2025-11", 790), new("2025-12", 810)]
+            : []);
+
+    public Task<Paged<AnomalyDto>> AnomaliesAsync(AnomalyFilter filter, int page, int size, CancellationToken cancellationToken)
+    {
+        var items = Anomalies
+            .Select(a => _acks.TryGetValue(a.Id, out var ack) ? a with { Status = ack.Status, Comment = ack.Comment } : a)
+            .Where(a => (filter.RegionKato is null || a.RegionKato == filter.RegionKato) && (filter.Status is null || a.Status == filter.Status))
+            .ToList();
+        return Task.FromResult(new Paged<AnomalyDto>(items.Skip((page - 1) * size).Take(size).ToList(), page, size, items.Count));
+    }
+
+    public Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, CancellationToken cancellationToken)
+    {
+        if (Anomalies.All(a => a.Id != anomalyId))
+        {
+            return Task.FromResult(false);
+        }
+
+        _acks[anomalyId] = (status, comment);
+        return Task.FromResult(true);
+    }
+
+    public Task<IReadOnlyList<string>> IndexMonthsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>(["2025-01", "2025-02", "2025-03"]);
+
+    public Task<IReadOnlyList<IndexItemDto>> IndexAsync(string month, string profileCode, string lang, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<IndexItemDto>>(
+        [
+            new("62", lang == Locale.Kk ? "Павлодар облысы" : "Павлодарская область", 0.05, 12, 95.2, 1, 900),
+            new("75", lang == Locale.Kk ? "Алматы қаласы" : "город Алматы", 0.6, 126, 2.4, 20, 5000),
+        ]);
+}
+
+public sealed class InMemoryDecisions : IDecisionRepository
+{
+    private readonly List<(DecisionDto Decision, string? Key)> _rows = [];
+
+    public Task<(DecisionDto Decision, bool Created)> RecordAsync(NewDecision decision, CancellationToken cancellationToken)
+    {
+        if (decision.IdempotencyKey is not null)
+        {
+            var existing = _rows.FirstOrDefault(r => r.Key == decision.IdempotencyKey);
+            if (existing.Decision is not null)
+            {
+                return Task.FromResult((existing.Decision, false));
+            }
+        }
+
+        var dto = new DecisionDto(Guid.NewGuid(), decision.Actor, decision.Role, decision.Subject, decision.SubjectId, null, null, decision.Reason, DateTimeOffset.UtcNow);
+        _rows.Add((dto, decision.IdempotencyKey));
+        return Task.FromResult((dto, true));
+    }
+
+    public Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, int page, int size, CancellationToken cancellationToken)
+    {
+        var items = _rows.Select(r => r.Decision).Where(d => (actor is null || d.Actor == actor) && (subject is null || d.Subject == subject)).ToList();
+        return Task.FromResult(new Paged<DecisionDto>(items, page, size, items.Count));
+    }
+}
+
+public sealed class InMemoryRefData : IRefDataRepository
+{
+    public Task<IReadOnlyList<RegionDto>> RegionsAsync(string lang, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<RegionDto>>([new("10", lang == Locale.Kk ? "Абай облысы" : "Область Абай", "Семей", 50.41, 80.23, 606)]);
+
+    public Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, int limit, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<OrganizationItemDto>>(new List<OrganizationItemDto>
+        {
+            new("028B", "Казахский ордена институт глазных болезней", "75", "center", "L", null, null),
+            new("22GN", "Городская больница №2", "75", "hospital", "M", null, null),
+        }.Where(o => (regionKato is null || o.RegionKato == regionKato) && (query is null || o.Name.Contains(query, StringComparison.OrdinalIgnoreCase))).Take(limit).ToList());
+
+    public Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ProfileDto>>([new("381", "Офтальмологические для взрослых", false, 12000), new("DH", "Дневной стационар", true, 300000)]);
+}

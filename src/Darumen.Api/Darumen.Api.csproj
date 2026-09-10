@@ -14,7 +14,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Darumen.Shared\Darumen.Shared.csproj" />
+    <ProjectReference Include="..\Darumen.Migrations\Darumen.Migrations.csproj" />
     <ProjectReference Include="..\Darumen.Modules\Queue\Darumen.Modules.Queue.csproj" />
+    <ProjectReference Include="..\Darumen.Modules\Analytics\Darumen.Modules.Analytics.csproj" />
+    <ProjectReference Include="..\Darumen.Modules\Simulation\Darumen.Modules.Simulation.csproj" />
+    <ProjectReference Include="..\Darumen.Modules\Journal\Darumen.Modules.Journal.csproj" />
     <ProjectReference Include="..\Darumen.Modules\RefData\Darumen.Modules.RefData.csproj" />
   </ItemGroup>
 

@@ -1,23 +1,46 @@
+using Darumen.Api;
+using Darumen.Migrations;
+using Darumen.Modules.Analytics;
+using Darumen.Modules.Journal;
+using Darumen.Modules.Queue;
+using Darumen.Modules.RefData;
+using Darumen.Modules.Simulation;
+using Darumen.Shared;
+using Darumen.Shared.Data;
+using Darumen.Shared.Modules;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
-builder.Services.AddProblemDetails();
+builder.Services.AddOutputCache();
+builder.Services.AddDarumenCore(builder.Configuration);
+builder.Services.AddDbContext<DarumenDbContext>(options => options.UseNpgsql(builder.Configuration.PostgresConnection()));
+builder.Services.AddHostedService<MigrationHostedService>();
+builder.Services.AddDarumenModules(
+    builder.Configuration,
+    new QueueModule(),
+    new AnalyticsModule(),
+    new SimulationModule(),
+    new JournalModule(),
+    new RefDataModule());
 
 var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseOutputCache();
 
 app.MapOpenApi();
 app.MapScalarApiReference(options => options.WithTitle("Darumen Health API"));
 app.MapHealthChecks("/health");
 
 var v1 = app.MapGroup("/api/v1");
-v1.MapGet("/", () => Results.Ok(new { name = "Darumen Health", version = "0.1.0" }))
+v1.MapGet("/", () => Results.Ok(new { name = "Darumen Health", version = "0.2.0" }))
   .WithName("Root");
+v1.MapDarumenModules();
 
 app.Run();
 

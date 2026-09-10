@@ -18,6 +18,7 @@ dependencies = [
   "grpcio-tools>=1.66",
   "grpcio-health-checking>=1.66",
   "grpcio-reflection>=1.66",
+  "clickhouse-connect>=0.8",
   "protobuf>=5",
   "fastapi>=0.115",
   "uvicorn>=0.30",

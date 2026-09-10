@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package darumen.v1;
+
+option csharp_namespace = "Darumen.Contracts.V1";
+
+import "darumen/v1/common.proto";
+
+// Simulation & Optimization: сценарии «что если» и перераспределение направлений внутри региона и профиля.
+service Simulation {
+  rpc Simulate(SimulateRequest) returns (SimulateResponse);
+  rpc Redistribute(RedistributeRequest) returns (RedistributeResponse);
+}
+
+message SimulateRequest {
+  RegionRef region = 1;
+  string profile_code = 2;
+  double capacity_delta_pct = 3;   // +15 означает пропускная способность на 15 % выше
+  double redirect_share_pct = 4;   // доля направлений, перенаправленных из группы
+  int32 horizon_days = 5;          // 0 означает 90
+}
+
+message ScenarioOutcome {
+  double mean_wait_days = 1;
+}
+
+message SimulateResponse {
+  int32 organisations = 1;
+  ScenarioOutcome baseline = 2;
+  ScenarioOutcome scenario = 3;
+  double delta_days = 4;
+  double ci_low = 5;
+  double ci_high = 6;
+  repeated string assumptions = 7;
+  ModelInfo model = 8;
+}
+
+message RedistributeRequest {
+  RegionRef region = 1;
+  string profile_code = 2;
+  double max_share_moved_pct = 3;  // 0 означает 20
+  double max_distance_km = 4;      // 0 означает без ограничения; действует, когда у организаций есть координаты
+  int32 horizon_days = 5;          // 0 означает 90
+}
+
+message Move {
+  OrganizationRef from = 1;
+  OrganizationRef to = 2;
+  double share_of_source_pct = 3;
+  double arrivals_per_day = 4;
+  double wait_from_before = 5;
+  double wait_from_after = 6;
+  double wait_to_before = 7;
+  double wait_to_after = 8;
+}
+
+message RedistributeResponse {
+  repeated Move moves = 1;
+  double total_wait_days_before = 2;
+  double total_wait_days_after = 3;
+  double total_delta_days = 4;
+  int32 horizon_days = 5;
+  ModelInfo model = 6;
+}

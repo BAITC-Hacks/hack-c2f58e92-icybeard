@@ -11,7 +11,15 @@ from darumen.models.streams import Stream
 from darumen.models.wait import train_wait
 from darumen.services.server import build_server
 from darumen.services.state import ModelState, haversine_km
-from darumen.v1 import common_pb2, forecast_pb2, forecast_pb2_grpc, queue_pb2, queue_pb2_grpc
+from darumen.v1 import (
+    common_pb2,
+    forecast_pb2,
+    forecast_pb2_grpc,
+    queue_pb2,
+    queue_pb2_grpc,
+    simulation_pb2,
+    simulation_pb2_grpc,
+)
 
 STREAM = Stream("er_visits_daily", "t", "er_visits_daily", "day", "visits", ("region_kato", "mo_key"), "day",
                 ("region_kato",), {"season": 7, "horizons": [7]}, {"window": 28, "threshold": 3.5})
@@ -144,3 +152,18 @@ def test_health_and_distance(served):
     assert status.status == health_pb2.HealthCheckResponse.SERVING
     assert abs(haversine_km(51.1694, 71.4491, 43.2389, 76.8897) - 970) < 30  # Astana to Almaty
     assert haversine_km(None, 1.0, 2.0, 3.0) == 0.0
+
+
+def test_simulation_scenarios_and_redistribution(served):
+    state, _, _, channel = served
+    sim = simulation_pb2_grpc.SimulationStub(channel)
+    assert len(state.sim_states) == 24
+    res = sim.Simulate(simulation_pb2.SimulateRequest(region=common_pb2.RegionRef(kato="10"), profile_code="381", capacity_delta_pct=25))
+    assert res.organisations == 12 and res.delta_days < 0 and res.ci_low <= res.delta_days <= res.ci_high and res.assumptions
+    assert res.model.name == "fluid_queue" and res.model.trained_through == "2025-03-31"
+    moves = sim.Redistribute(simulation_pb2.RedistributeRequest(region=common_pb2.RegionRef(kato="10"), profile_code="381"))
+    assert moves.moves and moves.total_delta_days < 0 and moves.moves[0].to.name.startswith("Больница")
+    assert moves.moves[0].share_of_source_pct <= 20.0 + 1e-9
+    with pytest.raises(grpc.RpcError) as err:
+        sim.Simulate(simulation_pb2.SimulateRequest(region=common_pb2.RegionRef(kato="99"), profile_code="381"))
+    assert err.value.code() == grpc.StatusCode.INVALID_ARGUMENT

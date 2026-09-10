@@ -1,0 +1,124 @@
+using Dapper;
+using Darumen.Shared.Api;
+using Darumen.Shared.Data;
+
+namespace Darumen.Modules.Analytics;
+
+public sealed class AnalyticsRepository(IDbConnectionFactory db) : IAnalyticsRepository
+{
+    public async Task<IReadOnlyList<StreamDto>> StreamsAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var rows = await connection.QueryAsync<StreamRow>(new CommandDefinition(
+            "SELECT stream_id AS StreamId, title AS Title, grain AS Grain, entity_keys AS EntityKeys, horizons AS Horizons FROM gold.streams ORDER BY stream_id",
+            cancellationToken: cancellationToken));
+        return rows.Select(r => new StreamDto(
+            r.StreamId, r.Title, r.Grain,
+            r.EntityKeys.Split(',', StringSplitOptions.RemoveEmptyEntries),
+            r.Horizons.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList())).ToList();
+    }
+
+    public async Task<IReadOnlyList<HistoryPointDto>> HistoryAsync(string streamId, string entityJson, int periods, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var rows = await connection.QueryAsync<HistoryPointDto>(new CommandDefinition(
+            """
+            SELECT period AS Period, y AS Y FROM (
+                SELECT period, y FROM gold.series WHERE stream_id = @streamId AND entity = @entityJson ORDER BY period DESC LIMIT @periods
+            ) t ORDER BY period
+            """,
+            new { streamId, entityJson, periods }, cancellationToken: cancellationToken));
+        return rows.ToList();
+    }
+
+    public async Task<Paged<AnomalyDto>> AnomaliesAsync(AnomalyFilter filter, int page, int size, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        const string where = """
+            WHERE (@regionKato IS NULL OR a.region_kato = @regionKato)
+              AND (@streamId IS NULL OR a.stream_id = @streamId)
+              AND (@severity IS NULL OR a.severity = @severity)
+              AND (@status IS NULL OR coalesce(k.status, a.status) = @status)
+            """;
+        var parameters = new
+        {
+            regionKato = filter.RegionKato,
+            streamId = filter.StreamId,
+            severity = filter.Severity,
+            status = filter.Status,
+            size,
+            offset = (page - 1) * size,
+        };
+        var total = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
+            $"SELECT count(*) FROM gold.anomalies a LEFT JOIN journal.anomaly_acks k ON k.anomaly_id = a.id {where}",
+            parameters, cancellationToken: cancellationToken));
+        var rows = await connection.QueryAsync<AnomalyRow>(new CommandDefinition(
+            $"""
+            SELECT a.id AS Id, a.stream_id AS StreamId, a.entity AS Entity, a.period AS Period, a.observed AS Observed,
+                   a.expected AS Expected, a.score AS Score, a.peer_score AS PeerScore, a.severity AS Severity, a.kind AS Kind,
+                   coalesce(k.status, a.status) AS Status, a.region_kato AS RegionKato, k.comment AS Comment
+            FROM gold.anomalies a LEFT JOIN journal.anomaly_acks k ON k.anomaly_id = a.id
+            {where}
+            ORDER BY abs(a.score) DESC, a.period DESC
+            LIMIT @size OFFSET @offset
+            """,
+            parameters, cancellationToken: cancellationToken));
+        var items = rows.Select(r => new AnomalyDto(
+            r.Id, r.StreamId, EntityJson.Parse(r.Entity), r.Period, r.Observed, r.Expected, r.Score, r.PeerScore,
+            r.Severity, r.Kind, r.Status, r.RegionKato, r.Comment)).ToList();
+        return new Paged<AnomalyDto>(items, page, size, total);
+    }
+
+    public async Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var exists = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
+            "SELECT EXISTS (SELECT 1 FROM gold.anomalies WHERE id = @anomalyId)", new { anomalyId }, cancellationToken: cancellationToken));
+        if (!exists)
+        {
+            return false;
+        }
+
+        await connection.ExecuteAsync(new CommandDefinition(
+            """
+            INSERT INTO journal.anomaly_acks (anomaly_id, status, comment, actor, acked_at)
+            VALUES (@anomalyId, @status, @comment, @actor, now())
+            ON CONFLICT (anomaly_id) DO UPDATE SET status = EXCLUDED.status, comment = EXCLUDED.comment, actor = EXCLUDED.actor, acked_at = now()
+            """,
+            new { anomalyId, status, comment, actor }, cancellationToken: cancellationToken));
+        return true;
+    }
+
+    public async Task<IReadOnlyList<string>> IndexMonthsAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        // месяц форматируется в SQL: Dapper читает date-скаляры ненадёжно
+        var months = await connection.QueryAsync<string>(new CommandDefinition(
+            "SELECT to_char(month, 'YYYY-MM') AS month FROM gold.access_index GROUP BY month ORDER BY month", cancellationToken: cancellationToken));
+        return months.ToList();
+    }
+
+    public async Task<IReadOnlyList<IndexItemDto>> IndexAsync(string month, string profileCode, string lang, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var monthStart = month + "-01"; // Dapper не передаёт DateOnly параметром, приводим в SQL
+        var rows = await connection.QueryAsync<IndexRow>(new CommandDefinition(
+            """
+            SELECT i.region_kato AS RegionKato, coalesce(r.name_ru, i.region_kato) AS NameRu, coalesce(r.name_kz, r.name_ru, i.region_kato) AS NameKz,
+                   i.share_over_30 AS ShareOver30, i.p90_days AS P90Days, i.index_value AS IndexValue, i.rank AS Rank, i.n AS N
+            FROM gold.access_index i LEFT JOIN refdata.regions r ON r.region_kato = i.region_kato
+            WHERE i.month = @monthStart::date AND i.profile_code = @profileCode
+            ORDER BY i.rank
+            """,
+            new { monthStart, profileCode }, cancellationToken: cancellationToken));
+        return rows.Select(r => new IndexItemDto(r.RegionKato, lang == Locale.Kk ? r.NameKz : r.NameRu, r.ShareOver30, r.P90Days, r.IndexValue, (int)r.Rank, r.N)).ToList();
+    }
+
+    private sealed record StreamRow(string StreamId, string Title, string Grain, string EntityKeys, string Horizons);
+
+    private sealed record AnomalyRow(
+        string Id, string StreamId, string Entity, string Period, double Observed, double Expected, double Score, double PeerScore,
+        string Severity, string Kind, string Status, string? RegionKato, string? Comment);
+
+    private sealed record IndexRow(string RegionKato, string NameRu, string NameKz, double ShareOver30, double P90Days, double IndexValue, long Rank, long N);
+}
