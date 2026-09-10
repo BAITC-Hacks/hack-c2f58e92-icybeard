@@ -47,7 +47,7 @@ public sealed class MedicinesRepository(IDbConnectionFactory db) : IMedicinesRep
         await using var connection = await db.OpenAsync(cancellationToken);
         var rows = await connection.QueryAsync<NosologyDto>(new CommandDefinition(
             """
-            SELECT nosology_id AS NosologyId, min(category_id) AS CategoryId, sum(issued_12m) AS Issued12m, sum(fulfilled_12m) AS Fulfilled12m, count(DISTINCT drug_mnn_id) AS MnnCount
+            SELECT nosology_id AS NosologyId, min(category_id) AS CategoryId, sum(issued_12m)::bigint AS Issued12m, sum(fulfilled_12m)::bigint AS Fulfilled12m, count(DISTINCT drug_mnn_id)::bigint AS MnnCount
             FROM gold.rx_mnn WHERE nosology_id <> 'unknown' GROUP BY nosology_id ORDER BY sum(issued_12m) DESC LIMIT @limit
             """,
             new { limit }, cancellationToken: cancellationToken));

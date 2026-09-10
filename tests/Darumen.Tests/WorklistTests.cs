@@ -7,9 +7,9 @@ namespace Darumen.Tests;
 public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
 {
     [Fact]
-    public void Builder_is_deterministic_and_flags_real_risks()
+    public async Task Builder_is_deterministic_and_flags_real_risks()
     {
-        var states = new InMemoryWorklist().QueueStatesAsync("75", CancellationToken.None).Result;
+        var states = await new InMemoryWorklist().QueueStatesAsync("75", CancellationToken.None);
         var first = WorklistBuilder.Build(states);
         var second = WorklistBuilder.Build(states);
         Assert.Equal(first.Select(i => i.PatientRef), second.Select(i => i.PatientRef));

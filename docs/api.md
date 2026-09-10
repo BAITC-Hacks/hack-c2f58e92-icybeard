@@ -117,10 +117,10 @@
 Полное объяснение прогноза с факторами и текстом на двух языках.
 
 ### `POST /api/v1/insight/ask` (chief, regulator)
-Тело `{ "question": "Где в марте самая длинная очередь на офтальмологию?", "regionKato": null }`. Ответ: `{ "answer": "…", "value": 126, "unit": "дней", "chart": { "type": "bar", "x": [...], "series": [...] }, "toolsUsed": ["forecast", "index"], "sources": [...] }`. Никакого доступа к сырым данным: только инструменты доменов и Cube.
+Тело `{ "question": "Где в марте самая длинная очередь на офтальмологию?", "regionKato": null }`. Ответ: `{ "answer": "…\nИсточник: access_index", "value": 126, "unit": null, "chart": { "type": "bar | line", "title", "x": [...], "series": [ { "name", "data": [...] } ] } | null, "toolsUsed": ["access_index"], "sources": ["tool:access_index"], "model": "claude-sonnet-5" }`. Модель видит только инструменты доменов (`access_index`, `regions`, `bed_profiles`, `organizations`, `queue_state`, `predict_wait`, `anomalies`, `forecast`, `simulate`, `medicines_check`), не сырые данные. Без `ANTHROPIC_API_KEY` (или `Insight:ApiKey`) ответ 503; `GET /api/v1/insight/status` показывает готовность. Эталонные вопросы: [insight-questions.md](insight-questions.md), прогон `scripts/insight_eval.py`.
 
 ### `POST /api/v1/insight/reports` (chief, regulator)
-Тело `{ "template": "region_monthly", "regionKato", "month", "format": "pdf | xlsx" }`. Ответ 202 `{ "reportId" }`, затем `GET /api/v1/insight/reports/{id}` → файл.
+Тело `{ "template": "region_monthly", "regionKato", "month", "format": "pdf | xlsx" }`. Ответ 202 `{ "reportId" }`, затем `GET /api/v1/insight/reports/{id}` → файл. Пока не реализовано: выгрузка таблиц индекса и сигналов делается из интерфейса.
 
 ## Intake
 

@@ -22,9 +22,9 @@ const errors = []
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`${m.location().url}: ${m.text()}`) })
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
 for (const step of pages) {
-  await page.goto(base + '/')
+  await page.goto(base + '/', { waitUntil: 'networkidle' })
   await page.evaluate((role) => { if (role) localStorage.setItem('darumen.role', role); else localStorage.removeItem('darumen.role') }, step.role)
-  await page.goto(base + step.path)
+  await page.goto(base + step.path, { waitUntil: 'networkidle' })
   let ok = true
   try {
     await page.getByText(step.wait, { exact: false }).first().waitFor({ timeout: 20000 })
