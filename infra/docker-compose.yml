@@ -84,11 +84,13 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
-    command: start-dev
+    command: start-dev --import-realm
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
     ports: ["8080:8080"]
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.22.0
@@ -96,6 +98,15 @@ services:
     ports: ["5001:5000"]  # 5000 is taken by AirPlay Receiver on macOS
     volumes:
       - mlflowdata:/mlflow
+
+  models:
+    build:
+      context: ..
+      dockerfile: infra/models.Dockerfile
+    volumes:
+      - ../lakehouse:/lakehouse:ro
+    ports: ["50051:50051"]
+    profiles: [app]
 
   api:
     build:
@@ -108,10 +119,12 @@ services:
       Messaging__BootstrapServers: kafka:9092
       Messaging__SchemaRegistry: http://schema-registry:8081
       ModelServices__Address: http://models:50051
+      Auth__Authority: http://keycloak:8080/realms/darumen
     ports: ["8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_started }
+      models: { condition: service_started }
     profiles: [app]
 
 volumes:

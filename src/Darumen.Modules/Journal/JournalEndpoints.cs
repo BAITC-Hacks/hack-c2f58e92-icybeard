@@ -1,5 +1,6 @@
 using Darumen.Contracts.V1;
 using Darumen.Shared.Api;
+using Darumen.Shared.Auth;
 using Darumen.Shared.Messaging;
 
 namespace Darumen.Modules.Journal;
@@ -8,7 +9,7 @@ public static class JournalEndpoints
 {
     public static void Map(IEndpointRouteBuilder api)
     {
-        var group = api.MapGroup("/journal").WithTags("Journal");
+        var group = api.MapGroup("/journal").WithTags("Journal").RequireAuthorization(Policies.DoctorOrRegulator);
 
         group.MapPost("/decisions", async (DecisionRequestDto body, HttpContext http, IDecisionRepository repository, CancellationToken ct) =>
             {
@@ -48,5 +49,13 @@ public static class JournalEndpoints
                 return Results.Ok(await repository.ListAsync(who, subject, p, s, ct));
             })
             .WithName("Decisions").WithSummary("Журнал решений").Produces<Paged<DecisionDto>>();
+
+        group.MapGet("/audit", async (string? actor, int? page, int? size, IAuditRepository repository, CancellationToken ct) =>
+            {
+                var (p, s) = Paging.Normalize(page, size);
+                return Results.Ok(await repository.ListAsync(actor, p, s, ct));
+            })
+            .RequireAuthorization(Policies.Regulator)
+            .WithName("Audit").WithSummary("Журнал аудита запросов врачей и регуляторов").Produces<Paged<AuditEntryDto>>();
     }
 }

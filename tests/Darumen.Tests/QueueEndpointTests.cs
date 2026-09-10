@@ -93,11 +93,20 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task Organisation_series_is_served_or_404()
     {
-        var client = app.CreateClient();
+        var client = app.CreateClient("chief");
         var ok = await client.GetFromJsonAsync<OrganizationSeriesDto>("/api/v1/queue/organizations/028B?profileCode=381");
         Assert.Single(ok!.Days);
         Assert.Equal(6.1, ok.Throughput!.ThroughputPerDay);
         var missing = await client.GetAsync("/api/v1/queue/organizations/ZZZZ?profileCode=381");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+    }
+
+    [Fact]
+    public async Task Protected_routes_need_a_role()
+    {
+        Assert.Equal(HttpStatusCode.Unauthorized, (await app.CreateClient().GetAsync("/api/v1/queue/organizations/028B?profileCode=381")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("citizen").GetAsync("/api/v1/queue/organizations/028B?profileCode=381")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("chief").PostAsJsonAsync("/api/v1/simulate", new { regionKato = "75", profileCode = "381" })).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await app.CreateClient("admin").GetAsync("/api/v1/queue/organizations/028B?profileCode=381")).StatusCode);
     }
 }

@@ -1,26 +1,27 @@
+using System.Security.Claims;
+using Darumen.Shared.Auth;
 using Microsoft.AspNetCore.Http;
 
 namespace Darumen.Shared.Api;
 
-/// <summary>Кто делает запрос: из JWT после подключения Keycloak, до этого из заголовков X-Actor и X-Role.</summary>
+/// <summary>Кто делает запрос: из claims (JWT Keycloak или схема заголовков).</summary>
 public sealed record CurrentUser(string Actor, string Role, string? RegionKato)
 {
     public const string Anonymous = "anonymous";
+    public const string NoRole = "none";
 
-    public static CurrentUser From(HttpContext context)
+    public static CurrentUser From(HttpContext context) => From(context.User);
+
+    public static CurrentUser From(ClaimsPrincipal principal)
     {
-        var principal = context.User;
-        if (principal.Identity?.IsAuthenticated == true)
+        if (principal.Identity?.IsAuthenticated != true)
         {
-            var actor = principal.FindFirst("preferred_username")?.Value ?? principal.Identity.Name ?? Anonymous;
-            var role = principal.FindFirst("role")?.Value ?? principal.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? "unknown";
-            return new CurrentUser(actor, role, principal.FindFirst("region_kato")?.Value);
+            return new CurrentUser(Anonymous, NoRole, null);
         }
 
-        var headers = context.Request.Headers;
-        return new CurrentUser(
-            headers.TryGetValue("X-Actor", out var a) && !string.IsNullOrWhiteSpace(a) ? a.ToString() : Anonymous,
-            headers.TryGetValue("X-Role", out var r) && !string.IsNullOrWhiteSpace(r) ? r.ToString() : "unknown",
-            headers.TryGetValue("X-Region", out var g) && !string.IsNullOrWhiteSpace(g) ? g.ToString() : null);
+        var actor = principal.FindFirst(DarumenClaims.Name)?.Value ?? principal.Identity.Name ?? Anonymous;
+        var roles = principal.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+        var role = Roles.All.FirstOrDefault(roles.Contains) ?? roles.FirstOrDefault() ?? NoRole;
+        return new CurrentUser(actor, role, principal.FindFirst(DarumenClaims.Region)?.Value);
     }
 }

@@ -1,4 +1,5 @@
 using Darumen.Shared.Api;
+using Darumen.Shared.Auth;
 using Darumen.Shared.Data;
 using Darumen.Shared.Options;
 using Microsoft.Extensions.Configuration;
@@ -13,6 +14,9 @@ public static class ServiceCollectionExtensions
     {
         services.Configure<ModelServicesOptions>(configuration.GetSection(ModelServicesOptions.Section));
         services.AddDarumenPostgres(configuration);
+        services.AddDarumenAuth(configuration);
+        services.AddSingleton<AuditQueue>();
+        services.AddHostedService<AuditWriter>();
         services.AddProblemDetails();
         services.AddExceptionHandler<UpstreamExceptionHandler>();
         return services;

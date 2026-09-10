@@ -14,6 +14,8 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
 
     public DbSet<IntakeBatch> IntakeBatches => Set<IntakeBatch>();
 
+    public DbSet<AuditRecord> Audit => Set<AuditRecord>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -62,6 +64,24 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
             e.Property(x => x.OccurredAt).HasColumnName("occurred_at").HasColumnType("timestamptz");
             e.Property(x => x.ReceivedAt).HasColumnName("received_at").HasColumnType("timestamptz");
             e.HasIndex(x => new { x.Dataset, x.ReceivedAt });
+        });
+
+        modelBuilder.Entity<AuditRecord>(e =>
+        {
+            e.ToTable("audit");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id").UseIdentityAlwaysColumn();
+            e.Property(x => x.At).HasColumnName("at").HasColumnType("timestamptz");
+            e.Property(x => x.Actor).HasColumnName("actor").HasMaxLength(200);
+            e.Property(x => x.Role).HasColumnName("role").HasMaxLength(50);
+            e.Property(x => x.Method).HasColumnName("method").HasMaxLength(10);
+            e.Property(x => x.Path).HasColumnName("path").HasMaxLength(500);
+            e.Property(x => x.Query).HasColumnName("query");
+            e.Property(x => x.Status).HasColumnName("status");
+            e.Property(x => x.DurationMs).HasColumnName("duration_ms");
+            e.Property(x => x.TraceId).HasColumnName("trace_id").HasMaxLength(64);
+            e.HasIndex(x => new { x.Actor, x.At });
+            e.HasIndex(x => x.At);
         });
     }
 }
@@ -122,4 +142,28 @@ public sealed class IntakeBatch
     public DateTime? OccurredAt { get; set; }
 
     public DateTime ReceivedAt { get; set; }
+}
+
+/// <summary>Журнал аудита: каждый запрос врача, главврача, регулятора, стюарда и администратора.</summary>
+public sealed class AuditRecord
+{
+    public long Id { get; set; }
+
+    public DateTime At { get; set; }
+
+    public string Actor { get; set; } = string.Empty;
+
+    public string Role { get; set; } = string.Empty;
+
+    public string Method { get; set; } = string.Empty;
+
+    public string Path { get; set; } = string.Empty;
+
+    public string? Query { get; set; }
+
+    public int Status { get; set; }
+
+    public int DurationMs { get; set; }
+
+    public string TraceId { get; set; } = string.Empty;
 }

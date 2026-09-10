@@ -1,5 +1,6 @@
 using Darumen.Contracts.V1;
 using Darumen.Shared.Api;
+using Darumen.Shared.Auth;
 using Darumen.Shared.Messaging;
 
 namespace Darumen.Modules.Analytics;
@@ -15,14 +16,16 @@ public static class AnalyticsEndpoints
     {
         api.MapGet("/streams", async (IAnalyticsRepository repository, CancellationToken ct) =>
                 Results.Ok(new { items = await repository.StreamsAsync(ct) }))
+            .RequireAuthorization(Policies.Authenticated)
             .WithTags("Forecast").WithName("Streams").WithSummary("Каталог зарегистрированных потоков");
 
         api.MapGet("/forecast/{streamId}", async (string streamId, int? horizon, HttpRequest http, ForecastService service, CancellationToken ct) =>
                 await service.ForecastAsync(streamId, ParseEntity(http.Query), horizon ?? 0, ct))
+            .RequireAuthorization(Policies.ChiefOrRegulator)
             .WithTags("Forecast").WithName("Forecast").WithSummary("Прогноз потока для сущности: entity[regionKato]=75&entity[profileCode]=381")
             .Produces<ForecastResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity).ProducesProblem(StatusCodes.Status404NotFound);
 
-        var anomalies = api.MapGroup("/anomalies").WithTags("Anomalies");
+        var anomalies = api.MapGroup("/anomalies").WithTags("Anomalies").RequireAuthorization(Policies.ChiefOrRegulator);
         anomalies.MapGet("/", async (string? regionKato, string? streamId, string? severity, string? status, int? page, int? size,
                 IAnalyticsRepository repository, CancellationToken ct) =>
             {

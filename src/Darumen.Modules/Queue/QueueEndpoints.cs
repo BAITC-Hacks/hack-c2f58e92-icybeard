@@ -1,4 +1,5 @@
 using Darumen.Shared.Api;
+using Darumen.Shared.Auth;
 
 namespace Darumen.Modules.Queue;
 
@@ -35,6 +36,7 @@ public static class QueueEndpoints
                 var series = await repository.SeriesAsync(moCode, profileCode, days ?? DefaultSeriesDays, ct);
                 return series is null ? Results.NotFound() : Results.Ok(series);
             })
+            .RequireAuthorization(Policies.ChiefOrRegulator)
             .WithName("QueueOrganizationSeries")
             .WithSummary("Ряд очереди и пропускной способности организации по профилю")
             .Produces<OrganizationSeriesDto>()

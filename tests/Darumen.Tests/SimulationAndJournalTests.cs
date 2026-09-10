@@ -12,7 +12,7 @@ public sealed class SimulationAndJournalTests(TestApp app) : IClassFixture<TestA
     [Fact]
     public async Task Simulate_returns_delta_with_interval()
     {
-        var response = await app.CreateClient().PostAsJsonAsync("/api/v1/simulate", new SimulateRequestDto("75", "381", new ScenarioDto(15, null, 90)));
+        var response = await app.CreateClient("regulator").PostAsJsonAsync("/api/v1/simulate", new SimulateRequestDto("75", "381", new ScenarioDto(15, null, 90)));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<SimulateResponseDto>();
         Assert.Equal(-3, body!.DeltaDays);
@@ -23,7 +23,7 @@ public sealed class SimulationAndJournalTests(TestApp app) : IClassFixture<TestA
     [Fact]
     public async Task Redistribute_lists_moves_and_validates_region()
     {
-        var client = app.CreateClient();
+        var client = app.CreateClient("regulator");
         var body = await (await client.PostAsJsonAsync("/api/v1/redistribute", new RedistributeRequestDto("75", "381", null))).Content.ReadFromJsonAsync<RedistributeResponseDto>();
         Assert.Single(body!.Moves);
         Assert.Equal("SLOW", body.Moves[0].FromMo.MoCode);
@@ -34,9 +34,7 @@ public sealed class SimulationAndJournalTests(TestApp app) : IClassFixture<TestA
     [Fact]
     public async Task Decision_is_recorded_once_per_idempotency_key()
     {
-        var client = app.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Actor", "doctor-1");
-        client.DefaultRequestHeaders.Add("X-Role", "doctor");
+        var client = app.CreateClient("doctor", "doctor-1");
         client.DefaultRequestHeaders.Add("Idempotency-Key", "k-1");
         var request = new DecisionRequestDto("referral", "75.028B.381.10", JsonDocument.Parse("{\"moCode\":\"22GN\"}").RootElement, JsonDocument.Parse("{\"moCode\":\"028B\"}").RootElement, "пациент выбрал ближайшую");
         var first = await client.PostAsJsonAsync("/api/v1/journal/decisions", request);
@@ -59,7 +57,7 @@ public sealed class SimulationAndJournalTests(TestApp app) : IClassFixture<TestA
     [Fact]
     public async Task Intake_batches_are_listed()
     {
-        var body = await app.CreateClient().GetFromJsonAsync<Paged<Darumen.Modules.Intake.BatchDto>>("/api/v1/intake/batches?dataset=bg_referrals");
+        var body = await app.CreateClient("steward").GetFromJsonAsync<Paged<Darumen.Modules.Intake.BatchDto>>("/api/v1/intake/batches?dataset=bg_referrals");
         Assert.Single(body!.Items);
         Assert.Equal(767084, body.Items[0].RowsLoaded);
     }
@@ -67,7 +65,7 @@ public sealed class SimulationAndJournalTests(TestApp app) : IClassFixture<TestA
     [Fact]
     public async Task Decision_without_subject_is_422()
     {
-        var response = await app.CreateClient().PostAsJsonAsync("/api/v1/journal/decisions", new DecisionRequestDto(null, null, null, null, null));
+        var response = await app.CreateClient("doctor").PostAsJsonAsync("/api/v1/journal/decisions", new DecisionRequestDto(null, null, null, null, null));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 

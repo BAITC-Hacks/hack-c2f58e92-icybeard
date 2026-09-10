@@ -1,5 +1,6 @@
 using Darumen.Contracts.V1;
 using Darumen.Shared.Api;
+using Darumen.Shared.Auth;
 using Darumen.Shared.Options;
 using Microsoft.Extensions.Options;
 
@@ -30,6 +31,7 @@ public static class SimulationEndpoints
                     response.Organisations, new OutcomeDto(response.Baseline.MeanWaitDays), new OutcomeDto(response.Scenario.MeanWaitDays),
                     response.DeltaDays, [response.CiLow, response.CiHigh], response.Assumptions.ToList(), response.Model.ToDto()));
             })
+            .RequireAuthorization(Policies.Regulator)
             .WithTags("Simulation").WithName("Simulate").WithSummary("Сценарий «что если» для региона и профиля")
             .Produces<SimulateResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
@@ -56,6 +58,7 @@ public static class SimulationEndpoints
                 return Results.Ok(new RedistributeResponseDto(
                     moves, response.TotalWaitDaysBefore, response.TotalWaitDaysAfter, response.TotalDeltaDays, response.HorizonDays, response.Model.ToDto()));
             })
+            .RequireAuthorization(Policies.Regulator)
             .WithTags("Simulation").WithName("Redistribute").WithSummary("Жадное перераспределение направлений внутри региона и профиля")
             .Produces<RedistributeResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }

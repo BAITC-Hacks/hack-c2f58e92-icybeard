@@ -5,6 +5,7 @@ using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
+using Darumen.Shared.Auth;
 using Darumen.Shared.Messaging;
 using Darumen.Tests.Fakes;
 using Microsoft.AspNetCore.Hosting;
@@ -27,10 +28,25 @@ public sealed class TestApp : WebApplicationFactory<Program>
 
     public InMemoryDecisions Decisions { get; } = new();
 
+    /// <summary>Клиент с ролью для схемы заголовков.</summary>
+    public HttpClient CreateClient(string role, string actor = "user-1", string? region = null)
+    {
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.ActorHeader, actor);
+        client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.RoleHeader, role);
+        if (region is not null)
+        {
+            client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.RegionHeader, region);
+        }
+
+        return client;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting(MigrationHostedService.Setting, "false");
         builder.UseSetting($"{MessagingOptions.Section}:Mode", MessagingOptions.StubMode);
+        builder.UseSetting($"{AuthOptions.Section}:Mode", AuthOptions.HeadersMode);
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<QueueIntelligence.QueueIntelligenceClient>();

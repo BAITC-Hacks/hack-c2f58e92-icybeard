@@ -9,6 +9,7 @@ using Darumen.Contracts.V1;
 using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
 using Darumen.Shared.Api;
+using Darumen.Shared.Auth;
 using Darumen.Shared.Messaging;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -30,6 +31,7 @@ public sealed class KafkaIntegrationTests : IDisposable
         builder.UseSetting($"{MessagingOptions.Section}:BootstrapServers", Bootstrap);
         builder.UseSetting($"{MessagingOptions.Section}:SchemaRegistry", Registry);
         builder.UseSetting($"{MessagingOptions.Section}:ConsumerGroup", "darumen-api-test");
+        builder.UseSetting($"{AuthOptions.Section}:Mode", AuthOptions.HeadersMode);
     });
 
     [KafkaFact]
@@ -91,6 +93,8 @@ public sealed class KafkaIntegrationTests : IDisposable
     public async Task Python_batch_loaded_event_is_consumed_into_intake_batches()
     {
         var client = _app.CreateClient();
+        client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.ActorHeader, "steward-1");
+        client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.RoleHeader, Roles.Steward);
         await Task.Delay(TimeSpan.FromSeconds(3)); // слушатель Wolverine подключается к группе
         var batchId = $"bg_referrals-test-{Guid.NewGuid():N}";
         var root = RepoRoot();

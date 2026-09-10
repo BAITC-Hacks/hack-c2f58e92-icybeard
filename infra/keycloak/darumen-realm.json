@@ -1,0 +1,264 @@
+{
+  "realm": "darumen",
+  "displayName": "Darumen Health",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "accessTokenLifespan": 3600,
+  "roles": {
+    "realm": [
+      {
+        "name": "citizen",
+        "description": "Darumen role citizen"
+      },
+      {
+        "name": "doctor",
+        "description": "Darumen role doctor"
+      },
+      {
+        "name": "chief",
+        "description": "Darumen role chief"
+      },
+      {
+        "name": "regulator",
+        "description": "Darumen role regulator"
+      },
+      {
+        "name": "steward",
+        "description": "Darumen role steward"
+      },
+      {
+        "name": "admin",
+        "description": "Darumen role admin"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "darumen-web",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:4173/*",
+        "http://localhost:8000/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        {
+          "name": "region_kato",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "region_kato",
+            "claim.name": "region_kato",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience darumen-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "darumen-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "darumen-mobile",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "kz.darumen://callback",
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        {
+          "name": "region_kato",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "region_kato",
+            "claim.name": "region_kato",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience darumen-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "darumen-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "darumen-api",
+      "enabled": true,
+      "bearerOnly": true,
+      "protocol": "openid-connect",
+      "publicClient": false
+    }
+  ],
+  "users": [
+    {
+      "username": "citizen1",
+      "enabled": true,
+      "email": "citizen1@darumen.local",
+      "emailVerified": true,
+      "firstName": "Citizen1",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "darumen",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "citizen"
+      ]
+    },
+    {
+      "username": "doctor1",
+      "enabled": true,
+      "email": "doctor1@darumen.local",
+      "emailVerified": true,
+      "firstName": "Doctor1",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "darumen",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "doctor"
+      ],
+      "attributes": {
+        "region_kato": [
+          "75"
+        ]
+      }
+    },
+    {
+      "username": "chief1",
+      "enabled": true,
+      "email": "chief1@darumen.local",
+      "emailVerified": true,
+      "firstName": "Chief1",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "darumen",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "chief"
+      ],
+      "attributes": {
+        "region_kato": [
+          "75"
+        ]
+      }
+    },
+    {
+      "username": "regulator1",
+      "enabled": true,
+      "email": "regulator1@darumen.local",
+      "emailVerified": true,
+      "firstName": "Regulator1",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "darumen",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "regulator"
+      ]
+    },
+    {
+      "username": "steward1",
+      "enabled": true,
+      "email": "steward1@darumen.local",
+      "emailVerified": true,
+      "firstName": "Steward1",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "darumen",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "steward"
+      ]
+    },
+    {
+      "username": "admin1",
+      "enabled": true,
+      "email": "admin1@darumen.local",
+      "emailVerified": true,
+      "firstName": "Admin1",
+      "lastName": "Demo",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "darumen",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin"
+      ]
+    }
+  ]
+}

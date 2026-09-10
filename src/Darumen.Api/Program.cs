@@ -7,6 +7,7 @@ using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
 using Darumen.Modules.Simulation;
 using Darumen.Shared;
+using Darumen.Shared.Auth;
 using Darumen.Shared.Data;
 using Darumen.Shared.Messaging;
 using Darumen.Shared.Modules;
@@ -35,6 +36,9 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseMiddleware<AuditMiddleware>();
 app.UseOutputCache();
 
 app.MapOpenApi();
