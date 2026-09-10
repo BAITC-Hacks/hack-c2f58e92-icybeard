@@ -43,7 +43,7 @@
 |---|---|
 | Каркас | Vue 3 + Vite + TypeScript, SPA, без Nuxt |
 | Состояние | Pinia |
-| UI‑набор | PrimeVue 4, лицензия MIT |
+| UI‑набор | PrimeVue 5 (при установке 10 сентября npm выдал 5.0.1; лицензия MIT) |
 | Графики и карта | vue‑echarts, MapLibre GL |
 | Формы | VeeValidate + zod |
 | i18n | vue‑i18n, казахский и русский |

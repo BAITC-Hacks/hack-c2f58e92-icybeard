@@ -1,0 +1,41 @@
+[project]
+name = "darumen"
+version = "0.1.0"
+description = "Darumen Health: data intake, lakehouse, models and model services"
+requires-python = ">=3.12"
+dependencies = [
+  "duckdb>=1.1",
+  "pyarrow>=17",
+  "pandas>=2.2",
+  "pyyaml>=6",
+  "lightgbm>=4.5",
+  "scikit-learn>=1.5",
+  "statsforecast>=2.0",
+  "shap>=0.46",
+  "ortools>=9.11",
+  "mlflow>=2.22",
+  "grpcio>=1.66",
+  "grpcio-tools>=1.66",
+  "protobuf>=5",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6", "dagster>=1.9", "dagster-webserver>=1.9"]
+scribe = ["faster-whisper>=1.0"]
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+exclude = ["src/darumen/gen"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

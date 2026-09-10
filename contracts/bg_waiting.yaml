@@ -1,0 +1,49 @@
+dataset: bg_waiting
+title: Ожидающие плановую госпитализацию в стационары
+source:
+  system: ИС БГ
+  publisher: МЗ РК
+  portal_id: magda-ds-abe1cec8-b45b-4e4c-ba04-891e0ed8b02f
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+grain: одно направление, та же когорта, что и bg_referrals
+keys: [region_origin_code, mo_destination_code, profile_code, patient_seq_no]
+signature:
+  - region_origin_code
+  - mo_destination_code
+  - profile_code
+  - patient_seq_no
+  - icd10_ref_diag_code
+  - diagnosis_name
+  - operation_code
+  - operation_name
+  - registration_dt
+  - planned_dt
+  - sdu_load_date
+columns:
+  region_origin_code: { type: string, semantic: region_kato }
+  mo_destination_code: { type: string, semantic: mo_code }
+  profile_code: { type: string, semantic: profile_code }
+  patient_seq_no: { type: string }
+  icd10_ref_diag_code: { type: string, semantic: icd10, dictionary: refdata.icd10 }
+  diagnosis_name: { type: string }
+  operation_code: { type: string, nullable: true }
+  operation_name: { type: string, nullable: true }
+  registration_dt: { type: timestamp, formats: ["%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"] }
+  planned_dt: { type: timestamp, formats: ["%Y-%m-%d %H:%M:%S"], null_values: ["1970-01-01 00:00:00"], nullable: true }
+  sdu_load_date: { type: timestamp, semantic: technical }
+derive:
+  hospitalization_code: "region_origin_code || '.' || mo_destination_code || '.' || profile_code || '.' || patient_seq_no"
+privacy:
+  class: quasi_identifiers
+  direct_identifiers: []
+  public_aggregates_min_count: 5
+rules:
+  - { level: block, check: "registration_dt between '2020-01-01' and now()" }
+  - { level: warn, check: "count(distinct region_origin_code) = 20" }
+  - { level: warn, check: "match_rate(hospitalization_code, bg_referrals.hospitalization_code) >= 0.99" }
+partition: [region_origin_code, "month(registration_dt)"]

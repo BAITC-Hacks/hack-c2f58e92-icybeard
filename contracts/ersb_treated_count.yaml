@@ -1,0 +1,44 @@
+dataset: ersb_treated_count
+title: Количество пролеченных случаев в разрезе МО
+source:
+  system: ЭРСБ
+  publisher: МЗ РК
+  portal_id: magda-ds-5ebd7ba4-3bc1-4dbd-bce0-7538ce571902
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+grain: одна организация, снимок на дату загрузки
+keys: [medicine_organization, sdu_load_date]
+signature:
+  - medicine_organization
+  - discharged_total
+  - discharged_children
+  - treated_budget
+  - treated_paid
+  - discharged_within_day
+  - deaths_total
+  - bed_days
+  - amount_to_pay
+  - sdu_load_date
+columns:
+  medicine_organization: { type: string, semantic: mo_name, resolve: refdata.mo_registry }
+  discharged_total: { type: int }
+  discharged_children: { type: int }
+  treated_budget: { type: int }
+  treated_paid: { type: int }
+  discharged_within_day: { type: int }
+  deaths_total: { type: int }
+  bed_days: { type: int }
+  amount_to_pay: { type: decimal }
+  sdu_load_date: { type: timestamp, semantic: snapshot }
+privacy:
+  class: aggregate
+  public_aggregates_min_count: 5
+rules:
+  - { level: block, check: "discharged_total >= 0 and bed_days >= 0" }
+  - { level: quarantine, check: "discharged_children <= discharged_total" }
+  - { level: warn, check: "row_count between 2000 and 2500" }
+partition: ["date(sdu_load_date)"]

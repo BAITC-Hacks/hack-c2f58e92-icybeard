@@ -1,0 +1,6 @@
+@Darumen.Api_HostAddress = http://localhost:5059
+
+GET {{Darumen.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,120 @@
+name: darumen
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_USER: darumen
+      POSTGRES_PASSWORD: darumen
+      POSTGRES_DB: darumen
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darumen"]
+      interval: 5s
+      retries: 10
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    environment:
+      CLICKHOUSE_USER: darumen
+      CLICKHOUSE_PASSWORD: darumen
+      CLICKHOUSE_DB: darumen
+    ports: ["8123:8123", "9000:9000"]
+    volumes:
+      - chdata:/var/lib/clickhouse
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+
+  cube:
+    image: cubejs/cube:latest
+    environment:
+      CUBEJS_DB_TYPE: clickhouse
+      CUBEJS_DB_HOST: clickhouse
+      CUBEJS_DB_PORT: "8123"
+      CUBEJS_DB_NAME: darumen
+      CUBEJS_DB_USER: darumen
+      CUBEJS_DB_PASS: darumen
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_API_SECRET: dev-secret
+    ports: ["4000:4000"]
+    volumes:
+      - ./cube:/cube/conf
+    depends_on: [clickhouse]
+
+  kafka:
+    image: apache/kafka:3.9.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports: ["29092:29092"]
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.7.1
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:9092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports: ["8081:8081"]
+    depends_on: [kafka]
+
+  valkey:
+    image: valkey/valkey:8
+    ports: ["6379:6379"]
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: darumen
+      MINIO_ROOT_PASSWORD: darumen123
+    ports: ["9002:9000", "9001:9001"]
+    volumes:
+      - miniodata:/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports: ["8080:8080"]
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.22.0
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow/mlflow.db --artifacts-destination /mlflow/artifacts
+    ports: ["5000:5000"]
+    volumes:
+      - mlflowdata:/mlflow
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:8000
+      ConnectionStrings__Postgres: Host=postgres;Database=darumen;Username=darumen;Password=darumen
+      ConnectionStrings__ClickHouse: Host=clickhouse;Port=8123;Database=darumen;Username=darumen;Password=darumen
+      Kafka__BootstrapServers: kafka:9092
+      Kafka__SchemaRegistry: http://schema-registry:8081
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka: { condition: service_started }
+    profiles: [app]
+
+volumes:
+  pgdata:
+  chdata:
+  miniodata:
+  mlflowdata:

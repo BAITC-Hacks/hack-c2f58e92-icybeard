@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Darumen.Api/Darumen.Api.csproj" />
+    <Project Path="src/Darumen.Contracts/Darumen.Contracts.csproj" />
+    <Project Path="src/Darumen.Migrations/Darumen.Migrations.csproj" />
+    <Project Path="src/Darumen.Shared/Darumen.Shared.csproj" />
+  </Folder>
+  <Folder Name="/src/Darumen.Modules/" />
+  <Folder Name="/src/Darumen.Modules/Queue/">
+    <Project Path="src/Darumen.Modules/Queue/Darumen.Modules.Queue.csproj" />
+  </Folder>
+  <Folder Name="/src/Darumen.Modules/RefData/">
+    <Project Path="src/Darumen.Modules/RefData/Darumen.Modules.RefData.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Darumen.Tests/Darumen.Tests.csproj" />
+  </Folder>
+</Solution>

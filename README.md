@@ -61,12 +61,31 @@ python3 scripts/profile_datasets.py DataSets
 - Дневной стационар (профиль `DH`) это 48 % направлений с нулевым ожиданием, его выделять отдельно.
 - Никогда не запускать два загрузчика в одну папку одновременно.
 
+## Запуск
+
+```bash
+make venv     # Python-окружение для ml/
+make serve    # инфраструктура: Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, MLflow
+make build    # .NET и веб
+make test     # тесты .NET, Python и веб
+```
+
+API: `dotnet run --project src/Darumen.Api`, документация на `/scalar`, здоровье на `/health`. Веб: `cd apps/web && npm run dev`. Мобильный клиент: `cd apps/mobile && flutter run`.
+
 ## Структура
 
 ```
-docs/       документация проекта
-proto/      контракты gRPC и событий Kafka (.NET и Python)
+src/        решение .NET 10: Darumen.Api, Darumen.Shared, Darumen.Contracts, Darumen.Modules/*, Darumen.Migrations
+tests/      Darumen.Tests (xunit)
+ml/         Python: intake, lakehouse, features, models, сервисы моделей (src/darumen), tests/
+apps/web/   Vue 3 + Vite + PrimeVue
+apps/mobile/ Flutter
+proto/      контракты gRPC и событий Kafka
+contracts/  контракты наборов данных (YAML)
+streams/    декларации потоков (YAML)
+infra/      docker-compose, Dockerfile API, init Postgres
 scripts/    загрузка, проверка и профилирование данных
+docs/       документация проекта
 DataSets/   локальные данные (в .gitignore)
 ```
 

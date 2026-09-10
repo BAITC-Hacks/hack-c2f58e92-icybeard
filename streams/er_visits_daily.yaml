@@ -1,0 +1,9 @@
+stream: er_visits_daily
+title: Обращения в приёмный покой без госпитализации, по организациям, по дням
+from: silver.bg_er_refusals
+entity: [region_kato, mo_code]
+time: { column: refuse_dt, grain: day }
+measure: { agg: count }
+peer_group: [region_kato, mo_type, mo_size_bucket]
+forecast: { horizons: [7, 14, 30], min_history_days: 60 }
+anomaly: { method: robust_z, window_days: 28, threshold: 3.5 }

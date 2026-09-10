@@ -1,10 +1,36 @@
+# данные
 DataSets/
  DataSets/
 *.csv
 *.parquet
 *.duckdb
+.download.lock
+
+# python
 .venv/
 __pycache__/
 *.pyc
+*.egg-info/
+ml/src/darumen/gen/
+mlruns/
+
+# .net
+bin/
+obj/
+*.user
+.vs/
+
+# web
+node_modules/
+apps/web/dist/
+
+# flutter
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.flutter-plugins*
+apps/mobile/ios/Pods/
+
+# env и ide
+.env
 .DS_Store
-.download.lock
+.idea/

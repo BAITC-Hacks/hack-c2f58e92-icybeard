@@ -1,0 +1,61 @@
+dataset: bg_er_refusals
+title: Отказы в плановой госпитализации (приёмный покой)
+source:
+  system: ИС БГ
+  publisher: МЗ РК
+  portal_id: magda-ds-62470e60-4a84-4c67-9c7b-4a5f14fc1d48
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  parts: "_part_{n:03d}_of_{m:03d}"
+grain: одно обращение в приёмный покой без госпитализации
+keys: [row_hash]
+signature:
+  - region_in
+  - org_in
+  - resident
+  - insured
+  - benefit_cat
+  - refuse_dt
+  - attach_region
+  - attach_org
+  - icd10
+  - icd_name
+  - amount
+  - finance_src
+  - sdu_load_date
+columns:
+  region_in: { type: string, semantic: region_name, resolve: refdata.regions }
+  org_in: { type: string, semantic: mo_name, resolve: refdata.mo_registry }
+  resident: { type: string, enum: [Город, Село], nullable: true }
+  insured: { type: string, enum: [Застрахован, "Не застрахован"] }
+  benefit_cat: { type: string, nullable: true }
+  refuse_dt: { type: timestamp, formats: ["%Y-%m-%d %H:%M:%S"] }
+  attach_region: { type: string, semantic: region_name, resolve: refdata.regions, nullable: true }
+  attach_org: { type: string, semantic: mo_name, resolve: refdata.mo_registry, nullable: true }
+  icd10: { type: string, semantic: icd10, dictionary: refdata.icd10 }
+  icd_name: { type: string }
+  amount: { type: decimal, nullable: true }
+  finance_src: { type: string, dictionary: refdata.finance_sources, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: technical }
+privacy:
+  class: quasi_identifiers
+  direct_identifiers: []
+  public_aggregates_min_count: 5
+rules:
+  - { level: block, check: "refuse_dt between '2020-01-01' and now()" }
+  - { level: quarantine, check: "amount is null or amount >= 0" }
+  - { level: warn, check: "rows_per_part between 200000 and 300000" }
+  - { level: warn, check: "count(distinct region_in) = 20" }
+partition: [region_kato, "month(refuse_dt)"]
+streams:
+  - name: er_visits_daily
+    entity: [region_kato, mo_code]
+    time: { column: refuse_dt, grain: day }
+    measure: { agg: count }
+    peer_group: [region_kato, mo_type, mo_size_bucket]
+    forecast: { horizons: [7, 14, 30], min_history_days: 60 }
+    anomaly: { method: robust_z, window_days: 28, threshold: 3.5 }
