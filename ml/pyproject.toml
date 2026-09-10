@@ -16,6 +16,8 @@ dependencies = [
   "mlflow>=2.22",
   "grpcio>=1.66",
   "grpcio-tools>=1.66",
+  "grpcio-health-checking>=1.66",
+  "grpcio-reflection>=1.66",
   "protobuf>=5",
   "fastapi>=0.115",
   "uvicorn>=0.30",
@@ -35,7 +37,7 @@ where = ["src"]
 [tool.ruff]
 line-length = 110
 target-version = "py312"
-exclude = ["src/darumen/gen"]
+exclude = ["src/darumen/v1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

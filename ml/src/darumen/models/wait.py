@@ -69,11 +69,13 @@ class WaitModel:
             out[col] = np.where(np.isnan(out[col]), self.global_baseline[col], out[col])
         return out
 
-    def explain(self, rows: pd.DataFrame, top: int = 4, lang: str = "ru") -> list[dict]:
-        """Per-row SHAP contributions of the p50 model, rendered as short sentences."""
+    def explain(self, rows: pd.DataFrame, top: int = 4, lang: str = "ru", target: str = "q50") -> list[dict]:
+        """Per-row SHAP contributions of one booster, rendered as short sentences: days for the quantile
+        models, log-odds for the risk models (the summary converts the base to a probability)."""
         x, _ = encode(rows, self.categories)
-        contrib = self.boosters["q50"].predict(x, pred_contrib=True)
+        contrib = self.boosters[target].predict(x, pred_contrib=True)
         labels = LABELS_KZ if lang == "kz" else LABELS_RU
+        in_days = target in ("q50", "q90")
         results = []
         for i, (_, row) in enumerate(rows.iterrows()):
             pairs = sorted(zip(FEATURES, contrib[i][:-1], strict=True), key=lambda kv: -abs(kv[1]))[:top]
@@ -82,11 +84,15 @@ class WaitModel:
                 raw = row.get(name)
                 shown = f"{raw:.1f}" if isinstance(raw, (float, np.floating)) and not pd.isna(raw) else str(raw)
                 sign = "+" if value >= 0 else "−"
-                unit = "күн" if lang == "kz" else "дн."
+                unit = (" күн" if lang == "kz" else " дн.") if in_days else ""
                 factors.append({"name": name, "contribution": float(value),
-                                "text": f"{labels.get(name, name)}: {shown} ({sign}{abs(value):.1f} {unit})"})
+                                "text": f"{labels.get(name, name)}: {shown} ({sign}{abs(value):.1f}{unit})"})
             base = float(contrib[i][-1])
-            summary = (f"Базовое ожидание {base:.0f} дн., ключевые факторы: " if lang != "kz" else f"Базалық күту {base:.0f} күн, негізгі факторлар: ")
+            if in_days:
+                summary = (f"Базовое ожидание {base:.0f} дн., ключевые факторы: " if lang != "kz" else f"Базалық күту {base:.0f} күн, негізгі факторлар: ")
+            else:
+                risk = 1 / (1 + np.exp(-base))
+                summary = (f"Базовый риск {risk:.0%}, ключевые факторы: " if lang != "kz" else f"Базалық тәуекел {risk:.0%}, негізгі факторлар: ")
             summary += "; ".join(f["text"] for f in factors[:2])
             results.append({"summary": summary, "factors": factors})
         return results

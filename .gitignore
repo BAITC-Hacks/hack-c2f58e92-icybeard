@@ -12,7 +12,7 @@ DataSets/
 __pycache__/
 *.pyc
 *.egg-info/
-ml/src/darumen/gen/
+ml/src/darumen/v1/
 mlruns/
 
 # .net

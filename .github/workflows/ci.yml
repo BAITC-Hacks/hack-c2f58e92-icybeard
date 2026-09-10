@@ -24,6 +24,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv venv ml/.venv --python 3.12
       - run: uv pip install --python ml/.venv/bin/python -e "ml[dev]"
+      - run: make proto
       - run: ml/.venv/bin/python -m ruff check ml
       - run: ml/.venv/bin/python -m pytest ml/tests -q
 

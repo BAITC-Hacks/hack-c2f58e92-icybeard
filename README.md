@@ -91,6 +91,13 @@ make eval     # оценка против baseline на отложенных в�
 ml/.venv/bin/python -m darumen.models.train --only simulate,index   # одна часть
 ```
 
+Сервисы моделей по gRPC (контракты в `proto/darumen/v1`, код генерируется в `ml/src/darumen/v1` командой `make proto`):
+
+```bash
+make models-serve                                    # QueueIntelligence и LoadForecasting на :50051, health и reflection включены
+grpcurl -plaintext localhost:50051 list              # проверить
+```
+
 Карточки моделей в `docs/model-cards/` и `docs/access-index.md` генерируются командой `make train`, руками их не правят. Результаты лежат в `lakehouse/models/` и `lakehouse/gold/` (прогнозы, аномалии, индекс, перераспределение), метрики в MLflow.
 
 ## Структура

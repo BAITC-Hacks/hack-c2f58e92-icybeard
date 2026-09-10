@@ -44,17 +44,20 @@ build: ## Собрать .NET и веб
 	dotnet build Darumen.slnx -c Release --nologo -v q
 	cd apps/web && npm run build
 
-test: venv ## Все тесты: .NET, Python, веб
+test: proto ## Все тесты: .NET, Python, веб
 	dotnet test Darumen.slnx -c Release --nologo -v q
 	$(PY) -m pytest ml/tests -q
 	cd apps/web && npm run test -- --run
 
-proto: venv ## Сгенерировать Python-код из proto/
-	mkdir -p ml/src/darumen/gen
-	$(PY) -m grpc_tools.protoc -I proto --python_out=ml/src/darumen/gen --grpc_python_out=ml/src/darumen/gen proto/darumen/v1/*.proto
+proto: venv ## Сгенерировать Python-код gRPC из proto/ в ml/src/darumen/v1 (в .gitignore)
+	$(PY) -m grpc_tools.protoc -I proto --python_out=ml/src --grpc_python_out=ml/src --pyi_out=ml/src proto/darumen/v1/*.proto
+	@touch ml/src/darumen/v1/__init__.py
+
+models-serve: proto ## gRPC-сервисы моделей (Queue Intelligence, Load Forecasting) на :50051
+	$(PY) -m darumen.services --lakehouse lakehouse --port 50051
 
 lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data intake-status refdata gold train eval serve down build test proto lint
+.PHONY: help venv data intake-status refdata gold train eval serve down build test proto models-serve lint
