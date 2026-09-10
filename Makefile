@@ -6,14 +6,19 @@ COMPOSE ?= docker compose -f infra/docker-compose.yml
 help: ## Список целей
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
 
-venv: ## Python-окружение для ml/
-	@test -d ml/.venv || python3 -m venv ml/.venv
-	@$(PY) -m pip install -q -U pip
-	@$(PY) -m pip install -q -e "ml[dev]"
+UV ?= uv
+PYTHON_VERSION ?= 3.12
 
-data: venv ## Скачать и проверить данные, собрать silver и gold
+venv: ## Python-окружение для ml/ через uv
+	@test -x $(PY) || $(UV) venv ml/.venv --python $(PYTHON_VERSION)
+	@$(UV) pip install --python $(PY) -q -e "ml[dev]"
+
+data: venv ## Проверить данные и загрузить их в lakehouse (bronze, silver, манифесты)
 	$(PY) scripts/download_datasets.py --verify-only referrals waiting refusals treated_count --base "$(DATASETS_DIR)"
-	$(PY) -m darumen.lakehouse.build --datasets "$(DATASETS_DIR)"
+	$(PY) -m darumen.intake add "$(DATASETS_DIR)" --contracts contracts --lakehouse lakehouse
+
+intake-status: ## Манифесты загрузок
+	$(PY) -m darumen.intake status --lakehouse lakehouse
 
 train: venv ## Обучить модели и зарегистрировать в MLflow
 	$(PY) -m darumen.models.train
@@ -44,4 +49,4 @@ lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data train eval serve down build test proto lint
+.PHONY: help venv data intake-status train eval serve down build test proto lint

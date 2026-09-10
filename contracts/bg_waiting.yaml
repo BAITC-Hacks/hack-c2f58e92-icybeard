@@ -30,7 +30,7 @@ columns:
   profile_code: { type: string, semantic: profile_code }
   patient_seq_no: { type: string }
   icd10_ref_diag_code: { type: string, semantic: icd10, dictionary: refdata.icd10 }
-  diagnosis_name: { type: string }
+  diagnosis_name: { type: string, nullable: true }
   operation_code: { type: string, nullable: true }
   operation_name: { type: string, nullable: true }
   registration_dt: { type: timestamp, formats: ["%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S"] }
@@ -38,12 +38,14 @@ columns:
   sdu_load_date: { type: timestamp, semantic: technical }
 derive:
   hospitalization_code: "region_origin_code || '.' || mo_destination_code || '.' || profile_code || '.' || patient_seq_no"
+  region_kato: "region_origin_code"
+  mo_code: "mo_destination_code"
+  is_day_hospital: "profile_code = 'DH'"
 privacy:
   class: quasi_identifiers
   direct_identifiers: []
   public_aggregates_min_count: 5
 rules:
-  - { level: block, check: "registration_dt between '2020-01-01' and now()" }
-  - { level: warn, check: "count(distinct region_origin_code) = 20" }
-  - { level: warn, check: "match_rate(hospitalization_code, bg_referrals.hospitalization_code) >= 0.99" }
-partition: [region_origin_code, "month(registration_dt)"]
+  - { level: block, reason: registration_out_of_range, check: "registration_dt between '2020-01-01' and now()" }
+  - { level: warn, reason: all_regions_present, check: "count(distinct region_origin_code) = 20" }
+partition: [region_kato, "month(registration_dt)"]

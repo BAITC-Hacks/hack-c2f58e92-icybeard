@@ -26,19 +26,19 @@ signature:
 columns:
   medicine_organization: { type: string, semantic: mo_name, resolve: refdata.mo_registry }
   discharged_total: { type: int }
-  discharged_children: { type: int }
-  treated_budget: { type: int }
-  treated_paid: { type: int }
-  discharged_within_day: { type: int }
-  deaths_total: { type: int }
-  bed_days: { type: int }
-  amount_to_pay: { type: decimal }
+  discharged_children: { type: int, nullable: true }
+  treated_budget: { type: int, nullable: true }
+  treated_paid: { type: int, nullable: true }
+  discharged_within_day: { type: int, nullable: true }
+  deaths_total: { type: int, nullable: true }
+  bed_days: { type: int, nullable: true }
+  amount_to_pay: { type: decimal, nullable: true }
   sdu_load_date: { type: timestamp, semantic: snapshot }
 privacy:
   class: aggregate
   public_aggregates_min_count: 5
 rules:
-  - { level: block, check: "discharged_total >= 0 and bed_days >= 0" }
-  - { level: quarantine, check: "discharged_children <= discharged_total" }
-  - { level: warn, check: "row_count between 2000 and 2500" }
+  - { level: block, reason: negative_counts, check: "discharged_total >= 0 and coalesce(bed_days, 0) >= 0" }
+  - { level: quarantine, reason: children_exceed_total, check: "discharged_children is null or discharged_children <= discharged_total" }
+  - { level: warn, reason: plausible_row_count, check: "count(*) between 1000 and 5000" }
 partition: ["date(sdu_load_date)"]

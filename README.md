@@ -72,6 +72,17 @@ make test     # тесты .NET, Python и веб
 
 API: `dotnet run --project src/Darumen.Api`, документация на `/scalar`, здоровье на `/health`. Веб: `cd apps/web && npm run dev`. Мобильный клиент: `cd apps/mobile && flutter run`.
 
+Слепая загрузка данных (Data Intake Fabric, см. [docs/data-intake.md](docs/data-intake.md)):
+
+```bash
+make data                                                        # проверить скачанное и загрузить всю папку DataSets
+ml/.venv/bin/python -m darumen.intake add "DataSets/<набор>"      # один набор или один файл
+ml/.venv/bin/python -m darumen.intake inspect <file.csv>          # отпечаток файла и подбор контракта
+make intake-status                                               # манифесты загрузок
+```
+
+Файл с известной схемой проходит в `lakehouse/bronze` и `lakehouse/silver` (Parquet, партиции по региону и месяцу) с манифестом и карантином; файл с неизвестной схемой получает черновик контракта в `lakehouse/drafts/` для стюарда.
+
 ## Структура
 
 ```
