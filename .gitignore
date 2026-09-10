@@ -37,3 +37,4 @@ apps/mobile/ios/Pods/
 .idea/
 apps/web/e2e/shots/
 apps/web/.env
+infra/cube/.cubestore/
