@@ -27,6 +27,8 @@
 | [docs/doctor-consult.md](docs/doctor-consult.md) | Сценарий приёма: AI‑скрайб с утверждением врачом, памятка пациенту, проверка рецепта на покрытие ОСМС и доступность в аптеках |
 | [docs/implementation-plan.md](docs/implementation-plan.md) | Детальный план на четыре недели: вехи, задачи по дням с владельцами и условиями готовности, зависимости, линии отсечения, риски по неделям |
 | [docs/tech-stack.md](docs/tech-stack.md) | Решения по стеку: .NET 10, Kafka, PostgreSQL, ClickHouse с Cube, Vue 3, Flutter, Python для данных и моделей; структура монорепо |
+| [docs/gold-schemas.md](docs/gold-schemas.md) | Схемы silver, refdata и gold: колонки, типы, ключи, партиции, проверки качества |
+| [docs/api.md](docs/api.md) | REST API v1: соглашения, эндпоинты по доменам с примерами запросов и ответов |
 | [docs/data-requests.md](docs/data-requests.md) | Что из данных есть, чего не хватает, приоритетный запрос организаторам, открытые источники, черновик письма |
 | [docs/tz.md](docs/tz.md) | Техническое задание программы (текст организаторов) |
 
