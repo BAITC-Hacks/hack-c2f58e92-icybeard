@@ -1,4 +1,4 @@
-"""python -m darumen.models.train [--lakehouse lakehouse] [--only wait]"""
+"""python -m darumen.models.train [--lakehouse lakehouse] [--only wait,forecast,anomaly,simulate,index]"""
 from __future__ import annotations
 
 import argparse
@@ -10,6 +10,8 @@ from .anomaly import detect_all
 from .cards import write_cards
 from .common import load_features, mlflow_log, models_dir
 from .forecast import forecast_all
+from .index import build_index, method_note
+from .simulate import counterfactual_q1
 from .wait import model_card, train_wait
 
 CARDS_DIR = Path(__file__).resolve().parents[4] / "docs" / "model-cards"
@@ -18,7 +20,7 @@ CARDS_DIR = Path(__file__).resolve().parents[4] / "docs" / "model-cards"
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="darumen.models.train")
     parser.add_argument("--lakehouse", default="lakehouse")
-    parser.add_argument("--only", default="wait,forecast,anomaly", help="через запятую: wait, forecast, anomaly")
+    parser.add_argument("--only", default="wait,forecast,anomaly,simulate,index", help="через запятую: wait, forecast, anomaly, simulate, index")
     parser.add_argument("--cards", default=str(CARDS_DIR))
     args = parser.parse_args(argv)
     lake = Lakehouse(Path(args.lakehouse))
@@ -60,9 +62,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"anomaly  {stream_id:20s} series={report['series']:>5} alerts={report['alerts']} critical={report['critical']} "
                   f"entity-specific={report['entity_specific']} | injected spikes: precision@k {report.get('precision_at_k', float('nan')):.2f} "
                   f"recall {report.get('recall_at_threshold', float('nan')):.2f} alerts/1000 {report.get('alerts_per_1000_points', float('nan')):.1f}")
-    if "forecast" in args.only or "anomaly" in args.only:
+    if "simulate" in args.only:
+        summary = counterfactual_q1(lake)
+        lo, hi = summary["saved_share_band"]
+        c = summary["consistency"]
+        print(f"simulate counterfactual Q1: {summary['groups_with_moves']} region×profile groups with moves, "
+              f"{summary['saved_days']:,.0f} of {summary['wait_days_before']:,.0f} waiting days saved ({summary['saved_share']:.1%}, band {lo:.1%}–{hi:.1%}) "
+              f"over {summary['horizon_days']} days from {summary['as_of']}; consistency with observed p50: spearman {c['spearman']:.2f}, MAE {c['mae_days']:.1f} d")
+        mlflow_log("simulate", {"as_of": summary["as_of"], "horizon_days": summary["horizon_days"]},
+                   {k: v for k, v in summary.items() if isinstance(v, (int, float))} | {f"consistency_{k}": v for k, v in c.items()},
+                   [lake.root / "models" / "simulate" / "counterfactual_q1.json"])
+    if {"forecast", "anomaly", "simulate"} & set(args.only.split(",")):
         for path in write_cards(lake, Path(args.cards)):
             print(f"card {path}")
+    if "index" in args.only:
+        index = build_index(lake)
+        note = Path(args.cards).parent / "access-index.md"
+        method_note(note)
+        latest = index[(index["profile_code"] == "all") & (index["month"] == index["month"].max())]
+        print(f"index    {len(index):,} rows, latest month {index['month'].max()}: top {latest.iloc[0]['region_kato']} "
+              f"({latest.iloc[0]['index_value']}), bottom {latest.iloc[-1]['region_kato']} ({latest.iloc[-1]['index_value']}); note {note}")
     print(f"done in {time.time() - started:.1f}s")
     return 0
 
