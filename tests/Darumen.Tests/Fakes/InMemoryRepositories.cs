@@ -1,6 +1,7 @@
 using Darumen.Modules.Analytics;
 using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
+using Darumen.Modules.Medicines;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
 using Darumen.Shared.Api;
@@ -130,6 +131,27 @@ public sealed class InMemoryWorklist : IWorklistRepository
             new(AsOf, "22GN", "Городская больница №2", "381", "75", 12, 3, 8, 4.0, 0.02, 9, 20),
             new(AsOf, "027O", "Городская больница №7", "021", "75", 40, 6, 14, 6.0, 0.05, 7, 15),
         ]);
+}
+
+public sealed class InMemoryMedicines : IMedicinesRepository
+{
+    public static IReadOnlyList<RxWeek> Weeks(int fulfilledRecent) =>
+        Enumerable.Range(0, 16).Select(i => new RxWeek(new DateOnly(2025, 1, 6).AddDays(7 * i), 100, i < 12 ? 90 : fulfilledRecent, i < 12 ? 70 : fulfilledRecent / 2, 3, 9)).ToList();
+
+    public Task<IReadOnlyList<RxWeek>> WeeksAsync(string mnnId, int weeks, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<RxWeek>>(mnnId == "817" ? Weeks(40) : mnnId == "900" ? Weeks(88) : []);
+
+    public Task<IReadOnlyList<RxMonth>> MonthsAsync(string nosologyId, int months, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<RxMonth>>(nosologyId == "109" ? [new(new DateOnly(2025, 3, 1), "63", 5000, 4800, 4000, 2, 8)] : []);
+
+    public Task<IReadOnlyList<DrugProgram>> ProgramsAsync(string nosologyId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DrugProgram>>(nosologyId == "109" ? [new("90", "63", 120, 40, 2260)] : []);
+
+    public Task<IReadOnlyList<NosologyDto>> NosologiesAsync(int limit, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<NosologyDto>>([new("109", "63", 60000, 58000, 25)]);
+
+    public Task<IReadOnlyList<MnnDto>> MnnAsync(string nosologyId, int limit, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<MnnDto>>([new("817", nosologyId, "63", 30000, 29000, 3), new("900", nosologyId, "63", 10000, 9900, 2)]);
 }
 
 public sealed class InMemoryIntake : IIntakeRepository

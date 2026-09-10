@@ -83,19 +83,19 @@
 
 ## Medicines
 
-### `POST /api/v1/medicines/check` (doctor, citizen)
-Тело `{ "mnnId", "nosologyId", "regionKato" }`. Ответ:
+### `POST /api/v1/medicines/check` (публичный)
+Тело `{ "mnnId", "nosologyId", "regionKato" }` (нужен хотя бы один из `mnnId`, `nosologyId`). Ответ:
 ```json
 {
-  "covered": true, "program": "ОСМС", "category": "…",
+  "covered": true, "program": "Программа 90", "category": "63",
   "fillDaysP50": 3, "fillDaysP90": 12, "pFilled14d": 0.91,
-  "shortage": { "flag": false, "score": 0.4 },
-  "pharmacies": [ { "drugStoreId", "name", "lat", "lon", "fills30d" } ],
-  "alternatives": [ { "specId", "name" } ],
-  "model"
+  "shortage": { "flag": false, "score": 0.1, "basis": "обеспечено 92 % выписанных за 4 нед. против 95 % за предыдущие 12" },
+  "pharmacies": [], "alternatives": [ { "mnnId", "name", "issued12m" } ],
+  "basis": "по 1 240 обеспеченным рецептам МНН за 4 нед.",
+  "model": { "name": "rx_fill", "version": "1.0.0", "trainedThrough": "2025-03-24" }
 }
 ```
-`pharmacies` пустой, пока нет справочника аптек (запрос 12).
+`covered` по активным спецификациям нозологии (справочник спецификаций), сроки по фактическим обеспеченным рецептам (МНН за последние недели, иначе нозология за месяцы), дефицит по падению доли обеспеченных к выписанным. Названий МНН и аптек в открытых данных нет (запросы 12, 13): `pharmacies` пустой, названия вида «МНН 817». `GET /api/v1/medicines/nosologies`, `GET /api/v1/medicines/mnn?nosologyId=` дают списки для выбора.
 
 ## Journal: решения человека
 

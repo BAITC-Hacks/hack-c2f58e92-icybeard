@@ -65,6 +65,19 @@ export interface Region { regionKato: string; name: string; capital: string; lat
 export interface OrganizationItem { moCode: string; name: string; regionKato: string; moType: string | null; sizeBucket: string | null }
 export interface Profile { profileCode: string; name: string; isDayHospital: boolean; referrals: number }
 
+export interface Shortage { flag: boolean; score: number; basis: string }
+export interface AlternativeMnn { mnnId: string; name: string; issued12m: number }
+export interface CheckResponse {
+  covered: boolean; program: string | null; category: string | null; fillDaysP50: number | null; fillDaysP90: number | null
+  pFilled14d: number | null; shortage: Shortage; pharmacies: unknown[]; alternatives: AlternativeMnn[]; basis: string; model: ModelInfo
+}
+export interface Nosology { nosologyId: string; categoryId: string; issued12m: number; fulfilled12m: number; mnnCount: number }
+export interface Mnn { mnnId: string; nosologyId: string; categoryId: string; issued12m: number; fulfilled12m: number; fillDaysP50: number | null }
+
+export interface ChartSeries { name: string; data: (number | null)[] }
+export interface Chart { type: 'line' | 'bar'; title: string; x: string[]; series: ChartSeries[] }
+export interface AskResponse { answer: string; value: number | null; unit: string | null; chart: Chart | null; toolsUsed: string[]; sources: string[]; model: string }
+
 export interface Batch {
   batchId: string; dataset: string; status: string; rowsLoaded: number; rowsQuarantined: number
   partitions: string[]; occurredAt: string | null; receivedAt: string

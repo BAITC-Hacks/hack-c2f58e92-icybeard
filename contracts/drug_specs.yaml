@@ -1,0 +1,45 @@
+dataset: drug_specs
+title: Справочник спецификаций лекарственных препаратов
+source:
+  system: ИС Лекарственное обеспечение
+  publisher: МЗ РК
+  portal_id: magda-ds-e94d2147-5f53-47b1-84f1-57cea415effa
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  parts: "_part_{n:03d}_of_{m:03d}"
+grain: одна спецификация препарата в договоре закупа
+keys: [spec_id]
+signature:
+  - spec_id
+  - product_id
+  - category_id
+  - nosology_id
+  - contract_id
+  - spec_unit_price
+  - spec_unit_qty
+  - program_id
+  - spec_is_active
+  - sdu_load_date
+columns:
+  spec_id: { type: string }
+  product_id: { type: string, nullable: true, note: "названий препаратов в наборе нет (запрос 13)" }
+  category_id: { type: string, nullable: true }
+  nosology_id: { type: string, nullable: true }
+  contract_id: { type: string, nullable: true }
+  spec_unit_price: { type: decimal, nullable: true }
+  spec_unit_qty: { type: decimal, nullable: true }
+  program_id: { type: string, nullable: true }
+  spec_is_active: { type: string, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: snapshot }
+derive:
+  is_active: "spec_is_active = '1'"
+privacy:
+  class: aggregate
+  public_aggregates_min_count: 5
+rules:
+  - { level: quarantine, reason: negative_price, check: "spec_unit_price is null or spec_unit_price >= 0" }
+partition: ["year(sdu_load_date)"]

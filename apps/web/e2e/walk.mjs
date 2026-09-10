@@ -7,11 +7,13 @@ const pages = [
   { role: 'regulator', path: '/gov', wait: 'Индекс за' },
   { role: 'regulator', path: '/gov/regions/75', wait: 'Сигналы региона' },
   { role: 'regulator', path: '/gov/simulator', wait: 'Результат для' },
+  { role: 'regulator', path: '/gov/insight', wait: 'Вопрос' },
   { role: 'doctor', path: '/doctor/referral', wait: 'Альтернативы в регионе' },
   { role: 'doctor', path: '/doctor/worklist', wait: 'Приоритет' },
   { role: 'doctor', path: '/doctor/decisions', wait: 'Журнал решений' },
   { role: 'steward', path: '/steward', wait: 'Партии' },
   { role: null, path: '/wait', wait: 'В среднем по региону' },
+  { role: null, path: '/medicines', wait: 'Покрытие' },
 ]
 const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: { width: 1360, height: 900 }, locale: 'ru-RU' })

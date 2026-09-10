@@ -1,0 +1,10 @@
+stream: rx_weekly
+title: Обеспеченные рецепты по МНН, по неделям
+from: gold.rx_weekly
+gold: { table: rx_weekly, time: week, y: fulfilled }
+entity: [region_kato, drug_mnn_id]
+time: { column: week, grain: week }
+measure: { agg: sum }
+peer_group: [region_kato]
+forecast: { horizons: [4, 8, 13], min_history: 52, season: 1, backtest_windows: 3, backtest_step: 4 }  # без сезонности: недельный ряд рецептов
+anomaly: { method: robust_z, window: 26, threshold: 3.5 }

@@ -1,0 +1,75 @@
+dataset: rx_fulfilled
+title: Сведения об обеспеченных рецептах на лекарственные препараты
+source:
+  system: ИС Лекарственное обеспечение
+  publisher: МЗ РК
+  portal_id: magda-ds-3a2d309f-9880-45e0-9628-fa14967a3eb5
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  parts: "_part_{n:03d}_of_{m:03d}"
+grain: один обеспеченный (отпущенный в аптеке) рецепт
+keys: [recipe_id]
+signature:
+  - recipe_id
+  - polycl_id
+  - spec_id
+  - recipe_date
+  - recipe_num
+  - recipe_pack_qty
+  - signature
+  - drug_store_id
+  - recipe_prov_date
+  - created_date
+  - created_by_user_id
+  - modified_date
+  - modified_by_user_id
+  - category_id
+  - icd_id
+  - contract_type_code
+  - contract_id
+  - nosology_id
+  - drug_mnn_id
+  - quantity_in_consumer_packaging
+  - dosage
+  - med_service_type
+  - allow_package_opening
+  - sdu_load_date
+columns:
+  recipe_id: { type: string }
+  polycl_id: { type: string, nullable: true }
+  spec_id: { type: string, nullable: true }
+  recipe_date: { type: timestamp }
+  recipe_num: { type: string, drop: true, note: "дублирует recipe_id" }
+  recipe_pack_qty: { type: decimal, nullable: true }
+  signature: { type: string, drop: true, note: "свободный текст схемы приёма" }
+  drug_store_id: { type: string, nullable: true, note: "аптека без справочника (запрос 12)" }
+  recipe_prov_date: { type: timestamp, nullable: true }
+  created_date: { type: timestamp, nullable: true }
+  created_by_user_id: { type: string, drop: true }
+  modified_date: { type: timestamp, nullable: true }
+  modified_by_user_id: { type: string, drop: true }
+  category_id: { type: string, nullable: true }
+  icd_id: { type: string, semantic: icd10, nullable: true }
+  contract_type_code: { type: string, nullable: true }
+  contract_id: { type: string, nullable: true }
+  nosology_id: { type: string, nullable: true }
+  drug_mnn_id: { type: string, nullable: true }
+  quantity_in_consumer_packaging: { type: decimal, nullable: true }
+  dosage: { type: string, nullable: true }
+  med_service_type: { type: string, nullable: true }
+  allow_package_opening: { type: string, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: technical }
+derive:
+  fill_days: "date_diff('day', recipe_date::date, recipe_prov_date::date)"
+privacy:
+  class: quasi_identifiers
+  direct_identifiers: []
+  public_aggregates_min_count: 5
+rules:
+  - { level: quarantine, reason: date_out_of_range, check: "recipe_date between '2015-01-01' and now()" }
+  - { level: quarantine, reason: fulfilled_before_issue, check: "recipe_prov_date is null or recipe_prov_date >= recipe_date" }
+partition: ["year(recipe_date)"]

@@ -60,3 +60,10 @@ def test_smape_handles_zeros():
 def test_stream_dataclass_fields():
     s = Stream("x", "x", "t", "day", "y", ("a",), "day", ("a",), {"horizons": [7]}, {})
     assert s.freq == "D"
+
+
+def test_period_format_by_grain():
+    from darumen.models.streams import FREQ, period_format
+
+    assert period_format("day") == "%Y-%m-%d" and period_format("week") == "%Y-%m-%d" and period_format("month") == "%Y-%m"
+    assert FREQ["week"] == "W-MON"

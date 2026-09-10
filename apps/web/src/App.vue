@@ -14,8 +14,10 @@ const auth = useAuthStore()
 const links = computed(() => {
   const items: { to: string; label: string; roles?: Role[] }[] = [
     { to: '/wait', label: t('nav.wait') },
+    { to: '/medicines', label: t('nav.medicines') },
     { to: '/gov', label: t('nav.gov'), roles: ['chief', 'regulator'] },
     { to: '/gov/simulator', label: t('nav.simulator'), roles: ['regulator'] },
+    { to: '/gov/insight', label: t('nav.insight'), roles: ['chief', 'regulator'] },
     { to: '/doctor/referral', label: t('nav.referral'), roles: ['doctor'] },
     { to: '/doctor/worklist', label: t('nav.worklist'), roles: ['doctor'] },
     { to: '/doctor/decisions', label: t('nav.decisions'), roles: ['doctor', 'regulator'] },

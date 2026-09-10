@@ -1,0 +1,60 @@
+dataset: rx_issued
+title: Сведения о выписанных рецептах на лекарственные препараты
+source:
+  system: ИС Лекарственное обеспечение
+  publisher: МЗ РК
+  portal_id: magda-ds-e6cd5fc0-eaa0-4445-bcae-fd6be2d3c972
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+  parts: "_part_{n:03d}_of_{m:03d}"
+grain: один выписанный рецепт
+keys: [recipe_id]
+signature:
+  - recipe_id
+  - polycl_id
+  - spec_id
+  - recipe_date
+  - recipe_num
+  - recipe_pack_qty
+  - signature
+  - created_date
+  - created_by_user_id
+  - category_id
+  - icd_id
+  - nosology_id
+  - drug_mnn_id
+  - quantity_in_consumer_packaging
+  - dosage
+  - med_service_type
+  - allow_package_opening
+  - sdu_load_date
+columns:
+  recipe_id: { type: string }
+  polycl_id: { type: string, nullable: true, note: "идентификатор поликлиники без справочника: регион пока неизвестен (запрос 12)" }
+  spec_id: { type: string, nullable: true }
+  recipe_date: { type: timestamp }
+  recipe_num: { type: string, drop: true, note: "дублирует recipe_id" }
+  recipe_pack_qty: { type: decimal, nullable: true }
+  signature: { type: string, drop: true, note: "свободный текст схемы приёма, не нужен витринам" }
+  created_date: { type: timestamp, nullable: true }
+  created_by_user_id: { type: string, drop: true, note: "идентификатор пользователя системы" }
+  category_id: { type: string, nullable: true }
+  icd_id: { type: string, semantic: icd10, nullable: true }
+  nosology_id: { type: string, nullable: true }
+  drug_mnn_id: { type: string, nullable: true }
+  quantity_in_consumer_packaging: { type: decimal, nullable: true }
+  dosage: { type: string, nullable: true }
+  med_service_type: { type: string, nullable: true }
+  allow_package_opening: { type: string, nullable: true }
+  sdu_load_date: { type: timestamp, semantic: technical }
+privacy:
+  class: quasi_identifiers
+  direct_identifiers: []
+  public_aggregates_min_count: 5
+rules:
+  - { level: quarantine, reason: date_out_of_range, check: "recipe_date between '2015-01-01' and now()" }
+partition: ["year(recipe_date)"]

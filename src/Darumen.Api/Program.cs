@@ -1,8 +1,10 @@
 using Darumen.Api;
 using Darumen.Migrations;
 using Darumen.Modules.Analytics;
+using Darumen.Modules.Insight;
 using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
+using Darumen.Modules.Medicines;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
 using Darumen.Modules.Simulation;
@@ -19,6 +21,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
 builder.Services.AddOutputCache();
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
+{
+    var origins = builder.Configuration.GetSection("Cors:Origins").Get<string[]>() ?? [];
+    if (origins.Length == 0)
+    {
+        policy.SetIsOriginAllowed(_ => true); // разработка: Flutter web и Vite на любых локальных портах
+    }
+    else
+    {
+        policy.WithOrigins(origins);
+    }
+
+    policy.AllowAnyHeader().AllowAnyMethod().WithExposedHeaders("Location");
+}));
 builder.Services.AddDarumenCore(builder.Configuration);
 builder.Services.AddDarumenDbContext<DarumenDbContext>(builder.Configuration, options => options.UseNpgsql(builder.Configuration.PostgresConnection()));
 builder.Host.AddDarumenMessaging(builder.Configuration, opts => opts.Discovery.IncludeAssembly(typeof(IntakeModule).Assembly));
@@ -30,12 +46,15 @@ builder.Services.AddDarumenModules(
     new SimulationModule(),
     new JournalModule(),
     new RefDataModule(),
-    new IntakeModule());
+    new IntakeModule(),
+    new MedicinesModule(),
+    new InsightModule());
 
 var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<AuditMiddleware>();

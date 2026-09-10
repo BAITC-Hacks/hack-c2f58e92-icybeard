@@ -13,7 +13,7 @@ import pandas as pd
 
 from ..intake.pipeline import Lakehouse
 from .common import write_json
-from .streams import Stream, load_series, load_streams
+from .streams import Stream, load_series, load_streams, period_format
 
 VERSION = "1.0.0"
 LEVEL = 80
@@ -106,7 +106,7 @@ def forecast_stream(lake: Lakehouse, stream: Stream, out_dir: Path) -> tuple[pd.
     out = pd.DataFrame({
         "stream_id": stream.stream_id,
         "entity": fc[list(stream.entity)].apply(lambda r: json.dumps(dict(r), ensure_ascii=False), axis=1),
-        "period": fc["ds"].dt.strftime("%Y-%m-%d" if stream.grain == "day" else "%Y-%m"),
+        "period": fc["ds"].dt.strftime(period_format(stream.grain)),
         "horizon": fc["horizon"].astype(int),
         "yhat": np.clip(fc[chosen].to_numpy(), 0, None),
         "lo": np.clip(np.minimum(lo.to_numpy(), fc[chosen].to_numpy()), 0, None),

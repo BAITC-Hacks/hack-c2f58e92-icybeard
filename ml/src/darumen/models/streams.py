@@ -15,7 +15,13 @@ import yaml
 from ..intake.pipeline import Lakehouse
 
 STREAMS_DIR = Path(__file__).resolve().parents[4] / "streams"
-FREQ = {"day": "D", "month": "MS"}
+FREQ = {"day": "D", "week": "W-MON", "month": "MS"}
+PERIOD_FORMAT = {"day": "%Y-%m-%d", "week": "%Y-%m-%d", "month": "%Y-%m"}
+
+
+def period_format(grain: str) -> str:
+    """strftime pattern of a period label: days and weeks (Mondays) as dates, months as YYYY-MM."""
+    return PERIOD_FORMAT[grain]
 INCOMPLETE_TAIL_RATIO = 0.6  # trailing periods below this share of the trailing-year median are still being loaded
 
 

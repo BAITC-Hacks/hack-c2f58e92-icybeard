@@ -12,7 +12,7 @@ import pandas as pd
 
 from ..intake.pipeline import Lakehouse
 from .common import write_json
-from .streams import Stream, load_series, load_streams
+from .streams import Stream, load_series, load_streams, period_format
 
 VERSION = "1.0.0"
 MAD_TO_SIGMA = 1.4826
@@ -133,7 +133,7 @@ def detect_all(lake: Lakehouse, only: list[str] | None = None) -> dict[str, dict
             frames.append(pd.DataFrame({
                 "stream_id": stream_id,
                 "entity": flagged[list(stream.entity)].apply(lambda r: json.dumps(dict(r), ensure_ascii=False), axis=1),
-                "period": flagged["ds"].dt.strftime("%Y-%m-%d" if stream.grain == "day" else "%Y-%m"),
+                "period": flagged["ds"].dt.strftime(period_format(stream.grain)),
                 "observed": flagged["y"].to_numpy(), "expected": flagged["expected"].to_numpy(),
                 "score": flagged["z"].to_numpy(), "peer_score": flagged["peer_z"].to_numpy(),
                 "severity": flagged["severity"].to_numpy(), "kind": flagged["kind"].to_numpy(), "status": "open",

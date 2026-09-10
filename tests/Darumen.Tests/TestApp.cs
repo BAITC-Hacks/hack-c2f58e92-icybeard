@@ -1,8 +1,10 @@
 using Darumen.Api;
 using Darumen.Contracts.V1;
 using Darumen.Modules.Analytics;
+using Darumen.Modules.Insight;
 using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
+using Darumen.Modules.Medicines;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
 using Darumen.Shared.Auth;
@@ -27,6 +29,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
     public InMemoryAnalytics Analytics { get; } = new();
 
     public InMemoryDecisions Decisions { get; } = new();
+
+    public FakeInsightFactory Insight { get; } = new();
 
     /// <summary>Клиент с ролью для схемы заголовков.</summary>
     public HttpClient CreateClient(string role, string actor = "user-1", string? region = null)
@@ -65,6 +69,10 @@ public sealed class TestApp : WebApplicationFactory<Program>
             services.AddSingleton<IRefDataRepository, InMemoryRefData>();
             services.RemoveAll<IWorklistRepository>();
             services.AddSingleton<IWorklistRepository, InMemoryWorklist>();
+            services.RemoveAll<IMedicinesRepository>();
+            services.AddSingleton<IMedicinesRepository, InMemoryMedicines>();
+            services.RemoveAll<IInsightChatClientFactory>();
+            services.AddSingleton<IInsightChatClientFactory>(Insight);
             services.RemoveAll<IIntakeRepository>();
             services.AddSingleton<IIntakeRepository, InMemoryIntake>();
         });

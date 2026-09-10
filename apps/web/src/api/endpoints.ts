@@ -1,7 +1,7 @@
 import { api } from './client'
 import type {
-  AlternativesResponse, Anomaly, Batch, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
-  OrganizationItem, OrganizationSeries, Paged, PredictRequest, PredictResponse, Profile, RedistributeResponse, Region,
+  AlternativesResponse, Anomaly, AskResponse, Batch, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
+  Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, PredictResponse, Profile, RedistributeResponse, Region,
   SimulateResponse, Stream, WorklistItem,
 } from './types'
 
@@ -48,6 +48,17 @@ export const refdata = {
   organizations: (regionKato?: string, q?: string, profileCode?: string, limit = 200) =>
     api<{ items: OrganizationItem[] }>('/api/v1/refdata/organizations', { query: { regionKato, q, profileCode, limit } }),
   profiles: () => api<{ items: Profile[] }>('/api/v1/refdata/profiles'),
+}
+
+export const medicines = {
+  check: (body: { mnnId?: string | null; nosologyId?: string | null; regionKato?: string | null }) => api<CheckResponse>('/api/v1/medicines/check', { body }),
+  nosologies: (limit = 50) => api<{ items: Nosology[] }>('/api/v1/medicines/nosologies', { query: { limit } }),
+  mnn: (nosologyId: string, limit = 50) => api<{ items: Mnn[] }>('/api/v1/medicines/mnn', { query: { nosologyId, limit } }),
+}
+
+export const insight = {
+  ask: (question: string, regionKato?: string) => api<AskResponse>('/api/v1/insight/ask', { body: { question, regionKato } }),
+  status: () => api<{ available: boolean }>('/api/v1/insight/status'),
 }
 
 export const intake = {
