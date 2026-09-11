@@ -44,11 +44,18 @@ public sealed class InsightTools(
         AIFunctionFactory.Create(MedicinesCheckAsync, "medicines_check", "Покрытие, сроки обеспечения и признаки дефицита по нозологии и МНН (идентификаторы)."),
     ];
 
+    /// <summary>Ответ инструмента ограничен по размеру: локальные модели работают с контекстом 16k, куда должны
+    /// поместиться десять схем инструментов, вопрос и несколько ответов подряд.</summary>
+    public const int MaxToolResultChars = 6000;
+
     private string Track(string name, object payload)
     {
         Used.Add(name);
-        return JsonSerializer.Serialize(payload, Json);
+        var json = JsonSerializer.Serialize(payload, Json);
+        return json.Length <= MaxToolResultChars ? json : json[..MaxToolResultChars] + "…(обрезано)";
     }
+
+    private static string Short(string? text, int max = 70) => text is null ? string.Empty : text.Length <= max ? text : text[..max] + "…";
 
     [Description("Индекс доступности за месяц по профилю")]
     private async Task<string> AccessIndexAsync([Description("Месяц YYYY-MM; пусто = последний")] string? month, [Description("Код профиля койки или all")] string? profileCode, CancellationToken ct)
@@ -62,7 +69,7 @@ public sealed class InsightTools(
         var chosen = string.IsNullOrWhiteSpace(month) || !months.Contains(month) ? months[^1] : month;
         var items = await analytics.IndexAsync(chosen, string.IsNullOrWhiteSpace(profileCode) ? AnalyticsEndpoints.AllProfiles : profileCode, Locale.Ru, ct);
         Chart = new ChartDto("bar", $"Индекс доступности, {chosen}", items.Select(i => i.Name).ToList(), [new ChartSeriesDto("индекс", items.Select(i => (double?)i.IndexValue).ToList())]);
-        return Track("access_index", new { month = chosen, items = items.Select(i => new { i.RegionKato, i.Name, i.IndexValue, i.Rank, i.ShareOver30, i.P90Days, i.N }) });
+        return Track("access_index", new { month = chosen, items = items.Select(i => new { i.RegionKato, i.Name, i.IndexValue, i.Rank, shareOver30 = Math.Round(i.ShareOver30, 3), i.P90Days, i.N }) });
     }
 
     private async Task<string> RegionsAsync(CancellationToken ct) =>
@@ -72,7 +79,7 @@ public sealed class InsightTools(
         Track("bed_profiles", (await refData.ProfilesAsync(ct)).Take(60).Select(p => new { p.ProfileCode, p.Name, p.Referrals }));
 
     private async Task<string> OrganizationsAsync([Description("Код региона КАТО")] string regionKato, [Description("Код профиля койки")] string profileCode, CancellationToken ct) =>
-        Track("organizations", (await refData.OrganizationsAsync(regionKato, null, profileCode, 15, ct)).Select(o => new { o.MoCode, o.Name, o.MoType }));
+        Track("organizations", (await refData.OrganizationsAsync(regionKato, null, profileCode, 10, ct)).Select(o => new { o.MoCode, name = Short(o.Name), o.MoType }));
 
     private async Task<string> QueueStateAsync([Description("Код организации")] string moCode, [Description("Код профиля койки")] string profileCode, CancellationToken ct)
     {
@@ -90,13 +97,13 @@ public sealed class InsightTools(
     private async Task<string> PredictWaitAsync([Description("Код региона КАТО")] string regionKato, [Description("Код профиля койки")] string profileCode, [Description("Код организации, пусто = по региону")] string? moCode, CancellationToken ct)
     {
         var response = await queueService.PredictAsync(new PredictRequestDto(regionKato, moCode, profileCode, null, null, null, null, null), Locale.Ru, ct);
-        return Track("predict_wait", new { response.P50Days, response.P90Days, response.PWithin30Days, response.PRefusal, response.Queue, summary = response.Explanation.Summary });
+        return Track("predict_wait", new { p50Days = Math.Round(response.P50Days, 1), p90Days = Math.Round(response.P90Days, 1), pWithin30Days = Math.Round(response.PWithin30Days, 3), pRefusal = Math.Round(response.PRefusal, 3), response.Queue, summary = Short(response.Explanation.Summary, 200) });
     }
 
     private async Task<string> AnomaliesAsync([Description("Код региона КАТО, пусто = все")] string? regionKato, [Description("critical или warning, пусто = все")] string? severity, CancellationToken ct)
     {
-        var page = await analytics.AnomaliesAsync(new AnomalyFilter(string.IsNullOrWhiteSpace(regionKato) ? null : regionKato, null, string.IsNullOrWhiteSpace(severity) ? null : severity, "open"), 1, 15, ct);
-        return Track("anomalies", new { page.Total, items = page.Items.Select(a => new { a.StreamId, a.Entity, a.Period, a.Observed, a.Expected, a.Score, a.Severity, a.Kind }) });
+        var page = await analytics.AnomaliesAsync(new AnomalyFilter(string.IsNullOrWhiteSpace(regionKato) ? null : regionKato, null, string.IsNullOrWhiteSpace(severity) ? null : severity, "open"), 1, 8, ct);
+        return Track("anomalies", new { page.Total, items = page.Items.Select(a => new { a.StreamId, entity = string.Join(" / ", a.Entity.Values.Select(v => Short(v, 40))), a.Period, observed = Math.Round(a.Observed), expected = Math.Round(a.Expected), score = Math.Round(a.Score, 1), a.Severity, a.Kind }) });
     }
 
     private async Task<string> ForecastAsync([Description("streamId: admissions_monthly, er_visits_daily или vac_monthly")] string streamId, [Description("Код региона КАТО")] string regionKato, [Description("Второй ключ сущности: profile_code, mo_key или vaccination_plan")] string? secondKey, CancellationToken ct)
@@ -129,7 +136,7 @@ public sealed class InsightTools(
                 new ChartSeriesDto("факт", history.Select(h => (double?)h.Y).Concat(response.Points.Select(_ => (double?)null)).ToList()),
                 new ChartSeriesDto("прогноз", history.Select(_ => (double?)null).Concat(response.Points.Select(p => (double?)p.Yhat)).ToList()),
             ]);
-            return Track("forecast", new { streamId, entity, points = response.Points.Select(p => new { p.Period, p.Yhat, p.Lo, p.Hi }), history = history.TakeLast(6), backtest = new { response.Backtest.Smape, response.Backtest.Mase } });
+            return Track("forecast", new { streamId, entity, points = response.Points.Take(13).Select(p => new { p.Period, yhat = Math.Round(p.Yhat), lo = Math.Round(p.Lo), hi = Math.Round(p.Hi) }), history = history.TakeLast(6).Select(h => new { h.Period, y = Math.Round(h.Y) }), backtest = new { smape = Math.Round(response.Backtest.Smape, 3), mase = Math.Round(response.Backtest.Mase, 3) } });
         }
         catch (Grpc.Core.RpcException exception)
         {

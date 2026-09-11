@@ -1,5 +1,5 @@
 # Локальная модель для Insight и скрайба: те же веса qwen3.8:27b, но ограниченный контекст,
 # иначе Ollama резервирует KV-кэш на 128k токенов и модель не помещается в память ноутбука.
 FROM qwen3.8:27b
-PARAMETER num_ctx 8192
+PARAMETER num_ctx 16384
 PARAMETER temperature 0

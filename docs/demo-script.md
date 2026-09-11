@@ -1,6 +1,8 @@
 # Сценарий демонстрации (7 минут)
 
-Подготовка: `make serve`, `make publish`, `make models-serve`, `make scribe-serve`, `dotnet run --project src/Darumen.Api`, `cd apps/web && npm run dev`. Роль переключается в шапке (демо-режим) или входом Keycloak (`regulator1` / `darumen`).
+Живой стенд: https://dc.jurek.kz (роль в шапке, без пароля). Что есть на каждой странице и что показывать: [demo-pages.md](demo-pages.md).
+
+Подготовка локально: `make serve`, `make publish`, `make models-serve`, `make scribe-serve`, `dotnet run --project src/Darumen.Api`, `cd apps/web && npm run dev`. Роль переключается в шапке (демо-режим) или входом Keycloak (`regulator1` / `darumen`).
 
 1. **Проблема (30 с).** Очереди на плановую госпитализацию: в Алматы по офтальмологии 1 784 направления в институте глазных болезней, медианное ожидание 55 дней, треть отказов; рядом организации с ожиданием 9 дней.
 2. **Карта регионов, роль regulator (60 с).** `/gov`: индекс доступности за март 2025 по регионам, 20 центров регионов; клик в г. Алматы. Открытые сигналы аномалий сверху ленты.
