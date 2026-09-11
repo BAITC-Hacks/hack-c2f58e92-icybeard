@@ -38,3 +38,6 @@ apps/mobile/ios/Pods/
 apps/web/e2e/shots/
 apps/web/.env
 infra/cube/.cubestore/
+
+# прод-секреты деплоя
+infra/deploy/.env.prod

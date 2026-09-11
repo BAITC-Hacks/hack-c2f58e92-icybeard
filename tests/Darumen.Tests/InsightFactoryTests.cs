@@ -7,13 +7,23 @@ namespace Darumen.Tests;
 public sealed class InsightFactoryTests
 {
     [Fact]
-    public void Deepseek_is_the_default_and_needs_its_key()
+    public void Ollama_is_the_default_and_needs_no_key()
     {
-        var options = Options.Create(new InsightOptions());
+        var local = new LlmChatClientFactory(Options.Create(new InsightOptions()));
+        Assert.Equal("ollama", new InsightOptions().Provider);
+        Assert.Equal("ollama", local.ResolveKey());
+        Assert.NotNull(local.Create());
+        Assert.Equal("Ответ 12 дней.", InsightService.StripThinking("<think>долго думаю\nещё</think>Ответ 12 дней."));
+    }
+
+    [Fact]
+    public void Deepseek_needs_its_key()
+    {
+        var options = Options.Create(new InsightOptions { Provider = "deepseek" });
         Assert.Equal("deepseek", options.Value.Provider);
         Assert.Equal("DEEPSEEK_API_KEY", LlmChatClientFactory.KeyVariable(options.Value.Provider));
         Assert.Equal("ANTHROPIC_API_KEY", LlmChatClientFactory.KeyVariable("anthropic"));
-        var withoutKey = new LlmChatClientFactory(Options.Create(new InsightOptions { ApiKey = null }));
+        var withoutKey = new LlmChatClientFactory(Options.Create(new InsightOptions { Provider = "deepseek", ApiKey = null }));
         var saved = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
         Environment.SetEnvironmentVariable("DEEPSEEK_API_KEY", null);
         try

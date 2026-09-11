@@ -80,17 +80,20 @@ class LlmDrafter:
         '{"sections": {"Жалобы": "...", "Анамнез": "...", "Осмотр": "...", "Диагноз": "...", "Назначения": "..."}, "leaflet": "..."}.'
     )
     DEFAULTS: ClassVar[dict[str, tuple[str, str, str]]] = {
+        "ollama": ("http://localhost:11434/v1", "darumen-qwen3.8:27b", "OLLAMA_API_KEY"),
         "deepseek": ("https://api.deepseek.com", "deepseek-chat", "DEEPSEEK_API_KEY"),
         "openai": ("https://api.openai.com/v1", "gpt-4.1-mini", "OPENAI_API_KEY"),
     }
+    THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
 
     def __init__(self, provider: str | None = None, model: str | None = None, base_url: str | None = None,
                  api_key: str | None = None, fallback: Drafter | None = None):
-        self._provider = provider or os.environ.get("DARUMEN_LLM_PROVIDER", "deepseek")
-        default_url, default_model, key_var = self.DEFAULTS.get(self._provider, self.DEFAULTS["deepseek"])
+        self._provider = provider or os.environ.get("DARUMEN_LLM_PROVIDER", "ollama")
+        default_url, default_model, key_var = self.DEFAULTS.get(self._provider, self.DEFAULTS["ollama"])
         self._base_url = base_url or os.environ.get("DARUMEN_LLM_BASE_URL", default_url)
         self._model = model or os.environ.get("DARUMEN_SCRIBE_MODEL", default_model)
-        self._api_key = api_key or os.environ.get(key_var)
+        # Ollama ключ не проверяет: локальная модель доступна без переменной окружения
+        self._api_key = api_key or os.environ.get(key_var) or ("ollama" if self._provider == "ollama" else None)
         self._fallback = fallback or RuleDrafter()
         self.name = f"{self._provider}/{self._model}"
 
@@ -104,12 +107,14 @@ class LlmDrafter:
             from openai import OpenAI
 
             transcript = "\n".join(f"[{s.t0:.0f}-{s.t1:.0f}] {s.text}" for s in segments)
-            client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=60)
+            client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=float(os.environ.get("DARUMEN_LLM_TIMEOUT", "180")), max_retries=0)
+            system = self.PROMPT + ("\n/no_think" if self._provider == "ollama" else "")
             completion = client.chat.completions.create(
                 model=self._model, temperature=0, max_tokens=1200, response_format={"type": "json_object"},
-                messages=[{"role": "system", "content": self.PROMPT},
+                messages=[{"role": "system", "content": system},
                           {"role": "user", "content": f"Язык памятки: {language}. Стенограмма:\n{transcript}"}])
-            payload = json.loads(re.search(r"\{.*\}", completion.choices[0].message.content or "", re.DOTALL).group(0))
+            content = self.THINK.sub("", completion.choices[0].message.content or "")
+            payload = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
             sections = [Section(name, str(payload["sections"].get(name, "")).strip()) for name in SECTIONS[:-1]]
             return Draft([s for s in sections if s.text], str(payload["leaflet"]).strip(), self.name)
         except Exception:  # noqa: BLE001 - демо: любая ошибка модели означает черновик по правилам

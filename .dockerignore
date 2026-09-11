@@ -1,0 +1,20 @@
+# Контекст сборки — корень репозитория; данные и артефакты в образ не попадают
+DataSets/
+lakehouse/
+mlruns/
+refdata/
+.git/
+.venv/
+**/node_modules/
+**/bin/
+**/obj/
+**/__pycache__/
+**/dist/
+apps/mobile/
+apps/web/e2e/
+docs/
+.env
+.env.*
+**/.env
+**/.env.*
+infra/cube/.cubestore/

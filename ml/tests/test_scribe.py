@@ -62,7 +62,11 @@ def test_llm_drafter_without_key_uses_rules(monkeypatch):
     from darumen.scribe.transcribe import Segment
 
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-    drafter = LlmDrafter()
+    monkeypatch.delenv("DARUMEN_LLM_PROVIDER", raising=False)
+    drafter = LlmDrafter(provider="deepseek")
     assert drafter.name == "deepseek/deepseek-chat" and not drafter.available()
     draft = drafter.draft([Segment(0, 4, "Жалобы на кашель. Назначаю сироп.")], "ru")
     assert draft.model == "rules@1.0.0" and any(s.name == "Назначения" for s in draft.sections)
+    local = LlmDrafter()
+    assert local.name == "ollama/darumen-qwen3.8:27b" and local.available()
+    assert LlmDrafter.THINK.sub("", "<think>мысли</think>{\"a\": 1}") == '{"a": 1}'

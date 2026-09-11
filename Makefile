@@ -45,6 +45,9 @@ serve: ## Поднять инфраструктуру и сервисы
 down: ## Остановить сервисы
 	$(COMPOSE) down
 
+deploy: ## Задеплоить на dc.jurek.kz (rsync + docker compose на VM); первый раз: make deploy ARGS=--replace-dc
+	scripts/deploy.sh $(ARGS)
+
 build: ## Собрать .NET и веб
 	dotnet build Darumen.slnx -c Release --nologo -v q
 	cd apps/web && npm run build
@@ -70,8 +73,11 @@ venv-scribe: venv ## Установить faster-whisper и anthropic для с�
 dagster: venv ## Dagster UI с линией активов silver → refdata → gold → models → published
 	$(PY) -m dagster dev -m darumen.orchestration.definitions
 
+ollama-model: ## Локальная модель для Insight и скрайба с контекстом 8k (нужен ollama pull qwen3.8:27b)
+	ollama create darumen-qwen3.8:27b -f infra/ollama/Modelfile
+
 lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data intake-status refdata gold publish train eval serve down build test proto models-serve scribe-serve venv-scribe dagster lint
+.PHONY: help venv data intake-status refdata gold publish train eval serve down build test proto models-serve scribe-serve venv-scribe dagster ollama-model lint

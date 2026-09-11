@@ -19,10 +19,17 @@ public static class InsightEndpoints
 
                 if (!service.Available)
                 {
-                    return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Insight не настроен", detail: "Задайте DEEPSEEK_API_KEY (или Insight:ApiKey), чтобы включить вопросы к данным.");
+                    return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Insight не настроен", detail: "Задайте ключ провайдера (DEEPSEEK_API_KEY или Insight:ApiKey) либо провайдера ollama без ключа.");
                 }
 
-                return Results.Ok(await service.AskAsync(body.Question!, body.RegionKato, ct));
+                try
+                {
+                    return Results.Ok(await service.AskAsync(body.Question!, body.RegionKato, ct));
+                }
+                catch (InsightUnavailableException exception)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Модель недоступна", detail: exception.Message);
+                }
             })
             .WithName("InsightAsk").WithSummary("Вопрос к данным: ответ с цифрой, графиком и списком использованных инструментов")
             .Produces<AskResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity).ProducesProblem(StatusCodes.Status503ServiceUnavailable);

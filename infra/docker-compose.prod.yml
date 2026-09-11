@@ -1,0 +1,114 @@
+# Продовый деплой Darumen на VM (dc.jurek.kz, Hetzner 195.201.7.56) — самостоятельный файл, НЕ оверлей
+# над docker-compose.yml (compose мерджит списки ports, оверлеем порт не убрать).
+#
+# Что отличается от dev-стека:
+#   - только то, без чего API не работает: postgres, models (gRPC), scribe, api, web;
+#     ClickHouse/Cube/Kafka/Keycloak/MinIO/MLflow/Valkey не поднимаем — Auth в режиме
+#     headers, Messaging в режиме stub, ClickHouse в C# не используется;
+#   - наружу смотрит только web на 127.0.0.1:5173 — TLS терминирует хостовый Caddy
+#     (блок dc.jurek.kz → reverse_proxy 127.0.0.1:5173, см. pos-server/deploy/caddy/Caddyfile.host);
+#   - lakehouse монтируется с хоста (/srv/darumen/lakehouse: gold, models, refdata — ~60 МБ);
+#   - секреты — из /srv/darumen/.env (образец: infra/deploy/.env.prod.example).
+#
+# Запуск на VM (делает scripts/deploy.sh):
+#   docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --build
+#   docker compose -f infra/docker-compose.prod.yml --env-file .env --profile tools run --rm publish
+name: darumen
+
+x-models-build: &models-build
+  context: ..
+  dockerfile: infra/models.Dockerfile
+  args:
+    SCRIBE_EXTRAS: "1"
+
+services:
+  postgres:
+    image: imresamu/postgis:17-3.5
+    environment:
+      POSTGRES_USER: darumen
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: darumen
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U darumen"]
+      interval: 5s
+      retries: 20
+
+  models:
+    build: *models-build
+    image: darumen-models
+    environment:
+      DARUMEN_LAKEHOUSE: /lakehouse
+    volumes:
+      - ${LAKEHOUSE_DIR:-../lakehouse}:/lakehouse:ro
+    restart: unless-stopped
+
+  scribe:
+    image: darumen-models
+    entrypoint: ["python", "-m", "darumen.scribe", "--host", "0.0.0.0", "--port", "8010"]
+    environment:
+      DARUMEN_SCRIBE_DIR: /scribe
+      DARUMEN_LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      DARUMEN_SCRIBE_MODEL: ${SCRIBE_MODEL:-deepseek-chat}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    volumes:
+      - scribedata:/scribe
+      - whispercache:/root/.cache   # веса faster-whisper скачиваются один раз
+    restart: unless-stopped
+    depends_on:
+      - models
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/api.Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://0.0.0.0:8000
+      ConnectionStrings__Postgres: Host=postgres;Database=darumen;Username=darumen;Password=${POSTGRES_PASSWORD}
+      ModelServices__Address: http://models:50051
+      Auth__Mode: headers
+      Messaging__Mode: stub
+      Cors__Origins__0: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}
+      ReverseProxy__Clusters__scribe__Destinations__local__Address: http://scribe:8010/
+      Insight__Provider: ${LLM_PROVIDER:-deepseek}
+      Insight__Model: ${INSIGHT_MODEL:-deepseek-chat}
+      Insight__BaseUrl: ${INSIGHT_BASE_URL:-https://api.deepseek.com/v1}
+      Insight__NoThinkHint: "false"
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      models: { condition: service_started }
+      scribe: { condition: service_started }
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/web/Dockerfile
+    ports:
+      - "127.0.0.1:5173:80"
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  # Одноразовая публикация gold и refdata из lakehouse в Postgres (после первого up и после каждого обновления данных):
+  #   docker compose -f infra/docker-compose.prod.yml --env-file .env --profile tools run --rm publish
+  publish:
+    image: darumen-models
+    entrypoint: ["python", "-m", "darumen.lakehouse", "publish", "--lakehouse", "/lakehouse", "--only", "postgres"]
+    environment:
+      POSTGRES_DSN: postgresql://darumen:${POSTGRES_PASSWORD}@postgres:5432/darumen
+    volumes:
+      - ${LAKEHOUSE_DIR:-../lakehouse}:/lakehouse:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    profiles: [tools]
+
+volumes:
+  pgdata:
+  scribedata:
+  whispercache:

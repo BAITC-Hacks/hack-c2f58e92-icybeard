@@ -31,6 +31,7 @@
 | [docs/api.md](docs/api.md) | REST API v1: соглашения, эндпоинты по доменам с примерами запросов и ответов |
 | [docs/data-requests.md](docs/data-requests.md) | Что из данных есть, чего не хватает, приоритетный запрос организаторам, открытые источники, черновик письма |
 | [docs/tz.md](docs/tz.md) | Техническое задание программы (текст организаторов) |
+| [docs/deploy.md](docs/deploy.md) | Публичный стенд dc.jurek.kz: продовый compose, скрипт деплоя, что не поднимаем и почему |
 
 ## Данные
 
@@ -105,7 +106,7 @@ grpcurl -plaintext localhost:50051 list              # проверить
 
 Карточки моделей в `docs/model-cards/` и `docs/access-index.md` генерируются командой `make train`, руками их не правят. Переобучить один поток: `ml/.venv/bin/python -m darumen.models.train --only forecast,anomaly --streams rx_weekly` (результат сливается в общие таблицы прогнозов и аномалий). Линия активов в Dagster: `make dagster` (silver → refdata → gold → models → published).
 
-AI-скрайб (демо, [docs/doctor-consult.md](docs/doctor-consult.md)): `make scribe-serve` поднимает FastAPI на :8010, API проксирует его через YARP под `/api/v1/scribe/*` (политика doctor, памятки публичны по токену). Стенограмма: faster-whisper (`make venv-scribe`, модель скачивается при первом запросе) или напечатанный текст; черновик записи по разделам: DeepSeek (`DEEPSEEK_API_KEY` в `.env`, OpenAI-совместимый API, провайдер меняется переменной `DARUMEN_LLM_PROVIDER`), иначе правила по ключевым словам. Аудио удаляется при утверждении записи врачом. Графики: Cube над ClickHouse (`infra/cube`, dev-режим на :4000, `GET /cubejs-api/v1/meta`). Результаты лежат в `lakehouse/models/` и `lakehouse/gold/` (прогнозы, аномалии, индекс, перераспределение), метрики в MLflow.
+AI-скрайб (демо, [docs/doctor-consult.md](docs/doctor-consult.md)): `make scribe-serve` поднимает FastAPI на :8010, API проксирует его через YARP под `/api/v1/scribe/*` (политика doctor, памятки публичны по токену). Стенограмма: faster-whisper (`make venv-scribe`, модель скачивается при первом запросе) или напечатанный текст; черновик записи по разделам: локальная модель в Ollama (`ollama pull qwen3.8:27b`, затем `make ollama-model` создаёт `darumen-qwen3.8:27b` с контекстом 8k, иначе KV-кэш на 128k токенов не помещается в память ноутбука; 18 ГБ на GPU), провайдер меняется переменной `DARUMEN_LLM_PROVIDER` (ollama, deepseek, openai), иначе правила по ключевым словам. Аудио удаляется при утверждении записи врачом. Графики: Cube над ClickHouse (`infra/cube`, dev-режим на :4000, `GET /cubejs-api/v1/meta`). Результаты лежат в `lakehouse/models/` и `lakehouse/gold/` (прогнозы, аномалии, индекс, перераспределение), метрики в MLflow.
 
 ## Структура
 
