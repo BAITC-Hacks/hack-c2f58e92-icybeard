@@ -19,6 +19,9 @@ public sealed class MessagingOptions
     public const string KafkaMode = "kafka";
     public const string StubMode = "stub";
 
+    /// <summary>Outbox и inbox в Postgres, но без Kafka: один сервер без брокера (публичный стенд).</summary>
+    public const string LocalMode = "local";
+
     /// <summary>kafka: Postgres outbox/inbox и Kafka; stub: без внешних транспортов (тесты, разработка без compose).</summary>
     public string Mode { get; set; } = KafkaMode;
 
@@ -58,6 +61,15 @@ public static class MessagingSetup
             opts.PersistMessagesWithPostgresql(configuration.PostgresConnection(), options.Schema);
             opts.UseEntityFrameworkCoreTransactions();
             opts.Policies.AutoApplyTransactions();
+
+            if (string.Equals(options.Mode, MessagingOptions.LocalMode, StringComparison.OrdinalIgnoreCase))
+            {
+                // IDbContextOutbox требует персистентность, поэтому Postgres остаётся; внешние транспорты заглушены,
+                // события без маршрута Wolverine отбрасывает с предупреждением
+                opts.StubAllExternalTransports();
+                opts.Services.AddResourceSetupOnStartup();
+                return;
+            }
             opts.Policies.UseDurableOutboxOnAllSendingEndpoints();
             opts.Policies.UseDurableInboxOnAllListeners();
 

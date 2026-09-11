@@ -88,6 +88,9 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # issuer в токенах всегда localhost:8080 (браузер), а служебные адреса (JWKS) отдаются по хосту запроса (api → keycloak)
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports: ["8080:8080"]
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
@@ -112,12 +115,73 @@ services:
     build:
       context: ..
       dockerfile: infra/models.Dockerfile
+      args:
+        SCRIBE_EXTRAS: "1"
     entrypoint: ["python", "-m", "darumen.scribe", "--host", "0.0.0.0", "--port", "8010"]
     environment:
       DARUMEN_SCRIBE_DIR: /scribe
+      DARUMEN_LLM_PROVIDER: ollama
+      DARUMEN_LLM_BASE_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/v1}
+      DARUMEN_SCRIBE_MODEL: ${OLLAMA_MODEL:-darumen-qwen3.8:27b}
+    extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - scribedata:/scribe
     ports: ["8010:8010"]
+    profiles: [app]
+
+  # Конвейер данных в контейнере: intake → refdata → gold → train → publish. Запуск: make pipeline
+  pipeline:
+    build:
+      context: ..
+      dockerfile: infra/models.Dockerfile
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        python -m darumen.intake add /datasets --contracts contracts --lakehouse /lakehouse --no-events &&
+        python -m darumen.refdata build --lakehouse /lakehouse &&
+        python -m darumen.lakehouse build --lakehouse /lakehouse &&
+        python -m darumen.models.train --lakehouse /lakehouse --cards /cards &&
+        python -m darumen.lakehouse publish --lakehouse /lakehouse
+    environment:
+      POSTGRES_DSN: host=postgres port=5432 dbname=darumen user=darumen password=darumen
+      CLICKHOUSE_URL: http://darumen:darumen@clickhouse:8123/darumen
+      MLFLOW_TRACKING_URI: sqlite:////lakehouse/mlflow.db
+    volumes:
+      - ${DATASETS_DIR:-../DataSets}:/datasets:ro
+      - ../lakehouse:/lakehouse
+      - ../docs/model-cards:/cards
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_started }
+    profiles: [pipeline]
+
+  # Ollama в контейнере только для Linux с NVIDIA (профиль ollama); на macOS Docker не видит GPU,
+  # поэтому Ollama остаётся приложением на хосте, а контейнеры ходят в host.docker.internal
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollamadata:/root/.ollama
+      - ./ollama:/modelfiles:ro
+    ports: ["11434:11434"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles: [ollama]
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: ../../infra/web.Dockerfile
+      args:
+        VITE_AUTH_MODE: ${WEB_AUTH_MODE:-keycloak}
+        VITE_KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080}
+    ports: ["3000:80"]
+    depends_on:
+      api: { condition: service_started }
     profiles: [app]
 
   api:
@@ -131,17 +195,28 @@ services:
       Messaging__BootstrapServers: kafka:9092
       Messaging__SchemaRegistry: http://schema-registry:8081
       ModelServices__Address: http://models:50051
+      Auth__Mode: ${API_AUTH_MODE:-keycloak}
       Auth__Authority: http://keycloak:8080/realms/darumen
       ReverseProxy__Clusters__scribe__Destinations__local__Address: http://scribe:8010/
+      Insight__Provider: ollama
+      Insight__BaseUrl: ${OLLAMA_URL:-http://host.docker.internal:11434/v1}
+      Insight__Model: ${OLLAMA_MODEL:-darumen-qwen3.8:27b}
+      Cors__Origins__0: http://localhost:3000
+      Cors__Origins__1: http://localhost:5173
+    extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ["8000:8000"]
     depends_on:
       postgres: { condition: service_healthy }
       kafka: { condition: service_started }
+      schema-registry: { condition: service_started }
+      keycloak: { condition: service_started }
       models: { condition: service_started }
+      scribe: { condition: service_started }
     profiles: [app]
 
 volumes:
   scribedata:
+  ollamadata:
   pgdata:
   chdata:
   miniodata:

@@ -1,10 +1,14 @@
 FROM python:3.12-slim
 WORKDIR /app
-RUN pip install --no-cache-dir uv
+# libgomp1 — OpenMP-рантайм для LightGBM; без него import lightgbm падает в slim-образе
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm -rf /var/lib/apt/lists/* \
+ && pip install --no-cache-dir uv
 COPY ml/pyproject.toml ml/pyproject.toml
 COPY ml/src ml/src
 COPY proto proto
 COPY streams streams
+COPY contracts contracts
+COPY refdata refdata
 # SCRIBE_EXTRAS=1 ставит faster-whisper и openai для сервиса скрайба (прод); по умолчанию — только модели
 ARG SCRIBE_EXTRAS=0
 RUN if [ "$SCRIBE_EXTRAS" = "1" ]; then uv pip install --system --no-cache -e "ml[scribe]"; else uv pip install --system --no-cache -e ml; fi \

@@ -30,27 +30,34 @@ for d in gold models refdata; do
   [ -d "$ROOT/lakehouse/$d" ] || { echo "нет lakehouse/$d — сначала make data / make train" >&2; exit 1; }
 done
 
-RSYNC=(rsync -az --delete --info=stats1
-  --exclude '.git' --exclude 'DataSets' --exclude 'lakehouse' --exclude 'mlruns' --exclude 'refdata'
+RSYNC=(rsync -az --delete
+  --exclude '.git' --exclude '/DataSets' --exclude '/lakehouse' --exclude '/mlruns' --exclude '/refdata'
   --exclude '.venv' --exclude 'node_modules' --exclude 'bin' --exclude 'obj' --exclude '__pycache__'
-  --exclude 'dist' --exclude 'apps/mobile' --exclude 'docs' --exclude '.env' --exclude '.env.*'
+  --exclude 'dist' --exclude '/apps/mobile' --exclude '/docs' --exclude '.env' --exclude '.env.*'
   --exclude 'infra/cube/.cubestore' --exclude '.DS_Store' --exclude '*.duckdb')
 
 echo "→ создаю $DEST на $HOST"
-ssh "$HOST" "mkdir -p '$DEST/lakehouse'"
+# /srv принадлежит root: если mkdir не проходит, пробуем sudo без пароля; иначе подсказываем, что сделать руками
+ssh "$HOST" "mkdir -p '$DEST/lakehouse' 2>/dev/null || (sudo -n mkdir -p '$DEST/lakehouse' && sudo -n chown -R \$(id -u):\$(id -g) '$DEST')" || {
+  echo "✗ не могу создать $DEST под пользователем ${HOST%@*}. Один раз выполните:" >&2
+  echo "    ssh -t $HOST 'sudo mkdir -p $DEST && sudo chown \$(id -u):\$(id -g) $DEST'" >&2
+  echo "  либо деплойте в домашний каталог: DEPLOY_PATH=~/darumen make deploy ARGS=--replace-dc" >&2
+  exit 1
+}
 
 echo "→ синхронизирую код"
 "${RSYNC[@]}" "$ROOT/" "$HOST:$DEST/"
 
 echo "→ синхронизирую витрины lakehouse (gold, models, refdata, manifests)"
-rsync -az --delete --info=stats1 \
+rsync -az --delete \
   --include '/gold/***' --include '/models/***' --include '/refdata/***' --include '/manifests/***' --exclude '*' \
   "$ROOT/lakehouse/" "$HOST:$DEST/lakehouse/"
 
 echo "→ кладу .env"
 scp -q "$ROOT/$ENV_FILE" "$HOST:$DEST/.env"
 
-COMPOSE="docker compose -f $DEST/infra/docker-compose.prod.yml --env-file $DEST/.env"
+# LAKEHOUSE_DIR задаём из DEST, чтобы .env.prod не зависел от пути на VM
+COMPOSE="LAKEHOUSE_DIR=$DEST/lakehouse docker compose -f $DEST/infra/docker-compose.prod.yml --env-file $DEST/.env"
 
 if [ "$REPLACE_DC" = 1 ]; then
   echo "→ останавливаю старый стек GovTech Camp в $OLD_STACK (тома не трогаю)"
@@ -66,7 +73,8 @@ if [ "$PUBLISH" = 1 ]; then
 fi
 
 echo "→ чищу неиспользуемые образы"
-ssh "$HOST" "docker image prune -f >/dev/null"
+# кэш сборки на 8 ГБ VM быстро съедает диск: оставляем 2 ГБ для инкрементальных сборок
+ssh "$HOST" "docker image prune -f >/dev/null; docker builder prune -f --keep-storage 2GB >/dev/null"
 
 echo "→ проверка"
 ssh "$HOST" "$COMPOSE ps"

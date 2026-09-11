@@ -39,11 +39,20 @@ train: venv ## Обучить модели и зарегистрировать �
 eval: venv ## Оценить модели против baseline на отложенной выборке
 	$(PY) -m darumen.models.evaluate
 
-serve: ## Поднять инфраструктуру и сервисы
+serve: ## Поднять только инфраструктуру (Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, MLflow)
 	$(COMPOSE) up -d
 
-down: ## Остановить сервисы
-	$(COMPOSE) down
+up: ## Поднять всё в Docker: инфраструктура, API, сервис моделей, скрайб, веб на :3000 (Ollama на хосте)
+	$(COMPOSE) --profile app up -d --build
+
+down: ## Остановить все контейнеры
+	$(COMPOSE) --profile app --profile pipeline --profile ollama down
+
+logs: ## Логи приложения
+	$(COMPOSE) --profile app logs -f --tail=100 api models scribe web
+
+pipeline: ## Конвейер данных в контейнере: intake → refdata → gold → train → publish (DataSets и lakehouse с хоста)
+	$(COMPOSE) --profile pipeline run --rm --build pipeline
 
 deploy: ## Задеплоить на dc.jurek.kz (rsync + docker compose на VM); первый раз: make deploy ARGS=--replace-dc
 	scripts/deploy.sh $(ARGS)
@@ -80,4 +89,4 @@ lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data intake-status refdata gold publish train eval serve down build test proto models-serve scribe-serve venv-scribe dagster ollama-model lint
+.PHONY: help venv data intake-status refdata gold publish train eval serve up down logs pipeline build test proto models-serve scribe-serve venv-scribe dagster ollama-model lint

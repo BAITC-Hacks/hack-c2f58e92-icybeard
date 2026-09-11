@@ -14,7 +14,7 @@
 | api | `infra/api.Dockerfile` | .NET API: `Auth__Mode=headers`, `Messaging__Mode=stub`, Insight через DeepSeek |
 | web | `infra/web/Dockerfile` | Vite-сборка за nginx, `/api`, `/openapi`, `/scalar`, `/health` проксируются в api |
 
-ClickHouse, Cube, Kafka, Schema Registry, Keycloak, MinIO, MLflow и Valkey в проде не нужны: в C# ClickHouse не используется, шина работает в режиме заглушки, авторизация — заголовками `X-Actor`/`X-Role`/`X-Region` (демо-режим, роль выбирается в интерфейсе — как и на старом стенде, стенд не для персональных данных).
+ClickHouse, Cube, Kafka, Schema Registry, Keycloak, MinIO, MLflow и Valkey в проде не нужны: в C# ClickHouse не используется, шина хранит outbox в Postgres, а Kafka заглушена, авторизация — заголовками `X-Actor`/`X-Role`/`X-Region` (демо-режим, роль выбирается в интерфейсе — как и на старом стенде, стенд не для персональных данных).
 
 ## Как задеплоить
 

@@ -2,7 +2,6 @@
 DataSets/
 lakehouse/
 mlruns/
-refdata/
 .git/
 .venv/
 **/node_modules/
@@ -18,3 +17,22 @@ docs/
 **/.env
 **/.env.*
 infra/cube/.cubestore/
+# контексты сборки не должны тащить данные, зависимости и артефакты
+.git
+.github
+ DataSets
+DataSets
+lakehouse
+ml/.venv
+**/bin
+**/obj
+**/node_modules
+apps/web/dist
+apps/web/e2e/shots
+apps/mobile
+infra/cube/.cubestore
+infra/keycloak
+docs/model-cards
+*.csv
+*.parquet
+!refdata

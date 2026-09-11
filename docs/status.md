@@ -12,6 +12,7 @@
 | Сервисы моделей | gRPC (QueueIntelligence, LoadForecasting, Simulation) с health и reflection, контракты в `proto/` | `make models-serve`, `grpcurl -plaintext localhost:50051 list` |
 | API | .NET 10 модульный монолит: Queue, Analytics, Simulation, Journal, RefData, Intake, Medicines, Insight; Keycloak или режим заголовков; аудит; Wolverine outbox/inbox и Kafka с Protobuf через Schema Registry; YARP к скрайбу | `dotnet run --project src/Darumen.Api`, `/scalar` |
 | Публикация | Postgres (таблицы API) и ClickHouse (ряды) из Parquet; Cube над ClickHouse | `make publish`, `make serve` |
+| Docker | все сервисы приложения в контейнерах (`make up`: api, models, scribe, web на :3000; `make pipeline` для данных), Ollama на хосте через host.docker.internal, профиль `ollama` для Linux с GPU | `make up`, `make logs` |
 | Веб | Vue 3: карта регионов, регион, симулятор, вопросы к данным, ассистент направления, рабочий список, журнал решений, AI-скрайб, консоль стюарда, ожидание для граждан, проверка рецепта | `cd apps/web && npm run dev`, `npm run walk` |
 | Мобильное | Flutter: гражданин (ожидание, рецепт), врач (рабочий список, ассистент направления), настройки, web-сборка | `cd apps/mobile && flutter run` |
 | События | `decision.recorded` из API в Kafka, `intake.batch.loaded` из Python в API | `DARUMEN_KAFKA_TEST=1 dotnet test --filter KafkaIntegrationTests` |

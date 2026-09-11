@@ -62,7 +62,21 @@ python3 scripts/profile_datasets.py DataSets
 - Дневной стационар (профиль `DH`) это 48 % направлений с нулевым ожиданием, его выделять отдельно.
 - Никогда не запускать два загрузчика в одну папку одновременно.
 
-## Запуск
+## Запуск в Docker
+
+Весь стек поднимается контейнерами, на хосте остаётся только Ollama (Docker Desktop на macOS не даёт контейнерам GPU; на Linux с NVIDIA есть профиль `ollama`).
+
+```bash
+cp .env.example .env               # адреса и режимы, значения по умолчанию подходят для ноутбука
+ollama pull qwen3.8:27b && make ollama-model   # локальная модель с контекстом 8k (один раз)
+make serve                         # инфраструктура: Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, MLflow
+make pipeline                      # данные в контейнере: intake → refdata → gold → train → publish (DataSets и lakehouse монтируются с хоста)
+make up                            # API :8000, сервис моделей :50051, скрайб :8010, веб :3000
+```
+
+Веб на `http://localhost:3000` (вход через Keycloak: `regulator1` / `darumen` и другие демо-пользователи; `WEB_AUTH_MODE=headers` в `.env` включает переключатель ролей без входа). API за nginx веба и напрямую на `:8000` (`/scalar`). Логи: `make logs`, остановка: `make down`. Образы: `infra/api.Dockerfile`, `infra/models.Dockerfile` (модели, скрайб, конвейер), `infra/web.Dockerfile`.
+
+## Запуск для разработки (без Docker для приложения)
 
 ```bash
 make venv     # Python-окружение для ml/

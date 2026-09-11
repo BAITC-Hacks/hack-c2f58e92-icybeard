@@ -4,7 +4,7 @@
 # Что отличается от dev-стека:
 #   - только то, без чего API не работает: postgres, models (gRPC), scribe, api, web;
 #     ClickHouse/Cube/Kafka/Keycloak/MinIO/MLflow/Valkey не поднимаем — Auth в режиме
-#     headers, Messaging в режиме stub, ClickHouse в C# не используется;
+#     headers, Messaging в режиме local (outbox в Postgres, без Kafka), ClickHouse в C# не используется;
 #   - наружу смотрит только web на 127.0.0.1:5173 — TLS терминирует хостовый Caddy
 #     (блок dc.jurek.kz → reverse_proxy 127.0.0.1:5173, см. pos-server/deploy/caddy/Caddyfile.host);
 #   - lakehouse монтируется с хоста (/srv/darumen/lakehouse: gold, models, refdata — ~60 МБ);
@@ -71,7 +71,7 @@ services:
       ConnectionStrings__Postgres: Host=postgres;Database=darumen;Username=darumen;Password=${POSTGRES_PASSWORD}
       ModelServices__Address: http://models:50051
       Auth__Mode: headers
-      Messaging__Mode: stub
+      Messaging__Mode: local   # outbox в Postgres, без Kafka
       Cors__Origins__0: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}
       ReverseProxy__Clusters__scribe__Destinations__local__Address: http://scribe:8010/
       Insight__Provider: ${LLM_PROVIDER:-deepseek}
