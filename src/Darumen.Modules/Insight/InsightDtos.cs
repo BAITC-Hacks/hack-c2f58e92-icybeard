@@ -27,10 +27,13 @@ public sealed class InsightOptions
     /// <summary>Для Qwen3 в Ollama: добавить /no_think в системный промпт, чтобы не тратить время на размышления.</summary>
     public bool NoThinkHint { get; set; } = true;
 
+    /// <summary>reasoning_effort для OpenAI-совместимых API; none выключает скрытые рассуждения у Qwen3.8 в Ollama (ответ в разы быстрее). Пусто = не передавать.</summary>
+    public string? ReasoningEffort { get; set; } = "low";
+
     /// <summary>Ключ из конфигурации; иначе DEEPSEEK_API_KEY, OPENAI_API_KEY или ANTHROPIC_API_KEY по провайдеру.</summary>
     public string? ApiKey { get; set; }
 
-    public int MaxOutputTokens { get; set; } = 900;
+    public int MaxOutputTokens { get; set; } = 600;
 
     public int MaxToolCalls { get; set; } = 8;
 

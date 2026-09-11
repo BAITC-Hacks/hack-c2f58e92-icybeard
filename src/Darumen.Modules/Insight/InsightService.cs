@@ -1,3 +1,5 @@
+using Darumen.Modules.RefData;
+using Darumen.Shared.Api;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 
@@ -58,13 +60,49 @@ public sealed class LlmChatClientFactory(IOptions<InsightOptions> options) : IIn
     }
 }
 
-public sealed class InsightService(IInsightChatClientFactory factory, InsightTools tools, IOptions<InsightOptions> options)
+/// <summary>Справочная часть системного промпта: коды регионов и частых профилей, чтобы модель не тратила раунд на их поиск.</summary>
+public sealed class InsightPromptCache
+{
+    public const int TopProfiles = 14;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private string? _reference;
+
+    public async Task<string> ReferenceAsync(IRefDataRepository refData, CancellationToken cancellationToken)
+    {
+        if (_reference is not null)
+        {
+            return _reference;
+        }
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_reference is null)
+            {
+                var regions = await refData.RegionsAsync(Locale.Ru, cancellationToken);
+                var profiles = (await refData.ProfilesAsync(cancellationToken)).Where(p => !p.IsDayHospital).Take(TopProfiles);
+                _reference = "Коды регионов (КАТО): " + string.Join("; ", regions.Select(r => $"{r.RegionKato} {r.Name}")) +
+                             ".\nЧастые профили коек: " + string.Join("; ", profiles.Select(p => $"{p.ProfileCode} {p.Name}")) +
+                             ". Остальные профили: инструмент bed_profiles.";
+            }
+
+            return _reference;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+}
+
+public sealed class InsightService(IInsightChatClientFactory factory, InsightTools tools, IOptions<InsightOptions> options, IRefDataRepository refData, InsightPromptCache prompts)
 {
     public const string SystemPrompt = """
-        Ты аналитик Darumen Health для регулятора здравоохранения Казахстана. Отвечай по-русски, коротко и с цифрой.
+        Ты аналитик Darumen Health для регулятора здравоохранения Казахстана. Отвечай по-русски, коротко и с цифрой:
+        не больше четырёх предложений или шести строк списка, без таблиц.
         Данные: направления на плановую госпитализацию за I квартал 2025 года (ИС БГ), госпитализации с 2012 года (ЭРСБ),
-        вакцинация, рецепты. Регионы кодируются КАТО (двузначный), профили коек кодами (381 офтальмология для взрослых,
-        021 терапия, 031 кардиология для взрослых). Используй инструменты; не выдумывай значения. Если данных нет, скажи об этом.
+        вакцинация, рецепты. Коды регионов и частых профилей даны ниже: бери их оттуда и сразу вызывай нужный инструмент,
+        regions и bed_profiles вызывай только для кодов, которых нет в списке. Не выдумывай значения. Если данных нет, скажи об этом.
         Заверши ответ одной строкой "Источник: <инструменты>".
         """;
 
@@ -74,16 +112,31 @@ public sealed class InsightService(IInsightChatClientFactory factory, InsightToo
     {
         var inner = factory.Create() ?? throw new InvalidOperationException("Insight не настроен: задайте ANTHROPIC_API_KEY");
         var client = new ChatClientBuilder(inner).UseFunctionInvocation(configure: c => c.MaximumIterationsPerRequest = options.Value.MaxToolCalls).Build();
-        var system = options.Value.NoThinkHint && string.Equals(options.Value.Provider, InsightOptions.Ollama, StringComparison.OrdinalIgnoreCase) ? SystemPrompt + "\n/no_think" : SystemPrompt;
+        var system = SystemPrompt + "\n" + await prompts.ReferenceAsync(refData, cancellationToken);
+        if (options.Value.NoThinkHint && string.Equals(options.Value.Provider, InsightOptions.Ollama, StringComparison.OrdinalIgnoreCase))
+        {
+            system += "\n/no_think";
+        }
+
         var messages = new List<ChatMessage>
         {
             new(ChatRole.System, system),
             new(ChatRole.User, string.IsNullOrWhiteSpace(regionKato) ? question : $"{question}\n(регион пользователя: {regionKato})"),
         };
+        var chatOptions = new ChatOptions { Tools = [.. tools.All()], MaxOutputTokens = options.Value.MaxOutputTokens, Temperature = 0 };
+        var effort = options.Value.ReasoningEffort;
+        if (!string.IsNullOrWhiteSpace(effort) && !string.Equals(options.Value.Provider, InsightOptions.Anthropic, StringComparison.OrdinalIgnoreCase))
+        {
+            // reasoning_effort уходит в OpenAI-совместимый запрос как есть; для Ollama значение none выключает скрытые рассуждения
+#pragma warning disable OPENAI001 // свойство помечено экспериментальным в OpenAI SDK, но именно оно управляет рассуждениями
+            chatOptions.RawRepresentationFactory = _ => new OpenAI.Chat.ChatCompletionOptions { ReasoningEffortLevel = new OpenAI.Chat.ChatReasoningEffortLevel(effort) };
+#pragma warning restore OPENAI001
+        }
+
         ChatResponse response;
         try
         {
-            response = await client.GetResponseAsync(messages, new ChatOptions { Tools = [.. tools.All()], MaxOutputTokens = options.Value.MaxOutputTokens, Temperature = 0 }, cancellationToken);
+            response = await client.GetResponseAsync(messages, chatOptions, cancellationToken);
         }
         catch (Exception exception) when (exception is HttpRequestException or System.ClientModel.ClientResultException or TaskCanceledException)
         {

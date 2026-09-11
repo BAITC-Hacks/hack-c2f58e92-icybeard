@@ -109,10 +109,12 @@ class LlmDrafter:
             transcript = "\n".join(f"[{s.t0:.0f}-{s.t1:.0f}] {s.text}" for s in segments)
             client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=float(os.environ.get("DARUMEN_LLM_TIMEOUT", "180")), max_retries=0)
             system = self.PROMPT + ("\n/no_think" if self._provider == "ollama" else "")
+            effort = os.environ.get("DARUMEN_LLM_REASONING", "none" if self._provider == "ollama" else "")
             completion = client.chat.completions.create(
                 model=self._model, temperature=0, max_tokens=1200, response_format={"type": "json_object"},
                 messages=[{"role": "system", "content": system},
-                          {"role": "user", "content": f"Язык памятки: {language}. Стенограмма:\n{transcript}"}])
+                          {"role": "user", "content": f"Язык памятки: {language}. Стенограмма:\n{transcript}"}],
+                **({"extra_body": {"reasoning_effort": effort}} if effort else {}))
             content = self.THINK.sub("", completion.choices[0].message.content or "")
             payload = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
             sections = [Section(name, str(payload["sections"].get(name, "")).strip()) for name in SECTIONS[:-1]]

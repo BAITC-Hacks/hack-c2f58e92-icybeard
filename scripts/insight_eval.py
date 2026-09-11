@@ -11,6 +11,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -27,9 +28,17 @@ def questions() -> list[tuple[int, str, str]]:
     return rows
 
 
-def ask(api: str, role: str, question: str, timeout: float) -> dict:
-    req = urllib.request.Request(f"{api}/api/v1/insight/ask", data=json.dumps({"question": question}).encode(),
-                                 headers={"Content-Type": "application/json", "X-Actor": f"{role}1", "X-Role": role}, method="POST")
+def keycloak_token(url: str, user: str, password: str, client_id: str = "darumen-web") -> str:
+    """Пароль демо-пользователя реалма darumen обменивается на токен (для API в режиме keycloak, например в Docker)."""
+    data = urllib.parse.urlencode({"grant_type": "password", "client_id": client_id, "username": user, "password": password}).encode()
+    with urllib.request.urlopen(urllib.request.Request(f"{url}/realms/darumen/protocol/openid-connect/token", data=data), timeout=30) as r:
+        return json.load(r)["access_token"]
+
+
+def ask(api: str, role: str, question: str, timeout: float, token: str | None = None) -> dict:
+    headers = {"Content-Type": "application/json"}
+    headers.update({"Authorization": f"Bearer {token}"} if token else {"X-Actor": f"{role}1", "X-Role": role})
+    req = urllib.request.Request(f"{api}/api/v1/insight/ask", data=json.dumps({"question": question}).encode(), headers=headers, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             return json.load(r)
@@ -52,12 +61,15 @@ def main() -> int:
     parser.add_argument("--api", default="http://localhost:8000")
     parser.add_argument("--role", default="regulator")
     parser.add_argument("--timeout", type=float, default=600.0, help="секунд на вопрос; локальные модели отвечают минуты")
+    parser.add_argument("--keycloak", default=None, help="адрес Keycloak, например http://localhost:8080: вход паролем демо-пользователя вместо заголовков")
+    parser.add_argument("--password", default="darumen")
     args = parser.parse_args()
+    token = keycloak_token(args.keycloak, f"{args.role}1", args.password) if args.keycloak else None
     ok = 0
     rows = questions()
     for number, question, expectation in rows:
         started = time.time()
-        answer = ask(args.api, args.role, question, args.timeout)
+        answer = ask(args.api, args.role, question, args.timeout, token)
         good = passed(answer, expectation)
         ok += good
         print(f"{'OK  ' if good else 'FAIL'} {number:2d} [{time.time() - started:.0f}s] {question}\n     -> {answer.get('answer', '')[:160].replace(chr(10), ' ')} | tools {answer.get('toolsUsed')}", flush=True)

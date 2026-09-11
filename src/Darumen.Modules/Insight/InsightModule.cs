@@ -10,6 +10,7 @@ public sealed class InsightModule : IDarumenModule
     {
         services.Configure<InsightOptions>(configuration.GetSection(InsightOptions.Section));
         services.AddSingleton<IInsightChatClientFactory, LlmChatClientFactory>();
+        services.AddSingleton<InsightPromptCache>();
         services.AddScoped<InsightTools>();
         services.AddScoped<InsightService>();
     }
