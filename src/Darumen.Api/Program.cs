@@ -16,6 +16,8 @@ using Darumen.Shared.Modules;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
+DotEnv.Load(); // ключи из .env в корне репозитория без сторонних пакетов
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();

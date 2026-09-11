@@ -64,7 +64,7 @@ onMounted(async () => {
   <main class="page">
     <h1>Вопросы к данным</h1>
     <p class="lead">Вопрос на естественном языке превращается в вызовы инструментов доменов (индекс, прогноз, очередь, симулятор) и короткий ответ с цифрой. Модель не видит сырые данные.</p>
-    <Message v-if="available === false" severity="warn" :closable="false">Insight выключен: на сервере не задан ANTHROPIC_API_KEY. Вопросы вернут 503.</Message>
+    <Message v-if="available === false" severity="warn" :closable="false">Insight выключен: на сервере не задан DEEPSEEK_API_KEY (файл .env). Вопросы вернут 503.</Message>
     <div class="card">
       <div class="field"><label>Вопрос</label><Textarea v-model="question" rows="2" auto-resize /></div>
       <div class="actions">

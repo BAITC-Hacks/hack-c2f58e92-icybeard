@@ -1,12 +1,12 @@
-"""Drafters turn a transcript into sections and a patient leaflet. RuleDrafter works offline; AnthropicDrafter
-uses Claude when ANTHROPIC_API_KEY is set and falls back to the rules on any failure."""
+"""Drafters turn a transcript into sections and a patient leaflet. RuleDrafter works offline; LlmDrafter
+uses DeepSeek (or another OpenAI-compatible API) when its key is set and falls back to the rules on any failure."""
 from __future__ import annotations
 
 import json
 import os
 import re
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 from .transcribe import Segment
 
@@ -69,8 +69,9 @@ class RuleDrafter:
         return Draft(sections, leaflet, self.name)
 
 
-class AnthropicDrafter:
-    """Claude structures the transcript; output is validated JSON, otherwise the rules take over."""
+class LlmDrafter:
+    """A chat model structures the transcript through an OpenAI-compatible API (DeepSeek by default);
+    output is validated JSON, otherwise the rules take over. Nothing is sent without an API key."""
 
     PROMPT = (
         "Ты помощник врача. Из стенограммы приёма составь черновик записи по разделам "
@@ -78,26 +79,37 @@ class AnthropicDrafter:
         "если раздела нет в стенограмме, оставь пустую строку. Ответь только JSON вида "
         '{"sections": {"Жалобы": "...", "Анамнез": "...", "Осмотр": "...", "Диагноз": "...", "Назначения": "..."}, "leaflet": "..."}.'
     )
+    DEFAULTS: ClassVar[dict[str, tuple[str, str, str]]] = {
+        "deepseek": ("https://api.deepseek.com", "deepseek-chat", "DEEPSEEK_API_KEY"),
+        "openai": ("https://api.openai.com/v1", "gpt-4.1-mini", "OPENAI_API_KEY"),
+    }
 
-    def __init__(self, model: str | None = None, fallback: Drafter | None = None):
-        self._model = model or os.environ.get("DARUMEN_SCRIBE_MODEL", "claude-sonnet-5")
+    def __init__(self, provider: str | None = None, model: str | None = None, base_url: str | None = None,
+                 api_key: str | None = None, fallback: Drafter | None = None):
+        self._provider = provider or os.environ.get("DARUMEN_LLM_PROVIDER", "deepseek")
+        default_url, default_model, key_var = self.DEFAULTS.get(self._provider, self.DEFAULTS["deepseek"])
+        self._base_url = base_url or os.environ.get("DARUMEN_LLM_BASE_URL", default_url)
+        self._model = model or os.environ.get("DARUMEN_SCRIBE_MODEL", default_model)
+        self._api_key = api_key or os.environ.get(key_var)
         self._fallback = fallback or RuleDrafter()
-        self.name = f"anthropic/{self._model}"
+        self.name = f"{self._provider}/{self._model}"
 
     def available(self) -> bool:
-        return bool(os.environ.get("ANTHROPIC_API_KEY"))
+        return bool(self._api_key)
 
     def draft(self, segments: list[Segment], language: str) -> Draft:
         if not self.available():
             return self._fallback.draft(segments, language)
         try:
-            import anthropic
+            from openai import OpenAI
 
             transcript = "\n".join(f"[{s.t0:.0f}-{s.t1:.0f}] {s.text}" for s in segments)
-            message = anthropic.Anthropic().messages.create(
-                model=self._model, max_tokens=1200, system=self.PROMPT,
-                messages=[{"role": "user", "content": f"Язык памятки: {language}. Стенограмма:\n{transcript}"}])
-            payload = json.loads(re.search(r"\{.*\}", message.content[0].text, re.DOTALL).group(0))
+            client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=60)
+            completion = client.chat.completions.create(
+                model=self._model, temperature=0, max_tokens=1200, response_format={"type": "json_object"},
+                messages=[{"role": "system", "content": self.PROMPT},
+                          {"role": "user", "content": f"Язык памятки: {language}. Стенограмма:\n{transcript}"}])
+            payload = json.loads(re.search(r"\{.*\}", completion.choices[0].message.content or "", re.DOTALL).group(0))
             sections = [Section(name, str(payload["sections"].get(name, "")).strip()) for name in SECTIONS[:-1]]
             return Draft([s for s in sections if s.text], str(payload["leaflet"]).strip(), self.name)
         except Exception:  # noqa: BLE001 - демо: любая ошибка модели означает черновик по правилам
@@ -105,4 +117,4 @@ class AnthropicDrafter:
 
 
 def default_drafter() -> Drafter:
-    return AnthropicDrafter()
+    return LlmDrafter()

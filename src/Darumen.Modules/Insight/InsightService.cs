@@ -9,18 +9,35 @@ public interface IInsightChatClientFactory
     IChatClient? Create();
 }
 
-public sealed class AnthropicChatClientFactory(IOptions<InsightOptions> options) : IInsightChatClientFactory
+public sealed class LlmChatClientFactory(IOptions<InsightOptions> options) : IInsightChatClientFactory
 {
+    public static string KeyVariable(string provider) => provider.ToLowerInvariant() switch
+    {
+        InsightOptions.Anthropic => "ANTHROPIC_API_KEY",
+        InsightOptions.OpenAi => "OPENAI_API_KEY",
+        _ => "DEEPSEEK_API_KEY",
+    };
+
+    public string? ResolveKey() =>
+        string.IsNullOrWhiteSpace(options.Value.ApiKey) ? Environment.GetEnvironmentVariable(KeyVariable(options.Value.Provider)) : options.Value.ApiKey;
+
     public IChatClient? Create()
     {
-        var key = options.Value.ApiKey ?? Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY");
+        var key = ResolveKey();
         if (string.IsNullOrWhiteSpace(key))
         {
             return null;
         }
 
-        var client = new Anthropic.AnthropicClient(new Anthropic.Core.ClientOptions { ApiKey = key });
-        return client.AsIChatClient(options.Value.Model);
+        var settings = options.Value;
+        if (string.Equals(settings.Provider, InsightOptions.Anthropic, StringComparison.OrdinalIgnoreCase))
+        {
+            return new Anthropic.AnthropicClient(new Anthropic.Core.ClientOptions { ApiKey = key }).AsIChatClient(settings.Model);
+        }
+
+        // DeepSeek и другие OpenAI-совместимые API: тот же клиент, другой адрес
+        var client = new OpenAI.OpenAIClient(new System.ClientModel.ApiKeyCredential(key), new OpenAI.OpenAIClientOptions { Endpoint = new Uri(settings.BaseUrl) });
+        return client.GetChatClient(settings.Model).AsIChatClient();
     }
 }
 
@@ -48,7 +65,7 @@ public sealed class InsightService(IInsightChatClientFactory factory, InsightToo
         var response = await client.GetResponseAsync(messages, new ChatOptions { Tools = [.. tools.All()], MaxOutputTokens = options.Value.MaxOutputTokens, Temperature = 0 }, cancellationToken);
         var answer = response.Text.Trim();
         var used = tools.Used.Distinct().ToList();
-        return new AskResponseDto(answer, ExtractValue(answer), null, tools.Chart, used, used.Select(u => $"tool:{u}").ToList(), options.Value.Model);
+        return new AskResponseDto(answer, ExtractValue(answer), null, tools.Chart, used, used.Select(u => $"tool:{u}").ToList(), $"{options.Value.Provider}/{options.Value.Model}");
     }
 
     /// <summary>Первое число в ответе, если оно есть: удобно для карточки с цифрой.</summary>

@@ -2,6 +2,8 @@
 DATASETS_DIR ?= DataSets
 PY ?= ml/.venv/bin/python
 COMPOSE ?= docker compose -f infra/docker-compose.yml
+ENV_FILE ?= .env
+LOAD_ENV = $(if $(wildcard $(ENV_FILE)),set -a; . ./$(ENV_FILE); set +a;,)
 
 help: ## Список целей
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -60,7 +62,7 @@ models-serve: proto ## gRPC-сервисы моделей (Queue Intelligence, L
 	$(PY) -m darumen.services --lakehouse lakehouse --port 50051
 
 scribe-serve: venv ## Сервис AI-скрайба (FastAPI) на :8010; faster-whisper через make venv-scribe
-	$(PY) -m darumen.scribe --port 8010
+	$(LOAD_ENV) $(PY) -m darumen.scribe --port 8010
 
 venv-scribe: venv ## Установить faster-whisper и anthropic для скрайба
 	$(UV) pip install --python $(PY) -q -e "ml[dev,scribe]"

@@ -64,7 +64,7 @@ Flutter, клиент API генерируется из OpenAPI, push через
 | Реестр моделей | MLflow, карточки моделей; .NET читает метаданные через REST |
 | Хранилище признаков | Витрины в ClickHouse и Postgres плюс Valkey, без Feast на кэмпе |
 | Скрайб | faster‑whisper на CTranslate2, потоковая передача по WebSocket |
-| LLM | Anthropic SDK для C# через `Microsoft.Extensions.AI` в модуле Insight, Ollama как запасной вариант |
+| LLM | DeepSeek по умолчанию через OpenAI-совместимый клиент (`Microsoft.Extensions.AI.OpenAI`), Anthropic SDK как альтернативный провайдер для C# через `Microsoft.Extensions.AI` в модуле Insight, Ollama как запасной вариант |
 
 ## Сквозные
 

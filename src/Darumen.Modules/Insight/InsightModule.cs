@@ -9,7 +9,7 @@ public sealed class InsightModule : IDarumenModule
     public void AddServices(IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<InsightOptions>(configuration.GetSection(InsightOptions.Section));
-        services.AddSingleton<IInsightChatClientFactory, AnthropicChatClientFactory>();
+        services.AddSingleton<IInsightChatClientFactory, LlmChatClientFactory>();
         services.AddScoped<InsightTools>();
         services.AddScoped<InsightService>();
     }

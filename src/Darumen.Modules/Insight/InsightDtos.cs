@@ -12,9 +12,18 @@ public sealed record AskResponseDto(
 public sealed class InsightOptions
 {
     public const string Section = "Insight";
+    public const string DeepSeek = "deepseek";
+    public const string OpenAi = "openai";
+    public const string Anthropic = "anthropic";
 
-    public string Model { get; set; } = "claude-sonnet-5";
+    /// <summary>deepseek (OpenAI-совместимый API, дешевле), openai или anthropic.</summary>
+    public string Provider { get; set; } = DeepSeek;
 
+    public string Model { get; set; } = "deepseek-chat";
+
+    public string BaseUrl { get; set; } = "https://api.deepseek.com/v1";
+
+    /// <summary>Ключ из конфигурации; иначе DEEPSEEK_API_KEY, OPENAI_API_KEY или ANTHROPIC_API_KEY по провайдеру.</summary>
     public string? ApiKey { get; set; }
 
     public int MaxOutputTokens { get; set; } = 900;

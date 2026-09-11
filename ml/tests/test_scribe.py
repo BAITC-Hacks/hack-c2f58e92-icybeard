@@ -55,3 +55,14 @@ def test_typed_transcript_without_microphone(tmp_path):
     draft = api.post(f"/scribe/sessions/{session_id}/draft").json()
     assert any(s["name"] == "Назначения" and "контроль" in s["text"] for s in draft["sections"])
     assert api.get("/scribe/health").json()["transcriber"] == "fake"
+
+
+def test_llm_drafter_without_key_uses_rules(monkeypatch):
+    from darumen.scribe.draft import LlmDrafter
+    from darumen.scribe.transcribe import Segment
+
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    drafter = LlmDrafter()
+    assert drafter.name == "deepseek/deepseek-chat" and not drafter.available()
+    draft = drafter.draft([Segment(0, 4, "Жалобы на кашель. Назначаю сироп.")], "ru")
+    assert draft.model == "rules@1.0.0" and any(s.name == "Назначения" for s in draft.sections)
