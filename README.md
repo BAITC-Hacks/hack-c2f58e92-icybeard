@@ -76,7 +76,7 @@ make pipeline                      # данные в контейнере: intak
 make up                            # API :8000, сервис моделей :50051, скрайб :8010, веб :3000
 ```
 
-Веб на `http://localhost:3000` (вход через Keycloak: `regulator1` / `darumen` и другие демо-пользователи; `WEB_AUTH_MODE=headers` в `.env` включает переключатель ролей без входа). API за nginx веба и напрямую на `:8000` (`/scalar`). Логи: `make logs`, остановка: `make down`. Образы: `infra/api.Dockerfile`, `infra/models.Dockerfile` (модели, скрайб, конвейер), `infra/web.Dockerfile`.
+Веб на `http://localhost:3000`: кнопка «Войти» ведёт в Keycloak, демо-пользователи с паролем `darumen`: `regulator1`, `chief1`, `doctor1`, `steward1`, `citizen1`, `admin1`; страницы для граждан открыты без входа. Переключатель ролей без входа, как в разработке: `WEB_AUTH_MODE=headers` и `API_AUTH_MODE=headers` в `.env`, затем `make up`. API за nginx веба и напрямую на `:8000` (`/scalar`). Логи: `make logs`, остановка: `make down`. Образы: `infra/api.Dockerfile`, `infra/models.Dockerfile` (модели, скрайб, конвейер), `infra/web.Dockerfile`.
 
 ## Запуск для разработки (без Docker для приложения)
 

@@ -71,8 +71,18 @@ export const useAuthStore = defineStore('auth', () => {
       clientId: import.meta.env.VITE_KEYCLOAK_CLIENT ?? 'darumen-web',
     })
     try {
-      const authenticated = await keycloak.init({ onLoad: 'check-sso', pkceMethod: 'S256', checkLoginIframe: false })
+      // тихая проверка сессии через iframe со статической страницей, иначе keycloak-js делает полный редирект
+      // и оставляет в адресе #error=login_required, который потом ломает разбор кода авторизации
+      const authenticated = await keycloak.init({
+        onLoad: 'check-sso',
+        silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
+        pkceMethod: 'S256',
+        checkLoginIframe: false,
+      })
       if (authenticated) readToken()
+      if (window.location.hash.includes('error=') || window.location.hash.includes('state=')) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      }
     } catch (error) {
       console.warn('Keycloak недоступен, вход отключён', error)
     }
@@ -94,7 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function login() {
-    if (mode.value === 'keycloak') await keycloak?.login({ redirectUri: window.location.href })
+    if (mode.value === 'keycloak') await keycloak?.login({ redirectUri: window.location.origin + window.location.pathname })
   }
 
   async function logout() {
