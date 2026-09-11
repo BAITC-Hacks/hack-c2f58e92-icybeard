@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "lint": "vue-tsc --noEmit",
-    "walk": "node e2e/walk.mjs ./e2e/shots"
+    "walk": "node e2e/walk.mjs ./e2e/shots",
+    "deep-link": "node e2e/deep-link.mjs"
   },
   "dependencies": {
     "@primevue/themes": "^4.5.4",

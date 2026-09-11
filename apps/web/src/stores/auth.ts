@@ -103,8 +103,14 @@ export const useAuthStore = defineStore('auth', () => {
     writeStorage(next)
   }
 
+  /** Куда вернуться после входа: на страницу, с которой отправили домой из-за роли, иначе на текущую. */
+  function returnPath(): string {
+    const denied = new URLSearchParams(window.location.search).get('denied')
+    return denied && denied.startsWith('/') && !denied.startsWith('//') ? denied : window.location.pathname
+  }
+
   async function login() {
-    if (mode.value === 'keycloak') await keycloak?.login({ redirectUri: window.location.origin + window.location.pathname })
+    if (mode.value === 'keycloak') await keycloak?.login({ redirectUri: window.location.origin + returnPath() })
   }
 
   async function logout() {

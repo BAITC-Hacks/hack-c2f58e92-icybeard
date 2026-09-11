@@ -16,8 +16,12 @@ app.use(createPinia())
 app.use(PrimeVue, { theme: { preset: Aura, options: { darkModeSelector: '.darumen-dark' } } })
 app.use(ToastService)
 app.use(i18n)
-app.use(router)
 
+// Маршрутизатор подключается только после проверки сессии: его первая навигация сразу запускает защиту
+// маршрутов, и при переходе по прямой ссылке (например /gov/regions/19) роли уже должны быть известны.
 useAuthStore()
   .init()
-  .finally(() => app.mount('#app'))
+  .finally(() => {
+    app.use(router)
+    app.mount('#app')
+  })
