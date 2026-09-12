@@ -85,15 +85,21 @@ def eval_drafts(scenarios: list[dict], api: str, token: str | None) -> dict:
             draft = api_call(api, f"/api/v1/scribe/sessions/{sid}/draft", {}, token)
             text = " ".join(s.get("text", "") for s in draft.get("sections", [])).lower()
             missing = [kw for group in sc["expect"].values() for kw in group if kw.lower() not in text]
-            results.append({"id": sc["id"], "language": sc["language"], "ok": not missing,
+            model = str(draft.get("model", "?"))  # rules@… означает фолбэк без LLM — это не оценка модели
+            results.append({"id": sc["id"], "language": sc["language"], "ok": not missing, "model": model,
                             "missing": missing, "seconds": round(time.monotonic() - started, 1)})
-            print(f"draft {sc['id']} [{sc['language']}] {'OK' if not missing else 'MISSING ' + ', '.join(missing)}")
+            print(f"draft {sc['id']} [{sc['language']}] {model} {'OK' if not missing else 'MISSING ' + ', '.join(missing)}")
         except Exception as exc:  # noqa: BLE001 — сценарии независимы, падение одного не прерывает прогон
             results.append({"id": sc["id"], "language": sc["language"], "ok": False, "error": str(exc)})
             print(f"draft {sc['id']} [{sc['language']}] ERROR {exc}")
     done = [r for r in results if "error" not in r]
-    summary = {"scenarios": len(results), "reached_model": len(done),
+    models: dict[str, int] = {}
+    for r in done:
+        models[r["model"]] = models.get(r["model"], 0) + 1
+    summary = {"scenarios": len(results), "reached_model": len(done), "models": models,
                "clean_share": round(sum(r["ok"] for r in done) / len(done), 3) if done else None}
+    if any(m.startswith("rules@") for m in models):
+        summary["warning"] = "часть черновиков написана фолбэком правил (LLM не ответил) — это не оценка модели"
     return {"summary": summary, "results": results}
 
 
