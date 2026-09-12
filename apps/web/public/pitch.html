@@ -1,0 +1,1503 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Darumen Health — GovTech Camp 2026 · Кейс 1</title>
+
+<!-- ===========================================
+     FONTS — Onest (display/body) + IBM Plex Mono (chrome labels)
+     Both cover Cyrillic incl. Kazakh letters; IBM Plex Sans is the fallback.
+     =========================================== -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME — Clinical Minimal
+   Near-white surface, single muted teal accent, hairlines only.
+   Change these variables to retheme the whole deck.
+   =========================================== */
+:root {
+    --white: #FDFDFB;        /* slide surface */
+    --ink: #101418;          /* primary text */
+    --teal: #0F766E;         /* the only accent */
+    --teal-soft: #E4EFED;    /* accent wash for chips/banners */
+    --muted: #6E7680;        /* secondary text */
+    --faint: #B9BFC4;        /* page numbers, hints */
+    --hairline: #E6E8E6;     /* all rules and borders */
+    --danger: #8A3B2E;       /* red-lines strip (used sparingly) */
+
+    --font-body: 'Onest', 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+
+    --stage-bg: #0e1213;     /* letterbox color */
+    --slide-bg: var(--white);
+
+    --pad-x: 110px;          /* slide horizontal padding */
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-normal: 0.6s;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* ===========================================
+   FIXED 16:9 STAGE: MANDATORY BASE STYLES
+   (viewport-base.css, included in full)
+   =========================================== */
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+.deck-viewport {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    background: var(--stage-bg, #000);
+}
+.deck-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: var(--slide-bg, #fff);
+}
+.slide {
+    position: absolute;
+    inset: 0;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    background: var(--slide-bg, #fff);
+}
+.slide.active,
+.slide.visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    z-index: 1;
+}
+img, video, canvas, svg { max-width: 100%; max-height: 100%; }
+.deck-controls {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+@media print {
+    html, body { width: 1920px; height: auto; overflow: visible; background: #fff; }
+    .deck-viewport { position: static; overflow: visible; background: #fff; }
+    .deck-stage { position: static; width: auto; height: auto; transform: none !important; background: none; }
+    .slide {
+        position: relative;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 1920px;
+        height: 1080px;
+        break-after: page;
+        page-break-after: always;
+    }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+    .deck-controls { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+}
+/* === end viewport-base.css === */
+
+/* ===========================================
+   LANGUAGE SWITCH
+   Every text exists twice: <span class="L ru"> and <span class="L kz">.
+   body.kz shows Kazakh, default shows Russian.
+   =========================================== */
+.L { display: inline; }
+body:not(.kz) .L.kz { display: none; }
+body.kz .L.ru { display: none; }
+
+/* Fixed top-right cluster: Demo/Sign-in button + RU/KZ switch (outside the stage) */
+.top-right-chrome {
+    position: fixed;
+    top: 18px;
+    right: 20px;
+    z-index: 10001;
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+}
+.demo-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--teal);
+    color: #fff;
+    text-decoration: none;
+    border-radius: 10px;
+    padding: 6px 18px;
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: .02em;
+    transition: filter .2s ease;
+}
+.demo-btn:hover { filter: brightness(1.15); }
+.demo-btn .arrow { font-weight: 400; }
+/* Two-segment slider; pressing anywhere (even the active segment) flips the language */
+.lang-switch {
+    display: flex;
+    gap: 4px;
+    background: rgba(16, 20, 24, 0.75);
+    border-radius: 10px;
+    padding: 4px;
+    font-family: var(--font-body);
+    font-weight: 500;
+    font-size: 14px;
+    backdrop-filter: blur(6px);
+    cursor: pointer;
+}
+.lang-switch button {
+    border: 0;
+    background: transparent;
+    color: #b9bfc4;
+    font: inherit;
+    padding: 6px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background .25s ease, color .25s ease;
+}
+.lang-switch button.on { background: var(--white); color: var(--ink); }
+
+/* ===========================================
+   ENTRANCE ANIMATIONS — gentle fades, calm/minimal register
+   =========================================== */
+.reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity var(--duration-normal) var(--ease-out-expo),
+                transform var(--duration-normal) var(--ease-out-expo);
+}
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.slide.visible .reveal:nth-child(1) { transition-delay: .05s; }
+.slide.visible .reveal:nth-child(2) { transition-delay: .15s; }
+.slide.visible .reveal:nth-child(3) { transition-delay: .25s; }
+.slide.visible .reveal:nth-child(4) { transition-delay: .35s; }
+.slide.visible .reveal:nth-child(5) { transition-delay: .45s; }
+.slide.visible .reveal:nth-child(6) { transition-delay: .55s; }
+/* stagger helpers for grids: children fade one by one */
+.stagger > * {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity .55s var(--ease-out-expo), transform .55s var(--ease-out-expo);
+}
+.slide.visible .stagger > * { opacity: 1; transform: none; }
+.slide.visible .stagger > *:nth-child(1) { transition-delay: .3s; }
+.slide.visible .stagger > *:nth-child(2) { transition-delay: .4s; }
+.slide.visible .stagger > *:nth-child(3) { transition-delay: .5s; }
+.slide.visible .stagger > *:nth-child(4) { transition-delay: .6s; }
+.slide.visible .stagger > *:nth-child(5) { transition-delay: .7s; }
+.slide.visible .stagger > *:nth-child(6) { transition-delay: .8s; }
+
+/* ===========================================
+   SHARED SLIDE ANATOMY
+   Every slide: top chrome (brand + meta), content, bottom footer.
+   =========================================== */
+.slide { font-family: var(--font-body); color: var(--ink); }
+
+.chrome {
+    position: absolute;
+    top: 46px;
+    left: var(--pad-x);
+    right: var(--pad-x);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.brand { font-weight: 600; font-size: 20px; letter-spacing: .01em; }
+.brand::before {
+    content: "";
+    display: inline-block;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--teal);
+    margin-right: 11px;
+}
+.meta {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--muted);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    /* leave room for the fixed demo button + language switch in the window corner */
+    margin-right: 440px;
+}
+
+.foot {
+    position: absolute;
+    left: var(--pad-x);
+    right: var(--pad-x);
+    bottom: 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--faint);
+}
+
+/* Content zone between chrome and foot.
+   .spread vertically centers the block (the absolute tech-strip stays pinned to the bottom). */
+.content {
+    position: absolute;
+    top: 150px;
+    left: var(--pad-x);
+    right: var(--pad-x);
+    bottom: 110px;
+}
+.content.spread {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+/* keep centered blocks clear of the pinned tech-strip */
+.content.spread.has-strip { padding-bottom: 90px; }
+
+/* Headline block used by all content slides */
+.kicker {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--teal);
+}
+h2 {
+    font-weight: 300;
+    font-size: 62px;
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    margin-top: 20px;
+}
+h2 b { font-weight: 600; color: var(--teal); }
+.lead {
+    margin-top: 18px;
+    font-size: 24px;
+    color: var(--muted);
+    line-height: 1.5;
+    max-width: 1350px;
+    font-weight: 400;
+}
+
+/* Teal ML/AI tech-proof strip (the deck's signature element) */
+.tech-strip {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    border-top: 1px solid var(--hairline);
+    padding-top: 22px;
+    display: flex;
+    gap: 34px;
+    align-items: baseline;
+    font-size: 17px;
+    color: var(--muted);
+}
+.tech-strip .t { white-space: nowrap; }
+.tech-strip .t i {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-right: 8px;
+}
+.tech-strip .t b { font-weight: 600; color: var(--ink); }
+
+/* Card grids */
+.cards { display: grid; gap: 22px; }
+.cards.c3 { grid-template-columns: repeat(3, 1fr); }
+.cards.c4 { grid-template-columns: repeat(4, 1fr); }
+.cards.c2 { grid-template-columns: repeat(2, 1fr); }
+.card {
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 26px 28px;
+    background: var(--white);
+}
+.card .tag {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--teal);
+}
+.card h3 { margin-top: 10px; font-size: 25px; font-weight: 600; line-height: 1.25; }
+.card p { margin-top: 8px; font-size: 18.5px; color: var(--muted); line-height: 1.45; }
+.card.wash { background: var(--teal-soft); border-color: transparent; }
+
+/* Ledger table (hairline rows, mono labels) */
+.ledger { border-top: 1px solid var(--ink); }
+.lrow {
+    display: flex;
+    align-items: baseline;
+    padding: 19px 0;
+    border-bottom: 1px solid var(--hairline);
+}
+.lrow .no { font-family: var(--font-mono); font-size: 13px; width: 56px; color: var(--faint); }
+.lrow .lbl {
+    font-family: var(--font-mono);
+    font-size: 13.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    width: 330px;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+.lrow .txt { flex: 1; font-size: 20px; font-weight: 400; line-height: 1.35; }
+.lrow .txt b { font-weight: 600; }
+.lrow .metric {
+    width: 400px;
+    flex-shrink: 0;
+    text-align: right;
+    font-size: 19px;
+    color: var(--teal);
+    font-weight: 600;
+}
+.lrow .metric small { display: block; font-weight: 400; font-size: 15px; color: var(--muted); }
+
+/* Horizontal flow diagram (architecture / pipeline) */
+.flow { display: flex; align-items: stretch; gap: 0; }
+.fstep {
+    flex: 1;
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 24px 24px;
+    position: relative;
+}
+.fstep + .fstep { margin-left: 46px; }
+.fstep + .fstep::before {
+    content: "→";
+    position: absolute;
+    left: -36px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--teal);
+    font-size: 26px;
+    font-weight: 300;
+}
+.fstep .tag {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--teal);
+}
+.fstep h3 { margin-top: 8px; font-size: 22px; font-weight: 600; line-height: 1.25; }
+.fstep p { margin-top: 6px; font-size: 16.5px; color: var(--muted); line-height: 1.4; }
+
+/* Numbered scenario steps */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; }
+.step { border-top: 3px solid var(--teal); padding-top: 18px; }
+.step .n { font-family: var(--font-mono); font-size: 14px; color: var(--teal); letter-spacing: .12em; }
+.step h3 { margin-top: 10px; font-size: 23px; font-weight: 600; line-height: 1.3; }
+.step p { margin-top: 8px; font-size: 18px; color: var(--muted); line-height: 1.45; }
+
+/* Banner line (human-in-the-loop, red lines, stand) */
+.banner {
+    border-radius: 14px;
+    background: var(--teal-soft);
+    padding: 20px 28px;
+    font-size: 20px;
+    line-height: 1.45;
+    color: var(--ink);
+}
+.banner b { font-weight: 600; color: var(--teal); }
+.banner.line {
+    background: transparent;
+    border: 1px solid var(--hairline);
+}
+.banner.red { background: #F6ECE9; }
+.banner.red b { color: var(--danger); }
+
+/* Checklist */
+.checks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 44px; }
+.check { display: flex; gap: 16px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid var(--hairline); }
+.check::before {
+    content: "✓";
+    color: var(--teal);
+    font-weight: 700;
+    font-size: 20px;
+    flex-shrink: 0;
+}
+.check .w { font-size: 19px; line-height: 1.35; }
+.check .w b { font-weight: 600; }
+.check .w small { display: block; font-size: 15.5px; color: var(--muted); margin-top: 2px; }
+
+/* Ecosystem chips */
+.chips { display: flex; flex-wrap: wrap; gap: 12px; }
+.chip {
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    padding: 10px 20px;
+    font-size: 17px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+.chip b { font-weight: 600; color: var(--ink); }
+.chip.hot { background: var(--teal-soft); border-color: transparent; }
+.chip.hot b { color: var(--teal); }
+
+/* Two-column split */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; }
+.split h4 {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--teal);
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--ink);
+}
+.split ul { list-style: none; }
+.split li { padding: 13px 0; border-bottom: 1px solid var(--hairline); font-size: 19px; line-height: 1.4; }
+.split li b { font-weight: 600; }
+.split li small { display: block; font-size: 15.5px; color: var(--muted); margin-top: 3px; }
+
+/* ===========================================
+   TITLE SLIDE (mirrors the approved style preview)
+   =========================================== */
+.s-title .main { position: absolute; top: 250px; left: var(--pad-x); right: var(--pad-x); }
+.s-title h1 {
+    font-weight: 300;
+    font-size: 96px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-top: 32px;
+    max-width: 1520px;
+}
+.s-title h1 b { font-weight: 600; color: var(--teal); }
+.s-title .subtitle { margin-top: 32px; font-size: 26px; color: var(--muted); max-width: 1200px; line-height: 1.55; }
+
+/* ===========================================
+   INLINE EDIT MODE (hover top-left corner or press E; Ctrl+S saves)
+   =========================================== */
+.edit-hotzone { position: fixed; top: 0; left: 0; width: 80px; height: 80px; z-index: 10000; cursor: pointer; }
+.edit-toggle {
+    position: fixed; top: 18px; left: 18px; z-index: 10001;
+    border: 0; border-radius: 10px; padding: 8px 12px;
+    background: rgba(16,20,24,.75); color: #fff; font-size: 16px; cursor: pointer;
+    opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.edit-toggle.show, .edit-toggle.active { opacity: 1; pointer-events: auto; }
+.edit-toggle.active { background: var(--teal); }
+body.editing [contenteditable="true"] { outline: 1px dashed var(--teal); outline-offset: 2px; }
+
+/* End-of-deck toast */
+.end-toast {
+    position: fixed;
+    bottom: 84px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10002;
+    background: rgba(16, 20, 24, 0.88);
+    color: #fff;
+    font-family: var(--font-body);
+    font-size: 15px;
+    padding: 10px 24px;
+    border-radius: 999px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .3s ease;
+    backdrop-filter: blur(6px);
+}
+.end-toast.show { opacity: 1; }
+.end-toast b { color: #2DD4A7; font-weight: 600; }
+
+/* Telegram contacts on the closing slide */
+.contacts {
+    margin-top: 26px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+.contacts .team {
+    font-weight: 600;
+    font-size: 20px;
+    margin-right: 10px;
+}
+.contacts a.tg {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    padding: 10px 20px;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    text-decoration: none;
+    transition: background .2s ease, border-color .2s ease;
+}
+.contacts a.tg:hover { background: var(--teal-soft); border-color: transparent; }
+.contacts a.tg i {
+    font-style: normal;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--teal);
+}
+
+/* Deck navigation bar (chrome outside the stage): dots + counter + menu toggle */
+.deck-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: #8fa1a5;
+    letter-spacing: .15em;
+    background: rgba(16,20,24,.55);
+    padding: 8px 16px;
+    border-radius: 999px;
+    backdrop-filter: blur(6px);
+}
+.nav-arrow {
+    border: 0;
+    background: transparent;
+    color: #8fa1a5;
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 4px;
+    cursor: pointer;
+    transition: color .2s ease;
+}
+.nav-arrow:hover { color: #fff; }
+.nav-arrow:disabled { color: rgba(255,255,255,.18); cursor: default; }
+.deck-dots { display: flex; gap: 7px; }
+.deck-dots button {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    border: 0;
+    padding: 0;
+    background: rgba(255,255,255,.28);
+    cursor: pointer;
+    transition: background .2s ease, transform .2s ease;
+}
+.deck-dots button:hover { background: rgba(255,255,255,.6); transform: scale(1.25); }
+.deck-dots button.on { background: #2DD4A7; }
+.counter-btn {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.counter-btn:hover { color: #fff; }
+
+/* Slide overview menu (press M, or click the counter) */
+.slide-menu {
+    position: fixed;
+    inset: 0;
+    z-index: 10005;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(14, 18, 19, 0.55);
+    backdrop-filter: blur(8px);
+}
+.slide-menu.open { display: flex; }
+.slide-menu .panel {
+    background: var(--white);
+    border-radius: 18px;
+    padding: 36px 40px;
+    width: min(920px, 92vw);
+    max-height: 86vh;
+    overflow: auto;
+    font-family: var(--font-body);
+}
+.slide-menu .panel h5 {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 18px;
+}
+.slide-menu .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 22px; }
+.slide-menu .grid button {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    font-size: 16px;
+    color: var(--ink);
+    padding: 9px 10px;
+    border-radius: 9px;
+    cursor: pointer;
+}
+.slide-menu .grid button:hover { background: var(--teal-soft); }
+.slide-menu .grid button.on { background: var(--teal); color: #fff; }
+.slide-menu .grid button .n {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+}
+.slide-menu .grid button.on .n { color: rgba(255,255,255,.7); }
+.slide-menu .hint {
+    margin-top: 20px;
+    font-size: 13.5px;
+    color: var(--muted);
+}
+</style>
+</head>
+<body>
+
+<!-- Fixed chrome: demo/sign-in + language switch (top right), edit affordance (top left) -->
+<div class="top-right-chrome">
+    <a class="demo-btn" href="https://dc.jurek.kz" target="_blank" rel="noopener">
+        <span class="L ru">Демо · Войти</span><span class="L kz">Демо · Кіру</span> <span class="arrow">→</span>
+    </a>
+    <nav class="lang-switch" id="langToggle" aria-label="Switch language" title="Тілді ауыстыру / Сменить язык">
+        <button id="btnRu" class="on">РУС</button>
+        <button id="btnKz">ҚАЗ</button>
+    </nav>
+</div>
+
+<!-- Slide overview: press M or click the page counter -->
+<div class="slide-menu" id="slideMenu">
+    <div class="panel">
+        <h5><span class="L ru">Слайды</span><span class="L kz">Слайдтар</span></h5>
+        <div class="grid" id="menuGrid">
+            <button data-i="0"><span class="n">01</span><span>Darumen Health</span></button>
+            <button data-i="1"><span class="n">02</span><span><span class="L ru">Проблема</span><span class="L kz">Мәселе</span></span></button>
+            <button data-i="2"><span class="n">03</span><span><span class="L ru">Продукт</span><span class="L kz">Өнім</span></span></button>
+            <button data-i="3"><span class="n">04</span><span><span class="L ru">Сценарий</span><span class="L kz">Сценарий</span></span></button>
+            <button data-i="4"><span class="n">05</span><span><span class="L ru">Гражданин</span><span class="L kz">Азамат</span></span></button>
+            <button data-i="5"><span class="n">06</span><span><span class="L ru">Врач</span><span class="L kz">Дәрігер</span></span></button>
+            <button data-i="6"><span class="n">07</span><span><span class="L ru">Регулятор</span><span class="L kz">Реттеуші</span></span></button>
+            <button data-i="7"><span class="n">08</span><span>ML-<span class="L ru">ядро</span><span class="L kz">ядро</span></span></button>
+            <button data-i="8"><span class="n">09</span><span><span class="L ru">Граница ML и AI</span><span class="L kz">ML мен AI шекарасы</span></span></button>
+            <button data-i="9"><span class="n">10</span><span><span class="L ru">Валидация</span><span class="L kz">Валидация</span></span></button>
+            <button data-i="10"><span class="n">11</span><span><span class="L ru">Архитектура</span><span class="L kz">Сәулет</span></span></button>
+            <button data-i="11"><span class="n">12</span><span><span class="L ru">Доверие</span><span class="L kz">Сенім</span></span></button>
+            <button data-i="12"><span class="n">13</span><span><span class="L ru">Требования ТЗ</span><span class="L kz">ТТ талаптары</span></span></button>
+            <button data-i="13"><span class="n">14</span><span><span class="L ru">Ограничения</span><span class="L kz">Шектеулер</span></span></button>
+            <button data-i="14"><span class="n">15</span><span><span class="L ru">Дальше</span><span class="L kz">Әрі қарай</span></span></button>
+        </div>
+        <div class="hint"><span class="L ru">Клавиши: ← → листать · 1–9 быстрый переход · M меню · Esc закрыть</span><span class="L kz">Пернелер: ← → парақтау · 1–9 жылдам өту · M мәзір · Esc жабу</span></div>
+    </div>
+</div>
+<div class="edit-hotzone"></div>
+<button class="edit-toggle" id="editToggle" title="Edit mode (E)">✏️</button>
+
+<div class="deck-viewport">
+<main class="deck-stage" id="deckStage">
+
+<!-- ============ SLIDE 1 · TITLE ============ -->
+<section class="slide s-title active" aria-label="Title">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">GOVTECH CAMP 2026 · КЕЙС 1 · МЗ РК</span><span class="L kz">GOVTECH CAMP 2026 · 1-КЕЙС · ҚР ДСМ</span></div>
+    </header>
+    <div class="main">
+        <div class="kicker reveal"><span class="L ru">Платформа данных здравоохранения</span><span class="L kz">Денсаулық сақтау деректер платформасы</span></div>
+        <h1 class="reveal"><span class="L ru">Каждое направление получает <b>прогноз</b>.<br>Каждое решение остаётся за <b>врачом</b>.</span><span class="L kz">Әр жолдама <b>болжам</b> алады.<br>Әр шешім <b>дәрігерде</b> қалады.</span></h1>
+        <div class="subtitle reveal">
+            <span class="L ru">Ожидание госпитализации, нагрузка на стационары и маршрутизация — предсказуемы на открытых данных МЗ РК</span>
+            <span class="L kz">Емдеуге жатқызуды күту, стационар жүктемесі және бағыттау — ҚР ДСМ ашық деректерінде болжамды</span>
+        </div>
+    </div>
+    <div class="content" style="top:auto; bottom:110px; height:70px;">
+        <div class="tech-strip reveal">
+            <span class="t"><i>ML</i><b>LightGBM</b> <span class="L ru">ожидание и отказ</span><span class="L kz">күту және бас тарту</span></span>
+            <span class="t"><i>ML</i><b>AutoETS</b> <span class="L ru">нагрузка 1–3 мес</span><span class="L kz">жүктеме 1–3 ай</span></span>
+            <span class="t"><i><span class="L ru">Модель</span><span class="L kz">Модель</span></i><b><span class="L ru">Симулятор</span><span class="L kz">Симулятор</span></b> <span class="L ru">что-если</span><span class="L kz">«не болса»</span></span>
+            <span class="t"><i>AI</i><b><span class="L ru">LLM + инструменты</span><span class="L kz">LLM + құралдар</span></b> <span class="L ru">вопросы к данным</span><span class="L kz">деректерге сұрақтар</span></span>
+        </div>
+    </div>
+    <footer class="foot"><span>darumen · gov / care / lab / med / family / ai</span><span>01 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 2 · PROBLEM ============ -->
+<section class="slide" aria-label="Problem">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">01 · Проблема</span><span class="L kz">01 · Мәселе</span></div>
+    </header>
+    <div class="content spread has-strip">
+        <div class="kicker reveal"><span class="L ru">Кейс 1 · Очереди на плановую госпитализацию</span><span class="L kz">1-кейс · Жоспарлы емдеуге жатқызу кезектері</span></div>
+        <h2 class="reveal"><span class="L ru">Очередь есть. Но её <b>никто не видит</b>.</span><span class="L kz">Кезек бар. Бірақ оны <b>ешкім көрмейді</b>.</span></h2>
+        <p class="lead reveal"><span class="L ru">Бюро госпитализации регистрирует направления и назначает даты — но не отвечает на главные вопросы трёх участников системы.</span><span class="L kz">Емдеуге жатқызу бюросы жолдамаларды тіркейді — бірақ жүйенің үш қатысушысының басты сұрақтарына жауап бермейді.</span></p>
+        <div class="cards c3 stagger" style="margin-top: 40px;">
+            <div class="card">
+                <div class="tag"><span class="L ru">Гражданин</span><span class="L kz">Азамат</span></div>
+                <h3><span class="L ru">«Сколько я буду ждать?»</span><span class="L kz">«Мен қанша күтемін?»</span></h3>
+                <p><span class="L ru">Срок неизвестен. В офтальмологии медиана — 35 дней, а в соседнем регионе тот же профиль — меньше недели.</span><span class="L kz">Мерзім белгісіз. Офтальмологияда медиана — 35 күн, ал көрші аймақта сол бейін — бір аптадан аз.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Врач ПМСП</span><span class="L kz">МСАК дәрігері</span></div>
+                <h3><span class="L ru">«Куда направить?»</span><span class="L kz">«Қайда жолдау керек?»</span></h3>
+                <p><span class="L ru">41 % направлений уходят в другую организацию — выбор реален, но риск отказа врачу не виден.</span><span class="L kz">Жолдамалардың 41 %-ы басқа ұйымға кетеді — таңдау бар, бірақ бас тарту қаупі дәрігерге көрінбейді.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Регулятор</span><span class="L kz">Реттеуші</span></div>
+                <h3><span class="L ru">«Где перегрузка?»</span><span class="L kz">«Жүктеме қайда?»</span></h3>
+                <p><span class="L ru">Аномалии видны постфактум. За квартал 2,7 млн дней ожидания закончились отказом в госпитализации.</span><span class="L kz">Ауытқулар кейін ғана көрінеді. Тоқсанда 2,7 млн күту күні бас тартумен аяқталды.</span></p>
+            </div>
+        </div>
+        <div class="tech-strip reveal">
+            <span class="t"><i><span class="L ru">Данные</span><span class="L kz">Деректер</span></i><span class="L ru">I квартал 2025 · 767 тыс. направлений · 20 регионов · 13,4 % ждут дольше 30 дней · 11 % — отказ</span><span class="L kz">2025 ж. I тоқсан · 767 мың жолдама · 20 аймақ · 13,4 % 30 күннен ұзақ күтеді · 11 % — бас тарту</span></span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Проблема</span><span class="L kz">Мәселе</span></span><span>02 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 3 · PRODUCT ============ -->
+<section class="slide" aria-label="Product">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">02 · Продукт</span><span class="L kz">02 · Өнім</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Что мы построили</span><span class="L kz">Біз не құрдық</span></div>
+        <h2 class="reveal"><span class="L ru">Слой <b>прогноза и маршрутизации</b> поверх Бюро госпитализации</span><span class="L kz">Емдеуге жатқызу бюросының үстіндегі <b>болжам және бағыттау</b> қабаты</span></h2>
+        <div class="flow stagger" style="margin-top: 44px;">
+            <div class="fstep">
+                <div class="tag"><span class="L ru">Вход</span><span class="L kz">Кіріс</span></div>
+                <h3><span class="L ru">Открытые данные МЗ РК</span><span class="L kz">ҚР ДСМ ашық деректері</span></h3>
+                <p><span class="L ru">15 наборов, 450 млн строк: направления, ожидающие, отказы, пролеченные, рецепты, вакцинация</span><span class="L kz">15 жинақ, 450 млн жол: жолдамалар, күтушілер, бас тартулар, емделгендер, рецептер, вакцинация</span></p>
+            </div>
+            <div class="fstep">
+                <div class="tag"><span class="L ru">Ядро</span><span class="L kz">Ядро</span></div>
+                <h3><span class="L ru">Общее ML-ядро</span><span class="L kz">Ортақ ML-ядро</span></h3>
+                <p><span class="L ru">Прогноз рядов · детектор аномалий · скоринг ожидания и риска · объяснение каждого вывода</span><span class="L kz">Қатарлар болжамы · ауытқу детекторы · күту скорингі · әр қорытындының түсіндірмесі</span></p>
+            </div>
+            <div class="fstep">
+                <div class="tag"><span class="L ru">Выход</span><span class="L kz">Шығыс</span></div>
+                <h3><span class="L ru">Три кабинета</span><span class="L kz">Үш кабинет</span></h3>
+                <p><span class="L ru">Гражданин · врач ПМСП · регулятор — веб и мобильное приложение, единый вход</span><span class="L kz">Азамат · МСАК дәрігері · реттеуші — веб және мобильді қосымша, бірыңғай кіру</span></p>
+            </div>
+        </div>
+        <p class="lead reveal" style="margin-top: 36px;"><span class="L ru">Один движок — шесть линеек продукта. Кейс 1 — это Darumen Gov; остальные линейки подключаются к тому же ядру.</span><span class="L kz">Бір қозғалтқыш — алты өнім желісі. 1-кейс — Darumen Gov; қалғандары сол ядроға қосылады.</span></p>
+        <div class="chips reveal" style="margin-top: 20px;">
+            <span class="chip hot"><b>Gov</b> · <span class="L ru">ситуационный центр</span><span class="L kz">жағдай орталығы</span></span>
+            <span class="chip"><b>Care</b> · <span class="L ru">врачи и клиники</span><span class="L kz">дәрігерлер мен клиникалар</span></span>
+            <span class="chip"><b>Lab</b> · <span class="L ru">диагностика</span><span class="L kz">диагностика</span></span>
+            <span class="chip"><b>Med</b> · <span class="L ru">лекарства</span><span class="L kz">дәрілер</span></span>
+            <span class="chip"><b>Family</b> · <span class="L ru">профилактика</span><span class="L kz">алдын алу</span></span>
+            <span class="chip"><b>AI</b> · <span class="L ru">ассистент навигации</span><span class="L kz">навигация ассистенті</span></span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Продукт</span><span class="L kz">Өнім</span></span><span>03 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 4 · END-TO-END SCENARIO ============ -->
+<section class="slide" aria-label="Scenario">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">03 · Сценарий</span><span class="L kz">03 · Сценарий</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Как это работает вживую</span><span class="L kz">Бұл іс жүзінде қалай жұмыс істейді</span></div>
+        <h2 class="reveal"><span class="L ru">Один сценарий — <b>три кабинета</b></span><span class="L kz">Бір сценарий — <b>үш кабинет</b></span></h2>
+        <div class="steps stagger" style="margin-top: 50px;">
+            <div class="step">
+                <div class="n">01</div>
+                <h3><span class="L ru">Гражданин видит срок</span><span class="L kz">Азамат мерзімді көреді</span></h3>
+                <p><span class="L ru">Ожидание в своей организации — 35 дней; в соседнем районе тот же профиль — 9 дней.</span><span class="L kz">Өз ұйымында күту — 35 күн; көрші ауданда сол бейін — 9 күн.</span></p>
+            </div>
+            <div class="step">
+                <div class="n">02</div>
+                <h3><span class="L ru">Врач подтверждает маршрут</span><span class="L kz">Дәрігер бағытты растайды</span></h3>
+                <p><span class="L ru">В момент выписки направления: прогноз, риск отказа, альтернативы. Кнопку нажимает врач.</span><span class="L kz">Жолдама жазу сәтінде: болжам, бас тарту қаупі, баламалар. Түймені дәрігер басады.</span></p>
+            </div>
+            <div class="step">
+                <div class="n">03</div>
+                <h3><span class="L ru">Регулятор видит сигнал</span><span class="L kz">Реттеуші сигналды көреді</span></h3>
+                <p><span class="L ru">Перегруженная организация загорается в ленте аномалий — на фоне похожих по профилю и размеру.</span><span class="L kz">Шамадан тыс жүктелген ұйым ауытқулар таспасында жанады — ұқсас ұйымдар фонында.</span></p>
+            </div>
+            <div class="step">
+                <div class="n">04</div>
+                <h3><span class="L ru">Симулятор считает рычаг</span><span class="L kz">Симулятор тетікті есептейді</span></h3>
+                <p><span class="L ru">Сколько коек или перенаправлений снимает проблему: −19 % дней ожидания при переносе до 20 % направлений.</span><span class="L kz">Қанша төсек мәселені шешеді: жолдамалардың 20 %-ын ауыстырғанда күту күндері −19 %.</span></p>
+            </div>
+        </div>
+        <div class="banner reveal" style="margin-top: 42px;">
+            <span class="L ru"><b>Каждый шаг фиксируется</b> в журнале решений: что рекомендовала система и что выбрал человек.</span>
+            <span class="L kz"><b>Әр қадам тіркеледі</b>: жүйе не ұсынды және адам нені таңдады — шешімдер журналында.</span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Сценарий</span><span class="L kz">Сценарий</span></span><span>04 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 5 · CITIZEN ============ -->
+<section class="slide" aria-label="Citizen">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">04 · Гражданин</span><span class="L kz">04 · Азамат</span></div>
+    </header>
+    <div class="content spread has-strip">
+        <div class="kicker reveal">Darumen Care · Family</div>
+        <h2 class="reveal"><span class="L ru">Кабинет гражданина: <b>сроки</b>, а не диагнозы</span><span class="L kz">Азамат кабинеті: диагноз емес — <b>мерзім</b></span></h2>
+        <div class="cards c4 stagger" style="margin-top: 40px;">
+            <div class="card">
+                <div class="tag"><span class="L ru">Ожидание</span><span class="L kz">Күту</span></div>
+                <h3><span class="L ru">Сколько ждать</span><span class="L kz">Қанша күту</span></h3>
+                <p><span class="L ru">Прогноз p50 и p90 по региону и профилю — «около N дней», честный интервал.</span><span class="L kz">Аймақ пен бейін бойынша p50 және p90 болжамы — адал интервал.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Маршрут</span><span class="L kz">Бағыт</span></div>
+                <h3><span class="L ru">Где быстрее</span><span class="L kz">Қай жерде жылдамырақ</span></h3>
+                <p><span class="L ru">Три организации с меньшим ожиданием — в своём регионе и соседних.</span><span class="L kz">Күтуі азырақ үш ұйым — өз аймағында және көршілерде.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Лекарства</span><span class="L kz">Дәрілер</span></div>
+                <h3><span class="L ru">Проверка рецепта</span><span class="L kz">Рецептіні тексеру</span></h3>
+                <p><span class="L ru">Покрыт ли препарат ОСМС, где получить и сколько ждать обеспечения.</span><span class="L kz">Дәрі МӘМС-пен өтеле ме, қайдан алу және қанша күту.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Доступ</span><span class="L kz">Қолжетімділік</span></div>
+                <h3><span class="L ru">Веб и мобильное</span><span class="L kz">Веб және мобильді</span></h3>
+                <p><span class="L ru">Flutter-приложение; в перспективе — вход через eGov mobile.</span><span class="L kz">Flutter-қосымша; болашақта — eGov mobile арқылы кіру.</span></p>
+            </div>
+        </div>
+        <div class="banner red reveal" style="margin-top: 30px;">
+            <span class="L ru"><b>Красная линия ТЗ:</b> никаких персональных данных на входе и никаких медицинских советов на выходе. Только регион, профиль и тип направления; строки с малыми числами скрываются.</span>
+            <span class="L kz"><b>ТТ қызыл сызығы:</b> кірісте дербес деректер жоқ, шығыста медициналық кеңес жоқ. Тек аймақ, бейін және жолдама түрі; аз сандар жасырылады.</span>
+        </div>
+        <div class="tech-strip reveal">
+            <span class="t"><i>ML</i><span class="L ru">та же модель LightGBM, что и у врача — гражданин видит её агрегаты</span><span class="L kz">дәрігердегідей LightGBM моделі — азамат оның агрегаттарын көреді</span></span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Гражданин</span><span class="L kz">Азамат</span></span><span>05 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 6 · DOCTOR ============ -->
+<section class="slide" aria-label="Doctor">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">05 · Врач</span><span class="L kz">05 · Дәрігер</span></div>
+    </header>
+    <div class="content spread has-strip">
+        <div class="kicker reveal">Darumen Care</div>
+        <h2 class="reveal"><span class="L ru">Кабинет врача: подсказка <b>в момент направления</b></span><span class="L kz">Дәрігер кабинеті: <b>жолдама сәтіндегі</b> кеңес</span></h2>
+        <div class="cards c4 stagger" style="margin-top: 40px;">
+            <div class="card">
+                <div class="tag"><span class="L ru">Ассистент</span><span class="L kz">Ассистент</span></div>
+                <h3><span class="L ru">Ассистент направления</span><span class="L kz">Жолдама ассистенті</span></h3>
+                <p><span class="L ru">Прогноз ожидания, риск отказа и альтернативы региона — до нажатия кнопки.</span><span class="L kz">Күту болжамы, бас тарту қаупі және аймақ баламалары — түймені басқанға дейін.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Объяснимость</span><span class="L kz">Түсіндірме</span></div>
+                <h3><span class="L ru">«Почему так»</span><span class="L kz">«Неге бұлай»</span></h3>
+                <p><span class="L ru">Вклад факторов в днях: очередь, пропускная способность, профиль, сезон.</span><span class="L kz">Факторлар үлесі күнмен: кезек, өткізу қабілеті, бейін, маусым.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Поток</span><span class="L kz">Ағын</span></div>
+                <h3><span class="L ru">Рабочий список</span><span class="L kz">Жұмыс тізімі</span></h3>
+                <p><span class="L ru">Приоритеты пациентов из прогноза ожидания и риска отказа; журнал своих решений.</span><span class="L kz">Науқас басымдықтары болжамнан; өз шешімдерінің журналы.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag">AI</div>
+                <h3><span class="L ru">AI-скрайб приёма</span><span class="L kz">Қабылдаудың AI-скрайбы</span></h3>
+                <p><span class="L ru">Расшифровка, черновик записи и памятка пациенту — врач утверждает каждую; аудио удаляется.</span><span class="L kz">Транскрипция мен жазба жобасы — әрқайсысын дәрігер бекітеді; аудио өшіріледі.</span></p>
+            </div>
+        </div>
+        <div class="banner reveal" style="margin-top: 30px;">
+            <span class="L ru"><b>Human-in-the-loop:</b> система только рекомендует — кнопку «направить» нажимает врач, и его выбор попадает в журнал рядом с рекомендацией.</span>
+            <span class="L kz"><b>Human-in-the-loop:</b> жүйе тек ұсынады — «жолдау» түймесін дәрігер басады, оның таңдауы журналға ұсыныспен қатар жазылады.</span>
+        </div>
+        <div class="tech-strip reveal">
+            <span class="t"><i>ML</i><b>LightGBM</b> <span class="L ru">квантили p50/p90 + классификатор отказа</span><span class="L kz">p50/p90 квантильдері + бас тарту классификаторы</span></span>
+            <span class="t"><i>ML</i><b>SHAP</b> <span class="L ru">факторы словами и в днях</span><span class="L kz">факторлар сөзбен және күнмен</span></span>
+            <span class="t"><i>AI</i><b>faster-whisper + LLM</b> <span class="L ru">только черновики</span><span class="L kz">тек жобалар</span></span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Врач</span><span class="L kz">Дәрігер</span></span><span>06 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 7 · REGULATOR ============ -->
+<section class="slide" aria-label="Regulator">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">06 · Регулятор</span><span class="L kz">06 · Реттеуші</span></div>
+    </header>
+    <div class="content spread has-strip">
+        <div class="kicker reveal">Darumen Gov</div>
+        <h2 class="reveal"><span class="L ru">Ситуационный центр: от карты — <b>к рычагу</b></span><span class="L kz">Жағдай орталығы: картадан — <b>тетікке</b></span></h2>
+        <div class="cards c3 stagger" style="margin-top: 36px;">
+            <div class="card">
+                <div class="tag"><span class="L ru">Обзор</span><span class="L kz">Шолу</span></div>
+                <h3><span class="L ru">Карта и индекс доступности</span><span class="L kz">Карта және қолжетімділік индексі</span></h3>
+                <p><span class="L ru">20 регионов, рейтинг по доле ожидания дольше 30 дней и p90; формула — под картой.</span><span class="L kz">20 аймақ, 30 күннен ұзақ күту үлесі мен p90 бойынша рейтинг; формула — картаның астында.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Прогноз</span><span class="L kz">Болжам</span></div>
+                <h3><span class="L ru">Нагрузка на 1–3 месяца</span><span class="L kz">1–3 айға жүктеме</span></h3>
+                <p><span class="L ru">Госпитализации и приёмные покои; ошибка модели против наива — прямо под графиком.</span><span class="L kz">Емдеуге жатқызу және қабылдау бөлімдері; модель қатесі — графиктің астында.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Сигналы</span><span class="L kz">Сигналдар</span></div>
+                <h3><span class="L ru">Лента аномалий</span><span class="L kz">Ауытқулар таспасы</span></h3>
+                <p><span class="L ru">Организация сравнивается с похожими, а не с абсолютным порогом; сигнал закрывает человек.</span><span class="L kz">Ұйым ұқсастармен салыстырылады; сигналды адам жабады.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Рычаг</span><span class="L kz">Тетік</span></div>
+                <h3><span class="L ru">Симулятор «что если»</span><span class="L kz">«Не болса» симуляторы</span></h3>
+                <p><span class="L ru">Койки, ставки, перенос направлений — сценарии сравниваются между собой до решения.</span><span class="L kz">Төсектер, мөлшерлемелер, жолдамаларды ауыстыру — сценарийлер шешімге дейін салыстырылады.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag">AI · Insight</div>
+                <h3><span class="L ru">Вопросы к данным</span><span class="L kz">Деректерге сұрақтар</span></h3>
+                <p><span class="L ru">«Три худших региона по кардиологии?» — ответ цифрой и графиком, со списком вызванных инструментов.</span><span class="L kz">«Кардиология бойынша ең нашар үш аймақ?» — жауап сан және графикпен, құралдар тізімімен.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Аудит</span><span class="L kz">Аудит</span></div>
+                <h3><span class="L ru">Журнал решений</span><span class="L kz">Шешімдер журналы</span></h3>
+                <p><span class="L ru">Все решения всех ролей: рекомендация, выбор, причина — основа для разбора и отчётности.</span><span class="L kz">Барлық рөлдердің шешімдері: ұсыныс, таңдау, себеп.</span></p>
+            </div>
+        </div>
+        <div class="tech-strip reveal">
+            <span class="t"><i>ML</i><b>AutoETS</b> <span class="L ru">против сезонного наива</span><span class="L kz">маусымдық наивке қарсы</span></span>
+            <span class="t"><i>ML</i><b><span class="L ru">Робастный z</span><span class="L kz">Робасты z</span></b> <span class="L ru">сигналы аномалий</span><span class="L kz">ауытқу сигналдары</span></span>
+            <span class="t"><i><span class="L ru">Модель</span><span class="L kz">Модель</span></i><b><span class="L ru">Жидкостная очередь</span><span class="L kz">Сұйықтық кезек моделі</span></b> k·L/μ</span>
+            <span class="t"><i>AI</i><b>LLM</b> <span class="L ru">только через инструменты</span><span class="L kz">тек құралдар арқылы</span></span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Регулятор</span><span class="L kz">Реттеуші</span></span><span>07 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 8 · ML CORE TABLE ============ -->
+<section class="slide" aria-label="ML core">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">07 · ML-ядро</span><span class="L kz">07 · ML-ядро</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Технологии · модели</span><span class="L kz">Технологиялар · модельдер</span></div>
+        <h2 class="reveal"><span class="L ru">Одно ядро — <b>проверяемые модели</b></span><span class="L kz">Бір ядро — <b>тексерілетін модельдер</b></span></h2>
+        <div class="ledger reveal" style="margin-top: 36px;">
+            <div class="lrow">
+                <span class="no">01</span>
+                <span class="lbl"><span class="L ru">ML · Ожидание</span><span class="L kz">ML · Күту</span></span>
+                <span class="txt"><b>LightGBM</b>, <span class="L ru">квантильная регрессия p50/p90 с признаками очереди и пропускной способности</span><span class="L kz">p50/p90 квантильдік регрессия, кезек және өткізу қабілеті белгілерімен</span></span>
+                <span class="metric">3.87 <span class="L ru">против</span><span class="L kz">қарсы</span> 4.67<small><span class="L ru">пинбол p50, март 2025 · −17 % к baseline</span><span class="L kz">пинбол p50, 2025 наурыз · baseline-нан −17 %</span></small></span>
+            </div>
+            <div class="lrow">
+                <span class="no">02</span>
+                <span class="lbl"><span class="L ru">ML · Риск отказа</span><span class="L kz">ML · Бас тарту қаупі</span></span>
+                <span class="txt"><span class="L ru"><b>Классификатор</b> вероятности отказа после постановки в очередь</span><span class="L kz">Кезекке қойылғаннан кейінгі бас тарту ықтималдығының <b>классификаторы</b></span></span>
+                <span class="metric">AUC 0.79 <span class="L ru">против</span><span class="L kz">қарсы</span> 0.74<small><span class="L ru">калибровка по корзинам в пределах 0.04</span><span class="L kz">себеттер бойынша калибрлеу 0.04 шегінде</span></small></span>
+            </div>
+            <div class="lrow">
+                <span class="no">03</span>
+                <span class="lbl"><span class="L ru">ML · Потоки</span><span class="L kz">ML · Ағындар</span></span>
+                <span class="txt"><b>AutoETS</b>, <span class="L ru">1 627 рядов госпитализаций + приёмные покои, скользящий бэктест</span><span class="L kz">1 627 қатар + қабылдау бөлімдері, жылжымалы бэктест</span></span>
+                <span class="metric">MASE 0.78 <span class="L ru">против</span><span class="L kz">қарсы</span> 1.05<small><span class="L ru">лучше наива на 74 % рядов</span><span class="L kz">қатарлардың 74 %-ында наивтен жақсы</span></small></span>
+            </div>
+            <div class="lrow">
+                <span class="no">04</span>
+                <span class="lbl"><span class="L ru">Статистика · Аномалии</span><span class="L kz">Статистика · Ауытқулар</span></span>
+                <span class="txt"><span class="L ru"><b>Робастный z</b> к сезонной медиане, группа похожих организаций</span><span class="L kz">Маусымдық медианаға <b>робасты z</b>, ұқсас ұйымдар тобы</span></span>
+                <span class="metric"><span class="L ru">верхние 1–5 %</span><span class="L kz">жоғарғы 1–5 %</span><small><span class="L ru">подсаженные всплески найдены в топе ранжирования</span><span class="L kz">қосылған секірулер рейтинг төбесінде табылды</span></small></span>
+            </div>
+            <div class="lrow">
+                <span class="no">05</span>
+                <span class="lbl"><span class="L ru">Модель · Симулятор</span><span class="L kz">Модель · Симулятор</span></span>
+                <span class="txt"><span class="L ru"><b>Жидкостная модель очереди</b> k·L/μ с калибровкой по факту, жадный перенос</span><span class="L kz">Фактімен калибрленген <b>сұйықтық кезек моделі</b> k·L/μ</span></span>
+                <span class="metric"><span class="L ru">Спирмен</span><span class="L kz">Спирмен</span> 0.61<small><span class="L ru">порядок организаций воспроизводится; 4 255 пар</span><span class="L kz">ұйымдар реті қайталанады; 4 255 жұп</span></small></span>
+            </div>
+        </div>
+        <div class="banner line reveal" style="margin-top: 26px;">
+            <span class="L ru"><b>Правило ядра:</b> модель, не побившая baseline на отложенной выборке, в демо не попадает — <code style="font-family: var(--font-mono); font-size: 17px;">make eval</code> падает.</span>
+            <span class="L kz"><b>Ядро ережесі:</b> кейінге қалдырылған іріктемеде baseline-ды жеңбеген модель демоға кірмейді — <code style="font-family: var(--font-mono); font-size: 17px;">make eval</code> құлайды.</span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">ML-ядро</span><span class="L kz">ML-ядро</span></span><span>08 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 9 · ML vs AI ============ -->
+<section class="slide" aria-label="ML vs AI">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">08 · Граница ML и AI</span><span class="L kz">08 · ML мен AI шекарасы</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Одно правило на весь продукт</span><span class="L kz">Бүкіл өнімге бір ереже</span></div>
+        <h2 class="reveal"><span class="L ru"><b>ML считает.</b> AI формулирует.</span><span class="L kz"><b>ML есептейді.</b> AI тұжырымдайды.</span></h2>
+        <div class="split reveal" style="margin-top: 36px;">
+            <div>
+                <h4><span class="L ru">ML и статистика — источник чисел</span><span class="L kz">ML және статистика — сандар көзі</span></h4>
+                <ul>
+                    <li><span class="L ru"><b>Каждое число на экране</b> приходит из модели или формулы с метрикой на отложенной выборке</span><span class="L kz"><b>Экрандағы әр сан</b> кейінге қалдырылған іріктемеде метрикасы бар модельден келеді</span></li>
+                    <li><span class="L ru">Прогнозы, риски, индекс доступности, сигналы, сценарии симулятора</span><span class="L kz">Болжамдар, қауіптер, қолжетімділік индексі, сигналдар, симулятор сценарийлері</span></li>
+                    <li><span class="L ru">Метки происхождения: «ML-модель», «расчёт по формуле» — со ссылкой на карточку модели</span><span class="L kz">Шығу белгілері: «ML-модель», «формула бойынша есеп» — модель карточкасына сілтемемен</span></li>
+                </ul>
+            </div>
+            <div>
+                <h4><span class="L ru">AI — интерфейс и черновики</span><span class="L kz">AI — интерфейс және жобалар</span></h4>
+                <ul>
+                    <li><span class="L ru"><b>Insight:</b> LLM отвечает только через инструменты доменов, без доступа к сырым данным; каждый ответ — со списком инструментов. 27 из 30 эталонных вопросов</span><span class="L kz"><b>Insight:</b> LLM тек домен құралдары арқылы жауап береді; әр жауапта құралдар тізімі бар. 30 эталон сұрақтың 27-сі</span></li>
+                    <li><span class="L ru"><b>Скрайб:</b> черновик записи из расшифровки — врач утверждает каждую, аудио удаляется</span><span class="L kz"><b>Скрайб:</b> транскрипциядан жазба жобасы — дәрігер бекітеді, аудио өшіріледі</span></li>
+                    <li><span class="L ru">Модель заменяема настройкой: локальная в Ollama (данные не покидают контур) или облачная</span><span class="L kz">Модель баптаумен ауыстырылады: жергілікті Ollama немесе бұлттық</span></li>
+                </ul>
+            </div>
+        </div>
+        <div class="banner red reveal" style="margin-top: 30px;">
+            <span class="L ru"><b>AI принципиально не делает:</b> диагнозы, выбор лечения и доз, интерпретацию анализов, автоматическое перенаправление пациента, расчёт любых чисел.</span>
+            <span class="L kz"><b>AI ешқашан жасамайды:</b> диагноз, емдеу мен доза таңдау, талдауларды түсіндіру, науқасты автоматты қайта бағыттау, кез келген сан есептеу.</span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Граница ML и AI</span><span class="L kz">ML мен AI шекарасы</span></span><span>09 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 10 · VALIDATION ============ -->
+<section class="slide" aria-label="Validation">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">09 · Валидация</span><span class="L kz">09 · Валидация</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Насколько обучению можно верить</span><span class="L kz">Оқытуға қаншалықты сенуге болады</span></div>
+        <h2 class="reveal"><span class="L ru">Обучение проверено <b>как в продакшене</b></span><span class="L kz">Оқыту <b>өндірістегідей</b> тексерілген</span></h2>
+        <div class="cards c4 stagger" style="margin-top: 40px;">
+            <div class="card">
+                <div class="tag"><span class="L ru">Разделение</span><span class="L kz">Бөлу</span></div>
+                <h3><span class="L ru">Время + организации</span><span class="L kz">Уақыт + ұйымдар</span></h3>
+                <p><span class="L ru">Январь–февраль в обучение, март в проверку; плюс 10 % организаций целиком исключены из обучения.</span><span class="L kz">Қаңтар–ақпан оқытуға, наурыз тексеруге; 10 % ұйым оқытудан толық шығарылған.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag">Baseline</div>
+                <h3><span class="L ru">Простое правило — соперник</span><span class="L kz">Қарапайым ереже — қарсылас</span></h3>
+                <p><span class="L ru">Медиана по организации и профилю, сезонный наив — модель сравнивается с ними всегда.</span><span class="L kz">Ұйым мен бейін бойынша медиана, маусымдық наив — модель әрқашан солармен салыстырылады.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Утечки</span><span class="L kz">Ағып кету</span></div>
+                <h3><span class="L ru">Тест на утечку признаков</span><span class="L kz">Белгілердің ағып кету тесті</span></h3>
+                <p><span class="L ru">Признаки загрузки считаются строго по данным до даты регистрации — это закреплено тестом.</span><span class="L kz">Жүктеме белгілері тек тіркеу күніне дейінгі деректерден есептеледі — тестпен бекітілген.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Калибровка</span><span class="L kz">Калибрлеу</span></div>
+                <h3><span class="L ru">Вероятности сверены с фактом</span><span class="L kz">Ықтималдықтар фактімен салыстырылған</span></h3>
+                <p><span class="L ru">Таблицы «предсказано против наблюдалось» по десяти корзинам; интервал p90 накрывает ровно 90 %.</span><span class="L kz">«Болжанған мен бақыланған» кестелері; p90 интервалы дәл 90 % қамтиды.</span></p>
+            </div>
+        </div>
+        <div class="banner reveal" style="margin-top: 32px;">
+            <span class="L ru"><b>Честный вердикт:</b> модели точнее простого правила на 15–20 % и откалиброваны на отложенном месяце. Этого достаточно для ранжирования и маршрутизации — и мы прямо говорим, что срок «с точностью до дня» пока обещать нельзя: у нас один сезон данных.</span>
+            <span class="L kz"><b>Адал қорытынды:</b> модельдер қарапайым ережеден 15–20 % дәлірек және калибрленген. Бұл саралау мен бағыттауға жеткілікті — бірақ «күніне дейін дәл» мерзімді әзірге уәде ете алмаймыз: бізде бір маусым дерек қана бар.</span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Валидация</span><span class="L kz">Валидация</span></span><span>10 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 11 · ARCHITECTURE ============ -->
+<section class="slide" aria-label="Architecture">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">10 · Архитектура</span><span class="L kz">10 · Сәулет</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Как это собрано</span><span class="L kz">Бұл қалай құрастырылған</span></div>
+        <h2 class="reveal"><span class="L ru">От файла — <b>до кабинета</b></span><span class="L kz">Файлдан — <b>кабинетке дейін</b></span></h2>
+        <div class="flow stagger" style="margin-top: 44px;">
+            <div class="fstep">
+                <div class="tag"><span class="L ru">Приём</span><span class="L kz">Қабылдау</span></div>
+                <h3><span class="L ru">Контракты данных</span><span class="L kz">Деректер контрактілері</span></h3>
+                <p><span class="L ru">Отпечаток файла, правила качества, карантин, черновик для неизвестной схемы</span><span class="L kz">Файл таңбасы, сапа ережелері, бұзушыларға карантин</span></p>
+            </div>
+            <div class="fstep">
+                <div class="tag">Lakehouse</div>
+                <h3>bronze · silver · gold</h3>
+                <p><span class="L ru">DuckDB + Parquet, витрины очередей и потоков; Dagster поверх тех же функций</span><span class="L kz">DuckDB + Parquet, кезек витриналары; үстінде Dagster</span></p>
+            </div>
+            <div class="fstep">
+                <div class="tag"><span class="L ru">Модели</span><span class="L kz">Модельдер</span></div>
+                <h3>Python · gRPC</h3>
+                <p><span class="L ru">QueueIntelligence, LoadForecasting, Simulation; MLflow, карточки моделей из make train</span><span class="L kz">Үш gRPC-сервис; MLflow, модель карточкалары</span></p>
+            </div>
+            <div class="fstep">
+                <div class="tag">API</div>
+                <h3><span class="L ru">Монолит .NET 10</span><span class="L kz">.NET 10 монолиті</span></h3>
+                <p><span class="L ru">Queue / Analytics / Simulation / Journal / Insight; Wolverine, outbox, Kafka + Protobuf</span><span class="L kz">Queue / Analytics / Journal / Insight модульдері; Wolverine, outbox, Kafka</span></p>
+            </div>
+            <div class="fstep">
+                <div class="tag"><span class="L ru">Клиенты</span><span class="L kz">Клиенттер</span></div>
+                <h3>Vue 3 · Flutter</h3>
+                <p><span class="L ru">Веб-кабинеты и мобильное приложение; Keycloak SSO, роли и аудит каждого запроса</span><span class="L kz">Веб-кабинеттер мен мобильді қосымша; Keycloak SSO, рөлдер мен аудит</span></p>
+            </div>
+        </div>
+        <div class="chips reveal" style="margin-top: 38px;">
+            <span class="chip"><b>PostgreSQL</b> + PostGIS</span>
+            <span class="chip"><b>ClickHouse</b> + Cube</span>
+            <span class="chip"><b>Kafka</b> + Schema Registry</span>
+            <span class="chip"><b>Keycloak</b></span>
+            <span class="chip"><b>Docker</b> · CI</span>
+            <span class="chip hot"><b>make up</b> · <span class="L ru">весь стенд одной командой</span><span class="L kz">бүкіл стенд бір командамен</span></span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Архитектура</span><span class="L kz">Сәулет</span></span><span>11 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 12 · TRUST ============ -->
+<section class="slide" aria-label="Trust">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">11 · Доверие</span><span class="L kz">11 · Сенім</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Безопасность и подотчётность</span><span class="L kz">Қауіпсіздік және есептілік</span></div>
+        <h2 class="reveal"><span class="L ru">Доверие <b>встроено</b>, а не добавлено</span><span class="L kz">Сенім кейін емес — <b>әуелден</b> орнатылған</span></h2>
+        <div class="cards c4 stagger" style="margin-top: 42px;">
+            <div class="card">
+                <div class="tag">Human-in-the-loop</div>
+                <h3><span class="L ru">Решает человек</span><span class="L kz">Шешімді адам қабылдайды</span></h3>
+                <p><span class="L ru">Врач выбирает организацию, регулятор подтверждает сигнал и сценарий — система рекомендует.</span><span class="L kz">Дәрігер ұйымды таңдайды, реттеуші сигналды растайды — жүйе тек ұсынады.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Аудит</span><span class="L kz">Аудит</span></div>
+                <h3><span class="L ru">Журнал всего</span><span class="L kz">Барлығының журналы</span></h3>
+                <p><span class="L ru">Каждый запрос врача и регулятора в аудите; idempotency и outbox — ничего не теряется и не дублируется.</span><span class="L kz">Әр сұраныс аудитте; idempotency және outbox — ештеңе жоғалмайды.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Данные</span><span class="L kz">Деректер</span></div>
+                <h3><span class="L ru">Без персональных данных</span><span class="L kz">Дербес деректерсіз</span></h3>
+                <p><span class="L ru">Только агрегаты МЗ РК; рабочий список — синтетический из реальных очередей; аудио скрайба удаляется.</span><span class="L kz">Тек агрегаттар; жұмыс тізімі — синтетикалық; скрайб аудиосы өшіріледі.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Происхождение</span><span class="L kz">Шығу тегі</span></div>
+                <h3><span class="L ru">Откуда каждое число</span><span class="L kz">Әр сан қайдан</span></h3>
+                <p><span class="L ru">Метки «ML», «формула», «AI-черновик»; версия модели в каждом ответе; карточки моделей из обучения.</span><span class="L kz">«ML», «формула», «AI-жоба» белгілері; әр жауапта модель нұсқасы.</span></p>
+            </div>
+        </div>
+        <div class="banner line reveal" style="margin-top: 34px;">
+            <span class="L ru">Соответствие §10 ТЗ: AI — не единственный источник истины, персональные данные не используются, продукт — не «дашборд с промптами», а модели с метриками и объяснением.</span>
+            <span class="L kz">ТТ §10 сәйкестігі: AI — жалғыз ақиқат көзі емес, дербес деректер қолданылмайды, өнім — промпттары бар дашборд емес, метрикалы модельдер.</span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Доверие</span><span class="L kz">Сенім</span></span><span>12 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 13 · REQUIREMENTS ============ -->
+<section class="slide" aria-label="Requirements">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">12 · Требования ТЗ</span><span class="L kz">12 · ТТ талаптары</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">§7 минимальные требования</span><span class="L kz">§7 ең төменгі талаптар</span></div>
+        <h2 class="reveal"><span class="L ru">Требования закрыты <b>проверяемо</b></span><span class="L kz">Талаптар <b>тексерілетіндей</b> жабылған</span></h2>
+        <div class="checks stagger" style="margin-top: 36px;">
+            <div class="check"><div class="w"><b><span class="L ru">Реальные данные кейса</span><span class="L kz">Кейстің нақты деректері</span></b><small><span class="L ru">15 наборов МЗ РК с ashyq.data.gov.kz, 1 406 организаций, 20 регионов</span><span class="L kz">ҚР ДСМ 15 жинағы, 1 406 ұйым, 20 аймақ</span></small></div></div>
+            <div class="check"><div class="w"><b><span class="L ru">Реальный ML, не фильтры и не промпты</span><span class="L kz">Нақты ML, сүзгілер мен промпттар емес</span></b><small><span class="L ru">LightGBM, AutoETS, робастный z, модель очереди — все с метриками</span><span class="L kz">LightGBM, AutoETS, робасты z — барлығы метрикамен</span></small></div></div>
+            <div class="check"><div class="w"><b><span class="L ru">Измеримый результат</span><span class="L kz">Өлшенетін нәтиже</span></b><small><span class="L ru">дни ожидания, риск отказа, дефицит коек, место региона в индексе</span><span class="L kz">күту күндері, бас тарту қаупі, төсек тапшылығы, аймақ орны</span></small></div></div>
+            <div class="check"><div class="w"><b><span class="L ru">Метрики и валидация на отложенной выборке</span><span class="L kz">Кейінге қалдырылған іріктемедегі метрикалар</span></b><small><span class="L ru">метрика ошибки — прямо под графиком прогноза на стенде</span><span class="L kz">қате метрикасы — стендтегі графиктің астында</span></small></div></div>
+            <div class="check"><div class="w"><b><span class="L ru">Объяснимость выводов</span><span class="L kz">Қорытындылардың түсіндірмесі</span></b><small><span class="L ru">карточка «Почему так», формула индекса, допущения симулятора</span><span class="L kz">«Неге бұлай» карточкасы, индекс формуласы</span></small></div></div>
+            <div class="check"><div class="w"><b><span class="L ru">Сквозной сценарий end-to-end</span><span class="L kz">End-to-end сценарий</span></b><small><span class="L ru">гражданин → врач → регулятор в одном прогоне на живом стенде</span><span class="L kz">азамат → дәрігер → реттеуші бір прогонда</span></small></div></div>
+            <div class="check"><div class="w"><b><span class="L ru">Воспроизводимость</span><span class="L kz">Қайталанғыштық</span></b><small>GitHub · README · docker compose · make data / train / eval / test · CI</small></div></div>
+            <div class="check"><div class="w"><b><span class="L ru">Несколько регионов, без диагнозов (§11)</span><span class="L kz">Бірнеше аймақ, диагнозсыз (§11)</span></b><small><span class="L ru">карта 20 регионов, рейтинг, переключение профилей; никаких советов пациентам</span><span class="L kz">20 аймақ картасы, рейтинг; науқастарға кеңес жоқ</span></small></div></div>
+        </div>
+        <div class="banner reveal" style="margin-top: 30px;">
+            <span class="L ru"><b>Живой стенд:</b> dc.jurek.kz — все страницы с данными; локально — <b>make up</b>.</span>
+            <span class="L kz"><b>Тірі стенд:</b> dc.jurek.kz — барлық беттер деректермен; жергілікті — <b>make up</b>.</span>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Требования ТЗ</span><span class="L kz">ТТ талаптары</span></span><span>13 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 14 · LIMITS ============ -->
+<section class="slide" aria-label="Limitations">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">13 · Ограничения</span><span class="L kz">13 · Шектеулер</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Честно о данных</span><span class="L kz">Деректер туралы адал</span></div>
+        <h2 class="reveal"><span class="L ru">Мы знаем <b>границы</b> своих данных</span><span class="L kz">Деректеріміздің <b>шекарасын</b> білеміз</span></h2>
+        <div class="split reveal" style="margin-top: 34px;">
+            <div>
+                <h4><span class="L ru">Ограничения</span><span class="L kz">Шектеулер</span></h4>
+                <ul>
+                    <li><span class="L ru"><b>Один сезон:</b> направления покрывают только I квартал 2025 — летнюю сезонность модель не видела</span><span class="L kz"><b>Бір маусым:</b> жолдамалар тек 2025 ж. I тоқсанын қамтиды</span></li>
+                    <li><span class="L ru"><b>Нет координат</b> организаций и аптек, названий МНН — расстояния и лекарства показаны идентификаторами</span><span class="L kz"><b>Координаттар жоқ:</b> ұйымдар мен дәріханалар, ХПА атаулары жоқ</span></li>
+                    <li><span class="L ru"><b>Полигоны регионов</b> — до реформы 2022 года, карта показывает центры</span><span class="L kz"><b>Аймақ полигондары</b> — 2022 реформасына дейінгі</span></li>
+                    <li><span class="L ru"><b>Аномалии</b> проверены на подсаженных всплесках — размеченных инцидентов нет</span><span class="L kz"><b>Ауытқулар</b> қосылған секірулерде тексерілген</span></li>
+                </ul>
+            </div>
+            <div>
+                <h4><span class="L ru">Что мы с этим делаем</span><span class="L kz">Бұған не істеп жатырмыз</span></h4>
+                <ul>
+                    <li><span class="L ru"><b>13 запросов данных</b> организаторам: история 2023–2025, справочник МО, координаты, МНН, ГИС-границы</span><span class="L kz"><b>13 дерек сұранысы:</b> 2023–2025 тарихы, ұйымдар анықтамалығы, координаттар, ХПА</span></li>
+                    <li><span class="L ru"><b>История пролеченных с 2012 года</b> — источник сезонности для прогноза 1–3 месяца</span><span class="L kz"><b>2012 жылдан бергі емделгендер тарихы</b> — маусымдылық көзі</span></li>
+                    <li><span class="L ru"><b>Внешние ориентиры</b> (NHS RTT, OECD, Eurostat): форма сезонности и пороги индекса — подписанный «внешний ориентир», не метки обучения</span><span class="L kz"><b>Сыртқы бағдарлар</b> (NHS, OECD, Eurostat): маусымдылық пішіні мен шектер — оқыту белгілері емес</span></li>
+                    <li><span class="L ru">Каждое внешнее число подписано <b>источником и годом</b></span><span class="L kz">Әр сыртқы сан <b>көзі және жылымен</b> қол қойылған</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Ограничения</span><span class="L kz">Шектеулер</span></span><span>14 / 15</span></footer>
+</section>
+
+<!-- ============ SLIDE 15 · NEXT ============ -->
+<section class="slide" aria-label="Next">
+    <header class="chrome">
+        <div class="brand">Darumen Health</div>
+        <div class="meta"><span class="L ru">14 · Дальше</span><span class="L kz">14 · Әрі қарай</span></div>
+    </header>
+    <div class="content spread">
+        <div class="kicker reveal"><span class="L ru">Дорожная карта</span><span class="L kz">Жол картасы</span></div>
+        <h2 class="reveal"><span class="L ru">От демо — <b>к пилоту</b></span><span class="L kz">Демодан — <b>пилотқа</b></span></h2>
+        <div class="cards c3 stagger" style="margin-top: 42px;">
+            <div class="card wash">
+                <div class="tag"><span class="L ru">Шаг 1</span><span class="L kz">1-қадам</span></div>
+                <h3><span class="L ru">Пилот в одном регионе</span><span class="L kz">Бір аймақтағы пилот</span></h3>
+                <p><span class="L ru">Подключение ГИС и справочников, дообучение на полном годе истории, проспективная проверка прогноза на живой очереди.</span><span class="L kz">ГАЖ бен анықтамалықтарды қосу, толық жыл тарихында қайта оқыту, тірі кезекте болжамды тексеру.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Шаг 2</span><span class="L kz">2-қадам</span></div>
+                <h3><span class="L ru">SLA на сроки ожидания</span><span class="L kz">Күту мерзіміне SLA</span></h3>
+                <p><span class="L ru">Публичный индекс доступности с целевыми порогами; сигналы и симулятор — в регулярный процесс управления.</span><span class="L kz">Мақсатты шектері бар жария қолжетімділік индексі; сигналдар — тұрақты басқару процесіне.</span></p>
+            </div>
+            <div class="card">
+                <div class="tag"><span class="L ru">Шаг 3</span><span class="L kz">3-қадам</span></div>
+                <h3><span class="L ru">Экосистема на том же ядре</span><span class="L kz">Сол ядродағы экожүйе</span></h3>
+                <p><span class="L ru">Lab, Med, Family подключаются потоками — каждый только с метрикой на отложенной выборке и объяснением.</span><span class="L kz">Lab, Med, Family ағындармен қосылады — әрқайсысы тек метрикамен.</span></p>
+            </div>
+        </div>
+        <div class="banner reveal" style="margin-top: 32px;">
+            <span class="L ru"><b>Darumen Health</b> · GovTech Camp 2026 · Кейс 1 · живой стенд <b>dc.jurek.kz</b> · репозиторий с make up, make train, make eval</span>
+            <span class="L kz"><b>Darumen Health</b> · GovTech Camp 2026 · 1-кейс · тірі стенд <b>dc.jurek.kz</b> · make up, make train, make eval репозиторийі</span>
+        </div>
+        <div class="contacts reveal">
+            <span class="team"><span class="L ru">Команда IcyBeard</span><span class="L kz">IcyBeard командасы</span></span>
+            <a class="tg" href="https://t.me/Lirimaer" target="_blank" rel="noopener"><i>TG</i>@Lirimaer</a>
+            <a class="tg" href="https://t.me/icybeard" target="_blank" rel="noopener"><i>TG</i>@icybeard</a>
+        </div>
+    </div>
+    <footer class="foot"><span><span class="L ru">Дальше</span><span class="L kz">Әрі қарай</span></span><span>15 / 15 · <span class="L ru">конец</span><span class="L kz">соңы</span></span></footer>
+</section>
+
+</main>
+</div>
+
+<!-- End-of-deck toast -->
+<div class="end-toast" id="endToast"><span class="L ru">Это <b>последний</b> слайд — спасибо! Напишите нам в Telegram ↓</span><span class="L kz">Бұл <b>соңғы</b> слайд — рақмет! Telegram-да жазыңыз ↓</span></div>
+
+<!-- Navigation bar outside the stage: clickable dots + counter (opens the overview menu) -->
+<div class="deck-controls">
+    <button class="nav-arrow" id="navPrev" title="Previous (←)" aria-label="Previous slide">‹</button>
+    <div class="deck-dots" id="deckDots"></div>
+    <button class="nav-arrow" id="navNext" title="Next (→)" aria-label="Next slide">›</button>
+    <button class="counter-btn" id="pageCounter" title="Slide overview (M)">1 / 15 ☰</button>
+</div>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   Keyboard: ← → space PgUp PgDn Home End · wheel · touch swipe.
+   URL hash (#5) deep-links to a slide.
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.slides = document.querySelectorAll('.slide');
+        this.stage = document.getElementById('deckStage');
+        this.counter = document.getElementById('pageCounter');
+        this.currentSlide = 0;
+        this.wheelLock = false;
+        this.buildDots();
+        this.setupStageScale();
+        this.setupKeyboardNav();
+        this.setupTouchNav();
+        this.setupWheelNav();
+        const fromHash = parseInt(location.hash.slice(1), 10);
+        this.showSlide(isNaN(fromHash) ? 0 : fromHash - 1);
+    }
+
+    /* One clickable dot per slide in the bottom bar */
+    buildDots() {
+        const wrap = document.getElementById('deckDots');
+        this.dots = [];
+        this.slides.forEach((slide, i) => {
+            const dot = document.createElement('button');
+            dot.title = `${i + 1} · ${slide.getAttribute('aria-label') || ''}`;
+            dot.addEventListener('click', () => this.showSlide(i));
+            wrap.appendChild(dot);
+            this.dots.push(dot);
+        });
+    }
+
+    /* Scale the fixed 1920x1080 stage to the window (letterbox as needed) */
+    setupStageScale() {
+        const scale = () => {
+            const f = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            const x = (window.innerWidth - 1920 * f) / 2;
+            const y = (window.innerHeight - 1080 * f) / 2;
+            this.stage.style.transform = `translate(${x}px, ${y}px) scale(${f})`;
+        };
+        scale();
+        window.addEventListener('resize', scale);
+    }
+
+    setupKeyboardNav() {
+        document.addEventListener('keydown', (e) => {
+            if (document.body.classList.contains('editing')) return; // don't navigate while editing
+            if (['ArrowRight', 'ArrowDown', ' ', 'PageDown'].includes(e.key)) { e.preventDefault(); this.showSlide(this.currentSlide + 1); }
+            else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(e.key)) { e.preventDefault(); this.showSlide(this.currentSlide - 1); }
+            else if (e.key === 'Home') { e.preventDefault(); this.showSlide(0); }
+            else if (e.key === 'End') { e.preventDefault(); this.showSlide(this.slides.length - 1); }
+            else if (/^[1-9]$/.test(e.key)) { this.showSlide(parseInt(e.key, 10) - 1); }  // quick jump 1–9
+            else if (e.key === '0') { this.showSlide(9); }                                 // 0 → slide 10
+        });
+    }
+
+    setupTouchNav() {
+        let startX = null;
+        document.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+        document.addEventListener('touchend', (e) => {
+            if (startX === null) return;
+            const dx = e.changedTouches[0].clientX - startX;
+            if (Math.abs(dx) > 60) this.showSlide(this.currentSlide + (dx < 0 ? 1 : -1));
+            startX = null;
+        }, { passive: true });
+    }
+
+    setupWheelNav() {
+        document.addEventListener('wheel', (e) => {
+            if (this.wheelLock || Math.abs(e.deltaY) < 24) return;
+            this.wheelLock = true;
+            setTimeout(() => { this.wheelLock = false; }, 650);
+            this.showSlide(this.currentSlide + (e.deltaY > 0 ? 1 : -1));
+        }, { passive: true });
+    }
+
+    /* Brief "this is the end" toast when trying to go past the last slide */
+    flashEnd() {
+        const toast = document.getElementById('endToast');
+        toast.classList.add('show');
+        clearTimeout(this.endTimer);
+        this.endTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    showSlide(index) {
+        if (index >= this.slides.length) this.flashEnd();
+        this.currentSlide = Math.max(0, Math.min(index, this.slides.length - 1));
+        this.slides.forEach((slide, i) => {
+            slide.classList.toggle('active', i === this.currentSlide);
+            slide.classList.toggle('visible', i === this.currentSlide);
+        });
+        this.counter.textContent = `${this.currentSlide + 1} / ${this.slides.length} ☰`;
+        document.getElementById('navPrev').disabled = this.currentSlide === 0;
+        document.getElementById('navNext').disabled = this.currentSlide === this.slides.length - 1;
+        this.dots.forEach((dot, i) => dot.classList.toggle('on', i === this.currentSlide));
+        document.querySelectorAll('#menuGrid button').forEach((b, i) => b.classList.toggle('on', i === this.currentSlide));
+        history.replaceState(null, '', `#${this.currentSlide + 1}`);
+    }
+}
+const deck = new SlidePresentation();
+document.getElementById('navPrev').addEventListener('click', () => deck.showSlide(deck.currentSlide - 1));
+document.getElementById('navNext').addEventListener('click', () => deck.showSlide(deck.currentSlide + 1));
+
+/* ===========================================
+   SLIDE OVERVIEW MENU — M key or the page counter opens it
+   =========================================== */
+const slideMenu = document.getElementById('slideMenu');
+function toggleMenu(force) {
+    slideMenu.classList.toggle('open', force);
+}
+document.getElementById('pageCounter').addEventListener('click', () => toggleMenu());
+document.querySelectorAll('#menuGrid button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        deck.showSlide(parseInt(btn.dataset.i, 10));
+        toggleMenu(false);
+    });
+});
+slideMenu.addEventListener('click', (e) => { if (e.target === slideMenu) toggleMenu(false); });
+document.addEventListener('keydown', (e) => {
+    if (document.body.classList.contains('editing')) return;
+    if (e.key === 'm' || e.key === 'M') toggleMenu();
+    if (e.key === 'Escape') toggleMenu(false);
+});
+
+/* ===========================================
+   LANGUAGE SWITCH — RU default, KZ via body.kz; persisted.
+   =========================================== */
+function setLang(lang) {
+    document.body.classList.toggle('kz', lang === 'kz');
+    document.getElementById('btnRu').classList.toggle('on', lang === 'ru');
+    document.getElementById('btnKz').classList.toggle('on', lang === 'kz');
+    document.documentElement.lang = lang === 'kz' ? 'kk' : 'ru';
+    try { localStorage.setItem('darumen-lang', lang); } catch (e) { /* private mode */ }
+}
+/* Any press on the slider flips the language — including pressing the active segment */
+document.getElementById('langToggle').addEventListener('click', () => {
+    setLang(document.body.classList.contains('kz') ? 'ru' : 'kz');
+});
+try { const saved = localStorage.getItem('darumen-lang'); if (saved) setLang(saved); } catch (e) { /* ignore */ }
+/* URL override, e.g. darumen-pitch.html?lang=kz#3 — handy for sharing a specific language */
+const langParam = new URLSearchParams(location.search).get('lang');
+if (langParam === 'kz' || langParam === 'ru') setLang(langParam);
+
+/* ===========================================
+   INLINE EDITOR — hover top-left corner or press E; Ctrl+S downloads the file.
+   =========================================== */
+const editor = {
+    isActive: false,
+    toggleEditMode() {
+        this.isActive = !this.isActive;
+        document.body.classList.toggle('editing', this.isActive);
+        document.getElementById('editToggle').classList.toggle('active', this.isActive);
+        document.querySelectorAll('.slide h1, .slide h2, .slide h3, .slide p, .slide .lead, .slide .banner, .slide .kicker, .slide .txt, .slide .metric, .slide li, .slide .w')
+            .forEach(el => el.setAttribute('contenteditable', this.isActive ? 'true' : 'false'));
+    },
+    save() {
+        /* Serialize the current DOM (with edits) into a downloadable HTML file */
+        const clone = document.documentElement.cloneNode(true);
+        clone.querySelectorAll('[contenteditable]').forEach(el => el.removeAttribute('contenteditable'));
+        clone.querySelector('body').classList.remove('editing');
+        const blob = new Blob(['<!DOCTYPE html>\n' + clone.outerHTML], { type: 'text/html' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'darumen-pitch.html';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+};
+document.getElementById('editToggle').addEventListener('click', () => editor.toggleEditMode());
+const hotzone = document.querySelector('.edit-hotzone');
+const editToggle = document.getElementById('editToggle');
+let hideTimeout = null;
+hotzone.addEventListener('mouseenter', () => { clearTimeout(hideTimeout); editToggle.classList.add('show'); });
+hotzone.addEventListener('mouseleave', () => { hideTimeout = setTimeout(() => { if (!editor.isActive) editToggle.classList.remove('show'); }, 400); });
+editToggle.addEventListener('mouseenter', () => clearTimeout(hideTimeout));
+editToggle.addEventListener('mouseleave', () => { hideTimeout = setTimeout(() => { if (!editor.isActive) editToggle.classList.remove('show'); }, 400); });
+document.addEventListener('keydown', (e) => {
+    if ((e.key === 'e' || e.key === 'E') && !e.target.getAttribute('contenteditable')) editor.toggleEditMode();
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); editor.save(); }
+});
+</script>
+</body>
+</html>

@@ -31,7 +31,7 @@ for d in gold models refdata; do
 done
 
 RSYNC=(rsync -az --delete
-  --exclude '.git' --exclude '/DataSets' --exclude '/lakehouse' --exclude '/mlruns' --exclude '/refdata'
+  --exclude '.git' --exclude '/DataSets' --exclude '/lakehouse' --exclude '/mlruns'
   --exclude '.venv' --exclude 'node_modules' --exclude 'bin' --exclude 'obj' --exclude '__pycache__'
   --exclude 'dist' --exclude '/apps/mobile' --exclude '/docs' --exclude '.env' --exclude '.env.*'
   --exclude 'infra/cube/.cubestore' --exclude '.DS_Store' --exclude '*.duckdb')

@@ -54,7 +54,10 @@ logs: ## Логи приложения
 pipeline: ## Конвейер данных в контейнере: intake → refdata → gold → train → publish (DataSets и lakehouse с хоста)
 	$(COMPOSE) --profile pipeline run --rm --build pipeline
 
-deploy: ## Задеплоить на dc.jurek.kz (rsync + docker compose на VM); первый раз: make deploy ARGS=--replace-dc
+pitch: ## Обновить копию презентации в веб-приложении из darumen-pitch.html
+	cp darumen-pitch.html apps/web/public/pitch.html
+
+deploy: pitch ## Задеплоить на dc.jurek.kz (rsync + docker compose на VM); первый раз: make deploy ARGS=--replace-dc
 	scripts/deploy.sh $(ARGS)
 
 build: ## Собрать .NET и веб
