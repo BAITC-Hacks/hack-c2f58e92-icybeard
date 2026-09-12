@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import { journal } from '@/api/endpoints'
 import type { WorklistItem } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
@@ -44,7 +45,7 @@ watch(flag, load)
 
 <template>
   <main class="page">
-    <h1>Рабочий список</h1>
+    <h1>Рабочий список <OriginTag kind="ml" note="Приоритеты рассчитаны моделью ожидания и риска отказа" /></h1>
     <p class="lead synthetic">Пациенты на маршруте плановой госпитализации. На кэмпе список синтетический: он собран из реальных очередей организаций без персональных данных.</p>
     <div class="actions" style="margin: 0 0 12px"><Select v-model="flag" :options="flags" option-label="label" option-value="value" size="small" /></div>
     <ErrorBox :error="error" />

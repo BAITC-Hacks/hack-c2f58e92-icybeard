@@ -8,6 +8,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { scribe } from '@/api/endpoints'
 import type { ScribeDraft, ScribeHealth } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 
 const toast = useToast()
 const consent = ref(false)
@@ -150,7 +151,7 @@ onBeforeUnmount(() => recorder?.state === 'recording' && recorder.stop())
         <div class="actions"><Button label="Составить черновик" icon="pi pi-file-edit" :disabled="!transcript" :loading="busy" @click="makeDraft" /></div>
       </div>
       <div v-if="draft" class="card">
-        <h2>Черновик записи ({{ draft.model }})</h2>
+        <h2>Черновик записи ({{ draft.model }}) <OriginTag kind="ai" note="Черновик сгенерирован из стенограммы; в запись попадает только после утверждения врачом" /></h2>
         <div v-for="section in draft.sections" :key="section.name" class="field" style="margin-bottom: 8px">
           <label>{{ section.name }}</label>
           <Textarea v-model="section.text" rows="2" auto-resize />

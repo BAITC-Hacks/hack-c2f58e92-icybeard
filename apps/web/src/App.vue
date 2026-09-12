@@ -5,11 +5,14 @@ import SelectButton from 'primevue/selectbutton'
 import Toast from 'primevue/toast'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { setLocale } from '@/i18n'
 import { ROLES, useAuthStore, type Role } from '@/stores/auth'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 
 const links = computed(() => {
   const items: { to: string; label: string; roles?: Role[] }[] = [
@@ -36,6 +39,12 @@ const localeOptions = [
 function onLocale(value: 'ru' | 'kk' | null) {
   if (value) setLocale(value)
 }
+
+/** Выбор демо-роли на главной сразу ведёт на домашний экран роли. */
+function onDemoRole(value: Role | null) {
+  auth.setDemoRole(value)
+  if (value && route.path === '/') router.push(auth.roleHome())
+}
 </script>
 
 <template>
@@ -58,7 +67,7 @@ function onLocale(value: 'ru' | 'kk' | null) {
             show-clear
             size="small"
             data-testid="role-select"
-            @update:model-value="auth.setDemoRole($event)"
+            @update:model-value="onDemoRole($event)"
           />
           <span class="muted">{{ auth.actor ?? t('auth.guest') }} · {{ t('auth.demo') }}</span>
         </template>

@@ -5,6 +5,7 @@ import { onMounted, ref } from 'vue'
 import { analytics, queue } from '@/api/endpoints'
 import type { AlternativesResponse, IndexItem, PredictResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import { days, pct } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
@@ -53,13 +54,13 @@ onMounted(async () => {
     </div>
     <div v-if="prediction" class="grid cols-2" style="margin-top: 16px">
       <div class="card">
-        <h2>В среднем по региону</h2>
+        <h2>В среднем по региону <OriginTag kind="ml" /></h2>
         <div class="kpi">
           <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">половина пациентов ждёт не дольше, дн.</div></div>
           <div class="item"><div class="value">{{ days(prediction.p90Days) }}</div><div class="label">9 из 10 ждут не дольше, дн.</div></div>
           <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">попадают за 30 дней</div></div>
         </div>
-        <p v-if="indexItem" class="muted" style="margin-top: 8px">Индекс доступности региона {{ indexItem.indexValue.toFixed(1) }}, место {{ indexItem.rank }} среди регионов.</p>
+        <p v-if="indexItem" class="muted" style="margin-top: 8px">Индекс доступности региона {{ indexItem.indexValue.toFixed(1) }}, место {{ indexItem.rank }} среди регионов. <OriginTag kind="formula" /></p>
         <p v-else class="muted" style="margin-top: 8px">Индекс для региона не показан: слишком мало наблюдений (малые числа подавлены).</p>
       </div>
       <div class="card">

@@ -8,6 +8,7 @@ import { onMounted, ref } from 'vue'
 import { simulation } from '@/api/endpoints'
 import type { RedistributeResponse, SimulateResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import { days, num, signed } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
@@ -63,7 +64,7 @@ onMounted(async () => {
         <ErrorBox :error="error" />
       </div>
       <div class="card" v-if="result">
-        <h2>Результат для {{ result.organisations }} организаций</h2>
+        <h2>Результат для {{ result.organisations }} организаций <OriginTag kind="formula" /></h2>
         <div class="kpi">
           <div class="item"><div class="value">{{ days(result.baseline.meanWaitDays, 1) }}</div><div class="label">ожидание сейчас, дн.</div></div>
           <div class="item"><div class="value">{{ days(result.scenario.meanWaitDays, 1) }}</div><div class="label">ожидание в сценарии, дн.</div></div>

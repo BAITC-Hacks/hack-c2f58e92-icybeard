@@ -11,6 +11,7 @@ import VChart from 'vue-echarts'
 import { insight } from '@/api/endpoints'
 import type { AskResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
@@ -75,7 +76,7 @@ onMounted(async () => {
     </div>
     <div v-if="result" class="grid cols-2" style="margin-top: 16px">
       <div class="card">
-        <h2>Ответ</h2>
+        <h2>Ответ <OriginTag kind="ai" note="Формулировка — языковой модели; каждое число взято из перечисленных ниже инструментов" /></h2>
         <p style="white-space: pre-wrap">{{ result.answer }}</p>
         <p class="muted">инструменты: {{ result.toolsUsed.join(', ') || 'нет' }} · модель {{ result.model }}</p>
       </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Explanation, ModelInfo } from '@/api/types'
+import OriginTag from '@/components/OriginTag.vue'
 import { signed } from '@/lib/format'
 
 defineProps<{ explanation: Explanation; model?: ModelInfo; unit?: string }>()
@@ -7,7 +8,7 @@ defineProps<{ explanation: Explanation; model?: ModelInfo; unit?: string }>()
 
 <template>
   <div class="card">
-    <h2>Почему так</h2>
+    <h2>Почему так <OriginTag kind="ml" /></h2>
     <p>{{ explanation.summary }}</p>
     <div v-for="factor in explanation.factors" :key="factor.name" class="factor">
       <span>{{ factor.text }}</span>

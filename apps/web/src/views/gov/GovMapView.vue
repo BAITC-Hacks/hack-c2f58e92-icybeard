@@ -8,6 +8,7 @@ import type { Anomaly, IndexResponse } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import IndexTable from '@/components/IndexTable.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import RegionMap from '@/components/RegionMap.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
@@ -83,12 +84,12 @@ watch([month, profile], load)
         <p class="muted" style="margin-top: 8px">{{ index?.method }}</p>
       </div>
       <div class="card">
-        <h2>Индекс за {{ index?.month ?? '…' }}</h2>
+        <h2>Индекс за {{ index?.month ?? '…' }} <OriginTag kind="formula" /></h2>
         <IndexTable :items="index?.items ?? []" @select="router.push({ name: 'region', params: { kato: $event } })" />
       </div>
     </div>
     <div class="card" style="margin-top: 16px">
-      <h2>Открытые сигналы</h2>
+      <h2>Открытые сигналы <OriginTag kind="formula" /></h2>
       <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" />
     </div>
   </main>

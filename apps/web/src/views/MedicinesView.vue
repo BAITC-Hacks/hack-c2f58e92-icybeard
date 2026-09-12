@@ -6,6 +6,7 @@ import { onMounted, ref, watch } from 'vue'
 import { medicines } from '@/api/endpoints'
 import type { CheckResponse, Mnn, Nosology } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import { days, num, pct } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
@@ -67,7 +68,7 @@ watch(nosologyId, loadMnn)
     </div>
     <div v-if="result" class="grid cols-2" style="margin-top: 16px">
       <div class="card">
-        <h2>Покрытие</h2>
+        <h2>Покрытие <OriginTag kind="formula" note="Покрытие и сроки считаются правилами по витринам рецептов, без обучения" /></h2>
         <p><Tag :value="result.covered ? 'покрыт программой' : 'активных спецификаций нет'" :severity="result.covered ? 'success' : 'warn'" /> <span v-if="result.program">{{ result.program }}, категория {{ result.category }}</span></p>
         <h2 style="margin-top: 16px">Сроки обеспечения</h2>
         <div class="kpi">

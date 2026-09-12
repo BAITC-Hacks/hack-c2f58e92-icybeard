@@ -103,6 +103,25 @@ export const useAuthStore = defineStore('auth', () => {
     writeStorage(next)
   }
 
+  /** Домашний экран роли: гражданин → ожидание, врач → рабочий список, главврач → свой регион, регулятор → карта, стюард → консоль. */
+  function roleHome(): string {
+    switch (role.value) {
+      case 'citizen':
+        return '/wait'
+      case 'doctor':
+        return '/doctor/worklist'
+      case 'chief':
+        return region.value ? `/gov/regions/${region.value}` : '/gov'
+      case 'regulator':
+      case 'admin':
+        return '/gov'
+      case 'steward':
+        return '/steward'
+      default:
+        return '/'
+    }
+  }
+
   /** Куда вернуться после входа: на страницу, с которой отправили домой из-за роли, иначе на текущую. */
   function returnPath(): string {
     const denied = new URLSearchParams(window.location.search).get('denied')
@@ -136,5 +155,5 @@ export const useAuthStore = defineStore('auth', () => {
     return headers
   }
 
-  return { mode, actor, roles, role, region, isAuthenticated, hasRole, init, setDemoRole, login, logout, authHeaders }
+  return { mode, actor, roles, role, region, isAuthenticated, hasRole, init, setDemoRole, roleHome, login, logout, authHeaders }
 })

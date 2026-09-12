@@ -8,6 +8,7 @@ import { analytics, queue } from '@/api/endpoints'
 import type { Anomaly, ForecastResponse, OrganizationItem, OrganizationSeries } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import QueueChart from '@/components/QueueChart.vue'
 import SeriesChart from '@/components/SeriesChart.vue'
 import { days, pct } from '@/lib/format'
@@ -113,12 +114,12 @@ watch(moCode, loadSeries)
           :title="`Госпитализации в регионе, профиль ${refdata.profileName(profile)}`"
           unit="случаев"
         />
-        <p v-if="forecast" class="muted">Бэктест: sMAPE {{ pct(forecast.backtest.smape, 1) }} против наивного {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}. {{ forecast.model.name }} {{ forecast.model.version }}.</p>
+        <p v-if="forecast" class="muted">Бэктест: sMAPE {{ pct(forecast.backtest.smape, 1) }} против наивного {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}. {{ forecast.model.name }} {{ forecast.model.version }}. <OriginTag kind="ml" /></p>
         <p v-else class="muted">Прогноз для этого профиля в регионе не строился (мало истории).</p>
       </div>
     </div>
     <div class="card" style="margin-top: 16px">
-      <h2>Сигналы региона</h2>
+      <h2>Сигналы региона <OriginTag kind="formula" /></h2>
       <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" />
     </div>
   </main>
