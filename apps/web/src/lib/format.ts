@@ -25,6 +25,14 @@ export function indexColor(value: number): string {
   return `hsl(${hue.toFixed(0)} 70% 42%)`
 }
 
+/** Риск отказа словами относительно среднего по стране (11 % направлений заканчиваются отказом). */
+export function refusalWords(p: number | null | undefined): string {
+  if (p === null || p === undefined || Number.isNaN(p)) return '—'
+  if (p >= 0.165) return 'выше среднего'
+  if (p <= 0.055) return 'ниже среднего'
+  return 'около среднего'
+}
+
 export function severityTone(severity: string): 'danger' | 'warn' | 'info' {
   if (severity === 'critical') return 'danger'
   if (severity === 'warning') return 'warn'

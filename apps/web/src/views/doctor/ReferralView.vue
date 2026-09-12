@@ -10,7 +10,7 @@ import { journal, queue } from '@/api/endpoints'
 import type { AlternativesResponse, OrganizationItem, PredictResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import ExplanationCard from '@/components/ExplanationCard.vue'
-import { days, pct } from '@/lib/format'
+import { days, pct, refusalWords } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
@@ -118,8 +118,14 @@ watch(() => [form.regionKato, form.profileCode], loadOrganizations)
             <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">медианное ожидание, дн.</div></div>
             <div class="item"><div class="value">{{ days(prediction.p90Days) }}</div><div class="label">p90, дн.</div></div>
             <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">госпитализация за 30 дней</div></div>
-            <div class="item"><div class="value">{{ pct(prediction.pRefusal) }}</div><div class="label">риск отказа</div></div>
+            <div class="item">
+              <div class="value">{{ prediction.refusalOrgInTraining === false ? refusalWords(prediction.pRefusal) : pct(prediction.pRefusal) }}</div>
+              <div class="label">риск отказа</div>
+            </div>
           </div>
+          <p v-if="prediction.refusalOrgInTraining === false" class="muted" style="margin-top: 8px">
+            Организации не было в обучении, поэтому риск отказа показан словами: на незнакомых организациях модель переоценивает проценты.
+          </p>
           <p v-if="prediction.queue" class="muted" style="margin-top: 8px">
             В очереди {{ prediction.queue.len }} направлений, медианный возраст {{ days(prediction.queue.ageP50) }} дн., {{ prediction.queue.throughputPerDay.toFixed(1) }} госпитализаций в день.
           </p>

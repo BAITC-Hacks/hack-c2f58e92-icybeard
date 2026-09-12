@@ -44,11 +44,18 @@ def test_forecast_backtests_against_baseline(tmp_path):
     root = _monthly_gold(tmp_path)
     stream = load_streams()["admissions_monthly"]
     frame, report = forecast_stream(Lakehouse(root), stream, root / "models" / "forecast" / "admissions_monthly")
-    assert report["series"] == 4 and report["baseline"] == "SeasonalNaive" and report["chosen"] == "AutoETS"
-    assert report["models"]["AutoETS"]["mase"] < report["models"]["SeasonalNaive"]["mase"] * 1.5
+    assert report["series"] == 4 and report["baseline"] == "SeasonalNaive"
+    # выбор по потоку: лучший из кандидатов, включая ансамбль; сезонная синтетика не должна отдать победу наиву
+    assert report["chosen"] in {"AutoETS", "Ensemble"}
+    assert report["models"][report["chosen"]]["mase"] <= report["models"]["SeasonalNaive"]["mase"]
+    # выбор по ряду: каждый ряд получил своего победителя, сумма совпадает с числом рядов
+    assert sum(report["per_series_choice"].values()) == report["series"]
     assert set(frame["horizon"]) == {1, 2, 3} and len(frame) == 12
     assert (frame["lo"] <= frame["yhat"]).all() and (frame["yhat"] <= frame["hi"]).all()
     assert frame["period"].str.match(r"\d{4}-\d{2}$").all()
+    # каждый ряд несёт имя своей модели и флаг плоского прогноза
+    assert frame["model"].str.contains("@").all() and frame["flat"].dtype == bool
+    assert "flat_share" in report
     assert (root / "models" / "forecast" / "admissions_monthly" / "report.json").exists()
 
 

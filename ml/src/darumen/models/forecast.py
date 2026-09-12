@@ -15,14 +15,27 @@ from ..intake.pipeline import Lakehouse
 from .common import write_json
 from .streams import Stream, load_series, load_streams, merge_stream_table, period_format
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 LEVEL = 80
+ENSEMBLE = "Ensemble"  # среднее двух кандидатов; считается из их прогнозов, не отдельной моделью
 
 
 def _models(season: int):
     from statsforecast.models import AutoETS, SeasonalNaive
 
     return [SeasonalNaive(season_length=season), AutoETS(season_length=season)], "SeasonalNaive"
+
+
+def _with_ensemble(frame: pd.DataFrame, names: list[str], level: int | None = None) -> pd.DataFrame:
+    """Add the Ensemble column (mean of the candidates) to a cv/forecast frame, intervals included."""
+    frame = frame.copy()
+    frame[ENSEMBLE] = frame[names].mean(axis=1)
+    if level is not None:
+        for side in ("lo", "hi"):
+            cols = [f"{n}-{side}-{level}" for n in names if f"{n}-{side}-{level}" in frame]
+            if cols:
+                frame[f"{ENSEMBLE}-{side}-{level}"] = frame[cols].mean(axis=1)
+    return frame
 
 
 def smape(y: np.ndarray, f: np.ndarray) -> float:
@@ -44,7 +57,7 @@ def seasonal_scale(train: pd.DataFrame, season: int) -> pd.Series:
     return train.groupby("unique_id").apply(_scale, include_groups=False)
 
 
-def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict]:
+def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict, dict[str, str]]:
     from statsforecast import StatsForecast
 
     cfg = stream.forecast
@@ -58,6 +71,8 @@ def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict]:
     cv["horizon"] = cv.groupby(["unique_id", "cutoff"]).cumcount() + 1
     scales = {cutoff: seasonal_scale(series[series["ds"] <= cutoff], season) for cutoff in cv["cutoff"].unique()}
     names = [m.__class__.__name__ for m in models]
+    cv = _with_ensemble(cv, names)
+    names = [*names, ENSEMBLE]
     per_model = {}
     for name in names:
         rows = []
@@ -79,9 +94,16 @@ def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict]:
         per_model[name]["series_better_than_baseline"] = wins / total if total else None
     # базовая модель тоже кандидат: если сезонный наив точнее, в прогноз идёт он, а не худшая модель
     best = min(names, key=lambda n: per_model[n]["mase"])
+    # выбор модели по каждому ряду: у ряда побеждает кандидат с меньшей ошибкой в его собственном бэктесте
+    per_series: dict[str, str] = {}
+    for uid, part in cv.groupby("unique_id"):
+        y = part["y"].to_numpy(dtype=float)
+        per_series[str(uid)] = min(names, key=lambda n: float(np.mean(np.abs(y - part[n].to_numpy(dtype=float)))))
+    choice_counts = {n: sum(1 for v in per_series.values() if v == n) for n in names}
     report = {"stream": stream.stream_id, "series": int(series["unique_id"].nunique()), "horizon": h, "season": season,
-              "windows": int(cfg.get("backtest_windows", 3)), "baseline": baseline, "chosen": best, "models": per_model}
-    return cv, report
+              "windows": int(cfg.get("backtest_windows", 3)), "baseline": baseline, "chosen": best, "models": per_model,
+              "per_series_choice": choice_counts}
+    return cv, report, per_series
 
 
 def forecast_stream(lake: Lakehouse, stream: Stream, out_dir: Path) -> tuple[pd.DataFrame, dict]:
@@ -90,32 +112,49 @@ def forecast_stream(lake: Lakehouse, stream: Stream, out_dir: Path) -> tuple[pd.
     series = load_series(lake, stream)
     if series.empty:
         return pd.DataFrame(), {"stream": stream.stream_id, "series": 0, "skipped": "no gold table or too little history"}
-    cv, report = backtest(series, stream)
+    cv, report, per_series = backtest(series, stream)
     cfg = stream.forecast
     season = int(cfg.get("season", 1))
     h = int(max(cfg.get("horizons", [1])))
     models, _ = _models(season)
+    names = [m.__class__.__name__ for m in models]
     sf = StatsForecast(models=models, freq=stream.freq, n_jobs=-1)
     fc = sf.forecast(df=series[["unique_id", "ds", "y"]], h=h, level=[LEVEL])
     fc = fc.reset_index() if "unique_id" not in fc.columns else fc
-    chosen = report["chosen"]
+    fc = _with_ensemble(fc, names, LEVEL)
+    stream_best = report["chosen"]
     entities = series.drop_duplicates("unique_id").set_index("unique_id")[list(stream.entity)]
     fc = fc.join(entities, on="unique_id")
     fc["horizon"] = fc.groupby("unique_id").cumcount() + 1
-    lo = fc[f"{chosen}-lo-{LEVEL}"] if f"{chosen}-lo-{LEVEL}" in fc else fc[chosen]
-    hi = fc[f"{chosen}-hi-{LEVEL}"] if f"{chosen}-hi-{LEVEL}" in fc else fc[chosen]
+    # каждому ряду — его победитель бэктеста; ряды без бэктеста получают лучшую модель потока
+    fc["chosen"] = fc["unique_id"].map(per_series).fillna(stream_best)
+    idx = np.arange(len(fc))
+    def _pick(suffix: str) -> np.ndarray:
+        cols = {n: (f"{n}{suffix}" if f"{n}{suffix}" in fc else n) for n in [*names, ENSEMBLE]}
+        stacked = np.column_stack([fc[cols[n]].to_numpy(dtype=float) for n in [*names, ENSEMBLE]])
+        order = {n: i for i, n in enumerate([*names, ENSEMBLE])}
+        return stacked[idx, fc["chosen"].map(order).to_numpy()]
+    yhat = _pick("")
+    lo = _pick(f"-lo-{LEVEL}")
+    hi = _pick(f"-hi-{LEVEL}")
     out = pd.DataFrame({
         "stream_id": stream.stream_id,
         "entity": fc[list(stream.entity)].apply(lambda r: json.dumps(dict(r), ensure_ascii=False), axis=1),
         "period": fc["ds"].dt.strftime(period_format(stream.grain)),
         "horizon": fc["horizon"].astype(int),
-        "yhat": np.clip(fc[chosen].to_numpy(), 0, None),
-        "lo": np.clip(np.minimum(lo.to_numpy(), fc[chosen].to_numpy()), 0, None),
-        "hi": np.clip(np.maximum(hi.to_numpy(), fc[chosen].to_numpy()), 0, None),
-        "model": f"{chosen}@{VERSION}",
+        "yhat": np.clip(yhat, 0, None),
+        "lo": np.clip(np.minimum(lo, yhat), 0, None),
+        "hi": np.clip(np.maximum(hi, yhat), 0, None),
+        "model": fc["chosen"].map(lambda n: f"{n}@{VERSION}"),
+        "unique_id": fc["unique_id"],
     })
+    flat_series = out.groupby("unique_id")["yhat"].transform(lambda v: float(np.ptp(np.round(v.to_numpy(), 6))) == 0.0)
+    out["flat"] = flat_series.astype(bool)
+    out = out.drop(columns=["unique_id"])
     for k in stream.entity:
         out[k] = fc[k].to_numpy()
+    report["flat_series"] = int(out.loc[out["flat"], "entity"].nunique())
+    report["flat_share"] = round(report["flat_series"] / max(report["series"], 1), 3)
     out_dir.mkdir(parents=True, exist_ok=True)
     write_json(out_dir / "report.json", report)
     cv.to_parquet(out_dir / "backtest.parquet", index=False)

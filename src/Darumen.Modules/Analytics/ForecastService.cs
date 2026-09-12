@@ -47,6 +47,7 @@ public sealed class ForecastService(
             response.Points.Select(p => new ForecastPointDto(p.Period, p.Yhat, p.Lo, p.Hi)).ToList(),
             history,
             new BacktestDto(response.Backtest?.Smape ?? 0, response.Backtest?.Mase ?? 0, response.Backtest?.BaselineSmape ?? 0),
-            response.Model.ToDto()));
+            response.Model.ToDto(),
+            response.Flat));
     }
 }

@@ -24,7 +24,7 @@ public sealed class QueueService(
             : await states.SnapshotAsync(dto.MoCode, dto.ProfileCode!, cancellationToken);
         return new PredictResponseDto(
             wait.P50Days, wait.P90Days, wait.PWithin30Days, refusal.PRefusal, snapshot,
-            wait.Explanation.ToDto(lang), wait.Model.ToDto());
+            wait.Explanation.ToDto(lang), wait.Model.ToDto(), refusal.OrgInTraining);
     }
 
     public async Task<AlternativesResponseDto> AlternativesAsync(AlternativesRequestDto dto, CancellationToken cancellationToken)

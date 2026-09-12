@@ -62,8 +62,11 @@ class QueueIntelligenceServicer(queue_pb2_grpc.QueueIntelligenceServicer):
         rows, weights = self._resolve(request, context)
         pred = self.state.wait.predict(rows)
         top = rows.iloc[[int(np.argmax(weights))]]
+        # на незнакомых организациях классификатор переоценивает риск: интерфейс покажет его словами
+        trained_orgs = set(self.state.wait.categories.get("mo_code", []))
+        org_in_training = request.mo_code in trained_orgs if request.mo_code else True
         return queue_pb2.PredictRefusalResponse(
-            p_refusal=float(pred["p_refusal"].to_numpy() @ weights),
+            p_refusal=float(pred["p_refusal"].to_numpy() @ weights), org_in_training=org_in_training,
             explanation=explanation(self.state, top, target="refusal"), model=model_info(self.state))
 
     def Alternatives(self, request, context):

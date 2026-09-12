@@ -36,6 +36,7 @@ message PredictRefusalResponse {
   double p_refusal = 1;
   Explanation explanation = 2;
   ModelInfo model = 3;
+  bool org_in_training = 4;  // организация была в обучении: false → риск показывать словами, не процентом
 }
 
 message AlternativesRequest {

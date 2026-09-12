@@ -34,4 +34,5 @@ message ForecastResponse {
   repeated ForecastPoint points = 1;
   BacktestMetrics backtest = 2;
   ModelInfo model = 3;
+  bool flat = 4;                      // прогноз повторяет один уровень («уровень последнего месяца»)
 }

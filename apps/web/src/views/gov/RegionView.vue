@@ -114,7 +114,11 @@ watch(moCode, loadSeries)
           :title="`Госпитализации в регионе, профиль ${refdata.profileName(profile)}`"
           unit="случаев"
         />
-        <p v-if="forecast" class="muted">Бэктест: sMAPE {{ pct(forecast.backtest.smape, 1) }} против наивного {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}. {{ forecast.model.name }} {{ forecast.model.version }}. <OriginTag kind="ml" /></p>
+        <p v-if="forecast" class="muted">
+          Бэктест: sMAPE {{ pct(forecast.backtest.smape, 1) }} против наивного {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}.
+          {{ forecast.model.name }} {{ forecast.model.version }}. <OriginTag kind="ml" />
+          <span v-if="forecast.flat" class="synthetic" style="margin-left: 6px">уровень последнего месяца: модель выбрала константу, для планирования малоинформативно</span>
+        </p>
         <p v-else class="muted">Прогноз для этого профиля в регионе не строился (мало истории).</p>
       </div>
     </div>

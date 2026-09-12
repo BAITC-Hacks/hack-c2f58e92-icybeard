@@ -34,15 +34,16 @@ class LoadForecastingServicer(forecast_pb2_grpc.LoadForecastingServicer):
         points = [forecast_pb2.ForecastPoint(period=str(r.period), yhat=float(r.yhat), lo=float(r.lo), hi=float(r.hi))
                   for r in rows.itertuples()]
         name, _, version = str(rows["model"].iloc[0]).partition("@")
+        flat = bool(rows["flat"].iloc[0]) if "flat" in rows.columns else False
         report = state.reports.get(stream.stream_id, {})
         return forecast_pb2.ForecastResponse(
-            points=points, backtest=self._backtest(stream, entity, report),
+            points=points, backtest=self._backtest(stream, entity, report, chosen=name), flat=flat,
             model=common_pb2.ModelInfo(name=name, version=version, trained_through=str(report.get("trained_through", ""))))
 
-    def _backtest(self, stream: Stream, entity: dict[str, str], report: dict) -> forecast_pb2.BacktestMetrics:
+    def _backtest(self, stream: Stream, entity: dict[str, str], report: dict, chosen: str | None = None) -> forecast_pb2.BacktestMetrics:
         """sMAPE of this series in the rolling-origin backtest; MASE at stream level because its scale is
-        in-sample per series and not stored. Zero means no backtest."""
-        chosen, baseline = report.get("chosen"), report.get("baseline")
+        in-sample per series and not stored. Zero means no backtest. `chosen` — модель этого ряда."""
+        chosen, baseline = chosen or report.get("chosen"), report.get("baseline")
         mase = float(report.get("models", {}).get(chosen, {}).get("mase", 0.0)) if chosen else 0.0
         backtest = self.state.backtests.get(stream.stream_id)
         if backtest is None or chosen not in backtest or baseline not in backtest:

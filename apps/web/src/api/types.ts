@@ -16,6 +16,8 @@ export interface PredictRequest {
 export interface QueueSnapshot { len: number; ageP50: number | null; throughputPerDay: number }
 export interface PredictResponse {
   p50Days: number; p90Days: number; pWithin30Days: number; pRefusal: number
+  /** false — организация не была в обучении, риск отказа показываем словами, не процентом */
+  refusalOrgInTraining?: boolean
   queue: QueueSnapshot | null; explanation: Explanation; model: ModelInfo
 }
 export interface Organization { moCode: string; name: string; regionKato: string }
@@ -31,6 +33,8 @@ export interface HistoryPoint { period: string; y: number }
 export interface ForecastResponse {
   streamId: string; entity: Record<string, string>; points: ForecastPoint[]; history: HistoryPoint[]
   backtest: { smape: number; mase: number; baselineSmape: number }; model: ModelInfo
+  /** Прогноз повторяет один уровень («уровень последнего месяца») — для планирования малоинформативен. */
+  flat?: boolean
 }
 export interface Anomaly {
   id: string; streamId: string; entity: Record<string, string>; period: string; observed: number; expected: number

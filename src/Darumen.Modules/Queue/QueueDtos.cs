@@ -10,7 +10,7 @@ public sealed record QueueSnapshotDto(int Len, double? AgeP50, double Throughput
 
 public sealed record PredictResponseDto(
     double P50Days, double P90Days, double PWithin30Days, double PRefusal, QueueSnapshotDto? Queue,
-    ExplanationDto Explanation, ModelInfoDto Model);
+    ExplanationDto Explanation, ModelInfoDto Model, bool RefusalOrgInTraining);
 
 public sealed record AlternativesRequestDto(
     string? RegionKato, string? MoCode, string? ProfileCode, string? Icd10, string? ReferralPurpose,

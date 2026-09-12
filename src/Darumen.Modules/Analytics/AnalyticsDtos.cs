@@ -12,7 +12,7 @@ public sealed record BacktestDto(double Smape, double Mase, double BaselineSmape
 
 public sealed record ForecastResponseDto(
     string StreamId, IReadOnlyDictionary<string, string> Entity, IReadOnlyList<ForecastPointDto> Points,
-    IReadOnlyList<HistoryPointDto> History, BacktestDto Backtest, ModelInfoDto Model);
+    IReadOnlyList<HistoryPointDto> History, BacktestDto Backtest, ModelInfoDto Model, bool Flat);
 
 public sealed record AnomalyDto(
     string Id, string StreamId, IReadOnlyDictionary<string, string> Entity, string Period, double Observed, double Expected,
