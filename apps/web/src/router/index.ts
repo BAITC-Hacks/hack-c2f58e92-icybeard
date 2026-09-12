@@ -15,6 +15,7 @@ export const router = createRouter({
     { path: '/doctor/scribe', name: 'scribe', component: () => import('@/views/doctor/ScribeView.vue'), meta: { roles: ['doctor'] } },
     { path: '/gov', name: 'gov', component: () => import('@/views/gov/GovMapView.vue'), meta: { roles: ['chief', 'regulator'] } },
     { path: '/gov/regions/:kato', name: 'region', component: () => import('@/views/gov/RegionView.vue'), meta: { roles: ['chief', 'regulator'] } },
+    { path: '/gov/organizations/:moCode', name: 'organization', component: () => import('@/views/gov/OrganizationView.vue'), meta: { roles: ['chief', 'regulator'] } },
     { path: '/gov/insight', name: 'insight', component: () => import('@/views/gov/InsightView.vue'), meta: { roles: ['chief', 'regulator'] } },
     { path: '/gov/simulator', name: 'simulator', component: () => import('@/views/gov/SimulatorView.vue'), meta: { roles: ['regulator'] } },
     { path: '/quality', name: 'quality', component: () => import('@/views/gov/QualityView.vue'), meta: { roles: ['chief', 'regulator'] } },

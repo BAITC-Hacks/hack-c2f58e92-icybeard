@@ -27,8 +27,15 @@ public static class AnalyticsEndpoints
 
         var anomalies = api.MapGroup("/anomalies").WithTags("Anomalies").RequireAuthorization(Policies.ChiefOrRegulator);
         anomalies.MapGet("/", async (string? regionKato, string? streamId, string? severity, string? status, int? page, int? size,
-                IAnalyticsRepository repository, CancellationToken ct) =>
+                HttpContext http, IAnalyticsRepository repository, CancellationToken ct) =>
             {
+                // главврач видит сигналы только своего региона: клейм region_kato сильнее параметра запроса
+                var user = CurrentUser.From(http);
+                if (user.Role == Roles.Chief && !string.IsNullOrWhiteSpace(user.RegionKato))
+                {
+                    regionKato = user.RegionKato;
+                }
+
                 var (p, s) = Paging.Normalize(page, size);
                 return Results.Ok(await repository.AnomaliesAsync(new AnomalyFilter(regionKato, streamId, severity, status ?? "open"), p, s, ct));
             })

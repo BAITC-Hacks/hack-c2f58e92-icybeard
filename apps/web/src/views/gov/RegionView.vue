@@ -92,6 +92,7 @@ watch(moCode, loadSeries)
     <div class="actions" style="margin: 0 0 12px">
       <Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter size="small" style="min-width: 280px" />
       <Select v-model="moCode" :options="organizations" option-label="name" option-value="moCode" filter size="small" placeholder="Организация" style="min-width: 360px; max-width: 100%" />
+      <RouterLink v-if="moCode" :to="{ name: 'organization', params: { moCode }, query: { kato, profile } }">кабинет организации →</RouterLink>
     </div>
     <ErrorBox :error="error" />
     <div class="grid cols-2">
