@@ -82,6 +82,11 @@ watch([month, profile], load)
       <div>
         <RegionMap :regions="refdata.regions" :index="index?.items ?? []" @select="router.push({ name: 'region', params: { kato: $event } })" />
         <p class="muted" style="margin-top: 8px">{{ index?.method }}</p>
+        <!-- значения и правило применения: refdata/external_benchmarks.yaml -->
+        <p class="muted" style="margin-top: 4px">
+          Внешние ориентиры для p90 ожидания: 112 дней — цель Канады, 90 % катаракт (CIHI, 2023); 126 дней — стандарт NHS
+          «18 недель, 92 % пациентов» (2024). Ориентир, не норматив: индекс остаётся относительным.
+        </p>
       </div>
       <div class="card">
         <h2>Индекс за {{ index?.month ?? '…' }} <OriginTag kind="formula" /></h2>

@@ -72,6 +72,11 @@ onMounted(async () => {
         </div>
         <ul class="muted"><li v-for="a in result.assumptions" :key="a">{{ a }}</li></ul>
         <p class="muted">{{ result.model.name }} {{ result.model.version }}</p>
+        <!-- значения и источники: refdata/external_benchmarks.yaml (beds) -->
+        <p class="muted">
+          Ориентир коечного фонда: ЕС ≈ 5,3 койки на 1 000 жителей (Eurostat, 2021), Казахстан ≈ 6,0 (ВОЗ HFA, 2021) —
+          внешний ориентир для сценариев «добавить мощность», не норматив потребности.
+        </p>
       </div>
     </div>
     <div v-if="moves" class="card" style="margin-top: 16px">

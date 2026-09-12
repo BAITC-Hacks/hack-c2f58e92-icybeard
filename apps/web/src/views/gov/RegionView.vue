@@ -120,6 +120,11 @@ watch(moCode, loadSeries)
           {{ forecast.model.name }} {{ forecast.model.version }}. <OriginTag kind="ml" />
           <span v-if="forecast.flat" class="synthetic" style="margin-left: 6px">уровень последнего месяца: модель выбрала константу, для планирования малоинформативно</span>
         </p>
+        <!-- коэффициент и источник: refdata/external_benchmarks.yaml (diagnostics.dm01_tests_per_admission) -->
+        <p v-if="forecast && forecast.points.length" class="muted">
+          Оценка нагрузки на диагностику: ≈ {{ Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5).toLocaleString('ru-RU') }}
+          исследований в месяц по этому профилю (прогноз × 1,5 исследования на госпитализацию, производная NHS DM01, 2024 — внешний ориентир, не измерение; уточнится с данными ЕИП).
+        </p>
         <p v-else class="muted">Прогноз для этого профиля в регионе не строился (мало истории).</p>
       </div>
     </div>
