@@ -244,6 +244,8 @@ def model_card(model: WaitModel, report: dict) -> str:
     ]
     names = {"test_time": "Март 2025 (время)", "test_mo": "10 % организаций (перенос)"}
     for split, m in report.items():
+        if split not in names:  # by_region / by_profile — таблицы срезов для страницы качества, не сплиты
+            continue
         lines.append(f"| {names.get(split, split)} | {m['n']:,} | {m['pinball_p50']:.2f} / {m['pinball_p50_baseline']:.2f} | "
                      f"{m['pinball_p90']:.2f} / {m['pinball_p90_baseline']:.2f} | {m['mae_p50']:.2f} / {m['mae_p50_baseline']:.2f} | "
                      f"{m['coverage_p90']:.3f} | {m['auc_within30']:.3f} | {m['auc_refusal']:.3f} / {m['auc_refusal_baseline']:.3f} |")

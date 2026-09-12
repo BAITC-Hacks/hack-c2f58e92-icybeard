@@ -1,5 +1,5 @@
-# данные
-lakehouse/
+# данные (только корневой каталог данных: ml/src/darumen/lakehouse — код, он в репозитории)
+/lakehouse/
 DataSets/
  DataSets/
 *.csv
