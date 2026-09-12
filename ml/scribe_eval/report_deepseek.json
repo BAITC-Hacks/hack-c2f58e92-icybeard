@@ -1,0 +1,175 @@
+{
+  "scenarios": 20,
+  "drafts": {
+    "summary": {
+      "scenarios": 20,
+      "reached_model": 20,
+      "models": {
+        "deepseek/deepseek-chat": 20
+      },
+      "clean_share": 1.0
+    },
+    "results": [
+      {
+        "id": "ru01",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 8.0
+      },
+      {
+        "id": "ru02",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 5.7
+      },
+      {
+        "id": "ru03",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.4
+      },
+      {
+        "id": "ru04",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.7
+      },
+      {
+        "id": "ru05",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.3
+      },
+      {
+        "id": "ru06",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 3.7
+      },
+      {
+        "id": "ru07",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 3.4
+      },
+      {
+        "id": "ru08",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.1
+      },
+      {
+        "id": "ru09",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 3.6
+      },
+      {
+        "id": "ru10",
+        "language": "ru",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.5
+      },
+      {
+        "id": "kk01",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 5.0
+      },
+      {
+        "id": "kk02",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.6
+      },
+      {
+        "id": "kk03",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.8
+      },
+      {
+        "id": "kk04",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.3
+      },
+      {
+        "id": "kk05",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 8.3
+      },
+      {
+        "id": "kk06",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 7.0
+      },
+      {
+        "id": "kk07",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 5.2
+      },
+      {
+        "id": "kk08",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 5.6
+      },
+      {
+        "id": "kk09",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 4.6
+      },
+      {
+        "id": "kk10",
+        "language": "kk",
+        "ok": true,
+        "model": "deepseek/deepseek-chat",
+        "missing": [],
+        "seconds": 6.5
+      }
+    ]
+  }
+}
