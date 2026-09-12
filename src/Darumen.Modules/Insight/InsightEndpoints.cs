@@ -37,5 +37,18 @@ public static class InsightEndpoints
         group.MapGet("/status", (InsightService service, Microsoft.Extensions.Options.IOptions<InsightOptions> options) =>
                 Results.Ok(new { available = service.Available, provider = options.Value.Provider, model = options.Value.Model }))
             .WithName("InsightStatus").WithSummary("Настроен ли доступ к модели");
+
+        group.MapGet("/reports", async (string? month, string? profileCode, string? format, HttpRequest http,
+                InsightReportService reports, CancellationToken ct) =>
+            {
+                var kind = format == "xlsx" ? "xlsx" : "pdf";
+                var report = await reports.BuildAsync(month, profileCode, kind, Locale.From(http), ct);
+                return report is null
+                    ? Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Отчёт не собран",
+                        detail: "индекс не рассчитан или месяц вне доступных")
+                    : Results.File(report.Content, report.ContentType, report.FileName);
+            })
+            .WithName("InsightReports").WithSummary("Отчёт по индексу доступности за месяц: format=pdf|xlsx")
+            .Produces(StatusCodes.Status200OK).ProducesProblem(StatusCodes.Status404NotFound);
     }
 }

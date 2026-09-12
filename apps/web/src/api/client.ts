@@ -63,6 +63,23 @@ export async function apiUpload<T>(path: string, file: Blob, filename: string): 
   return handle<T>(response)
 }
 
+/** Скачивание файла с заголовками входа: fetch → blob → сохранение под именем из Content-Disposition. */
+export async function apiDownload(path: string, query?: Query): Promise<void> {
+  const auth = useAuthStore()
+  const headers = new Headers({ 'Accept-Language': i18n.global.locale.value, ...(await auth.authHeaders()) })
+  const response = await fetch(buildUrl(path.replace(/^\//, ''), query), { headers })
+  if (!response.ok) {
+    const body = safeJson(await response.text()) as { title?: string; detail?: string }
+    throw new ApiError(response.status, body?.title ?? `HTTP ${response.status}`, body?.detail)
+  }
+  const name = /filename\*?=(?:UTF-8'')?"?([^";]+)/i.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? 'report'
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(await response.blob())
+  link.download = decodeURIComponent(name)
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
 async function handle<T>(response: Response): Promise<T> {
   const text = await response.text()
   const body = text ? safeJson(text) : null

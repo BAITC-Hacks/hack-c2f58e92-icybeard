@@ -1,4 +1,4 @@
-import { api, apiUpload } from './client'
+import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, Batch, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
   Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region,
@@ -60,6 +60,8 @@ export const medicines = {
 export const insight = {
   ask: (question: string, regionKato?: string) => api<AskResponse>('/api/v1/insight/ask', { body: { question, regionKato } }),
   status: () => api<{ available: boolean }>('/api/v1/insight/status'),
+  report: (format: 'pdf' | 'xlsx', month?: string, profileCode?: string) =>
+    apiDownload('/api/v1/insight/reports', { format, month, profileCode }),
 }
 
 export const scribe = {

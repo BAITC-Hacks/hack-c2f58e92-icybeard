@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { analytics } from '@/api/endpoints'
+import { analytics, insight } from '@/api/endpoints'
 import type { Anomaly, IndexResponse } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
@@ -43,6 +44,20 @@ async function load() {
   }
 }
 
+const downloading = ref(false)
+
+/** Отчёт по индексу за выбранный месяц и профиль — PDF или Excel. */
+async function report(format: 'pdf' | 'xlsx') {
+  downloading.value = true
+  try {
+    await insight.report(format, month.value ?? undefined, profile.value === 'all' ? undefined : profile.value)
+  } catch (e) {
+    error.value = e
+  } finally {
+    downloading.value = false
+  }
+}
+
 async function ack(id: string, comment: string) {
   try {
     await analytics.ack(id, comment)
@@ -75,6 +90,8 @@ watch([month, profile], load)
         size="small"
         style="min-width: 280px"
       />
+      <Button label="Отчёт PDF" icon="pi pi-file-pdf" size="small" severity="secondary" :loading="downloading" @click="report('pdf')" />
+      <Button label="Excel" icon="pi pi-file-excel" size="small" severity="secondary" :loading="downloading" @click="report('xlsx')" />
       <span v-if="loading" class="muted">Загрузка…</span>
     </div>
     <ErrorBox :error="error" />

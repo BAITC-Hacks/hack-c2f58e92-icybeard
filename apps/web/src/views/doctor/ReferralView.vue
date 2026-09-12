@@ -5,6 +5,7 @@ import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, journal, queue } from '@/api/endpoints'
 import type { AlternativesResponse, OrganizationItem, PredictResponse, QualitySplit } from '@/api/types'
@@ -17,11 +18,13 @@ import { useRefdataStore } from '@/stores/refdata'
 const refdata = useRefdataStore()
 const auth = useAuthStore()
 const toast = useToast()
+const route = useRoute()
 
+// переход «открыть направление» из рабочего списка переносит организацию и профиль пациента
 const form = reactive({
   regionKato: auth.region ?? '75',
-  moCode: '028B',
-  profileCode: '381',
+  moCode: typeof route.query.moCode === 'string' && route.query.moCode ? route.query.moCode : '028B',
+  profileCode: typeof route.query.profileCode === 'string' && route.query.profileCode ? route.query.profileCode : '381',
   icd10: 'H25.1',
   referralPurpose: 'Оперативное лечение',
   territorialType: 'Город',
