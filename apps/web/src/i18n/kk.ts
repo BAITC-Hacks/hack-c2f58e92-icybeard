@@ -1,6 +1,6 @@
 export const kk = {
   nav: {
-    home: 'Басты бет', gov: 'Өңірлер картасы', simulator: 'Симулятор', insight: 'Деректерге сұрақтар', referral: 'Жолдама көмекшісі',
+    home: 'Басты бет', gov: 'Өңірлер картасы', simulator: 'Симулятор', insight: 'Деректерге сұрақтар', quality: 'Модельдер сапасы', referral: 'Жолдама көмекшісі',
     worklist: 'Жұмыс тізімі', medicines: 'Рецепт тексеру', decisions: 'Шешімдер журналы', scribe: 'AI-скрайб', steward: 'Стюард консолі', wait: 'Азаматтар үшін күту',
   },
   auth: { role: 'Рөл', login: 'Кіру', logout: 'Шығу', guest: 'Қонақ', demo: 'демо-режим' },

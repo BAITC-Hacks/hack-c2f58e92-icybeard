@@ -1,6 +1,6 @@
 export const ru = {
   nav: {
-    home: 'Главная', gov: 'Карта регионов', simulator: 'Симулятор', insight: 'Вопросы к данным', referral: 'Ассистент направления',
+    home: 'Главная', gov: 'Карта регионов', simulator: 'Симулятор', insight: 'Вопросы к данным', quality: 'Качество моделей', referral: 'Ассистент направления',
     worklist: 'Рабочий список', medicines: 'Проверка рецепта', decisions: 'Журнал решений', scribe: 'AI-скрайб', steward: 'Консоль стюарда', wait: 'Ожидание для граждан',
   },
   auth: { role: 'Роль', login: 'Войти', logout: 'Выйти', guest: 'Гость', demo: 'демо-режим' },

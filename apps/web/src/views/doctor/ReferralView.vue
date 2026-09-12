@@ -6,8 +6,8 @@ import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { ApiError } from '@/api/client'
-import { journal, queue } from '@/api/endpoints'
-import type { AlternativesResponse, OrganizationItem, PredictResponse } from '@/api/types'
+import { analytics, journal, queue } from '@/api/endpoints'
+import type { AlternativesResponse, OrganizationItem, PredictResponse, QualitySplit } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import ExplanationCard from '@/components/ExplanationCard.vue'
 import { days, pct, refusalWords } from '@/lib/format'
@@ -36,6 +36,8 @@ const fieldErrors = ref<Record<string, string>>({})
 const busy = ref(false)
 const reason = ref('')
 const recorded = ref<string | null>(null)
+// метрики модели против baseline из отчёта обучения — та же цифра, что на странице качества (§7.4)
+const waitQuality = ref<QualitySplit | null>(null)
 
 const purposes = ['Оперативное лечение', 'Консервативное лечение', 'Диагностика', 'Реабилитация']
 const territorial = ['Город', 'Село']
@@ -88,6 +90,11 @@ onMounted(async () => {
   await refdata.load()
   await loadOrganizations()
   await predict()
+  try {
+    waitQuality.value = (await analytics.quality()).wait?.test_time ?? null
+  } catch {
+    waitQuality.value = null // страница работает и без отчёта качества
+  }
 })
 watch(() => [form.regionKato, form.profileCode], loadOrganizations)
 </script>
@@ -131,6 +138,10 @@ watch(() => [form.regionKato, form.profileCode], loadOrganizations)
           </p>
         </div>
         <ExplanationCard :explanation="prediction.explanation" :model="prediction.model" unit="дн." style="margin-top: 16px" />
+        <p v-if="waitQuality" class="muted" style="margin-top: 8px">
+          Качество на отложенном марте 2025: пинбол p50 {{ waitQuality.pinball_p50.toFixed(2) }} против {{ waitQuality.pinball_p50_baseline.toFixed(2) }} у простого правила
+          ({{ ((1 - waitQuality.pinball_p50 / waitQuality.pinball_p50_baseline) * 100).toFixed(0) }} % точнее), AUC отказа {{ waitQuality.auc_refusal.toFixed(2) }} против {{ waitQuality.auc_refusal_baseline.toFixed(2) }}.
+        </p>
       </div>
     </div>
     <div v-if="alternatives" class="card" style="margin-top: 16px">

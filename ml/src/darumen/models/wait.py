@@ -168,6 +168,25 @@ def evaluate_split(model: WaitModel, df: pd.DataFrame) -> dict:
     return metrics
 
 
+def breakdown(model: WaitModel, df: pd.DataFrame, key: str, top: int = 25) -> list[dict]:
+    """Ошибка модели и baseline по срезам (регион, профиль): видно, где модель хуже простого правила."""
+    pred = model.predict(df)
+    base = model.baseline_predict(df)
+    rows = []
+    for value, part in df.groupby(key, observed=True):
+        admitted = part["wait_days"].notna().to_numpy()
+        if int(admitted.sum()) < 50:  # менее 50 наблюдений — оценка шумная, в отчёт не идёт
+            continue
+        y = part.loc[admitted, "wait_days"].to_numpy(dtype=float)
+        p = pred.loc[part.index[admitted], "p50_days"].to_numpy()
+        b = base.loc[part.index[admitted], "base_p50"].to_numpy()
+        rows.append({key: str(value), "n": int(admitted.sum()),
+                     "pinball_p50": pinball(y, p, 0.5), "pinball_p50_baseline": pinball(y, b, 0.5),
+                     "mae_p50": mae(y, p), "mae_p50_baseline": mae(y, b)})
+    rows.sort(key=lambda r: r["n"], reverse=True)
+    return rows[:top]
+
+
 def train_wait(features: pd.DataFrame, out_dir: Path, trained_through: str | None = None) -> tuple[WaitModel, dict]:
     train = features[features["split"] == "train"]
     tests = {name: features[features["split"] == name] for name in ("test_time", "test_mo")}
@@ -194,6 +213,9 @@ def train_wait(features: pd.DataFrame, out_dir: Path, trained_through: str | Non
     by_mo, by_profile, global_ = _baselines(train)
     model = WaitModel(boosters, categories, by_mo, by_profile, global_)
     report = {name: evaluate_split(model, df) for name, df in tests.items() if len(df)}
+    if len(tests["test_time"]):
+        report["by_region"] = breakdown(model, tests["test_time"], "region_kato")
+        report["by_profile"] = breakdown(model, tests["test_time"], "profile_code")
     importance = {name: dict(zip(FEATURES, booster.feature_importance("gain").tolist(), strict=True)) for name, booster in boosters.items()}
     model.metadata = {
         "name": "wait_quantile", "trained_through": trained_through or str(train["registration_date"].max()),

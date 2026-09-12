@@ -1,7 +1,7 @@
 import { api, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, Batch, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
-  Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region,
+  Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region,
   SimulateResponse, Stream, WorklistItem,
 } from './types'
 
@@ -25,6 +25,7 @@ export const analytics = {
   ack: (id: string, comment: string, status = 'acknowledged') =>
     api<void>(`/api/v1/anomalies/${encodeURIComponent(id)}/ack`, { body: { comment, status } }),
   index: (month?: string, profileCode?: string) => api<IndexResponse>('/api/v1/index', { query: { month, profileCode } }),
+  quality: () => api<QualityReport>('/api/v1/quality'),
 }
 
 export const simulation = {

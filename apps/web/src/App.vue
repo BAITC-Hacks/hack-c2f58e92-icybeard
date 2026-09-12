@@ -21,6 +21,7 @@ const links = computed(() => {
     { to: '/gov', label: t('nav.gov'), roles: ['chief', 'regulator'] },
     { to: '/gov/simulator', label: t('nav.simulator'), roles: ['regulator'] },
     { to: '/gov/insight', label: t('nav.insight'), roles: ['chief', 'regulator'] },
+    { to: '/quality', label: t('nav.quality'), roles: ['chief', 'regulator'] },
     { to: '/doctor/referral', label: t('nav.referral'), roles: ['doctor'] },
     { to: '/doctor/worklist', label: t('nav.worklist'), roles: ['doctor'] },
     { to: '/doctor/decisions', label: t('nav.decisions'), roles: ['doctor', 'regulator'] },

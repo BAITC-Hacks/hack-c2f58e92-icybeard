@@ -43,6 +43,33 @@ export interface Anomaly {
 export interface IndexItem { regionKato: string; name: string; shareOver30: number; p90Days: number; indexValue: number; rank: number; n: number }
 export interface IndexResponse { month: string; profileCode: string; items: IndexItem[]; months: string[]; method: string }
 
+/** Срез ошибки wait-модели по региону или профилю из отчёта обучения. */
+export interface QualityBreakdownRow {
+  region_kato?: string; profile_code?: string; n: number
+  pinball_p50: number; pinball_p50_baseline: number; mae_p50: number; mae_p50_baseline: number
+}
+export interface QualitySplit {
+  n: number; n_admitted: number
+  pinball_p50: number; pinball_p50_baseline: number; pinball_p90: number; pinball_p90_baseline: number
+  mae_p50: number; mae_p50_baseline: number; coverage_p90: number; coverage_p90_baseline: number
+  auc_within30: number; auc_refusal: number; auc_refusal_baseline: number
+}
+export interface QualityForecast {
+  series?: number; chosen?: string; baseline?: string; flat_share?: number; skipped?: string
+  per_series_choice?: Record<string, number>
+  models?: Record<string, { mase: number; smape: number }>
+}
+export interface QualityReport {
+  wait: {
+    trainedThrough?: string; trainRows?: number
+    test_time?: QualitySplit; test_mo?: QualitySplit
+    by_region?: QualityBreakdownRow[]; by_profile?: QualityBreakdownRow[]
+  } | null
+  forecasts: Record<string, QualityForecast>
+  anomalies: Record<string, { alerts?: number; precision_at_k?: number; recall_at_threshold?: number }>
+  simulate: { saved_share?: number; saved_share_band?: number[]; consistency_spearman?: number; horizon_days?: number } | null
+}
+
 export interface SimulateResponse {
   organisations: number; baseline: { meanWaitDays: number }; scenario: { meanWaitDays: number }
   deltaDays: number; ci: number[]; assumptions: string[]; model: ModelInfo

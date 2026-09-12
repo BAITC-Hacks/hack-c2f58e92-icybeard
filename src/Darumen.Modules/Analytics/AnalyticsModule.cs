@@ -15,6 +15,8 @@ public sealed class AnalyticsModule : IDarumenModule
             o.Address = new Uri(sp.GetRequiredService<IOptions<ModelServicesOptions>>().Value.Address));
         services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
         services.AddScoped<ForecastService>();
+        services.Configure<QualityOptions>(configuration.GetSection(QualityOptions.Section));
+        services.AddSingleton<QualityService>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder api) => AnalyticsEndpoints.Map(api);

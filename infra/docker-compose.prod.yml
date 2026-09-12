@@ -79,6 +79,9 @@ services:
       Insight__BaseUrl: ${INSIGHT_BASE_URL:-https://api.deepseek.com/v1}
       Insight__NoThinkHint: "false"
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      Quality__LakehouseDir: /lakehouse
+    volumes:
+      - ${LAKEHOUSE_DIR:-../lakehouse}:/lakehouse:ro   # отчёты моделей для /analytics/quality
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
