@@ -49,8 +49,8 @@ public sealed class RefDataRepository(IDbConnectionFactory db) : IRefDataReposit
         {
             var rows = await connection.QueryAsync<SeasonalityDto>(new CommandDefinition(
                 """
-                SELECT series_id AS SeriesId, month AS Month, multiplier AS Multiplier, title AS Title,
-                       source AS Source, source_year AS SourceYear, window_label AS WindowLabel
+                SELECT series_id AS SeriesId, month::int AS Month, multiplier AS Multiplier, title AS Title,
+                       source AS Source, source_year::int AS SourceYear, window_label AS WindowLabel
                 FROM refdata.seasonality ORDER BY series_id, month
                 """,
                 cancellationToken: cancellationToken));
