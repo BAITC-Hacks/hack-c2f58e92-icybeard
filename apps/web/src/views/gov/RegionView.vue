@@ -4,8 +4,8 @@ import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ApiError } from '@/api/client'
-import { analytics, queue } from '@/api/endpoints'
-import type { Anomaly, ForecastResponse, OrganizationItem, OrganizationSeries } from '@/api/types'
+import { analytics, queue, refdata as refdataApi } from '@/api/endpoints'
+import type { Anomaly, ForecastResponse, OrganizationItem, OrganizationSeries, Seasonality } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
@@ -29,6 +29,22 @@ const forecast = ref<ForecastResponse | null>(null)
 const anomalies = ref<Anomaly[]>([])
 const error = ref<unknown>(null)
 const seriesError = ref<unknown>(null)
+const seasonality = ref<Seasonality[]>([])
+
+/** Для плоского прогноза: месяцы горизонта с сезонным множителем NHS (форма плановых госпитализаций). */
+const flatSeasonHint = computed(() => {
+  if (!forecast.value?.flat) return null
+  const adm = new Map(seasonality.value.filter((s) => s.seriesId === 'rtt_admitted_per_day').map((s) => [s.month, s.multiplier]))
+  if (adm.size !== 12) return null
+  const short = ['', 'янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+  return forecast.value.points
+    .map((p) => {
+      const m = Number(p.period.slice(5, 7))
+      const delta = (adm.get(m)! - 1) * 100
+      return `${short[m]} ${delta > 0 ? '+' : '−'}${Math.abs(delta).toFixed(0)} %`
+    })
+    .join(', ')
+})
 
 async function loadRegion() {
   error.value = null
@@ -73,6 +89,11 @@ onMounted(async () => {
   await refdata.load()
   await loadRegion()
   await loadSeries()
+  try {
+    seasonality.value = (await refdataApi.seasonality()).items
+  } catch {
+    seasonality.value = [] // подсказка сезонности опциональна
+  }
 })
 watch(kato, async () => {
   await loadRegion()
@@ -119,6 +140,10 @@ watch(moCode, loadSeries)
           Бэктест: sMAPE {{ pct(forecast.backtest.smape, 1) }} против наивного {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}.
           {{ forecast.model.name }} {{ forecast.model.version }}. <OriginTag kind="ml" />
           <span v-if="forecast.flat" class="synthetic" style="margin-left: 6px">уровень последнего месяца: модель выбрала константу, для планирования малоинформативно</span>
+        </p>
+        <p v-if="flatSeasonHint" class="muted">
+          Сезонная форма плановых госпитализаций в системах типа NHS для этих месяцев: {{ flatSeasonHint }} к среднему
+          (NHS England RTT, 2017–2019 — внешний ориентир, не поправка модели).
         </p>
         <!-- коэффициент и источник: refdata/external_benchmarks.yaml (diagnostics.dm01_tests_per_admission) -->
         <p v-if="forecast && forecast.points.length" class="muted">

@@ -118,6 +118,9 @@ public sealed class InMemoryRefData : IRefDataRepository
 
     public Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ProfileDto>>([new("381", "Офтальмологические для взрослых", false, 12000), new("DH", "Дневной стационар", true, 300000)]);
+
+    public Task<IReadOnlyList<SeasonalityDto>> SeasonalityAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<SeasonalityDto>>([new("rtt_waiting_list", 9, 1.0186, "Лист ожидания", "NHS England RTT", 2020, "2017-01..2019-12")]);
 }
 
 public sealed class InMemoryWorklist : IWorklistRepository

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
 import Select from 'primevue/select'
-import { onMounted, ref } from 'vue'
-import { analytics, queue } from '@/api/endpoints'
-import type { AlternativesResponse, IndexItem, PredictResponse } from '@/api/types'
+import { computed, onMounted, ref } from 'vue'
+import { analytics, queue, refdata as refdataApi } from '@/api/endpoints'
+import type { AlternativesResponse, IndexItem, PredictResponse, Seasonality } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
 import { days, pct } from '@/lib/format'
@@ -17,6 +17,25 @@ const alternatives = ref<AlternativesResponse | null>(null)
 const indexItem = ref<IndexItem | null>(null)
 const error = ref<unknown>(null)
 const busy = ref(false)
+const seasonality = ref<Seasonality[]>([])
+
+/** Сезонный ориентир: лист ожидания в ближайшие месяцы относительно текущего (форма NHS RTT). */
+const seasonalHint = computed(() => {
+  const wl = seasonality.value.filter((s) => s.seriesId === 'rtt_waiting_list')
+  if (wl.length !== 12) return null
+  const byMonth = new Map(wl.map((s) => [s.month, s.multiplier]))
+  const now = new Date().getMonth() + 1
+  const current = byMonth.get(now)
+  if (!current) return null
+  const names = ['', 'январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре']
+  const parts = [1, 2, 3].map((step) => {
+    const m = ((now - 1 + step) % 12) + 1
+    const delta = ((byMonth.get(m)! - current) / current) * 100
+    const sign = delta > 0.05 ? '+' : delta < -0.05 ? '−' : '±'
+    return `в ${names[m]} ${sign}${Math.abs(delta).toFixed(1)} %`
+  })
+  return parts.join(', ')
+})
 
 async function run() {
   busy.value = true
@@ -37,6 +56,11 @@ async function run() {
 onMounted(async () => {
   await refdata.load()
   await run()
+  try {
+    seasonality.value = (await refdataApi.seasonality()).items
+  } catch {
+    seasonality.value = [] // без витрины сезонности страница работает как раньше
+  }
 })
 </script>
 
@@ -61,6 +85,10 @@ onMounted(async () => {
           <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">попадают за 30 дней</div></div>
         </div>
         <p v-if="indexItem" class="muted" style="margin-top: 8px">Индекс доступности региона {{ indexItem.indexValue.toFixed(1) }}, место {{ indexItem.rank }} среди регионов. <OriginTag kind="formula" /></p>
+        <p v-if="seasonalHint" class="muted" style="margin-top: 8px">
+          Сезонный ориентир: в системах типа NHS лист ожидания к текущему месяцу обычно меняется {{ seasonalHint }}
+          (форма сезона NHS England RTT, 2017–2019 — внешний ориентир, наши данные пока покрывают один квартал).
+        </p>
         <p v-else class="muted" style="margin-top: 8px">Индекс для региона не показан: слишком мало наблюдений (малые числа подавлены).</p>
       </div>
       <div class="card">

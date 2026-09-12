@@ -40,6 +40,9 @@ export interface Anomaly {
   id: string; streamId: string; entity: Record<string, string>; period: string; observed: number; expected: number
   score: number; peerScore: number; severity: string; kind: string; status: string; regionKato: string | null; comment: string | null
 }
+/** Внешняя сезонная форма (NHS): множитель месяца при среднегодовом = 1. */
+export interface Seasonality { seriesId: string; month: number; multiplier: number; title: string; source: string; sourceYear: number; windowLabel: string }
+
 export interface IndexItem { regionKato: string; name: string; shareOver30: number; p90Days: number; indexValue: number; rank: number; n: number }
 export interface IndexResponse { month: string; profileCode: string; items: IndexItem[]; months: string[]; method: string }
 

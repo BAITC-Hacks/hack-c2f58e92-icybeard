@@ -42,5 +42,25 @@ public sealed class RefDataRepository(IDbConnectionFactory db) : IRefDataReposit
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<SeasonalityDto>> SeasonalityAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            var rows = await connection.QueryAsync<SeasonalityDto>(new CommandDefinition(
+                """
+                SELECT series_id AS SeriesId, month AS Month, multiplier AS Multiplier, title AS Title,
+                       source AS Source, source_year AS SourceYear, window_label AS WindowLabel
+                FROM refdata.seasonality ORDER BY series_id, month
+                """,
+                cancellationToken: cancellationToken));
+            return rows.ToList();
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            return []; // таблица появится после make publish; до этого сезонного ориентира просто нет
+        }
+    }
+
     private sealed record RegionRow(string RegionKato, string NameRu, string? NameKz, string Capital, double? Lat, double? Lon, int? PopulationThousands);
 }

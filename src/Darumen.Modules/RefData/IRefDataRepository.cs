@@ -8,4 +8,6 @@ public interface IRefDataRepository
     Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, string? profileCode, int limit, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<SeasonalityDto>> SeasonalityAsync(CancellationToken cancellationToken);
 }

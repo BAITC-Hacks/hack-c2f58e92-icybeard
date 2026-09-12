@@ -1,7 +1,7 @@
 import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, Batch, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
-  Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region,
+  Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, Stream, WorklistItem,
 } from './types'
 
@@ -46,6 +46,7 @@ export const journal = {
 
 export const refdata = {
   regions: () => api<{ items: Region[] }>('/api/v1/refdata/regions'),
+  seasonality: () => api<{ items: Seasonality[] }>('/api/v1/refdata/seasonality'),
   organizations: (regionKato?: string, q?: string, profileCode?: string, limit = 200) =>
     api<{ items: OrganizationItem[] }>('/api/v1/refdata/organizations', { query: { regionKato, q, profileCode, limit } }),
   profiles: () => api<{ items: Profile[] }>('/api/v1/refdata/profiles'),

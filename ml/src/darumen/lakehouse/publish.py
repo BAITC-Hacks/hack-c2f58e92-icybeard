@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 import duckdb
 import pandas as pd
@@ -73,6 +74,24 @@ def streams_frame(streams: dict[str, Stream]) -> pd.DataFrame:
                          for s in streams.values()])
 
 
+def seasonality_frame() -> pd.DataFrame:
+    """Внешние сезонные формы (NHS) из refdata/external_seasonality.yaml — витрина для подписи в интерфейсе."""
+    import yaml
+
+    path = Path("refdata") / "external_seasonality.yaml"
+    if not path.exists():
+        return pd.DataFrame()
+    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    window = str(doc.get("meta", {}).get("window", ""))
+    rows = []
+    for series_id, series in doc.get("series", {}).items():
+        for month, multiplier in series["multipliers"].items():
+            rows.append({"series_id": series_id, "month": int(month), "multiplier": float(multiplier),
+                         "title": series.get("title", series_id), "source": series.get("source", ""),
+                         "source_year": int(series.get("year", 0)), "window_label": window})
+    return pd.DataFrame(rows)
+
+
 def batches_frame(lake: Lakehouse) -> pd.DataFrame:
     """Партии загрузки из манифестов lakehouse — консоль стюарда работает и без Kafka."""
     rows = []
@@ -131,6 +150,10 @@ def publish_postgres(lake: Lakehouse, dsn: str = DEFAULT_PG_DSN, streams: dict[s
             FROM read_parquet('{lake.root / 'gold' / 'queue_daily.parquet'}') q
             LEFT JOIN read_parquet('{lake.root / 'gold' / 'throughput_4w.parquet'}') t USING (day, mo_code, profile_code)
             WHERE q.day = DATE '{as_of}'""", ["mo_code", "profile_code"])
+        seasonality = seasonality_frame()
+        if len(seasonality):
+            con.register("seasonality_df", seasonality)
+            counts["refdata.seasonality"] = _replace_pg_table(con, "refdata.seasonality", "SELECT * FROM seasonality_df", ["series_id", "month"])
         streams = load_streams() if streams is None else streams
         con.register("streams_df", streams_frame(streams))
         counts["gold.streams"] = _replace_pg_table(con, "gold.streams", "SELECT * FROM streams_df", ["stream_id"])

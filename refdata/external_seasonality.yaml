@@ -1,0 +1,33 @@
+# Сезонные формы из открытых данных NHS England — внешний ориентир для месяцев,
+# которые казахстанские данные не покрывают (ИС БГ — только I квартал 2025, приёмные покои — 90 дней).
+# Правило (docs/system-structure.md §4): берём ФОРМУ сезона, не уровень; не метки обучения;
+# каждое использование в интерфейсе подписано «внешний ориентир, NHS, 2017–2019».
+#
+# Расчёт: окно 2017-01..2019-12 (до ковида), среднее по календарному месяцу,
+# нормировка на среднее = 1. Потоковые ряды (госпитализации, обращения) сначала делятся
+# на число дней месяца, лист ожидания — уровень, без нормировки на дни.
+
+meta:
+  window: "2017-01..2019-12"
+  computed: "2026-09-13"
+  note: "форма сезонности другой системы здравоохранения; уровень не переносится"
+
+series:
+  rtt_admitted_per_day:
+    title: "Плановые госпитализации (admitted RTT pathways), интенсивность в день"
+    source: "NHS England, RTT Annual Report 2019-20 timeseries (April 2007 – March 2020)"
+    url: "https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2020/11/Annual-Report-2019-20-timeseries-including-missing-data-ests-XLS-62K.xls"
+    year: 2020
+    multipliers: {1: 1.0104, 2: 1.0468, 3: 1.0264, 4: 0.9453, 5: 1.0051, 6: 1.0298, 7: 1.0178, 8: 0.9537, 9: 0.9890, 10: 1.0602, 11: 1.0776, 12: 0.8380}
+  rtt_waiting_list:
+    title: "Лист ожидания (incomplete RTT pathways), уровень на конец месяца"
+    source: "NHS England, RTT Annual Report 2019-20 timeseries (April 2007 – March 2020)"
+    url: "https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2020/11/Annual-Report-2019-20-timeseries-including-missing-data-ests-XLS-62K.xls"
+    year: 2020
+    multipliers: {1: 0.9473, 2: 0.9517, 3: 0.9722, 4: 0.9951, 5: 1.0105, 6: 1.0158, 7: 1.0164, 8: 1.0245, 9: 1.0186, 10: 1.0225, 11: 1.0109, 12: 1.0145}
+  ae_attendances_per_day:
+    title: "Обращения в приёмные отделения (A&E attendances), интенсивность в день"
+    source: "NHS England, Monthly A&E Time Series (August 2026 edition, history to 2010)"
+    url: "https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2026/09/Monthly-AE-Time-Series-August-2026-YG43sd.xls"
+    year: 2026
+    multipliers: {1: 0.9600, 2: 0.9747, 3: 0.9958, 4: 0.9982, 5: 1.0230, 6: 1.0229, 7: 1.0415, 8: 0.9663, 9: 0.9996, 10: 1.0056, 11: 1.0167, 12: 0.9957}

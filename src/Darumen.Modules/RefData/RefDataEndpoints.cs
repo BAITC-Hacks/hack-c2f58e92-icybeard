@@ -23,5 +23,9 @@ public static class RefDataEndpoints
         group.MapGet("/profiles", async (IRefDataRepository repository, CancellationToken ct) =>
                 Results.Ok(new { items = await repository.ProfilesAsync(ct) }))
             .WithName("Profiles").WithSummary("Профили коек");
+
+        group.MapGet("/seasonality", async (IRefDataRepository repository, CancellationToken ct) =>
+                Results.Ok(new { items = await repository.SeasonalityAsync(ct) }))
+            .WithName("Seasonality").WithSummary("Внешние сезонные формы (NHS, 2017–2019): множители месяцев при среднем = 1, ориентир для месяцев вне наблюдённого квартала");
     }
 }
