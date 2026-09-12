@@ -84,7 +84,9 @@ def eval_drafts(scenarios: list[dict], api: str, token: str | None) -> dict:
             api_call(api, f"/api/v1/scribe/sessions/{sid}/transcript", {"text": sc["transcript"]}, token)
             draft = api_call(api, f"/api/v1/scribe/sessions/{sid}/draft", {}, token)
             text = " ".join(s.get("text", "") for s in draft.get("sections", [])).lower()
-            missing = [kw for group in sc["expect"].values() for kw in group if kw.lower() not in text]
+            # «а|б» — любая из форм факта засчитывается (словами или цифрами)
+            missing = [kw for group in sc["expect"].values() for kw in group
+                       if not any(alt.strip().lower() in text for alt in kw.split("|"))]
             model = str(draft.get("model", "?"))  # rules@… означает фолбэк без LLM — это не оценка модели
             results.append({"id": sc["id"], "language": sc["language"], "ok": not missing, "model": model,
                             "missing": missing, "seconds": round(time.monotonic() - started, 1)})

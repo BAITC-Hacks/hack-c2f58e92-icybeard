@@ -1,0 +1,175 @@
+{
+  "scenarios": 20,
+  "drafts": {
+    "summary": {
+      "scenarios": 20,
+      "reached_model": 20,
+      "models": {
+        "ollama/darumen-qwen3.8:27b": 20
+      },
+      "clean_share": 1.0
+    },
+    "results": [
+      {
+        "id": "ru01",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 31.1
+      },
+      {
+        "id": "ru02",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 29.6
+      },
+      {
+        "id": "ru03",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 22.9
+      },
+      {
+        "id": "ru04",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 29.5
+      },
+      {
+        "id": "ru05",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 23.5
+      },
+      {
+        "id": "ru06",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 24.4
+      },
+      {
+        "id": "ru07",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 23.8
+      },
+      {
+        "id": "ru08",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 27.3
+      },
+      {
+        "id": "ru09",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 26.7
+      },
+      {
+        "id": "ru10",
+        "language": "ru",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 30.5
+      },
+      {
+        "id": "kk01",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 35.4
+      },
+      {
+        "id": "kk02",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 46.9
+      },
+      {
+        "id": "kk03",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 32.9
+      },
+      {
+        "id": "kk04",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 53.4
+      },
+      {
+        "id": "kk05",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 34.5
+      },
+      {
+        "id": "kk06",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 30.8
+      },
+      {
+        "id": "kk07",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 38.1
+      },
+      {
+        "id": "kk08",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 35.2
+      },
+      {
+        "id": "kk09",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 32.5
+      },
+      {
+        "id": "kk10",
+        "language": "kk",
+        "ok": true,
+        "model": "ollama/darumen-qwen3.8:27b",
+        "missing": [],
+        "seconds": 47.6
+      }
+    ]
+  }
+}
