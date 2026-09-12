@@ -119,8 +119,14 @@
 ### `POST /api/v1/insight/ask` (chief, regulator)
 Тело `{ "question": "Где в марте самая длинная очередь на офтальмологию?", "regionKato": null }`. Ответ: `{ "answer": "…\nИсточник: access_index", "value": 126, "unit": null, "chart": { "type": "bar | line", "title", "x": [...], "series": [ { "name", "data": [...] } ] } | null, "toolsUsed": ["access_index"], "sources": ["tool:access_index"], "model": "ollama/darumen-qwen3.8:27b" }`. Модель видит только инструменты доменов (`access_index`, `regions`, `bed_profiles`, `organizations`, `queue_state`, `predict_wait`, `anomalies`, `forecast`, `simulate`, `medicines_check`), не сырые данные. Провайдер задаётся в `Insight:Provider`: ollama по умолчанию (локальная модель через OpenAI-совместимый адрес `http://localhost:11434/v1`, ключ не нужен, для Qwen3 в промпт добавляется `/no_think`, теги `<think>` вырезаются), deepseek, openai или anthropic с ключом из `.env`. Сбой модели отдаётся как 503 «Модель недоступна». `GET /api/v1/insight/status` показывает готовность, провайдера и модель. Эталонные вопросы: [insight-questions.md](insight-questions.md), прогон `scripts/insight_eval.py`.
 
-### `POST /api/v1/insight/reports` (chief, regulator)
-Тело `{ "template": "region_monthly", "regionKato", "month", "format": "pdf | xlsx" }`. Ответ 202 `{ "reportId" }`, затем `GET /api/v1/insight/reports/{id}` → файл. Пока не реализовано: выгрузка таблиц индекса и сигналов делается из интерфейса.
+### `GET /api/v1/insight/reports?month=&profileCode=&format=pdf|xlsx` (chief, regulator)
+Отчёт «Индекс доступности за месяц»: PDF (QuestPDF, встроенный шрифт с кириллицей) или Excel (ClosedXML) из тех же витрин, что карта регионов. Ответ — файл с Content-Disposition; 404, если индекс не рассчитан. Кнопки скачивания есть на карте регионов.
+
+### `GET /api/v1/quality` (все авторизованные)
+Качество моделей одним JSON — отчёты `make train`/`make eval` из lakehouse (read-only mount): `{ "wait": { "test_time", "test_mo", "by_region": [...], "by_profile": [...], "trainedThrough" }, "forecasts": { "<stream>": { "chosen", "models", "per_series_choice", "flat_share" } }, "anomalies", "simulate" }`. Этот же источник цитируют страница /quality и строка метрик в ассистенте направления.
+
+### `GET /api/v1/refdata/seasonality` (публичный, как остальной refdata)
+Внешние сезонные формы NHS 2017–2019: `{ "items": [ { "seriesId": "rtt_waiting_list | rtt_admitted_per_day | ae_attendances_per_day", "month": 1–12, "multiplier", "title", "source", "sourceYear", "windowLabel" } ] }`. Множители при среднегодовом = 1; в интерфейсе всегда подписаны «внешний ориентир».
 
 ## Intake
 
