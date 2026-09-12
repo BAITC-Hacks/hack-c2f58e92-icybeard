@@ -20,7 +20,7 @@ class ApiException implements Exception {
 
 /// Клиент REST API. Вход через заголовки X-Actor/X-Role/X-Region (демо) или Bearer-токен Keycloak.
 class ApiClient {
-  ApiClient({required this.baseUrl, http.Client? http_, this.actor, this.role, this.region, this.locale = 'ru', this.token})
+  ApiClient({required this.baseUrl, http.Client? http_, this.actor, this.role, this.region, this.locale = 'ru', this.token, this.tokenProvider})
       : _http = http_ ?? http.Client();
 
   final String baseUrl;
@@ -31,25 +31,31 @@ class ApiClient {
   final String locale;
   final String? token;
 
-  Map<String, String> get _headers => {
+  /// Свежий Bearer-токен на каждый запрос (Keycloak с обновлением); null — режим заголовков.
+  final Future<String?> Function()? tokenProvider;
+
+  Map<String, String> _headers(String? bearer) => {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Accept-Language': locale,
-        if (token != null) 'Authorization': 'Bearer $token',
-        if (token == null && actor != null) 'X-Actor': actor!,
-        if (token == null && role != null) 'X-Role': role!,
-        if (token == null && region != null) 'X-Region': region!,
+        if (bearer != null) 'Authorization': 'Bearer $bearer',
+        if (bearer == null && actor != null) 'X-Actor': actor!,
+        if (bearer == null && role != null) 'X-Role': role!,
+        if (bearer == null && region != null) 'X-Region': region!,
       };
+
+  Future<String?> _bearer() async => token ?? await tokenProvider?.call();
 
   Uri _uri(String path, [Map<String, String?>? query]) {
     final clean = <String, String>{for (final e in (query ?? {}).entries) if (e.value != null && e.value!.isNotEmpty) e.key: e.value!};
     return Uri.parse('$baseUrl$path').replace(queryParameters: clean.isEmpty ? null : clean);
   }
 
-  Future<dynamic> get(String path, [Map<String, String?>? query]) async => _decode(await _http.get(_uri(path, query), headers: _headers));
+  Future<dynamic> get(String path, [Map<String, String?>? query]) async =>
+      _decode(await _http.get(_uri(path, query), headers: _headers(await _bearer())));
 
   Future<dynamic> post(String path, Object body, {Map<String, String>? headers}) async =>
-      _decode(await _http.post(_uri(path), headers: {..._headers, ...?headers}, body: jsonEncode(body)));
+      _decode(await _http.post(_uri(path), headers: {..._headers(await _bearer()), ...?headers}, body: jsonEncode(body)));
 
   dynamic _decode(http.Response response) {
     final text = utf8.decode(response.bodyBytes);
