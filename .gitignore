@@ -41,3 +41,6 @@ infra/cube/.cubestore/
 
 # прод-секреты деплоя
 infra/deploy/.env.prod
+
+# личные учебные материалы — не публикуются
+/learn/
