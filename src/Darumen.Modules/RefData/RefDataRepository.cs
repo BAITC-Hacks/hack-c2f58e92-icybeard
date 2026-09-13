@@ -62,5 +62,25 @@ public sealed class RefDataRepository(IDbConnectionFactory db) : IRefDataReposit
         }
     }
 
+    public async Task<IReadOnlyList<VaccinationBenchmarkDto>> VaccinationAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            var rows = await connection.QueryAsync<VaccinationBenchmarkDto>(new CommandDefinition(
+                """
+                SELECT vaccine AS Vaccine, title_ru AS TitleRu, year::int AS Year, coverage_pct AS CoveragePct,
+                       source AS Source, note AS Note
+                FROM refdata.vaccination_wuenic ORDER BY vaccine, year
+                """,
+                cancellationToken: cancellationToken));
+            return rows.ToList();
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            return []; // витрина появится после make publish
+        }
+    }
+
     private sealed record RegionRow(string RegionKato, string NameRu, string? NameKz, string Capital, double? Lat, double? Lon, int? PopulationThousands);
 }

@@ -77,8 +77,32 @@ def main(argv: list[str] | None = None) -> int:
         print(f"index    {index['rows']:,} rows over {index['months']} months | {index['latest_month']} top: "
               + ", ".join(f"{r['region_kato']} ({r['index_value']})" for r in index["latest_top"]) + " | bottom: "
               + ", ".join(f"{r['region_kato']} ({r['index_value']})" for r in index["latest_bottom"]))
+    # тест разумности против ВОЗ HFA: аннуализированный прогноз госпитализаций на 100 жителей
+    # не должен выходить за широкий коридор вокруг уровней страны (refdata/external_benchmarks.yaml)
+    sanity = {}
+    fc_path = lake.root / "gold" / "forecasts.parquet"
+    bench_path = Path("refdata") / "external_benchmarks.yaml"
+    if fc_path.exists() and bench_path.exists():
+        import yaml
+
+        bench = yaml.safe_load(bench_path.read_text(encoding="utf-8")).get("sanity", {})
+        corridor = bench.get("sanity_corridor_per_100", {}).get("value_range")
+        if corridor:
+            fc = pd.read_parquet(fc_path)
+            h1 = fc[(fc["stream_id"] == "admissions_monthly") & (fc["horizon"] == 1)]
+            regions = pd.read_parquet(lake.root / "refdata" / "regions.parquet")
+            population = float(regions["population_thousands"].sum()) * 1000
+            per100 = float(h1["yhat"].sum()) * 12 / population * 100
+            lo, hi = corridor
+            ok = lo <= per100 <= hi
+            failed |= not ok
+            sanity = {"annualized_admissions_per_100": round(per100, 1), "corridor": corridor,
+                      "kz_hfa_reference": bench.get("kz_admissions_per_100", {}).get("value_range"),
+                      "source": bench.get("kz_admissions_per_100", {}).get("source", "")}
+            print(f"sanity   annualized admissions forecast {per100:.1f} per 100 inhabitants | WHO HFA corridor {lo}–{hi} | "
+                  + ("OK" if ok else "OUT OF PLAUSIBLE RANGE"))
     write_json(models_dir(lake) / "report.json", {"wait": report, "forecast": forecasts, "anomaly": anomalies,
-                                                   "simulate": simulate, "index": index,
+                                                   "simulate": simulate, "index": index, "sanity": sanity,
                                                    "model_version": model.metadata.get("version")})
     return 1 if failed else 0
 

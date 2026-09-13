@@ -27,5 +27,9 @@ public static class RefDataEndpoints
         group.MapGet("/seasonality", async (IRefDataRepository repository, CancellationToken ct) =>
                 Results.Ok(new { items = await repository.SeasonalityAsync(ct) }))
             .WithName("Seasonality").WithSummary("Внешние сезонные формы (NHS, 2017–2019): множители месяцев при среднем = 1, ориентир для месяцев вне наблюдённого квартала");
+
+        group.MapGet("/vaccination", async (IRefDataRepository repository, CancellationToken ct) =>
+                Results.Ok(new { items = await repository.VaccinationAsync(ct) }))
+            .WithName("VaccinationBenchmarks").WithSummary("Оценки охвата вакцинацией WUENIC (ВОЗ/ЮНИСЕФ) по Казахстану: внешний ориентир для сигналов, не факт");
     }
 }

@@ -42,6 +42,8 @@ export interface Anomaly {
 }
 /** Внешняя сезонная форма (NHS): множитель месяца при среднегодовом = 1. */
 export interface Seasonality { seriesId: string; month: number; multiplier: number; title: string; source: string; sourceYear: number; windowLabel: string }
+/** Оценка охвата вакцинацией WUENIC (ВОЗ/ЮНИСЕФ) — внешний ориентир, не факт. */
+export interface VaccinationBenchmark { vaccine: string; titleRu: string; year: number; coveragePct: number; source: string; note: string }
 
 export interface IndexItem { regionKato: string; name: string; shareOver30: number; p90Days: number; indexValue: number; rank: number; n: number }
 export interface IndexResponse { month: string; profileCode: string; items: IndexItem[]; months: string[]; method: string }
@@ -81,6 +83,16 @@ export interface QualityReport {
     pinball_p50?: number; pinball_p50_baseline?: number; mae?: number; mae_baseline?: number
     median_los_days?: number; cells?: number
   } | null
+  /** Отчёт survival-модели (лог-логистическое AFT, вероятность госпитализации к дате). */
+  survival?: {
+    train_rows?: number; censored_share?: number; note?: string
+    splits?: Record<string, {
+      n: number; c_index: number; c_index_baseline: number; auc30: number; auc30_baseline: number
+      p_admit_mean?: Record<string, number>; observed_share?: Record<string, number>
+    }>
+  } | null
+  /** Отчёт дообучения детектора на разметке (или причина пропуска). */
+  anomalyLabelsModel?: { labels?: number; positives?: number; negatives?: number; skipped?: string; auc_cv?: number; auc_baseline_abs_score?: number } | null
   /** Разметка сигналов людьми (журнал подтверждений): статус → число. */
   anomalyLabels?: Record<string, number>
 }

@@ -132,6 +132,10 @@ public sealed class InMemoryRefData : IRefDataRepository
 
     public Task<IReadOnlyList<SeasonalityDto>> SeasonalityAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<SeasonalityDto>>([new("rtt_waiting_list", 9, 1.0186, "Лист ожидания", "NHS England RTT", 2020, "2017-01..2019-12")]);
+
+    public Task<IReadOnlyList<VaccinationBenchmarkDto>> VaccinationAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<VaccinationBenchmarkDto>>(
+            [new("DTP3", "АКДС, третья доза", 2024, 54.0, "WHO GHO / WUENIC", "внешний ориентир, не факт")]);
 }
 
 public sealed class InMemoryWorklist : IWorklistRepository

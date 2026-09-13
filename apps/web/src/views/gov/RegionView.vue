@@ -85,6 +85,16 @@ async function ack(id: string, comment: string) {
   }
 }
 
+async function dismiss(id: string, comment: string) {
+  try {
+    await analytics.ack(id, comment, 'dismissed')
+    anomalies.value = anomalies.value.filter((a) => a.id !== id)
+    toast.add({ severity: 'info', summary: 'Отмечен как ложный', life: 2500 })
+  } catch (e) {
+    error.value = e
+  }
+}
+
 onMounted(async () => {
   await refdata.load()
   await loadRegion()
@@ -155,7 +165,7 @@ watch(moCode, loadSeries)
     </div>
     <div class="card" style="margin-top: 16px">
       <h2>Сигналы региона <OriginTag kind="formula" /></h2>
-      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" />
+      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
     </div>
   </main>
 </template>

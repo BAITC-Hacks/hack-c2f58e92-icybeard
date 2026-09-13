@@ -7,7 +7,7 @@ import type { Anomaly } from '@/api/types'
 import { num, severityTone } from '@/lib/format'
 
 defineProps<{ items: Anomaly[]; canAck?: boolean }>()
-const emit = defineEmits<{ ack: [id: string, comment: string] }>()
+const emit = defineEmits<{ ack: [id: string, comment: string]; dismiss: [id: string, comment: string] }>()
 const comments = ref<Record<string, string>>({})
 
 function entityText(anomaly: Anomaly): string {
@@ -41,6 +41,8 @@ const streamTitles: Record<string, string> = {
       <div v-if="canAck && anomaly.status === 'open'" class="actions">
         <InputText v-model="comments[anomaly.id]" placeholder="что выяснили" size="small" style="flex: 1 1 200px" />
         <Button label="Подтвердить" size="small" icon="pi pi-check" @click="emit('ack', anomaly.id, comments[anomaly.id] ?? '')" />
+        <!-- отклонение — отрицательная метка для дообучения детектора (models/anomaly_labels) -->
+        <Button label="Ложный сигнал" size="small" icon="pi pi-times" severity="secondary" outlined @click="emit('dismiss', anomaly.id, comments[anomaly.id] ?? '')" />
       </div>
     </div>
   </div>

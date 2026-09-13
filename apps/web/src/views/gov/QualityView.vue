@@ -1,15 +1,25 @@
 <script setup lang="ts">
 import Tag from 'primevue/tag'
-import { onMounted, ref } from 'vue'
-import { analytics } from '@/api/endpoints'
-import type { QualityBreakdownRow, QualityReport } from '@/api/types'
+import { computed, onMounted, ref } from 'vue'
+import { analytics, refdata as refdataApi } from '@/api/endpoints'
+import type { QualityBreakdownRow, QualityReport, VaccinationBenchmark } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import { pct } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
 const refdata = useRefdataStore()
 const report = ref<QualityReport | null>(null)
+const vaccination = ref<VaccinationBenchmark[]>([])
 const error = ref<unknown>(null)
+
+/** Свежайший год WUENIC по ключевым вакцинам — контекст для сигналов вакцинации. */
+const wuenicLine = computed(() => {
+  const latest = (vaccine: string) => vaccination.value.filter((v) => v.vaccine === vaccine).at(-1)
+  const dtp3 = latest('DTP3')
+  const mcv1 = latest('MCV1')
+  if (!dtp3 || !mcv1) return ''
+  return `Внешний ориентир WUENIC (ВОЗ/ЮНИСЕФ, ${dtp3.year}): охват АКДС-3 ${dtp3.coveragePct.toFixed(0)} %, кори-1 ${mcv1.coveragePct.toFixed(0)} % — оценки заметно ниже административной отчётности, сигналы вакцинации стоит читать с этим контекстом.`
+})
 
 const streamTitles: Record<string, string> = {
   admissions_monthly: 'Госпитализации, помесячно',
@@ -47,6 +57,11 @@ onMounted(async () => {
     report.value = await analytics.quality()
   } catch (e) {
     error.value = e
+  }
+  try {
+    vaccination.value = (await refdataApi.vaccination()).items
+  } catch {
+    // внешний ориентир опционален: без витрины строка просто не показывается
   }
 })
 </script>
@@ -151,6 +166,12 @@ onMounted(async () => {
           </template>
           — каждое подтверждение из журнала становится меткой, на которой детектор получит измеримую точность.
         </p>
+        <p v-if="report.anomalyLabelsModel" class="muted" style="margin-top: 4px">
+          Дообучение детектора на разметке:
+          <template v-if="report.anomalyLabelsModel.skipped">{{ report.anomalyLabelsModel.skipped }} — кнопки «Подтвердить» и «Ложный сигнал» копят метки.</template>
+          <template v-else>CV-AUC {{ report.anomalyLabelsModel.auc_cv }} против {{ report.anomalyLabelsModel.auc_baseline_abs_score }} у ранжирования по силе.</template>
+        </p>
+        <p v-if="wuenicLine" class="muted" style="margin-top: 4px">{{ wuenicLine }}</p>
       </div>
       <div class="card" v-if="report.simulate">
         <h2>Симулятор</h2>
@@ -165,6 +186,27 @@ onMounted(async () => {
           </div>
         </div>
         <p class="muted" style="margin-top: 8px">Сценарии корректно сравнивать между собой; абсолютные дни модель занижает — это ограничение написано в карточке.</p>
+      </div>
+      <div class="card" v-if="report.survival?.splits">
+        <h2>Вероятность госпитализации к дате (survival AFT)</h2>
+        <div class="kpi">
+          <div class="item" v-if="report.survival.splits.test_time">
+            <div class="value">{{ report.survival.splits.test_time.c_index.toFixed(3) }} <span class="muted">/ {{ report.survival.splits.test_time.c_index_baseline.toFixed(3) }}</span></div>
+            <div class="label">C-index, модель / baseline (март 2025)</div>
+          </div>
+          <div class="item" v-if="report.survival.splits.test_mo">
+            <div class="value">{{ report.survival.splits.test_mo.c_index.toFixed(3) }} <span class="muted">/ {{ report.survival.splits.test_mo.c_index_baseline.toFixed(3) }}</span></div>
+            <div class="label">C-index на организациях вне обучения</div>
+          </div>
+          <div class="item" v-if="report.survival.splits.test_time?.p_admit_mean?.['30'] !== undefined">
+            <div class="value">{{ pct(report.survival.splits.test_time.p_admit_mean?.['30'] ?? 0) }} <span class="muted">/ {{ pct(report.survival.splits.test_time.observed_share?.['30'] ?? 0) }}</span></div>
+            <div class="label">P(госпитализация ≤ 30 дн.): предсказано / факт</div>
+          </div>
+        </div>
+        <p class="muted" style="margin-top: 8px">
+          Лог-логистическое AFT с честным цензурированием: отказы и открытые направления не выбрасываются,
+          поэтому вероятность безусловная — с учётом риска не попасть вовсе. {{ report.survival.note }}.
+        </p>
       </div>
       <div class="card" v-if="report.los">
         <h2>Длительность лечения (LOS, LightGBM)</h2>

@@ -7,12 +7,14 @@ from pathlib import Path
 
 from ..intake.pipeline import Lakehouse
 from .anomaly import detect_all
+from .anomaly_labels import train_anomaly_labels
 from .cards import write_cards
 from .common import load_features, mlflow_log, models_dir
 from .forecast import forecast_all
 from .index import build_index, method_note
 from .los import train_los
 from .simulate import counterfactual_q1
+from .survival import train_survival
 from .wait import model_card, train_wait
 
 CARDS_DIR = Path(__file__).resolve().parents[4] / "docs" / "model-cards"
@@ -21,7 +23,8 @@ CARDS_DIR = Path(__file__).resolve().parents[4] / "docs" / "model-cards"
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="darumen.models.train")
     parser.add_argument("--lakehouse", default="lakehouse")
-    parser.add_argument("--only", default="wait,forecast,anomaly,simulate,index,los", help="через запятую: wait, forecast, anomaly, simulate, index, los")
+    parser.add_argument("--only", default="wait,forecast,anomaly,simulate,index,los,survival,anomaly_labels",
+                        help="через запятую: wait, forecast, anomaly, simulate, index, los, survival, anomaly_labels")
     parser.add_argument("--cards", default=str(CARDS_DIR))
     parser.add_argument("--streams", default="", help="через запятую: только эти потоки для forecast и anomaly")
     args = parser.parse_args(argv)
@@ -87,6 +90,23 @@ def main(argv: list[str] | None = None) -> int:
         mlflow_log("los", {"train_rows": report["train_rows"]},
                    {k: v for k, v in report.items() if isinstance(v, (int, float))},
                    [lake.root / "models" / "los" / "report.json"])
+    if "survival" in args.only:
+        report = train_survival(lake, models_dir(lake) / "survival")
+        for split, m in report["splits"].items():
+            print(f"survival {split:10s} n={m['n']:>7,} c-index {m['c_index']:.3f} (base {m['c_index_baseline']:.3f}) "
+                  f"auc30 {m['auc30']:.3f} (base {m['auc30_baseline']:.3f}) "
+                  f"P(госп.≤30) {m['p_admit_mean']['30']:.2f} факт {m['observed_share']['30']:.2f}")
+        mlflow_log("survival", {"train_rows": report["train_rows"]},
+                   {f"{s}_{k}": v for s, m in report["splits"].items() for k, v in m.items()
+                    if isinstance(v, (int, float))},
+                   [lake.root / "models" / "survival" / "report.json"])
+    if "anomaly_labels" in args.only.split(","):
+        report = train_anomaly_labels(lake, models_dir(lake) / "anomaly_labels")
+        if report.get("skipped"):
+            print(f"anomaly_labels skipped: {report['skipped']}")
+        else:
+            print(f"anomaly_labels n={report['labels']} (+{report['positives']}/−{report['negatives']}) "
+                  f"CV-AUC {report['auc_cv']:.3f} (baseline |score| {report['auc_baseline_abs_score']:.3f})")
     if "index" in args.only:
         index = build_index(lake)
         note = Path(args.cards).parent / "access-index.md"

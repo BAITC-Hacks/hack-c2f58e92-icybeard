@@ -10,4 +10,7 @@ public interface IRefDataRepository
     Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken);
 
     Task<IReadOnlyList<SeasonalityDto>> SeasonalityAsync(CancellationToken cancellationToken);
+
+    /// <summary>Оценки охвата WUENIC; пусто, пока витрина не опубликована.</summary>
+    Task<IReadOnlyList<VaccinationBenchmarkDto>> VaccinationAsync(CancellationToken cancellationToken);
 }

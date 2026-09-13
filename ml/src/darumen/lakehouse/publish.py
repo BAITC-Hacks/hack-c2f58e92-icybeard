@@ -93,6 +93,23 @@ def seasonality_frame() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def vaccination_frame() -> pd.DataFrame:
+    """Оценки охвата WUENIC (ВОЗ/ЮНИСЕФ) из refdata/external_vaccination.yaml — внешний ориентир."""
+    import yaml
+
+    path = Path("refdata") / "external_vaccination.yaml"
+    if not path.exists():
+        return pd.DataFrame()
+    doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    rows = []
+    for series in doc.get("series", []):
+        for year, coverage in series.get("coverage_pct", {}).items():
+            rows.append({"vaccine": series["vaccine"], "title_ru": series.get("title_ru", series["vaccine"]),
+                         "year": int(year), "coverage_pct": float(coverage),
+                         "source": doc.get("source", ""), "note": doc.get("note", "")})
+    return pd.DataFrame(rows)
+
+
 def batches_frame(lake: Lakehouse) -> pd.DataFrame:
     """Партии загрузки из манифестов lakehouse — консоль стюарда работает и без Kafka."""
     rows = []
@@ -155,6 +172,10 @@ def publish_postgres(lake: Lakehouse, dsn: str = DEFAULT_PG_DSN, streams: dict[s
         if len(seasonality):
             con.register("seasonality_df", seasonality)
             counts["refdata.seasonality"] = _replace_pg_table(con, "refdata.seasonality", "SELECT * FROM seasonality_df", ["series_id", "month"])
+        vaccination = vaccination_frame()
+        if len(vaccination):
+            con.register("vaccination_df", vaccination)
+            counts["refdata.vaccination_wuenic"] = _replace_pg_table(con, "refdata.vaccination_wuenic", "SELECT * FROM vaccination_df", ["vaccine", "year"])
         streams = load_streams() if streams is None else streams
         con.register("streams_df", streams_frame(streams))
         counts["gold.streams"] = _replace_pg_table(con, "gold.streams", "SELECT * FROM streams_df", ["stream_id"])
