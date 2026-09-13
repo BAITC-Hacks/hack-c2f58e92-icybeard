@@ -16,4 +16,7 @@ public interface IAnalyticsRepository
     Task<IReadOnlyList<string>> IndexMonthsAsync(CancellationToken cancellationToken);
 
     Task<IReadOnlyList<IndexItemDto>> IndexAsync(string month, string profileCode, string lang, CancellationToken cancellationToken);
+
+    /// <summary>Разметка сигналов людьми: сколько подтверждено/закрыто. Метки для будущей точности детектора.</summary>
+    Task<IReadOnlyDictionary<string, int>> AnomalyAckStatsAsync(CancellationToken cancellationToken);
 }

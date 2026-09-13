@@ -16,7 +16,13 @@ const streamTitles: Record<string, string> = {
   er_visits_daily: 'Приёмные покои, по дням',
   rx_weekly: 'Рецепты, по неделям',
   vac_monthly: 'Вакцинация, помесячно',
+  onco_monthly: 'Онкология: впервые выявленные, помесячно',
   lab_estimate_monthly: 'Лаборатории (оценка), помесячно',
+}
+
+/** Всего сигналов, размеченных людьми (подтверждено + закрыто и т.д.). */
+function labelledTotal(labels?: Record<string, number>): number {
+  return Object.values(labels ?? {}).reduce((s, n) => s + n, 0)
 }
 
 /** Модель хуже baseline в этом срезе — подсветка проблемного места. */
@@ -137,7 +143,14 @@ onMounted(async () => {
           <span>{{ streamTitles[id] ?? id }}</span>
           <span class="contribution">{{ a.alerts ?? '—' }} сигн. · полнота {{ a.recall_at_threshold !== undefined ? pct(a.recall_at_threshold) : '—' }}</span>
         </div>
-        <p class="muted" style="margin-top: 8px">Проверка на подсаженных всплесках ×3; размеченных реальных инцидентов пока нет, точность появится с подтверждениями.</p>
+        <p class="muted" style="margin-top: 8px">Проверка на подсаженных всплесках ×3.</p>
+        <p class="muted" style="margin-top: 4px">
+          Разметка людьми: {{ labelledTotal(report.anomalyLabels) }} сигналов
+          <template v-if="labelledTotal(report.anomalyLabels) > 0">
+            ({{ Object.entries(report.anomalyLabels ?? {}).map(([s, n]) => `${s}: ${n}`).join(' · ') }})
+          </template>
+          — каждое подтверждение из журнала становится меткой, на которой детектор получит измеримую точность.
+        </p>
       </div>
       <div class="card" v-if="report.simulate">
         <h2>Симулятор</h2>

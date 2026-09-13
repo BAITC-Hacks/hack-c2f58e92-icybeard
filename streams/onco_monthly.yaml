@@ -1,0 +1,12 @@
+stream: onco_monthly
+title: Впервые выявленные ЗН по локализациям, по месяцам (ЭРОБ)
+from: silver.onco_ext
+gold: { table: onco_monthly, time: month, y: new_cases }
+entity: [localization]
+time: { column: month, grain: month }
+measure: { agg: sum }
+peer_group: []
+# Реестр накопительный: честная помесячная интенсивность только с 2024-09 (см. build_onco_monthly),
+# поэтому истории ~20 месяцев: бэктест короткий, сезон 12 присутствует один раз — прогноз ориентировочный.
+forecast: { horizons: [1, 2, 3], min_history: 14, season: 12, backtest_windows: 2, backtest_step: 3 }
+anomaly: { method: robust_z, window: 12, threshold: 4.0 }

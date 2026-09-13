@@ -63,7 +63,7 @@ public static class AnalyticsEndpoints
             .WithName("AcknowledgeAnomaly").WithSummary("Подтвердить или закрыть сигнал")
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
 
-        api.MapGet("/quality", (QualityService quality) => quality.Report())
+        api.MapGet("/quality", async (QualityService quality, CancellationToken ct) => await quality.ReportAsync(ct))
             .RequireAuthorization(Policies.Authenticated)
             .WithTags("Quality").WithName("ModelQuality")
             .WithSummary("Качество моделей: отчёты обучения против baseline, разбор по регионам и профилям, доля плоских прогнозов");

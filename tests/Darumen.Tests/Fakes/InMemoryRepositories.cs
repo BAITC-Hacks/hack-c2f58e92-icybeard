@@ -72,6 +72,10 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
             new("62", lang == Locale.Kk ? "Павлодар облысы" : "Павлодарская область", 0.05, 12, 95.2, 1, 900),
             new("75", lang == Locale.Kk ? "Алматы қаласы" : "город Алматы", 0.6, 126, 2.4, 20, 5000),
         ]);
+
+    public Task<IReadOnlyDictionary<string, int>> AnomalyAckStatsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<string, int>>(
+            _acks.Values.GroupBy(a => a.Status).ToDictionary(g => g.Key, g => g.Count()));
 }
 
 public sealed class InMemoryDecisions : IDecisionRepository

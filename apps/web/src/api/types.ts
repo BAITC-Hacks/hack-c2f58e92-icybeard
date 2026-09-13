@@ -71,6 +71,8 @@ export interface QualityReport {
   forecasts: Record<string, QualityForecast>
   anomalies: Record<string, { alerts?: number; precision_at_k?: number; recall_at_threshold?: number }>
   simulate: { saved_share?: number; saved_share_band?: number[]; consistency_spearman?: number; horizon_days?: number } | null
+  /** Разметка сигналов людьми (журнал подтверждений): статус → число. */
+  anomalyLabels?: Record<string, number>
 }
 
 export interface SimulateResponse {

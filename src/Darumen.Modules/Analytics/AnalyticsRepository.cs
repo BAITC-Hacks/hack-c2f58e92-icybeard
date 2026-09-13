@@ -125,6 +125,15 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
         return rows.Select(r => new IndexItemDto(r.RegionKato, lang == Locale.Kk ? r.NameKz : r.NameRu, r.ShareOver30, r.P90Days, r.IndexValue, (int)r.Rank, r.N)).ToList();
     }
 
+    public async Task<IReadOnlyDictionary<string, int>> AnomalyAckStatsAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var rows = await connection.QueryAsync<(string Status, int N)>(new CommandDefinition(
+            "SELECT status AS Status, count(*)::int AS N FROM journal.anomaly_acks GROUP BY status",
+            cancellationToken: cancellationToken));
+        return rows.ToDictionary(r => r.Status, r => r.N);
+    }
+
     private sealed record StreamRow(string StreamId, string Title, string Grain, string EntityKeys, string Horizons);
 
     private sealed record AnomalyRow(

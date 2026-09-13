@@ -16,7 +16,7 @@ public sealed class AnalyticsModule : IDarumenModule
         services.AddScoped<IAnalyticsRepository, AnalyticsRepository>();
         services.AddScoped<ForecastService>();
         services.Configure<QualityOptions>(configuration.GetSection(QualityOptions.Section));
-        services.AddSingleton<QualityService>();
+        services.AddScoped<QualityService>(); // scoped: тянет репозиторий для меток сигналов
     }
 
     public void MapEndpoints(IEndpointRouteBuilder api) => AnalyticsEndpoints.Map(api);

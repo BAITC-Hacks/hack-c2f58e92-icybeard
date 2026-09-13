@@ -295,12 +295,36 @@ def build_drug_programs(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Pa
         FROM {lake.silver_sql('drug_specs')} GROUP BY ALL ORDER BY 1, 2, 3""")
 
 
+def build_onco_monthly(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Path) -> int:
+    """Впервые выявленные ЗН по месяцам и локализациям из расширенного реестра ЭРОБ.
+    Реестр накопительный: полная помесячная интенсивность только с сентября 2024, более ранние
+    месяцы содержат лишь пациентов, оставшихся на учёте, поэтому ряд начинается с 2024-09."""
+    if not _has_silver(lake, "onco_ext"):
+        return 0
+    top = "'C50','C34','C44','C16','C18','C53','C61','C64'"  # локализации с достаточным месячным объёмом
+    base = f"""
+        SELECT date_trunc('month', diagnosis_date)::DATE AS month,
+               substr(diagnosis_code_canon, 1, 3) AS icd3
+        FROM {lake.silver_sql('onco_ext')}
+        WHERE diagnosis_date >= DATE '2024-09-01' AND diagnosis_code_canon LIKE 'C%'"""
+    return _write(con, out, "onco_monthly", f"""
+        WITH base AS ({base}),
+        grouped AS (
+            SELECT month, CASE WHEN icd3 IN ({top}) THEN icd3 ELSE 'OTH' END AS localization, count(*) AS new_cases
+            FROM base GROUP BY ALL)
+        SELECT month, localization, new_cases FROM grouped
+        UNION ALL
+        SELECT month, 'ALL' AS localization, sum(new_cases) AS new_cases FROM grouped GROUP BY month
+        ORDER BY month, localization""")
+
+
 BUILDERS: dict[str, Callable[[duckdb.DuckDBPyConnection, Lakehouse, Path], int]] = {
     "queue_daily": build_queue_daily,
     "throughput_4w": build_throughput_4w,
     "er_visits_daily": build_er_visits_daily,
     "admissions_monthly": build_admissions_monthly,
     "vac_monthly": build_vac_monthly,
+    "onco_monthly": build_onco_monthly,
     "features_wait": build_features_wait,
     "rx_weekly": build_rx_weekly,
     "rx_nosology_monthly": build_rx_nosology_monthly,

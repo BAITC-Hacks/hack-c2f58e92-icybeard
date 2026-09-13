@@ -12,10 +12,11 @@ public sealed class QualityOptions
 
 /// <summary>Качество моделей: отчёты make train / make eval из lakehouse/models как единый JSON.
 /// Ничего не пересчитывает — отдаёт то, что зафиксировано обучением, чтобы страница качества
-/// и презентация цитировали один и тот же источник.</summary>
-public sealed class QualityService(IOptions<QualityOptions> options)
+/// и презентация цитировали один и тот же источник. Плюс живая разметка сигналов из журнала:
+/// каждое подтверждение человеком — метка для будущей точности детектора.</summary>
+public sealed class QualityService(IOptions<QualityOptions> options, IAnalyticsRepository analytics)
 {
-    public IResult Report()
+    public async Task<IResult> ReportAsync(CancellationToken ct)
     {
         var root = Path.Combine(options.Value.LakehouseDir, "models");
         if (!Directory.Exists(root))
@@ -32,12 +33,26 @@ public sealed class QualityService(IOptions<QualityOptions> options)
             wait["trainRows"] = waitMeta["train_rows"]?.DeepClone();
         }
 
+        var labels = new JsonObject();
+        try
+        {
+            foreach (var (status, n) in await analytics.AnomalyAckStatsAsync(ct))
+            {
+                labels[status] = n;
+            }
+        }
+        catch (Exception)
+        {
+            // без Postgres страница качества всё равно показывает отчёты обучения
+        }
+
         var response = new JsonObject
         {
             ["wait"] = wait,
             ["forecasts"] = ReadPerStream(Path.Combine(root, "forecast")),
             ["anomalies"] = ReadPerStream(Path.Combine(root, "anomaly")),
             ["simulate"] = ReadJson(Path.Combine(root, "simulate", "counterfactual_q1.json")),
+            ["anomalyLabels"] = labels,
         };
         return Results.Json(response);
     }

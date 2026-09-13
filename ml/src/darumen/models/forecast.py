@@ -26,6 +26,52 @@ def _models(season: int):
     return [SeasonalNaive(season_length=season), AutoETS(season_length=season)], "SeasonalNaive"
 
 
+GLOBAL_LGBM = "GlobalLGBM"
+
+
+def _lgbm_features(df: pd.DataFrame, season: int) -> pd.DataFrame:
+    """Лаги + календарь + id ряда для глобальной модели. NaN в лагах LightGBM переваривает сам."""
+    lags = sorted({1, 2, 3, season} - {0})
+    out = df.sort_values(["unique_id", "ds"]).copy()
+    for lag in lags:
+        out[f"lag{lag}"] = out.groupby("unique_id")["y"].shift(lag)
+    out["month"] = out["ds"].dt.month
+    out["dow"] = out["ds"].dt.dayofweek
+    out["uid"] = out["unique_id"].astype("category")
+    return out
+
+
+def _global_lgbm(series: pd.DataFrame, cutoffs: list, h: int, season: int, freq: str) -> pd.DataFrame:
+    """Одна LightGBM на все ряды потока: обучение на истории до cutoff, рекурсивный прогноз h шагов.
+    Возвращает строки (unique_id, ds, cutoff, yhat); cutoff=NaT — финальный прогноз от конца истории."""
+    import lightgbm as lgb
+
+    lags = sorted({1, 2, 3, season} - {0})
+    features = [f"lag{lag}" for lag in lags] + ["month", "dow", "uid"]
+    rows = []
+    for cutoff in [*cutoffs, pd.NaT]:
+        train = series if pd.isna(cutoff) else series[series["ds"] <= cutoff]
+        feats = _lgbm_features(train, season).dropna(subset=[f"lag{max(lags)}"])
+        if len(feats) < 50:
+            continue
+        model = lgb.train({"objective": "l2", "verbosity": -1, "num_leaves": 31, "learning_rate": 0.1},
+                          lgb.Dataset(feats[features], feats["y"], categorical_feature=["uid"]), num_boost_round=200)
+        history = train.copy()
+        for _ in range(h):
+            nxt = history.groupby("unique_id")["ds"].max().reset_index()
+            nxt["ds"] = nxt["ds"] + pd.tseries.frequencies.to_offset(freq)
+            step = pd.concat([history, nxt.assign(y=np.nan)], ignore_index=True)
+            step_feats = _lgbm_features(step, season)
+            mask = step_feats["y"].isna()
+            preds = model.predict(step_feats.loc[mask, features])
+            predicted = step_feats.loc[mask, ["unique_id", "ds"]].assign(y=np.clip(preds, 0, None), cutoff=cutoff)
+            rows.append(predicted)
+            history = pd.concat([history, predicted[["unique_id", "ds", "y"]]], ignore_index=True)
+    if not rows:
+        return pd.DataFrame(columns=["unique_id", "ds", "cutoff", GLOBAL_LGBM])
+    return pd.concat(rows, ignore_index=True).rename(columns={"y": GLOBAL_LGBM})
+
+
 def _with_ensemble(frame: pd.DataFrame, names: list[str], level: int | None = None) -> pd.DataFrame:
     """Add the Ensemble column (mean of the candidates) to a cv/forecast frame, intervals included."""
     frame = frame.copy()
@@ -57,7 +103,7 @@ def seasonal_scale(train: pd.DataFrame, season: int) -> pd.Series:
     return train.groupby("unique_id").apply(_scale, include_groups=False)
 
 
-def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict, dict[str, str]]:
+def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict, dict[str, str], pd.DataFrame]:
     from statsforecast import StatsForecast
 
     cfg = stream.forecast
@@ -73,6 +119,18 @@ def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict, 
     names = [m.__class__.__name__ for m in models]
     cv = _with_ensemble(cv, names)
     names = [*names, ENSEMBLE]
+    # третий кандидат: глобальная LightGBM по лагам (одна модель на все ряды потока)
+    global_all = _global_lgbm(series[["unique_id", "ds", "y"]], list(cv["cutoff"].unique()), h, season, stream.freq)
+    global_final = global_all[global_all["cutoff"].isna()].drop(columns=["cutoff"])
+    global_bt = global_all[global_all["cutoff"].notna()]
+    if len(global_bt):
+        cv = cv.merge(global_bt[["unique_id", "ds", "cutoff", GLOBAL_LGBM]], on=["unique_id", "ds", "cutoff"], how="left")
+        if cv[GLOBAL_LGBM].notna().mean() > 0.99:
+            cv[GLOBAL_LGBM] = cv[GLOBAL_LGBM].fillna(cv[baseline])
+            names = [*names, GLOBAL_LGBM]
+        else:
+            cv = cv.drop(columns=[GLOBAL_LGBM])  # прогнозы не совпали по датам — кандидат не участвует
+            global_final = global_final.iloc[0:0]
     per_model = {}
     for name in names:
         rows = []
@@ -103,7 +161,7 @@ def backtest(series: pd.DataFrame, stream: Stream) -> tuple[pd.DataFrame, dict, 
     report = {"stream": stream.stream_id, "series": int(series["unique_id"].nunique()), "horizon": h, "season": season,
               "windows": int(cfg.get("backtest_windows", 3)), "baseline": baseline, "chosen": best, "models": per_model,
               "per_series_choice": choice_counts}
-    return cv, report, per_series
+    return cv, report, per_series, global_final
 
 
 def forecast_stream(lake: Lakehouse, stream: Stream, out_dir: Path) -> tuple[pd.DataFrame, dict]:
@@ -112,7 +170,7 @@ def forecast_stream(lake: Lakehouse, stream: Stream, out_dir: Path) -> tuple[pd.
     series = load_series(lake, stream)
     if series.empty:
         return pd.DataFrame(), {"stream": stream.stream_id, "series": 0, "skipped": "no gold table or too little history"}
-    cv, report, per_series = backtest(series, stream)
+    cv, report, per_series, global_final = backtest(series, stream)
     cfg = stream.forecast
     season = int(cfg.get("season", 1))
     h = int(max(cfg.get("horizons", [1])))
@@ -123,16 +181,27 @@ def forecast_stream(lake: Lakehouse, stream: Stream, out_dir: Path) -> tuple[pd.
     fc = fc.reset_index() if "unique_id" not in fc.columns else fc
     fc = _with_ensemble(fc, names, LEVEL)
     stream_best = report["chosen"]
+    candidates = [*names, ENSEMBLE]
+    if GLOBAL_LGBM in report["models"] and len(global_final):
+        fc = fc.merge(global_final.rename(columns={GLOBAL_LGBM: GLOBAL_LGBM}), on=["unique_id", "ds"], how="left")
+        fc[GLOBAL_LGBM] = fc[GLOBAL_LGBM].fillna(fc[names[0]])
+        # интервал 80 % из остатков бэктеста глобальной модели по каждому ряду
+        resid = (cv["y"] - cv[GLOBAL_LGBM]).abs().groupby(cv["unique_id"]).quantile(0.8)
+        band = fc["unique_id"].map(resid).fillna(0.0)
+        fc[f"{GLOBAL_LGBM}-lo-{LEVEL}"] = fc[GLOBAL_LGBM] - band
+        fc[f"{GLOBAL_LGBM}-hi-{LEVEL}"] = fc[GLOBAL_LGBM] + band
+        candidates = [*candidates, GLOBAL_LGBM]
     entities = series.drop_duplicates("unique_id").set_index("unique_id")[list(stream.entity)]
     fc = fc.join(entities, on="unique_id")
     fc["horizon"] = fc.groupby("unique_id").cumcount() + 1
     # каждому ряду — его победитель бэктеста; ряды без бэктеста получают лучшую модель потока
     fc["chosen"] = fc["unique_id"].map(per_series).fillna(stream_best)
+    fc["chosen"] = fc["chosen"].where(fc["chosen"].isin(candidates), names[0])  # кандидат выпал из финала — берём baseline
     idx = np.arange(len(fc))
     def _pick(suffix: str) -> np.ndarray:
-        cols = {n: (f"{n}{suffix}" if f"{n}{suffix}" in fc else n) for n in [*names, ENSEMBLE]}
-        stacked = np.column_stack([fc[cols[n]].to_numpy(dtype=float) for n in [*names, ENSEMBLE]])
-        order = {n: i for i, n in enumerate([*names, ENSEMBLE])}
+        cols = {n: (f"{n}{suffix}" if f"{n}{suffix}" in fc else n) for n in candidates}
+        stacked = np.column_stack([fc[cols[n]].to_numpy(dtype=float) for n in candidates])
+        order = {n: i for i, n in enumerate(candidates)}
         return stacked[idx, fc["chosen"].map(order).to_numpy()]
     yhat = _pick("")
     lo = _pick(f"-lo-{LEVEL}")
