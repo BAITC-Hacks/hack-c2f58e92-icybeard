@@ -1017,7 +1017,7 @@ body.editing [contenteditable="true"] { outline: 1px dashed var(--teal); outline
             <div class="lrow">
                 <span class="no">03</span>
                 <span class="lbl"><span class="L ru">ML · Потоки</span><span class="L kz">ML · Ағындар</span></span>
-                <span class="txt"><b>AutoETS</b>, <span class="L ru">1 627 рядов госпитализаций + приёмные покои, скользящий бэктест</span><span class="L kz">1 627 қатар + қабылдау бөлімдері, жылжымалы бэктест</span></span>
+                <span class="txt"><span class="L ru"><b>4 кандидата на каждый ряд</b> — наив, AutoETS, ансамбль, глобальный LightGBM; победитель по бэктесту ряда</span><span class="L kz"><b>Әр қатарға 4 үміткер</b> — наив, AutoETS, ансамбль, жаһандық LightGBM; жеңімпаз қатар бэктесті бойынша</span></span>
                 <span class="metric">MASE 0.78 <span class="L ru">против</span><span class="L kz">қарсы</span> 1.05<small><span class="L ru">лучше наива на 74 % рядов</span><span class="L kz">қатарлардың 74 %-ында наивтен жақсы</span></small></span>
             </div>
             <div class="lrow">
@@ -1031,6 +1031,12 @@ body.editing [contenteditable="true"] { outline: 1px dashed var(--teal); outline
                 <span class="lbl"><span class="L ru">Модель · Симулятор</span><span class="L kz">Модель · Симулятор</span></span>
                 <span class="txt"><span class="L ru"><b>Жидкостная модель очереди</b> k·L/μ с калибровкой по факту, жадный перенос</span><span class="L kz">Фактімен калибрленген <b>сұйықтық кезек моделі</b> k·L/μ</span></span>
                 <span class="metric"><span class="L ru">Спирмен</span><span class="L kz">Спирмен</span> 0.61<small><span class="L ru">порядок организаций воспроизводится; 4 255 пар</span><span class="L kz">ұйымдар реті қайталанады; 4 255 жұп</span></small></span>
+            </div>
+            <div class="lrow">
+                <span class="no">06</span>
+                <span class="lbl"><span class="L ru">ML · Стационар</span><span class="L kz">ML · Стационар</span></span>
+                <span class="txt"><span class="L ru"><b>Длительность лечения</b> (койка → пропускная способность) и survival-модель: вероятность госпитализации к дате, отказы честно цензурируются</span><span class="L kz"><b>Емдеу ұзақтығы</b> (төсек → өткізу қабілеті) және survival-модель: күнге дейін жатқызу ықтималдығы</span></span>
+                <span class="metric">0.92 <span class="L ru">против</span><span class="L kz">қарсы</span> 1.17<small><span class="L ru">пинбол p50 LOS · survival C-index 0.744 против 0.668 на новых организациях</span><span class="L kz">LOS пинбол p50 · жаңа ұйымдарда survival C-index 0.744 қарсы 0.668</span></small></span>
             </div>
         </div>
         <div class="banner line reveal" style="margin-top: 26px;">
@@ -1108,8 +1114,8 @@ body.editing [contenteditable="true"] { outline: 1px dashed var(--teal); outline
             </div>
         </div>
         <div class="banner reveal" style="margin-top: 32px;">
-            <span class="L ru"><b>Честный вердикт:</b> модели точнее простого правила на 15–20 % и откалиброваны на отложенном месяце. Этого достаточно для ранжирования и маршрутизации — и мы прямо говорим, что срок «с точностью до дня» пока обещать нельзя: у нас один сезон данных.</span>
-            <span class="L kz"><b>Адал қорытынды:</b> модельдер қарапайым ережеден 15–20 % дәлірек және калибрленген. Бұл саралау мен бағыттауға жеткілікті — бірақ «күніне дейін дәл» мерзімді әзірге уәде ете алмаймыз: бізде бір маусым дерек қана бар.</span>
+            <span class="L ru"><b>Честный вердикт:</b> модели точнее простого правила на 15–20 % и откалиброваны на отложенном месяце. Этого достаточно для ранжирования и маршрутизации — и мы прямо говорим, что срок «с точностью до дня» пока обещать нельзя: у нас один сезон данных. Плюс тест разумности: годовой прогноз госпитализаций сверяется с уровнями ВОЗ на 100 жителей.</span>
+            <span class="L kz"><b>Адал қорытынды:</b> модельдер қарапайым ережеден 15–20 % дәлірек және калибрленген. Бұл саралау мен бағыттауға жеткілікті — бірақ «күніне дейін дәл» мерзімді әзірге уәде ете алмаймыз: бізде бір маусым дерек қана бар. Оған қоса ақылға қонымдылық тесті: жылдық болжам ДДҰ деңгейлерімен салыстырылады.</span>
         </div>
     </div>
     <footer class="foot"><span><span class="L ru">Валидация</span><span class="L kz">Валидация</span></span><span>10 / 15</span></footer>
@@ -1213,7 +1219,7 @@ body.editing [contenteditable="true"] { outline: 1px dashed var(--teal); outline
         <h2 class="reveal"><span class="L ru">Требования закрыты <b>проверяемо</b></span><span class="L kz">Талаптар <b>тексерілетіндей</b> жабылған</span></h2>
         <div class="checks stagger" style="margin-top: 36px;">
             <div class="check"><div class="w"><b><span class="L ru">Реальные данные кейса</span><span class="L kz">Кейстің нақты деректері</span></b><small><span class="L ru">15 наборов МЗ РК с ashyq.data.gov.kz, 1 406 организаций, 20 регионов</span><span class="L kz">ҚР ДСМ 15 жинағы, 1 406 ұйым, 20 аймақ</span></small></div></div>
-            <div class="check"><div class="w"><b><span class="L ru">Реальный ML, не фильтры и не промпты</span><span class="L kz">Нақты ML, сүзгілер мен промпттар емес</span></b><small><span class="L ru">LightGBM, AutoETS, робастный z, модель очереди — все с метриками</span><span class="L kz">LightGBM, AutoETS, робасты z — барлығы метрикамен</span></small></div></div>
+            <div class="check"><div class="w"><b><span class="L ru">Реальный ML, не фильтры и не промпты</span><span class="L kz">Нақты ML, сүзгілер мен промпттар емес</span></b><small><span class="L ru">LightGBM, AutoETS + глобальный LightGBM, survival AFT, робастный z, модель очереди — все с метриками</span><span class="L kz">LightGBM, AutoETS + жаһандық LightGBM, survival AFT, робасты z — барлығы метрикамен</span></small></div></div>
             <div class="check"><div class="w"><b><span class="L ru">Измеримый результат</span><span class="L kz">Өлшенетін нәтиже</span></b><small><span class="L ru">дни ожидания, риск отказа, дефицит коек, место региона в индексе</span><span class="L kz">күту күндері, бас тарту қаупі, төсек тапшылығы, аймақ орны</span></small></div></div>
             <div class="check"><div class="w"><b><span class="L ru">Метрики и валидация на отложенной выборке</span><span class="L kz">Кейінге қалдырылған іріктемедегі метрикалар</span></b><small><span class="L ru">метрика ошибки — прямо под графиком прогноза на стенде</span><span class="L kz">қате метрикасы — стендтегі графиктің астында</span></small></div></div>
             <div class="check"><div class="w"><b><span class="L ru">Объяснимость выводов</span><span class="L kz">Қорытындылардың түсіндірмесі</span></b><small><span class="L ru">карточка «Почему так», формула индекса, допущения симулятора</span><span class="L kz">«Неге бұлай» карточкасы, индекс формуласы</span></small></div></div>
@@ -1253,7 +1259,7 @@ body.editing [contenteditable="true"] { outline: 1px dashed var(--teal); outline
                 <ul>
                     <li><span class="L ru"><b>13 запросов данных</b> организаторам: история 2023–2025, справочник МО, координаты, МНН, ГИС-границы</span><span class="L kz"><b>13 дерек сұранысы:</b> 2023–2025 тарихы, ұйымдар анықтамалығы, координаттар, ХПА</span></li>
                     <li><span class="L ru"><b>История пролеченных с 2012 года</b> — источник сезонности для прогноза 1–3 месяца</span><span class="L kz"><b>2012 жылдан бергі емделгендер тарихы</b> — маусымдылық көзі</span></li>
-                    <li><span class="L ru"><b>Внешние ориентиры</b> (NHS RTT, OECD, Eurostat): форма сезонности и пороги индекса — подписанный «внешний ориентир», не метки обучения</span><span class="L kz"><b>Сыртқы бағдарлар</b> (NHS, OECD, Eurostat): маусымдылық пішіні мен шектер — оқыту белгілері емес</span></li>
+                    <li><span class="L ru"><b>Внешние ориентиры</b> (NHS, CIHI, Eurostat, ВОЗ): сезонные формы из официальных файлов NHS, пороги индекса, оценки охвата вакцинацией WUENIC — подписанный «внешний ориентир», не метки обучения</span><span class="L kz"><b>Сыртқы бағдарлар</b> (NHS, CIHI, Eurostat, ДДҰ): NHS ресми файлдарынан маусымдылық, индекс шектері, WUENIC қамту бағалары — оқыту белгілері емес</span></li>
                     <li><span class="L ru">Каждое внешнее число подписано <b>источником и годом</b></span><span class="L kz">Әр сыртқы сан <b>көзі және жылымен</b> қол қойылған</span></li>
                 </ul>
             </div>
