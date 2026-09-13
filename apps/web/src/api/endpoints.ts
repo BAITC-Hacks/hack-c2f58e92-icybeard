@@ -1,7 +1,7 @@
 import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, Batch, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
-  Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
+  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, Stream, WorklistItem,
 } from './types'
 
@@ -26,6 +26,7 @@ export const analytics = {
     api<void>(`/api/v1/anomalies/${encodeURIComponent(id)}/ack`, { body: { comment, status } }),
   index: (month?: string, profileCode?: string) => api<IndexResponse>('/api/v1/index', { query: { month, profileCode } }),
   quality: () => api<QualityReport>('/api/v1/quality'),
+  los: (regionKato?: string, profileCode?: string) => api<LosResponse>('/api/v1/los', { query: { regionKato, profileCode } }),
 }
 
 export const simulation = {

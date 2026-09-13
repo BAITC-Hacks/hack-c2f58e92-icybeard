@@ -166,6 +166,27 @@ onMounted(async () => {
         </div>
         <p class="muted" style="margin-top: 8px">Сценарии корректно сравнивать между собой; абсолютные дни модель занижает — это ограничение написано в карточке.</p>
       </div>
+      <div class="card" v-if="report.los">
+        <h2>Длительность лечения (LOS, LightGBM)</h2>
+        <div class="kpi">
+          <div class="item">
+            <div class="value">{{ report.los.pinball_p50?.toFixed(2) }} <span class="muted">/ {{ report.los.pinball_p50_baseline?.toFixed(2) }}</span></div>
+            <div class="label">пинбол p50, модель / baseline ({{ gain(report.los.pinball_p50 ?? 0, report.los.pinball_p50_baseline ?? 0) }})</div>
+          </div>
+          <div class="item">
+            <div class="value">{{ report.los.mae?.toFixed(2) }} <span class="muted">/ {{ report.los.mae_baseline?.toFixed(2) }}</span></div>
+            <div class="label">MAE, дней</div>
+          </div>
+          <div class="item">
+            <div class="value">{{ report.los.cells?.toLocaleString('ru-RU') }}</div>
+            <div class="label">ячеек регион×профиль в витрине</div>
+          </div>
+        </div>
+        <p class="muted" style="margin-top: 8px">
+          Обучение на {{ report.los.train_rows?.toLocaleString('ru-RU') }} пролеченных случаях ЭРСБ, проверка по времени на {{ report.los.test_rows?.toLocaleString('ru-RU') }}.
+          Медиана длительности лечения переводит койки в пропускную способность: одна койка ≈ 1/LOS госпитализаций в день — это использует симулятор.
+        </p>
+      </div>
     </div>
   </main>
 </template>

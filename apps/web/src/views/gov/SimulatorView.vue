@@ -5,8 +5,8 @@ import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
 import Slider from 'primevue/slider'
 import { onMounted, ref } from 'vue'
-import { simulation } from '@/api/endpoints'
-import type { RedistributeResponse, SimulateResponse } from '@/api/types'
+import { analytics, simulation } from '@/api/endpoints'
+import type { LosItem, RedistributeResponse, SimulateResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
 import { days, num, signed } from '@/lib/format'
@@ -21,6 +21,7 @@ const horizon = ref(90)
 const maxShare = ref(20)
 const result = ref<SimulateResponse | null>(null)
 const moves = ref<RedistributeResponse | null>(null)
+const los = ref<LosItem | null>(null)
 const error = ref<unknown>(null)
 const busy = ref(false)
 
@@ -32,8 +33,10 @@ async function run() {
       simulation.simulate(region.value, profile.value, { capacityDeltaPct: capacity.value, redistributeSharePct: redirect.value, horizonDays: horizon.value }),
       simulation.redistribute(region.value, profile.value, { maxShareMovedPct: maxShare.value, horizonDays: horizon.value }),
     ])
+    // длительность лечения — отдельная витрина; её отсутствие не должно ломать расчёт
+    los.value = (await analytics.los(region.value, profile.value)).items[0] ?? null
   } catch (e) {
-    error.value = e
+    if (result.value === null) error.value = e
   } finally {
     busy.value = false
   }
@@ -71,6 +74,11 @@ onMounted(async () => {
           <div class="item"><div class="value">{{ signed(result.deltaDays) }}</div><div class="label">изменение, дн. (интервал {{ signed(result.ci[0] ?? 0) }} … {{ signed(result.ci[1] ?? 0) }})</div></div>
         </div>
         <ul class="muted"><li v-for="a in result.assumptions" :key="a">{{ a }}</li></ul>
+        <p class="muted" v-if="los && los.losMedianFact > 0">
+          Средняя длительность лечения в этой ячейке: {{ los.losMedianFact.toFixed(1) }} дн. (медиана факта за 12 мес,
+          {{ los.n.toLocaleString('ru-RU') }} случаев<template v-if="los.losP50Model !== null">; p50 LOS-модели {{ los.losP50Model.toFixed(1) }} дн.</template>) —
+          одна койка ≈ {{ (1 / los.losMedianFact).toFixed(2) }} госпитализации в день.
+        </p>
         <p class="muted">{{ result.model.name }} {{ result.model.version }}</p>
         <!-- значения и источники: refdata/external_benchmarks.yaml (beds) -->
         <p class="muted">

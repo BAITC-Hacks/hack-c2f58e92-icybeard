@@ -76,6 +76,13 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
     public Task<IReadOnlyDictionary<string, int>> AnomalyAckStatsAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyDictionary<string, int>>(
             _acks.Values.GroupBy(a => a.Status).ToDictionary(g => g.Key, g => g.Count()));
+
+    public Task<IReadOnlyList<LosItemDto>> LosAsync(string? regionKato, string? profileCode, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<LosItemDto>>(
+        [
+            new("75", "Кардиологические для взрослых", "031", 4200, 7.0, 6.8),
+            new("10", "Терапевтические", "021", 1800, 8.5, 8.1),
+        ]);
 }
 
 public sealed class InMemoryDecisions : IDecisionRepository

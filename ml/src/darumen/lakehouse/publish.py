@@ -35,6 +35,7 @@ PG_TABLES: dict[str, tuple[str, str, str, list[str]]] = {
     "gold.rx_nosology_monthly": ("gold/rx_nosology_monthly.parquet", "*", "", ["nosology_id", "month"]),
     "gold.drug_programs": ("gold/drug_programs.parquet", "*", "", ["nosology_id"]),
     "gold.rx_mnn": ("gold/rx_mnn.parquet", "*", "", ["nosology_id", "drug_mnn_id"]),
+    "gold.los_by_profile": ("gold/los_by_profile.parquet", "*", "", ["region_kato", "profile_code"]),
 }
 CH_TABLES: dict[str, tuple[str, str, list[str]]] = {
     "queue_daily": ("gold/queue_daily.parquet", "*", ["region_kato", "mo_code", "profile_code", "day"]),

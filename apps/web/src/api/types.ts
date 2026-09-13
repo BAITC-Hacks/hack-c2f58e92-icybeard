@@ -46,6 +46,10 @@ export interface Seasonality { seriesId: string; month: number; multiplier: numb
 export interface IndexItem { regionKato: string; name: string; shareOver30: number; p90Days: number; indexValue: number; rank: number; n: number }
 export interface IndexResponse { month: string; profileCode: string; items: IndexItem[]; months: string[]; method: string }
 
+/** Ячейка длительности лечения регион×профиль из gold.los_by_profile. */
+export interface LosItem { regionKato: string; profileName: string; profileCode: string | null; n: number; losMedianFact: number; losP50Model: number | null }
+export interface LosResponse { items: LosItem[]; method: string }
+
 /** Срез ошибки wait-модели по региону или профилю из отчёта обучения. */
 export interface QualityBreakdownRow {
   region_kato?: string; profile_code?: string; n: number
@@ -71,6 +75,12 @@ export interface QualityReport {
   forecasts: Record<string, QualityForecast>
   anomalies: Record<string, { alerts?: number; precision_at_k?: number; recall_at_threshold?: number }>
   simulate: { saved_share?: number; saved_share_band?: number[]; consistency_spearman?: number; horizon_days?: number } | null
+  /** Отчёт LOS-модели (LightGBM-квантиль p50 длительности лечения). */
+  los?: {
+    train_rows?: number; test_rows?: number; test_window?: string
+    pinball_p50?: number; pinball_p50_baseline?: number; mae?: number; mae_baseline?: number
+    median_los_days?: number; cells?: number
+  } | null
   /** Разметка сигналов людьми (журнал подтверждений): статус → число. */
   anomalyLabels?: Record<string, number>
 }

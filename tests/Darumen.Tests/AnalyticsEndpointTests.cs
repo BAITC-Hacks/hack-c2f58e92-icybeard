@@ -56,6 +56,17 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Los_returns_cells_and_method_note()
+    {
+        var body = await app.CreateClient("citizen").GetFromJsonAsync<LosResponseDto>("/api/v1/los?regionKato=75&profileCode=031");
+        Assert.NotNull(body);
+        Assert.Equal(2, body.Items.Count);
+        Assert.Equal("Кардиологические для взрослых", body.Items[0].ProfileName);
+        Assert.Equal(7.0, body.Items[0].LosMedianFact);
+        Assert.Contains("1/LOS", body.Method);
+    }
+
+    [Fact]
     public async Task Index_defaults_to_latest_month_and_validates_month()
     {
         var client = app.CreateClient();

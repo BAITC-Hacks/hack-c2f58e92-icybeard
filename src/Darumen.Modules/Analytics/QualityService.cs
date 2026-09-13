@@ -52,6 +52,7 @@ public sealed class QualityService(IOptions<QualityOptions> options, IAnalyticsR
             ["forecasts"] = ReadPerStream(Path.Combine(root, "forecast")),
             ["anomalies"] = ReadPerStream(Path.Combine(root, "anomaly")),
             ["simulate"] = ReadJson(Path.Combine(root, "simulate", "counterfactual_q1.json")),
+            ["los"] = ReadJson(Path.Combine(root, "los", "report.json")),
             ["anomalyLabels"] = labels,
         };
         return Results.Json(response);

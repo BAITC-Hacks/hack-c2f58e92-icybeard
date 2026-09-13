@@ -8,6 +8,10 @@ namespace Darumen.Modules.Analytics;
 public static class AnalyticsEndpoints
 {
     public const string AllProfiles = "all";
+    private const string LosMethod =
+        "Медиана длительности лечения по пролеченным случаям ЭРСБ за последние 12 месяцев; p50 модели — LightGBM-квантиль по профилю, региону, " +
+        "диагнозу и типу помощи. Ячейки меньше 100 случаев подавлены. Одна койка ≈ 1/LOS госпитализаций в день.";
+
     private const string IndexMethod =
         "Индекс = 100 − среднее перцентильных рангов региона по доле ожидавших дольше 30 дней и по 90-му перцентилю ожидания внутри месяца и профиля; " +
         "100 у самого доступного региона. Строки с числом госпитализаций меньше 5 подавлены.";
@@ -67,6 +71,13 @@ public static class AnalyticsEndpoints
             .RequireAuthorization(Policies.Authenticated)
             .WithTags("Quality").WithName("ModelQuality")
             .WithSummary("Качество моделей: отчёты обучения против baseline, разбор по регионам и профилям, доля плоских прогнозов");
+
+        api.MapGet("/los", async (string? regionKato, string? profileCode, IAnalyticsRepository repository, CancellationToken ct) =>
+                Results.Ok(new LosResponseDto(await repository.LosAsync(regionKato, profileCode, ct), LosMethod)))
+            .RequireAuthorization(Policies.Authenticated)
+            .WithTags("Quality").WithName("LengthOfStay")
+            .WithSummary("Длительность лечения по ячейкам регион×профиль: факт-медиана за 12 месяцев и p50 модели")
+            .Produces<LosResponseDto>();
 
         api.MapGet("/index", async (string? month, string? profileCode, HttpRequest http, IAnalyticsRepository repository, CancellationToken ct) =>
             {

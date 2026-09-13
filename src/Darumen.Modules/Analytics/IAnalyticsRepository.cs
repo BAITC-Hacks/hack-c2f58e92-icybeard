@@ -19,4 +19,7 @@ public interface IAnalyticsRepository
 
     /// <summary>Разметка сигналов людьми: сколько подтверждено/закрыто. Метки для будущей точности детектора.</summary>
     Task<IReadOnlyDictionary<string, int>> AnomalyAckStatsAsync(CancellationToken cancellationToken);
+
+    /// <summary>Длительность лечения по ячейкам регион×профиль из gold.los_by_profile; пусто, пока витрина не опубликована.</summary>
+    Task<IReadOnlyList<LosItemDto>> LosAsync(string? regionKato, string? profileCode, CancellationToken cancellationToken);
 }

@@ -24,4 +24,8 @@ public sealed record AckRequestDto(string? Comment, string? Status);
 
 public sealed record IndexItemDto(string RegionKato, string Name, double ShareOver30, double P90Days, double IndexValue, int Rank, long N);
 
+public sealed record LosItemDto(string RegionKato, string ProfileName, string? ProfileCode, long N, double LosMedianFact, double? LosP50Model);
+
+public sealed record LosResponseDto(IReadOnlyList<LosItemDto> Items, string Method);
+
 public sealed record IndexResponseDto(string Month, string ProfileCode, IReadOnlyList<IndexItemDto> Items, IReadOnlyList<string> Months, string Method);

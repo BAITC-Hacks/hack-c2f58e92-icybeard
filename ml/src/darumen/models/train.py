@@ -11,6 +11,7 @@ from .cards import write_cards
 from .common import load_features, mlflow_log, models_dir
 from .forecast import forecast_all
 from .index import build_index, method_note
+from .los import train_los
 from .simulate import counterfactual_q1
 from .wait import model_card, train_wait
 
@@ -20,7 +21,7 @@ CARDS_DIR = Path(__file__).resolve().parents[4] / "docs" / "model-cards"
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="darumen.models.train")
     parser.add_argument("--lakehouse", default="lakehouse")
-    parser.add_argument("--only", default="wait,forecast,anomaly,simulate,index", help="через запятую: wait, forecast, anomaly, simulate, index")
+    parser.add_argument("--only", default="wait,forecast,anomaly,simulate,index,los", help="через запятую: wait, forecast, anomaly, simulate, index, los")
     parser.add_argument("--cards", default=str(CARDS_DIR))
     parser.add_argument("--streams", default="", help="через запятую: только эти потоки для forecast и anomaly")
     args = parser.parse_args(argv)
@@ -78,6 +79,14 @@ def main(argv: list[str] | None = None) -> int:
     if {"forecast", "anomaly", "simulate"} & set(args.only.split(",")):
         for path in write_cards(lake, Path(args.cards)):
             print(f"card {path}")
+    if "los" in args.only:
+        report = train_los(lake, models_dir(lake) / "los")
+        print(f"los      train={report['train_rows']:,} test={report['test_rows']:,} | pinball p50 {report['pinball_p50']:.3f} "
+              f"(baseline {report['pinball_p50_baseline']:.3f}) MAE {report['mae']:.2f} (baseline {report['mae_baseline']:.2f}) | "
+              f"{report['cells']} ячеек region×profile в gold/los_by_profile")
+        mlflow_log("los", {"train_rows": report["train_rows"]},
+                   {k: v for k, v in report.items() if isinstance(v, (int, float))},
+                   [lake.root / "models" / "los" / "report.json"])
     if "index" in args.only:
         index = build_index(lake)
         note = Path(args.cards).parent / "access-index.md"

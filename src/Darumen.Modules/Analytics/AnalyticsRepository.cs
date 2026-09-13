@@ -134,6 +134,31 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
         return rows.ToDictionary(r => r.Status, r => r.N);
     }
 
+    public async Task<IReadOnlyList<LosItemDto>> LosAsync(string? regionKato, string? profileCode, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            // приведения типов в SQL: DuckDB пишет BIGINT/DOUBLE, Dapper подбирает конструктор по точным типам
+            var rows = await connection.QueryAsync<LosItemDto>(new CommandDefinition(
+                """
+                SELECT region_kato AS RegionKato, profile_name AS ProfileName, profile_code::text AS ProfileCode,
+                       n::bigint AS N, los_median_fact::float8 AS LosMedianFact, los_p50_model::float8 AS LosP50Model
+                FROM gold.los_by_profile
+                WHERE (@regionKato IS NULL OR region_kato = @regionKato)
+                  AND (@profileCode IS NULL OR profile_code = @profileCode)
+                ORDER BY n DESC
+                """,
+                new { regionKato, profileCode }, cancellationToken: cancellationToken));
+            return rows.ToList();
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            // витрина ещё не опубликована — страница живёт без блока LOS
+            return [];
+        }
+    }
+
     private sealed record StreamRow(string StreamId, string Title, string Grain, string EntityKeys, string Horizons);
 
     private sealed record AnomalyRow(
