@@ -123,13 +123,16 @@
 Отчёт «Индекс доступности за месяц»: PDF (QuestPDF, встроенный шрифт с кириллицей) или Excel (ClosedXML) из тех же витрин, что карта регионов. Ответ — файл с Content-Disposition; 404, если индекс не рассчитан. Кнопки скачивания есть на карте регионов.
 
 ### `GET /api/v1/quality` (все авторизованные)
-Качество моделей одним JSON — отчёты `make train`/`make eval` из lakehouse (read-only mount): `{ "wait": { "test_time", "test_mo", "by_region": [...], "by_profile": [...], "trainedThrough" }, "forecasts": { "<stream>": { "chosen", "models", "per_series_choice", "flat_share" } }, "anomalies", "simulate", "los", "anomalyLabels" }`. Этот же источник цитируют страница /quality и строка метрик в ассистенте направления.
+Качество моделей одним JSON — отчёты `make train`/`make eval` из lakehouse (read-only mount): `{ "wait": { "test_time", "test_mo", "by_region": [...], "by_profile": [...], "trainedThrough" }, "forecasts": { "<stream>": { "chosen", "models", "per_series_choice", "flat_share" } }, "anomalies", "simulate", "los", "survival", "anomalyLabelsModel", "anomalyLabels" }`. Этот же источник цитируют страница /quality и строка метрик в ассистенте направления.
 
 ### `GET /api/v1/los?regionKato=&profileCode=` (все авторизованные)
 Длительность лечения по ячейкам регион×профиль из `gold.los_by_profile`: `{ "items": [ { "regionKato", "profileName", "profileCode", "n", "losMedianFact", "losP50Model" } ], "method" }`. Медиана факта за последние 12 месяцев (ячейки ≥ 100 случаев) и p50 LightGBM-модели; симулятор показывает «одна койка ≈ 1/LOS госпитализаций в день». Пустой список, пока витрина не опубликована.
 
 ### `GET /api/v1/refdata/seasonality` (публичный, как остальной refdata)
 Внешние сезонные формы NHS 2017–2019: `{ "items": [ { "seriesId": "rtt_waiting_list | rtt_admitted_per_day | ae_attendances_per_day", "month": 1–12, "multiplier", "title", "source", "sourceYear", "windowLabel" } ] }`. Множители при среднегодовом = 1; в интерфейсе всегда подписаны «внешний ориентир».
+
+### `GET /api/v1/refdata/vaccination` (публичный, как остальной refdata)
+Оценки охвата вакцинацией WUENIC (ВОЗ/ЮНИСЕФ, WHO GHO API, страна KAZ): `{ "items": [ { "vaccine": "DTP3", "titleRu", "year", "coveragePct", "source", "note" } ] }`. Оценки заметно ниже административной отчётности (пересмотр после MICS) — показываются только как внешний ориентир. Обновление: `scripts/wuenic_fetch.py` → `make publish`.
 
 ## Intake
 
