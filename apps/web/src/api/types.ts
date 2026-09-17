@@ -134,6 +134,7 @@ export interface Mnn { mnnId: string; nosologyId: string; categoryId: string; is
 
 export interface ChartSeries { name: string; data: (number | null)[] }
 export interface Chart { type: 'line' | 'bar'; title: string; x: string[]; series: ChartSeries[] }
+export interface InsightStatus { available: boolean; provider: string; model: string }
 export interface AskResponse { answer: string; value: number | null; unit: string | null; chart: Chart | null; toolsUsed: string[]; sources: string[]; model: string }
 
 export interface ScribeHealth { status: string; transcriber: string; drafter: string }

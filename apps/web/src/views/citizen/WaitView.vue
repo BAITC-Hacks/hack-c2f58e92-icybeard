@@ -85,11 +85,11 @@ onMounted(async () => {
           <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">попадают за 30 дней</div></div>
         </div>
         <p v-if="indexItem" class="muted" style="margin-top: 8px">Индекс доступности региона {{ indexItem.indexValue.toFixed(1) }}, место {{ indexItem.rank }} среди регионов. <OriginTag kind="formula" /></p>
+        <p v-else class="muted" style="margin-top: 8px">Индекс для региона не показан: слишком мало наблюдений (малые числа подавлены).</p>
         <p v-if="seasonalHint" class="muted" style="margin-top: 8px">
           Сезонный ориентир: в системах типа NHS лист ожидания к текущему месяцу обычно меняется {{ seasonalHint }}
           (форма сезона NHS England RTT, 2017–2019 — внешний ориентир, наши данные пока покрывают один квартал).
         </p>
-        <p v-else class="muted" style="margin-top: 8px">Индекс для региона не показан: слишком мало наблюдений (малые числа подавлены).</p>
       </div>
       <div class="card">
         <h2>Где быстрее</h2>

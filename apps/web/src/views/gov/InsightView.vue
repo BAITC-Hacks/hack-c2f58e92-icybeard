@@ -9,7 +9,7 @@ import Textarea from 'primevue/textarea'
 import { computed, onMounted, ref } from 'vue'
 import VChart from 'vue-echarts'
 import { insight } from '@/api/endpoints'
-import type { AskResponse } from '@/api/types'
+import type { AskResponse, InsightStatus } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
 
@@ -19,7 +19,7 @@ const question = ref('Какой регион самый доступный по
 const result = ref<AskResponse | null>(null)
 const error = ref<unknown>(null)
 const busy = ref(false)
-const available = ref<boolean | null>(null)
+const status = ref<InsightStatus | null>(null)
 const examples = [
   'Сколько дней ждут офтальмологию в Алматы?',
   'Есть ли критические сигналы по Алматы?',
@@ -54,9 +54,9 @@ async function ask() {
 
 onMounted(async () => {
   try {
-    available.value = (await insight.status()).available
+    status.value = await insight.status()
   } catch {
-    available.value = null
+    status.value = null
   }
 })
 </script>
@@ -65,7 +65,9 @@ onMounted(async () => {
   <main class="page">
     <h1>Вопросы к данным</h1>
     <p class="lead">Вопрос на естественном языке превращается в вызовы инструментов доменов (индекс, прогноз, очередь, симулятор) и короткий ответ с цифрой. Модель не видит сырые данные.</p>
-    <Message v-if="available === false" severity="warn" :closable="false">Insight выключен: на сервере не задан DEEPSEEK_API_KEY (файл .env). Вопросы вернут 503.</Message>
+    <Message v-if="status && !status.available" severity="warn" :closable="false">
+      Insight выключен: для провайдера {{ status.provider }} ({{ status.model }}) на сервере не задан ключ API (файл .env). Вопросы вернут 503.
+    </Message>
     <div class="card">
       <div class="field"><label>Вопрос</label><Textarea v-model="question" rows="2" auto-resize /></div>
       <div class="actions">

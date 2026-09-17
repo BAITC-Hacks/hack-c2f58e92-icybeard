@@ -9,6 +9,7 @@ import { scribe } from '@/api/endpoints'
 import type { ScribeDraft, ScribeHealth } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
+import { pickRecordingFormat } from '@/lib/audio'
 
 const toast = useToast()
 const consent = ref(false)
@@ -25,7 +26,11 @@ const busy = ref(false)
 const recording = ref(false)
 let recorder: MediaRecorder | null = null
 let chunks: Blob[] = []
-const canRecord = typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices
+const recordingFormat =
+  typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices ? pickRecordingFormat((type) => MediaRecorder.isTypeSupported(type)) : null
+const canRecord = recordingFormat !== null
+// после утверждения аудио удалено, черновик и памятка зафиксированы: для нового приёма нужна новая сессия
+const approved = ref(false)
 
 async function start() {
   error.value = null
@@ -34,20 +39,29 @@ async function start() {
     draft.value = null
     transcript.value = ''
     leafletUrl.value = null
+    approved.value = false
   } catch (e) {
     error.value = e
   }
 }
 
 async function record() {
-  if (!canRecord) return
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-  recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+  if (!recordingFormat) return
+  const format = recordingFormat
+  error.value = null
+  let stream: MediaStream
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  } catch (e) {
+    error.value = e // доступ к микрофону запрещён или устройства нет
+    return
+  }
+  recorder = new MediaRecorder(stream, { mimeType: format.mimeType })
   chunks = []
   recorder.ondataavailable = (e) => chunks.push(e.data)
   recorder.onstop = async () => {
     stream.getTracks().forEach((t) => t.stop())
-    await upload(new Blob(chunks, { type: 'audio/webm' }), 'consult.webm')
+    await upload(new Blob(chunks, { type: format.mimeType }), `consult.${format.extension}`)
   }
   recorder.start()
   recording.value = true
@@ -106,6 +120,7 @@ async function approve() {
   try {
     const result = await scribe.approve(sessionId.value, draft.value.sections.map((s) => ({ name: s.name, text: s.text })), leaflet.value)
     leafletUrl.value = `${window.location.origin}/leaflet/${result.leafletToken}`
+    approved.value = true
     toast.add({ severity: 'success', summary: 'Запись утверждена, аудио удалено', life: 3000 })
   } catch (e) {
     error.value = e
@@ -141,14 +156,14 @@ onBeforeUnmount(() => recorder?.state === 'recording' && recorder.stop())
       <div class="card">
         <h2>Стенограмма</h2>
         <div class="actions">
-          <Button v-if="canRecord && !recording" label="Записать с микрофона" icon="pi pi-microphone" severity="secondary" @click="record" />
+          <Button v-if="canRecord && !recording" label="Записать с микрофона" icon="pi pi-microphone" severity="secondary" :disabled="approved" @click="record" />
           <Button v-if="recording" label="Остановить" icon="pi pi-stop" severity="danger" @click="stop" />
-          <label class="p-button p-button-secondary p-button-sm" style="cursor: pointer">загрузить файл<input type="file" accept="audio/*" hidden @change="onFile" /></label>
+          <label v-if="!approved" class="p-button p-button-secondary p-button-sm" style="cursor: pointer">загрузить файл<input type="file" accept="audio/*" hidden @change="onFile" /></label>
         </div>
         <div class="field" style="margin-top: 12px"><label>или напечатайте текст приёма</label><Textarea v-model="typed" rows="4" auto-resize /></div>
-        <div class="actions"><Button label="Использовать текст" size="small" severity="secondary" @click="useTyped" /></div>
+        <div class="actions"><Button label="Использовать текст" size="small" severity="secondary" :disabled="approved" @click="useTyped" /></div>
         <p v-if="transcript" style="white-space: pre-wrap; margin-top: 12px">{{ transcript }}</p>
-        <div class="actions"><Button label="Составить черновик" icon="pi pi-file-edit" :disabled="!transcript" :loading="busy" @click="makeDraft" /></div>
+        <div class="actions"><Button label="Составить черновик" icon="pi pi-file-edit" :disabled="!transcript || approved" :loading="busy" @click="makeDraft" /></div>
       </div>
       <div v-if="draft" class="card">
         <h2>Черновик записи ({{ draft.model }}) <OriginTag kind="ai" note="Черновик сгенерирован из стенограммы; в запись попадает только после утверждения врачом" /></h2>
@@ -158,7 +173,7 @@ onBeforeUnmount(() => recorder?.state === 'recording' && recorder.stop())
         </div>
         <div class="field"><label>Памятка пациенту</label><Textarea v-model="leaflet" rows="5" auto-resize /></div>
         <div class="actions">
-          <Button label="Утвердить и выдать памятку" icon="pi pi-check" @click="approve" />
+          <Button label="Утвердить и выдать памятку" icon="pi pi-check" :disabled="approved" @click="approve" />
           <a v-if="leafletUrl" :href="leafletUrl" target="_blank">{{ leafletUrl }}</a>
         </div>
       </div>

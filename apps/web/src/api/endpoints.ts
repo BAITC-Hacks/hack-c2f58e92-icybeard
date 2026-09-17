@@ -1,6 +1,6 @@
 import { api, apiDownload, apiUpload } from './client'
 import type {
-  AlternativesResponse, Anomaly, AskResponse, Batch, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
+  AlternativesResponse, Anomaly, AskResponse, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
   LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, Stream, VaccinationBenchmark, WorklistItem,
 } from './types'
@@ -62,7 +62,7 @@ export const medicines = {
 
 export const insight = {
   ask: (question: string, regionKato?: string) => api<AskResponse>('/api/v1/insight/ask', { body: { question, regionKato } }),
-  status: () => api<{ available: boolean }>('/api/v1/insight/status'),
+  status: () => api<InsightStatus>('/api/v1/insight/status'),
   report: (format: 'pdf' | 'xlsx', month?: string, profileCode?: string) =>
     apiDownload('/api/v1/insight/reports', { format, month, profileCode }),
 }
