@@ -11,6 +11,7 @@
 - **Объяснение:** `explanation: { summary, factors: [{ name, contribution, text }] }`, факторы отсортированы по `|contribution|`.
 - **Пагинация:** `?page=1&size=50`, ответ `{ items, page, size, total }`.
 - **Идемпотентность записи:** заголовок `Idempotency-Key` на POST журналов и решений.
+- **Ограничение частоты:** `POST /insight/ask` и `/scribe/*` — не больше `RateLimits:ModelCallsPerMinute` запросов в минуту на пользователя (по умолчанию 20), сверх лимита 429.
 - **Порог малых чисел:** публичные агрегаты с числом наблюдений меньше 5 возвращаются как `null` с `suppressed: true`.
 
 ## Queue: ожидание госпитализации
@@ -60,7 +61,7 @@
 Элемент: `{ "id", "streamId", "entity", "period", "observed", "expected", "score", "peerScore", "severity", "kind": "entity | shared", "status", "regionKato", "comment" }`. `id` детерминирован (md5 потока, сущности и периода), поэтому подтверждения переживают перепубликацию витрины.
 
 ### `POST /api/v1/anomalies/{id}/ack` (chief, regulator)
-Тело `{ "comment", "status": "acknowledged | closed" }` (по умолчанию `acknowledged`). Ответ 204, 404 если сигнала нет. Публикует `anomaly.acknowledged`.
+Тело `{ "comment", "status": "acknowledged | dismissed" }` (по умолчанию `acknowledged`; `dismissed` — ложный сигнал, отрицательная метка для дообучения детектора). В одной транзакции сохраняет подтверждение и запись в журнал решений (`subject: "anomaly"`, `subjectId` = id сигнала, `recommended: {"status": "open"}`, `chosen: {"status": …}`, `reason` = комментарий) и публикует `decision.recorded`. Ответ 204; 404 если сигнала нет; 403 если главврач закрывает сигнал не своего региона; 422 при другом статусе.
 
 ## Simulation
 
