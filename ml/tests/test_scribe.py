@@ -41,6 +41,10 @@ def test_full_flow_audio_draft_approve_leaflet_and_audio_deleted(tmp_path):
     token = approved.json()["leafletToken"]
     assert not list((store.root / "audio").iterdir())  # аудио удалено при утверждении
     assert api.post(f"/scribe/sessions/{session_id}/audio", files={"file": ("x.webm", b"1", "audio/webm")}).status_code == 409
+    # утверждённую запись нельзя пересобрать или утвердить повторно с другой памяткой
+    assert api.post(f"/scribe/sessions/{session_id}/transcript", json={"text": "Новый текст."}).status_code == 409
+    assert api.post(f"/scribe/sessions/{session_id}/draft").status_code == 409
+    assert api.post(f"/scribe/sessions/{session_id}/approve", json={"sections": draft["sections"], "patientLeaflet": "другая"}).status_code == 409
 
     leaflet = api.get(f"/scribe/leaflets/{token}").json()
     assert "Явка через 2 недели" in leaflet["text"] and leaflet["language"] == "ru"

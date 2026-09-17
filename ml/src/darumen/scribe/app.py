@@ -45,6 +45,13 @@ def create_app(store: SessionStore, transcriber: Transcriber, drafter: Drafter) 
             raise HTTPException(404, "session not found")
         return session
 
+    def editable_session(session_id: str):
+        """Сессия, в которую ещё можно писать: после утверждения аудио удалено, запись зафиксирована."""
+        session = session_or_404(session_id)
+        if session.approved:
+            raise HTTPException(409, "session already approved, audio was deleted")
+        return session
+
     @app.get("/scribe/health")
     def health():
         return {"status": "ok", "transcriber": transcriber.name, "drafter": getattr(drafter, "name", "unknown")}
@@ -60,9 +67,7 @@ def create_app(store: SessionStore, transcriber: Transcriber, drafter: Drafter) 
 
     @app.post("/scribe/sessions/{session_id}/audio")
     def upload_audio(session_id: str, file: Annotated[UploadFile, File()]):
-        session = session_or_404(session_id)
-        if session.approved:
-            raise HTTPException(409, "session already approved, audio was deleted")
+        session = editable_session(session_id)
         suffix = Path(file.filename or "audio.webm").suffix or ".webm"
         target = store.audio_path(session, suffix)
         with target.open("wb") as out:
@@ -78,14 +83,14 @@ def create_app(store: SessionStore, transcriber: Transcriber, drafter: Drafter) 
     @app.post("/scribe/sessions/{session_id}/transcript")
     def set_transcript(session_id: str, body: TranscriptIn):
         """Typed or pasted transcript for demos without a microphone."""
-        session = session_or_404(session_id)
+        session = editable_session(session_id)
         sentences = [s.strip() for s in body.text.replace("\n", " ").split(". ") if s.strip()]
         session.transcript = [{"t0": float(i * 4), "t1": float(i * 4 + 4), "text": s if s.endswith(".") else s + "."} for i, s in enumerate(sentences)]
         return {"transcript": session.transcript}
 
     @app.post("/scribe/sessions/{session_id}/draft")
     def make_draft(session_id: str):
-        session = session_or_404(session_id)
+        session = editable_session(session_id)
         if not session.transcript:
             raise HTTPException(409, "no transcript yet")
         draft = drafter.draft([Segment(t["t0"], t["t1"], t["text"]) for t in session.transcript], session.language)
@@ -94,7 +99,7 @@ def create_app(store: SessionStore, transcriber: Transcriber, drafter: Drafter) 
 
     @app.post("/scribe/sessions/{session_id}/approve", status_code=200)
     def approve(session_id: str, body: ApproveIn):
-        session = session_or_404(session_id)
+        session = editable_session(session_id)
         if not body.sections or not body.patient_leaflet.strip():
             raise HTTPException(422, "sections and patientLeaflet are required")
         token = store.approve(session, [s.model_dump() for s in body.sections], body.patient_leaflet)
