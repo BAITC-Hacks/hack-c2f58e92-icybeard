@@ -8,6 +8,8 @@ export const useRefdataStore = defineStore('refdata', () => {
   const regions = ref<Region[]>([])
   const profiles = ref<Profile[]>([])
   const organizations = ref<Record<string, OrganizationItem[]>>({})
+  /** Названия организаций по коду: наполняется из списков регионов и точечных запросов. */
+  const organizationNames = ref<Record<string, string>>({})
   const loaded = ref(false)
 
   async function load() {
@@ -18,13 +20,27 @@ export const useRefdataStore = defineStore('refdata', () => {
     loaded.value = true
   }
 
+  function remember(items: OrganizationItem[]) {
+    for (const item of items) organizationNames.value[item.moCode] = item.name
+  }
+
   /** Организации региона; с профилем только те, у кого есть очередь по этому профилю, сначала самые загруженные. */
   async function organizationsOf(regionKato: string, profileCode?: string): Promise<OrganizationItem[]> {
     const key = profileCode ? `${regionKato}:${profileCode}` : regionKato
     if (!organizations.value[key]) {
       organizations.value[key] = (await refdata.organizations(regionKato, undefined, profileCode)).items
+      remember(organizations.value[key])
     }
     return organizations.value[key]
+  }
+
+  /** Подгружает названия организаций, которых ещё нет в кэше (поиск реестра принимает точный код). */
+  async function resolveOrganizations(moCodes: Iterable<string>): Promise<void> {
+    const missing = [...new Set(moCodes)].filter((code) => code && !(code in organizationNames.value))
+    const found = await Promise.all(
+      missing.map((code) => refdata.organizations(undefined, code, undefined, 5).then((r) => r.items.filter((o) => o.moCode === code))),
+    )
+    remember(found.flat())
   }
 
   function regionName(kato: string | null | undefined): string {
@@ -35,5 +51,12 @@ export const useRefdataStore = defineStore('refdata', () => {
     return profiles.value.find((p) => p.profileCode === code)?.name ?? code ?? '—'
   }
 
-  return { regions, profiles, loaded, load, organizationsOf, regionName, profileName }
+  function organizationName(moCode: string | null | undefined): string {
+    if (!moCode) return '—'
+    return organizationNames.value[moCode] ?? moCode
+  }
+
+  return {
+    regions, profiles, loaded, load, organizationsOf, resolveOrganizations, regionName, profileName, organizationName,
+  }
 })
