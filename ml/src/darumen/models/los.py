@@ -52,6 +52,11 @@ def pinball50(y: np.ndarray, pred: np.ndarray) -> float:
 def train_los(lake: Lakehouse, out_dir: Path) -> dict:
     import lightgbm as lgb
 
+    # как forecast/anomaly/anomaly_labels: без набора ersb_cases (Список пролеченных случаев)
+    # молча пропускаем, а не падаем — это отдельный тяжёлый набор (42 ГБ), не всегда загружен
+    if not any(lake.silver("ersb_cases").glob("**/*.parquet")):
+        return {"skipped": "нет silver-данных ersb_cases (набор treated_list не загружен)"}
+
     df = _dataset(lake)
     for col in CATEGORICAL:
         df[col] = df[col].astype("category")
