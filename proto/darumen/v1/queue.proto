@@ -22,6 +22,7 @@ message PredictWaitRequest {
   string territorial_type = 6;  // Город или Село
   string finance_source = 7;
   string registration_date = 8; // YYYY-MM-DD, дата постановки в очередь
+  string referring_mo_code = 9; // необязательно: направляющая организация, даёт признак same_mo
 }
 
 message PredictWaitResponse {
