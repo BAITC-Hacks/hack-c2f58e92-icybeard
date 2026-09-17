@@ -11,6 +11,7 @@ import { analytics, journal, queue } from '@/api/endpoints'
 import type { AlternativesResponse, OrganizationItem, PredictResponse, QualitySplit } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import ExplanationCard from '@/components/ExplanationCard.vue'
+import { referralSubjectId, SUBJECT_REFERRAL } from '@/lib/decision'
 import { days, pct, refusalWords } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
@@ -29,7 +30,9 @@ const form = reactive({
   referralPurpose: 'Оперативное лечение',
   territorialType: 'Город',
   financeSource: 'Активы Фонда на ОСМС',
-  registrationDate: new Date().toISOString().slice(0, 10),
+  // пусто — сервис моделей берёт день после последних данных очереди: модель обучена на I квартале 2025,
+  // сегодняшняя дата вывела бы признаки календаря за пределы обучения
+  registrationDate: '',
 })
 const organizations = ref<OrganizationItem[]>([])
 const prediction = ref<PredictResponse | null>(null)
@@ -39,6 +42,9 @@ const fieldErrors = ref<Record<string, string>>({})
 const busy = ref(false)
 const reason = ref('')
 const recorded = ref<string | null>(null)
+const recording = ref(false)
+// один ключ идемпотентности на расчёт: повторный клик по тому же прогнозу не создаёт вторую запись
+let decisionKey = ''
 // метрики модели против baseline из отчёта обучения — та же цифра, что на странице качества (§7.4)
 const waitQuality = ref<QualitySplit | null>(null)
 
@@ -55,8 +61,10 @@ async function predict() {
   error.value = null
   fieldErrors.value = {}
   recorded.value = null
+  decisionKey = ''
   try {
     ;[prediction.value, alternatives.value] = await Promise.all([queue.predict(form), queue.alternatives({ ...form, limit: 5 })])
+    decisionKey = crypto.randomUUID()
   } catch (e) {
     if (e instanceof ApiError && e.status === 422 && e.errors) {
       fieldErrors.value = Object.fromEntries(Object.entries(e.errors).map(([k, v]) => [k, v.join(', ')]))
@@ -69,23 +77,32 @@ async function predict() {
   }
 }
 
+/** Рекомендация системы: самая быстрая по медиане организация среди выбранной и альтернатив. */
+function recommendedMo(): string {
+  const fastest = alternatives.value?.items[0]
+  return fastest && prediction.value && fastest.p50Days < prediction.value.p50Days ? fastest.mo.moCode : form.moCode
+}
+
 async function record(chosen: string) {
-  const recommended = alternatives.value?.items[0]?.mo.moCode ?? form.moCode
+  if (recorded.value || recording.value || !decisionKey) return
+  recording.value = true
   try {
     const created = await journal.record(
       {
-        subject: 'referral',
-        subjectId: `${form.regionKato}.${form.moCode}.${form.profileCode}.${form.registrationDate}`,
-        recommended: { moCode: recommended },
+        subject: SUBJECT_REFERRAL,
+        subjectId: referralSubjectId(form.regionKato, form.moCode, form.profileCode, form.registrationDate || new Date().toISOString().slice(0, 10)),
+        recommended: { moCode: recommendedMo() },
         chosen: { moCode: chosen },
         reason: reason.value,
       },
-      crypto.randomUUID(),
+      decisionKey,
     )
     recorded.value = created.decisionId
     toast.add({ severity: 'success', summary: 'Решение записано в журнал', detail: created.decisionId, life: 3000 })
   } catch (e) {
     error.value = e
+  } finally {
+    recording.value = false
   }
 }
 
@@ -116,7 +133,7 @@ watch(() => [form.regionKato, form.profileCode], loadOrganizations)
           <div class="field"><label>МКБ-10</label><InputText v-model="form.icd10" placeholder="H25.1" /></div>
           <div class="field"><label>Цель</label><Select v-model="form.referralPurpose" :options="purposes" /></div>
           <div class="field"><label>Город или село</label><Select v-model="form.territorialType" :options="territorial" /></div>
-          <div class="field"><label>Дата постановки в очередь</label><InputText v-model="form.registrationDate" placeholder="YYYY-MM-DD" /><span class="error">{{ fieldErrors.registrationDate }}</span></div>
+          <div class="field"><label>Дата постановки в очередь</label><InputText v-model="form.registrationDate" placeholder="пусто — по последним данным (I кв. 2025)" /><span class="error">{{ fieldErrors.registrationDate }}</span></div>
         </div>
         <div class="actions"><Button label="Рассчитать" icon="pi pi-calculator" :loading="busy" @click="predict" /></div>
         <ErrorBox :error="error" />
@@ -159,13 +176,13 @@ watch(() => [form.regionKato, form.profileCode], loadOrganizations)
             <td>{{ days(a.p90Days) }}</td>
             <td>{{ pct(a.pRefusal) }}</td>
             <td class="muted">{{ a.distanceKm > 0 ? `${a.distanceKm.toFixed(0)} км` : 'нет координат' }}</td>
-            <td><Button label="Направить сюда" size="small" severity="secondary" @click="record(a.mo.moCode)" /></td>
+            <td><Button label="Направить сюда" size="small" severity="secondary" :disabled="!!recorded" :loading="recording" @click="record(a.mo.moCode)" /></td>
           </tr>
         </tbody>
       </table>
       <div class="field" style="margin-top: 12px"><label>Причина выбора (попадает в журнал)</label><Textarea v-model="reason" rows="2" auto-resize /></div>
       <div class="actions">
-        <Button label="Оставить в выбранной организации" icon="pi pi-check" @click="record(form.moCode)" />
+        <Button label="Оставить в выбранной организации" icon="pi pi-check" :disabled="!!recorded" :loading="recording" @click="record(form.moCode)" />
         <span v-if="recorded" class="muted">записано: {{ recorded }}</span>
       </div>
     </div>
