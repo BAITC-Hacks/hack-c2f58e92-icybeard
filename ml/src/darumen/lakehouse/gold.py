@@ -27,6 +27,9 @@ HORIZON_DAYS = 120          # how far past the last registration the queue is tr
 WINDOW_DAYS = 28
 HOLDOUT_MO_BUCKETS = 10     # 1 of 10 organisations (by hash) is held out for test_mo
 TEST_TIME_START = "2025-03-01"
+# последние две недели февраля — только для ранней остановки обучения (early stopping), не в train и не в
+# March-отчёте: раньше валидацию брали сэмплом из test_time самого отчёта, отчёт был не совсем честным
+VALID_START = "2025-02-15"
 
 
 def _sql_path(path: Path) -> str:
@@ -198,7 +201,8 @@ def build_features_wait(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Pa
                (r.outcome = 'refused') AS refused,
                (r.wait_days IS NOT NULL AND r.wait_days <= 30) AS within_30,
                CASE WHEN hash(r.mo_code) % {HOLDOUT_MO_BUCKETS} = 0 THEN 'test_mo'
-                    WHEN r.registration_dt::DATE < DATE '{TEST_TIME_START}' THEN 'train'
+                    WHEN r.registration_dt::DATE < DATE '{VALID_START}' THEN 'train'
+                    WHEN r.registration_dt::DATE < DATE '{TEST_TIME_START}' THEN 'valid'
                     ELSE 'test_time' END AS split
         FROM referrals r
         LEFT JOIN queue_daily q ON q.mo_code = r.mo_code AND q.profile_code = r.profile_code

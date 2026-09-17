@@ -31,7 +31,10 @@ def synthetic_features(n: int = 3000, seed: int = 7) -> pd.DataFrame:
     df["refused"] = refused
     df["within_30"] = (~refused) & (wait <= 30)
     holdout = pd.Series(mo).isin(["0000", "0001"]).to_numpy()
-    df["split"] = np.where(holdout, "test_mo", np.where(reg < pd.Timestamp("2025-03-01"), "train", "test_time"))
+    # то же деление, что в gold.build_features_wait: train — до 15 февраля, valid — последние две недели
+    # февраля (ранняя остановка), test_time — март, test_mo — 2 из 12 организаций независимо от даты
+    time_split = np.select([reg < pd.Timestamp("2025-02-15"), reg < pd.Timestamp("2025-03-01")], ["train", "valid"], default="test_time")
+    df["split"] = np.where(holdout, "test_mo", time_split)
     return df
 
 
@@ -40,6 +43,20 @@ def test_pinball_and_coverage():
     assert pinball(y, y, 0.5) == 0.0
     assert pinball(y, y + 1, 0.9) < pinball(y, y - 1, 0.9)  # over-prediction is cheap at the 90th percentile
     assert coverage(y, np.array([1.0, 1.0, 5.0])) == 2 / 3
+
+
+def test_valid_split_is_held_out_from_train_and_from_the_march_report(tmp_path):
+    """2.1: ранняя остановка берёт последние две недели февраля (valid), не сэмпл из марта (test_time) —
+    иначе мартовский отчёт частично мерил бы модель на данных, по которым он же и настраивался."""
+    df = synthetic_features()
+    valid = df[df["split"] == "valid"]
+    assert len(valid) > 20  # иначе тест ничего не проверяет — упал бы в fallback-ветку train_wait
+    train_wait(df, tmp_path / "wait", trained_through="2025-02-28")
+    train_ids = set(df[df["split"] == "train"]["hospitalization_code"])
+    test_time_ids = set(df[df["split"] == "test_time"]["hospitalization_code"])
+    valid_ids = set(valid["hospitalization_code"])
+    assert train_ids.isdisjoint(valid_ids)
+    assert test_time_ids.isdisjoint(valid_ids)
 
 
 def test_train_beats_baseline_and_roundtrips(tmp_path):

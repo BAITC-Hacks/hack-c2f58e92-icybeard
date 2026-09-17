@@ -190,9 +190,16 @@ def breakdown(model: WaitModel, df: pd.DataFrame, key: str, top: int = 25) -> li
 def train_wait(features: pd.DataFrame, out_dir: Path, trained_through: str | None = None) -> tuple[WaitModel, dict]:
     train = features[features["split"] == "train"]
     tests = {name: features[features["split"] == name] for name in ("test_time", "test_mo")}
+    # early stopping on the last two weeks of February (features_wait's own "valid" split, held out from
+    # train by gold.build_features_wait) — never on a slice of the March report itself, or the reported
+    # test_time metrics would be partly measured on rows the model was tuned against. A features frame with
+    # no "valid" split (older fixtures) falls back to holding out a slice of train — excluded from it too,
+    # so the fallback is not its own smaller leak.
+    val = features[features["split"] == "valid"]
+    if len(val) <= 20:
+        val = train.sample(frac=0.1, random_state=42)
+        train = train.drop(val.index)
     x_train, categories = encode(train)
-    # early stopping on a slice of March held out from the model selection reports
-    val = tests["test_time"].sample(frac=0.3, random_state=42) if len(tests["test_time"]) > 20 else tests["test_time"]
     x_val, _ = encode(val, categories)
 
     admitted = train["wait_days"].notna().to_numpy()
