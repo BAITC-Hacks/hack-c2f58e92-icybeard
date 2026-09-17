@@ -46,7 +46,7 @@ class QueueIntelligenceServicer(queue_pb2_grpc.QueueIntelligenceServicer):
                 context.abort(grpc.StatusCode.NOT_FOUND, f"no organisations with profile '{profile}' in region '{region}'")
             mo_codes, weights = list(orgs["mo_code"]), orgs["registered_4w"].to_numpy(dtype=float) + 1.0
         rows = state.feature_rows(mo_codes, profile, request.icd10, request.referral_purpose, request.finance_source,
-                                  request.territorial_type, request.registration_date)
+                                  request.territorial_type, request.registration_date, request.referring_mo_code)
         return rows, weights / weights.sum()
 
     def PredictWait(self, request, context):
@@ -81,7 +81,7 @@ class QueueIntelligenceServicer(queue_pb2_grpc.QueueIntelligenceServicer):
         if orgs.empty:
             return queue_pb2.AlternativesResponse(model=model_info(state))
         rows = state.feature_rows(list(orgs["mo_code"]), base.profile_code, base.icd10, base.referral_purpose,
-                                  base.finance_source, base.territorial_type, base.registration_date)
+                                  base.finance_source, base.territorial_type, base.registration_date, base.referring_mo_code)
         pred = state.wait.predict(rows)
         origin = state.registry_by_code.get(base.mo_code, {})
         items = []

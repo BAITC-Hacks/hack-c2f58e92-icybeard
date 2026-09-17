@@ -83,6 +83,18 @@ def test_state_as_of_and_feature_layout(served):
     assert row["mo_size_bucket"] == "M" and row["region_kato"] == "10"
 
 
+def test_feature_rows_same_mo_flag(served):
+    """same_mo — True только когда указана направляющая организация и она совпадает с оцениваемой;
+    без указания (как раньше) поведение не меняется — всегда False."""
+    state = served[0]
+    referred_here = state.feature_rows(["0003"], "381", registration_date="2025-04-01", referring_mo_code="0003")
+    referred_elsewhere = state.feature_rows(["0003"], "381", registration_date="2025-04-01", referring_mo_code="0002")
+    unspecified = state.feature_rows(["0003"], "381", registration_date="2025-04-01")
+    assert bool(referred_here.iloc[0]["same_mo"]) is True
+    assert bool(referred_elsewhere.iloc[0]["same_mo"]) is False
+    assert bool(unspecified.iloc[0]["same_mo"]) is False
+
+
 def test_predict_wait_for_organisation(served):
     _, queue, _, _ = served
     res = queue.PredictWait(_request())

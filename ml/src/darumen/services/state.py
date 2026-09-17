@@ -143,9 +143,11 @@ class ModelState:
 
     # ---------- features for inference ----------
     def feature_rows(self, mo_codes: list[str], profile_code: str, icd10: str = "", referral_purpose: str = "",
-                     finance_source: str = "", territorial_type: str = "", registration_date: str = "") -> pd.DataFrame:
+                     finance_source: str = "", territorial_type: str = "", registration_date: str = "",
+                     referring_mo_code: str = "") -> pd.DataFrame:
         """One feature row per organisation, in the layout of gold.features_wait. The registration date defaults
-        to the day after as_of; the referring organisation is unknown, so same_mo is False."""
+        to the day after as_of. same_mo is True when the caller names the referring organisation and it matches
+        the hospital being scored; unknown (not passed) behaves exactly as before — same_mo is False."""
         when = pd.Timestamp(registration_date) if registration_date else self.as_of + pd.Timedelta(days=1)
         canon = icd10_canon(icd10) if icd10 else None
         state = self.queue[self.queue["profile_code"] == profile_code].set_index("mo_code")
@@ -168,6 +170,7 @@ class ModelState:
                 "wait_p50_4w": st["wait_p50_4w"] if st is not None else np.nan,
                 "wait_p90_4w": st["wait_p90_4w"] if st is not None else np.nan,
                 # gold uses DuckDB's dayofweek (0 = Sunday) and ISO week
-                "dow": (when.dayofweek + 1) % 7, "week_of_year": int(when.isocalendar().week), "same_mo": False,
+                "dow": (when.dayofweek + 1) % 7, "week_of_year": int(when.isocalendar().week),
+                "same_mo": bool(referring_mo_code) and referring_mo_code == mo,
             })
         return pd.DataFrame(rows, columns=FEATURES)
