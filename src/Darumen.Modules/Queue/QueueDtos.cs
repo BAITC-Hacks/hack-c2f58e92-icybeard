@@ -4,7 +4,7 @@ namespace Darumen.Modules.Queue;
 
 public sealed record PredictRequestDto(
     string? RegionKato, string? MoCode, string? ProfileCode, string? Icd10, string? ReferralPurpose,
-    string? TerritorialType, string? FinanceSource, string? RegistrationDate);
+    string? TerritorialType, string? FinanceSource, string? RegistrationDate, string? ReferringMoCode = null);
 
 public sealed record QueueSnapshotDto(int Len, double? AgeP50, double ThroughputPerDay);
 
@@ -14,9 +14,10 @@ public sealed record PredictResponseDto(
 
 public sealed record AlternativesRequestDto(
     string? RegionKato, string? MoCode, string? ProfileCode, string? Icd10, string? ReferralPurpose,
-    string? TerritorialType, string? FinanceSource, string? RegistrationDate, int? Limit, double? MaxDistanceKm)
+    string? TerritorialType, string? FinanceSource, string? RegistrationDate, int? Limit, double? MaxDistanceKm,
+    string? ReferringMoCode = null)
 {
-    public PredictRequestDto Base => new(RegionKato, MoCode, ProfileCode, Icd10, ReferralPurpose, TerritorialType, FinanceSource, RegistrationDate);
+    public PredictRequestDto Base => new(RegionKato, MoCode, ProfileCode, Icd10, ReferralPurpose, TerritorialType, FinanceSource, RegistrationDate, ReferringMoCode);
 }
 
 public sealed record OrganizationDto(string MoCode, string Name, string RegionKato);

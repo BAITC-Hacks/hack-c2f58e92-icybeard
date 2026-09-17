@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Darumen.Contracts.V1;
 using Darumen.Modules.Queue;
 using Grpc.Core;
 
@@ -73,6 +74,27 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
         {
             var response = await app.CreateClient().PostAsJsonAsync("/api/v1/queue/predict", Request);
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+        finally
+        {
+            app.Queue.OnPredictWait = previous;
+        }
+    }
+
+    [Fact]
+    public async Task Referring_mo_code_reaches_the_model_service()
+    {
+        var previous = app.Queue.OnPredictWait;
+        PredictWaitRequest? captured = null;
+        app.Queue.OnPredictWait = r => { captured = r; return previous(r); };
+        try
+        {
+            var withReferrer = Request with { ReferringMoCode = "028B" };
+            await app.CreateClient().PostAsJsonAsync("/api/v1/queue/predict", withReferrer);
+            Assert.Equal("028B", captured!.ReferringMoCode);
+
+            await app.CreateClient().PostAsJsonAsync("/api/v1/queue/predict", Request);
+            Assert.Equal(string.Empty, captured!.ReferringMoCode);
         }
         finally
         {

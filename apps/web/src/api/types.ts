@@ -12,6 +12,8 @@ export interface PredictRequest {
   territorialType?: string | null
   financeSource?: string | null
   registrationDate?: string | null
+  /** необязательно: направляющая организация — модель получит признак same_mo */
+  referringMoCode?: string | null
 }
 export interface QueueSnapshot { len: number; ageP50: number | null; throughputPerDay: number }
 export interface PredictResponse {

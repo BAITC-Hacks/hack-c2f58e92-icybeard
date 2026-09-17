@@ -33,8 +33,12 @@ const form = reactive({
   // пусто — сервис моделей берёт день после последних данных очереди: модель обучена на I квартале 2025,
   // сегодняшняя дата вывела бы признаки календаря за пределы обучения
   registrationDate: '',
+  // необязательно: если направление внутри своей же организации, модель получает признак same_mo
+  referringMoCode: '',
 })
 const organizations = ref<OrganizationItem[]>([])
+// список для «направляющей организации» — все организации региона, не только те, что лечат по этому профилю
+const referringOrganizations = ref<OrganizationItem[]>([])
 const prediction = ref<PredictResponse | null>(null)
 const alternatives = ref<AlternativesResponse | null>(null)
 const error = ref<unknown>(null)
@@ -54,6 +58,13 @@ const territorial = ['Город', 'Село']
 async function loadOrganizations() {
   organizations.value = await refdata.organizationsOf(form.regionKato, form.profileCode)
   if (!organizations.value.some((o) => o.moCode === form.moCode)) form.moCode = organizations.value[0]?.moCode ?? ''
+}
+
+async function loadReferringOrganizations() {
+  referringOrganizations.value = await refdata.organizationsOf(form.regionKato)
+  if (form.referringMoCode && !referringOrganizations.value.some((o) => o.moCode === form.referringMoCode)) {
+    form.referringMoCode = ''
+  }
 }
 
 async function predict() {
@@ -108,7 +119,7 @@ async function record(chosen: string) {
 
 onMounted(async () => {
   await refdata.load()
-  await loadOrganizations()
+  await Promise.all([loadOrganizations(), loadReferringOrganizations()])
   await predict()
   try {
     waitQuality.value = (await analytics.quality()).wait?.test_time ?? null
@@ -117,6 +128,7 @@ onMounted(async () => {
   }
 })
 watch(() => [form.regionKato, form.profileCode], loadOrganizations)
+watch(() => form.regionKato, loadReferringOrganizations)
 </script>
 
 <template>
@@ -131,6 +143,10 @@ watch(() => [form.regionKato, form.profileCode], loadOrganizations)
           <div class="field"><label>Организация</label><Select v-model="form.moCode" :options="organizations" option-label="name" option-value="moCode" filter /></div>
           <div class="field"><label>Профиль койки</label><Select v-model="form.profileCode" :options="refdata.profiles" option-label="name" option-value="profileCode" filter /><span class="error">{{ fieldErrors.profileCode }}</span></div>
           <div class="field"><label>МКБ-10</label><InputText v-model="form.icd10" placeholder="H25.1" /></div>
+          <div class="field">
+            <label>Направляющая организация</label>
+            <Select v-model="form.referringMoCode" :options="referringOrganizations" option-label="name" option-value="moCode" filter show-clear placeholder="не указана" />
+          </div>
           <div class="field"><label>Цель</label><Select v-model="form.referralPurpose" :options="purposes" /></div>
           <div class="field"><label>Город или село</label><Select v-model="form.territorialType" :options="territorial" /></div>
           <div class="field"><label>Дата постановки в очередь</label><InputText v-model="form.registrationDate" placeholder="пусто — по последним данным (I кв. 2025)" /><span class="error">{{ fieldErrors.registrationDate }}</span></div>

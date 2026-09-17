@@ -50,6 +50,7 @@ public sealed class QueueService(
         TerritorialType = dto.TerritorialType ?? string.Empty,
         FinanceSource = dto.FinanceSource ?? string.Empty,
         RegistrationDate = dto.RegistrationDate ?? string.Empty,
+        ReferringMoCode = dto.ReferringMoCode ?? string.Empty,
     };
 
     private DateTime Deadline() => DateTime.UtcNow.AddSeconds(options.Value.TimeoutSeconds);
