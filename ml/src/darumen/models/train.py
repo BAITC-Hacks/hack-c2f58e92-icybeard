@@ -50,10 +50,13 @@ def main(argv: list[str] | None = None) -> int:
         cards = Path(args.cards)
         cards.mkdir(parents=True, exist_ok=True)
         (cards / "wait.md").write_text(card, encoding="utf-8")
-        flat = {f"{split}_{k}": v for split, m in report.items() for k, v in m.items() if isinstance(v, (int, float))}
+        # by_region/by_profile — списки разбивок (breakdown()), не метрики сплита; в плоские метрики их не тащим
+        flat = {f"{split}_{k}": v for split, m in report.items() if isinstance(m, dict) for k, v in m.items() if isinstance(v, (int, float))}
         run_id = mlflow_log("wait", {"rows": model.metadata["train_rows"], **model.metadata["params"]}, flat,
                             [out / "metadata.json", cards / "wait.md"])
         for split, m in report.items():
+            if not isinstance(m, dict):
+                continue
             print(f"{split:10s} n={m['n']:>7,} pinball_p50 {m['pinball_p50']:.2f} (base {m['pinball_p50_baseline']:.2f}) "
                   f"pinball_p90 {m['pinball_p90']:.2f} (base {m['pinball_p90_baseline']:.2f}) coverage_p90 {m['coverage_p90']:.3f} "
                   f"auc_within30 {m['auc_within30']:.3f} auc_refusal {m['auc_refusal']:.3f} (base {m['auc_refusal_baseline']:.3f})")
@@ -95,12 +98,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"card {path}")
     if "los" in only:
         report = train_los(lake, models_dir(lake) / "los")
-        print(f"los      train={report['train_rows']:,} test={report['test_rows']:,} | pinball p50 {report['pinball_p50']:.3f} "
-              f"(baseline {report['pinball_p50_baseline']:.3f}) MAE {report['mae']:.2f} (baseline {report['mae_baseline']:.2f}) | "
-              f"{report['cells']} ячеек region×profile в gold/los_by_profile")
-        mlflow_log("los", {"train_rows": report["train_rows"]},
-                   {k: v for k, v in report.items() if isinstance(v, (int, float))},
-                   [lake.root / "models" / "los" / "report.json"])
+        if report.get("skipped"):
+            print(f"los      skipped: {report['skipped']}")
+        else:
+            print(f"los      train={report['train_rows']:,} test={report['test_rows']:,} | pinball p50 {report['pinball_p50']:.3f} "
+                  f"(baseline {report['pinball_p50_baseline']:.3f}) MAE {report['mae']:.2f} (baseline {report['mae_baseline']:.2f}) | "
+                  f"{report['cells']} ячеек region×profile в gold/los_by_profile")
+            mlflow_log("los", {"train_rows": report["train_rows"]},
+                       {k: v for k, v in report.items() if isinstance(v, (int, float))},
+                       [lake.root / "models" / "los" / "report.json"])
     if "survival" in only:
         report = train_survival(lake, models_dir(lake) / "survival")
         for split, m in report["splits"].items():
