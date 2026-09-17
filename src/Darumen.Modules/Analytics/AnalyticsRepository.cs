@@ -42,6 +42,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
               AND (@streamId IS NULL OR a.stream_id = @streamId)
               AND (@severity IS NULL OR a.severity = @severity)
               AND (@status IS NULL OR coalesce(k.status, a.status) = @status)
+              AND (@moCode IS NULL OR a.mo_code = @moCode)
             """;
         var parameters = new
         {
@@ -49,6 +50,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
             streamId = filter.StreamId,
             severity = filter.Severity,
             status = filter.Status,
+            moCode = filter.MoCode,
             size,
             offset = (page - 1) * size,
         };
@@ -59,7 +61,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
             $"""
             SELECT a.id AS Id, a.stream_id AS StreamId, a.entity AS Entity, a.period AS Period, a.observed AS Observed,
                    a.expected AS Expected, a.score AS Score, a.peer_score AS PeerScore, a.severity AS Severity, a.kind AS Kind,
-                   coalesce(k.status, a.status) AS Status, a.region_kato AS RegionKato, k.comment AS Comment
+                   coalesce(k.status, a.status) AS Status, a.region_kato AS RegionKato, k.comment AS Comment, a.mo_code AS MoCode
             FROM gold.anomalies a LEFT JOIN journal.anomaly_acks k ON k.anomaly_id = a.id
             {where}
             ORDER BY a.period DESC, abs(a.score) DESC
@@ -68,7 +70,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
             parameters, cancellationToken: cancellationToken));
         var items = rows.Select(r => new AnomalyDto(
             r.Id, r.StreamId, EntityJson.Parse(r.Entity), r.Period, r.Observed, r.Expected, r.Score, r.PeerScore,
-            r.Severity, r.Kind, r.Status, r.RegionKato, r.Comment)).ToList();
+            r.Severity, r.Kind, r.Status, r.RegionKato, r.Comment, r.MoCode)).ToList();
         return new Paged<AnomalyDto>(items, page, size, total);
     }
 
@@ -190,7 +192,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
 
     private sealed record AnomalyRow(
         string Id, string StreamId, string Entity, string Period, double Observed, double Expected, double Score, double PeerScore,
-        string Severity, string Kind, string Status, string? RegionKato, string? Comment);
+        string Severity, string Kind, string Status, string? RegionKato, string? Comment, string? MoCode);
 
     private sealed record IndexRow(string RegionKato, string NameRu, string NameKz, double ShareOver30, double P90Days, double IndexValue, long Rank, long N);
 }

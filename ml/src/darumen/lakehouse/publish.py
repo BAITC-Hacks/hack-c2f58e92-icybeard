@@ -28,7 +28,6 @@ PG_TABLES: dict[str, tuple[str, str, str, list[str]]] = {
     "refdata.bed_profiles": ("refdata/bed_profiles.parquet", "*", "", ["profile_code"]),
     "refdata.mo_registry": ("refdata/mo_registry.parquet", "* EXCLUDE (name_variants)", "", ["mo_code"]),
     "gold.forecasts": ("gold/forecasts.parquet", "*", "", ["stream_id", "entity"]),
-    "gold.anomalies": ("gold/anomalies.parquet", f"{ANOMALY_ID} AS id, *", "", ["stream_id", "region_kato", "severity"]),
     "gold.access_index": ("gold/access_index.parquet", "month::DATE AS month, * EXCLUDE (month)", "", ["month", "profile_code"]),
     "gold.redistribution_q1": ("gold/redistribution_q1.parquet", "*", "", ["region_kato", "profile_code"]),
     "gold.rx_weekly": ("gold/rx_weekly.parquet", "*", "", ["drug_mnn_id", "week"]),
@@ -49,6 +48,37 @@ CH_TABLES: dict[str, tuple[str, str, list[str]]] = {
     "rx_weekly": ("gold/rx_weekly.parquet", "*", ["region_kato", "drug_mnn_id", "week"]),
     "rx_nosology_monthly": ("gold/rx_nosology_monthly.parquet", "*", ["nosology_id", "category_id", "month"]),
 }
+
+
+def _has_column(con: duckdb.DuckDBPyConnection, path: Path, column: str) -> bool:
+    return column in con.execute(f"SELECT * FROM read_parquet('{path}') LIMIT 0").df().columns
+
+
+def anomalies_select(lake: Lakehouse) -> str | None:
+    """gold.anomalies с колонкой mo_code: сопоставление по (region_kato, mo_key) с gold.er_visits_daily, где
+    mo_code уже подтягивается из mo_name_index при сборке gold (build_er_visits_daily). Сигналы потоков без
+    организации (например, региональные помесячные) остаются с mo_code = NULL — кабинету организации они не
+    попадутся, а фильтр по региону их не теряет."""
+    path = lake.root / "gold" / "anomalies.parquet"
+    if not path.exists():
+        return None
+    con = duckdb.connect()
+    try:
+        has_mo_key = _has_column(con, path, "mo_key")
+    finally:
+        con.close()
+    er_visits_path = lake.root / "gold" / "er_visits_daily.parquet"
+    if has_mo_key and er_visits_path.exists():
+        return f"""
+            SELECT md5(a.stream_id || '|' || a.entity || '|' || a.period) AS id, a.*, m.mo_code
+            FROM read_parquet('{path}') a
+            LEFT JOIN (
+                SELECT DISTINCT region_kato, mo_key, mo_code
+                FROM read_parquet('{er_visits_path}')
+                WHERE mo_code IS NOT NULL
+            ) m ON m.region_kato = a.region_kato AND m.mo_key = a.mo_key
+        """
+    return f"SELECT {ANOMALY_ID} AS id, *, NULL::VARCHAR AS mo_code FROM read_parquet('{path}')"
 
 
 def _as_of(con: duckdb.DuckDBPyConnection, lake: Lakehouse) -> str:
@@ -161,6 +191,9 @@ def publish_postgres(lake: Lakehouse, dsn: str = DEFAULT_PG_DSN, streams: dict[s
                 continue
             sql = f"SELECT {select} FROM read_parquet('{path}')" + (f" WHERE {where}" if where else "")
             counts[name] = _replace_pg_table(con, name, sql, index)
+        anomalies_sql = anomalies_select(lake)
+        if anomalies_sql is not None:
+            counts["gold.anomalies"] = _replace_pg_table(con, "gold.anomalies", anomalies_sql, ["stream_id", "region_kato", "severity", "mo_code"])
         counts["gold.queue_state"] = _replace_pg_table(con, "gold.queue_state", f"""
             SELECT q.day AS as_of, q.mo_code, q.profile_code, q.region_kato, q.queue_len, q.queue_age_p50, q.queue_age_p90,
                    coalesce(t.throughput_per_day, 0.0) AS throughput_per_day, t.refusal_rate_4w, t.wait_p50_4w, t.wait_p90_4w,

@@ -57,6 +57,18 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Anomalies_filter_by_mo_code_for_the_organisation_cabinet()
+    {
+        var client = app.CreateClient("chief", "chief-75", "75");
+        var byOrg = await client.GetFromJsonAsync<Paged<AnomalyDto>>("/api/v1/anomalies?regionKato=75&moCode=028B");
+        Assert.Single(byOrg!.Items);
+        Assert.Equal("a1", byOrg.Items[0].Id);
+
+        var unknownOrg = await client.GetFromJsonAsync<Paged<AnomalyDto>>("/api/v1/anomalies?regionKato=75&moCode=ZZZZ");
+        Assert.Empty(unknownOrg!.Items);
+    }
+
+    [Fact]
     public async Task Chief_cannot_close_signals_of_another_region()
     {
         var chief = app.CreateClient("chief", "chief-75", "75");

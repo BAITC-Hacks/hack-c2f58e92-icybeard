@@ -30,14 +30,14 @@ public static class AnalyticsEndpoints
             .Produces<ForecastResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity).ProducesProblem(StatusCodes.Status404NotFound);
 
         var anomalies = api.MapGroup("/anomalies").WithTags("Anomalies").RequireAuthorization(Policies.ChiefOrRegulator);
-        anomalies.MapGet("/", async (string? regionKato, string? streamId, string? severity, string? status, int? page, int? size,
+        anomalies.MapGet("/", async (string? regionKato, string? streamId, string? severity, string? status, string? moCode, int? page, int? size,
                 HttpContext http, IAnalyticsRepository repository, CancellationToken ct) =>
             {
                 // главврач видит сигналы только своего региона: клейм region_kato сильнее параметра запроса
                 regionKato = RegionScope(CurrentUser.From(http)) ?? regionKato;
 
                 var (p, s) = Paging.Normalize(page, size);
-                return Results.Ok(await repository.AnomaliesAsync(new AnomalyFilter(regionKato, streamId, severity, status ?? "open"), p, s, ct));
+                return Results.Ok(await repository.AnomaliesAsync(new AnomalyFilter(regionKato, streamId, severity, status ?? "open", moCode), p, s, ct));
             })
             .WithName("Anomalies").WithSummary("Сигналы аномалий, по умолчанию открытые, отсортированы по силе")
             .Produces<Paged<AnomalyDto>>();

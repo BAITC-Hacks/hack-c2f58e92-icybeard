@@ -20,7 +20,7 @@ export const analytics = {
     for (const [key, value] of Object.entries(entity)) query[`entity[${key}]`] = value
     return api<ForecastResponse>(`/api/v1/forecast/${encodeURIComponent(streamId)}`, { query })
   },
-  anomalies: (filter: { regionKato?: string; streamId?: string; severity?: string; status?: string; page?: number; size?: number }) =>
+  anomalies: (filter: { regionKato?: string; streamId?: string; severity?: string; status?: string; moCode?: string; page?: number; size?: number }) =>
     api<Paged<Anomaly>>('/api/v1/anomalies', { query: filter }),
   ack: (id: string, comment: string, status = 'acknowledged') =>
     api<void>(`/api/v1/anomalies/${encodeURIComponent(id)}/ack`, { body: { comment, status } }),

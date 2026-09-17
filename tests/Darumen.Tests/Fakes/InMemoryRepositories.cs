@@ -25,7 +25,7 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
 
     public List<AnomalyDto> Anomalies { get; } =
     [
-        new("a1", "er_visits_daily", new Dictionary<string, string> { ["region_kato"] = "75", ["mo_key"] = "org a" }, "2025-03-15", 120, 40, 6.1, 5.0, "critical", "entity", "open", "75", null),
+        new("a1", "er_visits_daily", new Dictionary<string, string> { ["region_kato"] = "75", ["mo_key"] = "org a" }, "2025-03-15", 120, 40, 6.1, 5.0, "critical", "entity", "open", "75", null, "028B"),
         new("a2", "admissions_monthly", new Dictionary<string, string> { ["region_kato"] = "10", ["profile_code"] = "381" }, "2025-02", 50, 80, -3.4, -1.0, "warning", "shared", "open", "10", null),
     ];
 
@@ -44,7 +44,8 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
     {
         var items = Anomalies
             .Select(a => _acks.TryGetValue(a.Id, out var ack) ? a with { Status = ack.Status, Comment = ack.Comment } : a)
-            .Where(a => (filter.RegionKato is null || a.RegionKato == filter.RegionKato) && (filter.Status is null || a.Status == filter.Status))
+            .Where(a => (filter.RegionKato is null || a.RegionKato == filter.RegionKato) && (filter.Status is null || a.Status == filter.Status)
+                        && (filter.MoCode is null || a.MoCode == filter.MoCode))
             .ToList();
         return Task.FromResult(new Paged<AnomalyDto>(items.Skip((page - 1) * size).Take(size).ToList(), page, size, items.Count));
     }

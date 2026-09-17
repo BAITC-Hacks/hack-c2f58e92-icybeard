@@ -30,9 +30,6 @@ const error = ref<unknown>(null)
 
 const orgName = computed(() => organizations.value.find((o) => o.moCode === moCode.value)?.name ?? moCode.value)
 
-/** Сигналы, в сущности которых встречается код организации (mo_key и т. п.). */
-const orgAnomalies = computed(() => anomalies.value.filter((a) => Object.values(a.entity).includes(moCode.value)))
-
 async function load() {
   error.value = null
   series.value = null
@@ -45,7 +42,7 @@ async function load() {
       if (!(e instanceof ApiError && e.status === 404)) throw e
     }
     regionPrediction.value = await queue.predict({ regionKato: kato.value, profileCode: profile.value })
-    anomalies.value = (await analytics.anomalies({ regionKato: kato.value, status: 'open', size: 50 })).items
+    anomalies.value = (await analytics.anomalies({ regionKato: kato.value, moCode: moCode.value, status: 'open', size: 50 })).items
   } catch (e) {
     error.value = e
   }
@@ -122,8 +119,8 @@ watch([moCode, profile], load)
     </div>
     <div class="card" style="margin-top: 16px">
       <h2>Сигналы организации <OriginTag kind="formula" /></h2>
-      <AnomalyFeed :items="orgAnomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
-      <p v-if="orgAnomalies.length === 0" class="muted">Открытых сигналов по этой организации нет.</p>
+      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
+      <p v-if="anomalies.length === 0" class="muted">Открытых сигналов по этой организации нет.</p>
     </div>
   </main>
 </template>
