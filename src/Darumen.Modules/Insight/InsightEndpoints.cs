@@ -31,8 +31,10 @@ public static class InsightEndpoints
                     return Results.Problem(statusCode: StatusCodes.Status503ServiceUnavailable, title: "Модель недоступна", detail: exception.Message);
                 }
             })
+            .RequireRateLimiting(RateLimits.ModelCalls)
             .WithName("InsightAsk").WithSummary("Вопрос к данным: ответ с цифрой, графиком и списком использованных инструментов")
-            .Produces<AskResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity).ProducesProblem(StatusCodes.Status503ServiceUnavailable);
+            .Produces<AskResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable).Produces(StatusCodes.Status429TooManyRequests);
 
         group.MapGet("/status", (InsightService service, Microsoft.Extensions.Options.IOptions<InsightOptions> options) =>
                 Results.Ok(new { available = service.Available, provider = options.Value.Provider, model = options.Value.Model }))

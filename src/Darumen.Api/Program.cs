@@ -60,6 +60,7 @@ app.UseStatusCodePages();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter(); // после входа: лимит считается на пользователя
 app.UseMiddleware<AuditMiddleware>();
 app.UseOutputCache();
 

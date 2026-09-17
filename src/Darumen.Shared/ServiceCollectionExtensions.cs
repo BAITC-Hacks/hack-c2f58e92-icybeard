@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
         services.Configure<ModelServicesOptions>(configuration.GetSection(ModelServicesOptions.Section));
         services.AddDarumenPostgres(configuration);
         services.AddDarumenAuth(configuration);
+        services.AddDarumenRateLimits(configuration);
         services.AddSingleton<AuditQueue>();
         services.AddHostedService<AuditWriter>();
         services.AddProblemDetails();
