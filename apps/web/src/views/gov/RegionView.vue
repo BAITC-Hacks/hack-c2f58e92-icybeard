@@ -132,7 +132,7 @@ watch(moCode, loadSeries)
         <div v-if="series" class="kpi" style="margin-bottom: 12px">
           <div class="item"><div class="value">{{ series.days.at(-1)?.queueLen ?? '—' }}</div><div class="label">в очереди сейчас</div></div>
           <div class="item"><div class="value">{{ days(series.throughput?.throughputPerDay, 1) }}</div><div class="label">госпитализаций в день, 4 нед.</div></div>
-          <div class="item"><div class="value">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</div><div class="label">факт p50 / p90, дн.</div></div>
+          <div class="item"><div class="value">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</div><div class="label">факт p50 / p90 среди госпитализированных, дн.</div></div>
           <div class="item"><div class="value">{{ pct(series.throughput?.refusalRate4w) }}</div><div class="label">отказы, 4 нед.</div></div>
         </div>
         <QueueChart v-if="series" :days="series.days" title="Очередь организации по профилю" />

@@ -93,7 +93,7 @@ watch([moCode, profile], load)
           <div class="kpi">
             <div class="item"><div class="value">{{ series.days.at(-1)?.queueLen ?? '—' }}</div><div class="label">в очереди сейчас</div></div>
             <div class="item"><div class="value">{{ days(series.throughput?.throughputPerDay, 1) }}</div><div class="label">госпитализаций в день</div></div>
-            <div class="item"><div class="value">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</div><div class="label">факт p50 / p90, дн.</div></div>
+            <div class="item"><div class="value">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</div><div class="label">факт p50 / p90 среди госпитализированных, дн.</div></div>
             <div class="item"><div class="value">{{ pct(series.throughput?.refusalRate4w) }}</div><div class="label">отказы</div></div>
           </div>
         </template>
@@ -103,7 +103,7 @@ watch([moCode, profile], load)
         <h2>Регион для сравнения <OriginTag kind="ml" /></h2>
         <template v-if="regionPrediction">
           <div class="kpi">
-            <div class="item"><div class="value">{{ days(regionPrediction.p50Days) }} / {{ days(regionPrediction.p90Days) }}</div><div class="label">прогноз p50 / p90 по региону, дн.</div></div>
+            <div class="item"><div class="value">{{ days(regionPrediction.p50Days) }} / {{ days(regionPrediction.p90Days) }}</div><div class="label">прогноз p50 / p90 по региону среди госпитализированных, дн.</div></div>
             <div class="item"><div class="value">{{ pct(regionPrediction.pWithin30Days) }}</div><div class="label">попадают за 30 дней</div></div>
             <div class="item"><div class="value">{{ pct(regionPrediction.pRefusal) }}</div><div class="label">риск отказа по региону</div></div>
           </div>

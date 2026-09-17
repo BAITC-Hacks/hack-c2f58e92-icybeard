@@ -178,7 +178,7 @@ onMounted(async () => {
         <div class="kpi">
           <div class="item">
             <div class="value">{{ pct(report.simulate.saved_share) }}</div>
-            <div class="label">экономия дней ожидания за {{ report.simulate.horizon_days }} дней (интервал {{ pct(report.simulate.saved_share_band?.[0]) }}…{{ pct(report.simulate.saved_share_band?.[1]) }})</div>
+            <div class="label">экономия дней ожидания за {{ report.simulate.horizon_days }} дней, оценка сверху (интервал {{ pct(report.simulate.saved_share_band?.[0]) }}…{{ pct(report.simulate.saved_share_band?.[1]) }})</div>
           </div>
           <div class="item">
             <div class="value">{{ report.simulate.consistency_spearman?.toFixed(2) ?? '—' }}</div>

@@ -80,7 +80,7 @@ onMounted(async () => {
       <div class="card">
         <h2>В среднем по региону <OriginTag kind="ml" /></h2>
         <div class="kpi">
-          <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">половина пациентов ждёт не дольше, дн.</div></div>
+          <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">половина госпитализированных ждёт не дольше, дн.</div></div>
           <div class="item"><div class="value">{{ days(prediction.p90Days) }}</div><div class="label">9 из 10 ждут не дольше, дн.</div></div>
           <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">попадают за 30 дней</div></div>
         </div>

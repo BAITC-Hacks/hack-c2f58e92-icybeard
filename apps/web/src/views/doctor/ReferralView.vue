@@ -158,7 +158,7 @@ watch(() => form.regionKato, loadReferringOrganizations)
         <div class="card">
           <h2>Прогноз для {{ organizations.find((o) => o.moCode === form.moCode)?.name ?? form.moCode }}</h2>
           <div class="kpi">
-            <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">медианное ожидание, дн.</div></div>
+            <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">медианное ожидание среди госпитализированных, дн.</div></div>
             <div class="item"><div class="value">{{ days(prediction.p90Days) }}</div><div class="label">p90, дн.</div></div>
             <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">госпитализация за 30 дней</div></div>
             <div class="item">

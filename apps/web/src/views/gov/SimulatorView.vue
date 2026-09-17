@@ -71,7 +71,7 @@ onMounted(async () => {
         <div class="kpi">
           <div class="item"><div class="value">{{ days(result.baseline.meanWaitDays, 1) }}</div><div class="label">ожидание сейчас, дн.</div></div>
           <div class="item"><div class="value">{{ days(result.scenario.meanWaitDays, 1) }}</div><div class="label">ожидание в сценарии, дн.</div></div>
-          <div class="item"><div class="value">{{ signed(result.deltaDays) }}</div><div class="label">изменение, дн. (интервал {{ signed(result.ci[0] ?? 0) }} … {{ signed(result.ci[1] ?? 0) }})</div></div>
+          <div class="item"><div class="value">{{ signed(result.deltaDays) }}</div><div class="label">изменение, дн. (чувствительность к потоку ±20 %: {{ signed(result.ci[0] ?? 0) }} … {{ signed(result.ci[1] ?? 0) }})</div></div>
         </div>
         <ul class="muted"><li v-for="a in result.assumptions" :key="a">{{ a }}</li></ul>
         <p class="muted" v-if="los && los.losMedianFact > 0">
