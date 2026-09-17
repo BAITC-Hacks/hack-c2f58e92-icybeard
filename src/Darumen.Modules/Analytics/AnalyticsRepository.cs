@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Dapper;
 using Darumen.Migrations;
 using Darumen.Shared.Api;
@@ -71,34 +72,58 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
         return new Paged<AnomalyDto>(items, page, size, total);
     }
 
-    public async Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, Func<object> outboxEvent, CancellationToken cancellationToken)
+    public async Task<AckOutcome> AcknowledgeAsync(AnomalyAckCommand command, Func<object> outboxEvent, CancellationToken cancellationToken)
     {
         await using (var connection = await db.OpenAsync(cancellationToken))
         {
-            var exists = await connection.ExecuteScalarAsync<bool>(new CommandDefinition(
-                "SELECT EXISTS (SELECT 1 FROM gold.anomalies WHERE id = @anomalyId)", new { anomalyId }, cancellationToken: cancellationToken));
-            if (!exists)
+            var signal = await connection.QueryFirstOrDefaultAsync<SignalScopeRow>(new CommandDefinition(
+                "SELECT region_kato AS RegionKato FROM gold.anomalies WHERE id = @anomalyId",
+                new { anomalyId = command.AnomalyId }, cancellationToken: cancellationToken));
+            if (signal is null)
             {
-                return false;
+                return AckOutcome.NotFound;
+            }
+
+            if (command.RegionScope is not null && signal.RegionKato != command.RegionScope)
+            {
+                return AckOutcome.OutOfScope;
             }
         }
 
         var context = outbox.DbContext;
-        var ack = await context.AnomalyAcks.FindAsync([anomalyId], cancellationToken);
+        var now = DateTime.UtcNow;
+        var ack = await context.AnomalyAcks.FindAsync([command.AnomalyId], cancellationToken);
         if (ack is null)
         {
-            ack = new AnomalyAck { AnomalyId = anomalyId };
+            ack = new AnomalyAck { AnomalyId = command.AnomalyId };
             context.AnomalyAcks.Add(ack);
         }
 
-        ack.Status = status;
-        ack.Comment = comment;
-        ack.Actor = actor;
-        ack.AckedAt = DateTime.UtcNow;
+        ack.Status = command.Status;
+        ack.Comment = command.Comment;
+        ack.Actor = command.Actor;
+        ack.AckedAt = now;
+
+        // решение по сигналу видно в общем журнале рядом с решениями врачей: рекомендация системы — «открыт», выбор человека — статус
+        context.Decisions.Add(new Decision
+        {
+            Id = Guid.NewGuid(),
+            Actor = command.Actor,
+            Role = command.Role,
+            Subject = DecisionSubjects.Anomaly,
+            SubjectId = command.AnomalyId,
+            Recommended = StatusJson(AnomalyStatuses.Open),
+            Chosen = StatusJson(command.Status),
+            Reason = command.Comment,
+            RecordedAt = now,
+        });
+
         await outbox.PublishAsync(outboxEvent());
         await outbox.SaveChangesAndFlushMessagesAsync(cancellationToken);
-        return true;
+        return AckOutcome.Acknowledged;
     }
+
+    private static string StatusJson(string status) => JsonSerializer.Serialize(new { status });
 
     public async Task<IReadOnlyList<string>> IndexMonthsAsync(CancellationToken cancellationToken)
     {
@@ -158,6 +183,8 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
             return [];
         }
     }
+
+    private sealed record SignalScopeRow(string? RegionKato);
 
     private sealed record StreamRow(string StreamId, string Title, string Grain, string EntityKeys, string Horizons);
 

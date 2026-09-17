@@ -51,8 +51,27 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
         Assert.Single(after!.Items);
         Assert.Equal("проверено, вспышка ОРВИ", after.Items[0].Comment);
         Assert.Contains(app.Analytics.Published.OfType<Darumen.Contracts.V1.DecisionRecorded>(), e => e.Subject == "anomaly" && e.DecisionId == "a1" && e.Chosen == "acknowledged");
+        Assert.Contains(app.Analytics.Commands, c => c.AnomalyId == "a1" && c.Actor == "chief-75" && c.Role == "chief" && c.RegionScope == "75");
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/v1/anomalies/zzz/ack", new AckRequestDto(null, null))).StatusCode);
+    }
+
+    [Fact]
+    public async Task Chief_cannot_close_signals_of_another_region()
+    {
+        var chief = app.CreateClient("chief", "chief-75", "75");
+        var response = await chief.PostAsJsonAsync("/api/v1/anomalies/a2/ack", new AckRequestDto("не мой регион", "dismissed"));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.DoesNotContain(app.Analytics.Commands, c => c.AnomalyId == "a2");
+    }
+
+    [Fact]
+    public async Task Ack_accepts_only_closing_statuses()
+    {
+        var regulator = app.CreateClient("regulator");
+        var response = await regulator.PostAsJsonAsync("/api/v1/anomalies/a2/ack", new AckRequestDto(null, "closed"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.DoesNotContain(app.Analytics.Commands, c => c.AnomalyId == "a2");
     }
 
     [Fact]

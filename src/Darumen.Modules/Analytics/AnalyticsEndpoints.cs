@@ -34,11 +34,7 @@ public static class AnalyticsEndpoints
                 HttpContext http, IAnalyticsRepository repository, CancellationToken ct) =>
             {
                 // главврач видит сигналы только своего региона: клейм region_kato сильнее параметра запроса
-                var user = CurrentUser.From(http);
-                if (user.Role == Roles.Chief && !string.IsNullOrWhiteSpace(user.RegionKato))
-                {
-                    regionKato = user.RegionKato;
-                }
+                regionKato = RegionScope(CurrentUser.From(http)) ?? regionKato;
 
                 var (p, s) = Paging.Normalize(page, size);
                 return Results.Ok(await repository.AnomaliesAsync(new AnomalyFilter(regionKato, streamId, severity, status ?? "open"), p, s, ct));
@@ -48,24 +44,37 @@ public static class AnalyticsEndpoints
 
         anomalies.MapPost("/{id}/ack", async (string id, AckRequestDto? body, HttpContext http, IAnalyticsRepository repository, CancellationToken ct) =>
             {
-                var status = string.IsNullOrWhiteSpace(body?.Status) ? "acknowledged" : body.Status;
+                var status = string.IsNullOrWhiteSpace(body?.Status) ? AnomalyStatuses.Acknowledged : body.Status;
+                if (!AnomalyStatuses.Closing.Contains(status))
+                {
+                    return new ValidationErrors().Add("status", $"допустимые значения: {string.Join(", ", AnomalyStatuses.Closing)}").Problem();
+                }
+
                 var user = CurrentUser.From(http);
-                var acknowledged = await repository.AcknowledgeAsync(id, status, body?.Comment, user.Actor,
+                var command = new AnomalyAckCommand(id, status, body?.Comment, user.Actor, user.Role, RegionScope(user));
+                var outcome = await repository.AcknowledgeAsync(command,
                     () => new DecisionRecorded
                     {
                         Meta = Events.Meta(),
                         DecisionId = id,
                         ActorRole = user.Role,
-                        Subject = "anomaly",
-                        Recommended = "open",
+                        Subject = DecisionSubjects.Anomaly,
+                        Recommended = AnomalyStatuses.Open,
                         Chosen = status,
                         Reason = body?.Comment ?? string.Empty,
                     },
                     ct);
-                return acknowledged ? Results.NoContent() : Results.NotFound();
+                return outcome switch
+                {
+                    AckOutcome.Acknowledged => Results.NoContent(),
+                    AckOutcome.OutOfScope => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Сигнал другого региона",
+                        detail: "главврач закрывает сигналы только своего региона"),
+                    _ => Results.NotFound(),
+                };
             })
-            .WithName("AcknowledgeAnomaly").WithSummary("Подтвердить или закрыть сигнал")
-            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound);
+            .WithName("AcknowledgeAnomaly").WithSummary("Подтвердить сигнал или отметить ложным; решение попадает в журнал")
+            .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status403Forbidden).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
         api.MapGet("/quality", async (QualityService quality, CancellationToken ct) => await quality.ReportAsync(ct))
             .RequireAuthorization(Policies.Authenticated)
@@ -100,6 +109,10 @@ public static class AnalyticsEndpoints
             .WithTags("Index").WithName("AccessIndex").WithSummary("Индекс доступности плановой госпитализации по регионам")
             .Produces<IndexResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
+
+    /// <summary>Регион, которым ограничен пользователь: главврач работает только со своим регионом из клейма region_kato.</summary>
+    internal static string? RegionScope(CurrentUser user) =>
+        user.Role == Roles.Chief && !string.IsNullOrWhiteSpace(user.RegionKato) ? user.RegionKato : null;
 
     /// <summary>entity[regionKato]=75 → region_kato: 75; ключи в snake_case тоже принимаются.</summary>
     internal static IReadOnlyDictionary<string, string> ParseEntity(IQueryCollection query)

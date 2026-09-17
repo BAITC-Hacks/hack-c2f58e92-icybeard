@@ -22,6 +22,26 @@ public sealed record AnomalyFilter(string? RegionKato, string? StreamId, string?
 
 public sealed record AckRequestDto(string? Comment, string? Status);
 
+/// <summary>Статусы сигнала. Закрывающие статусы ставит человек; они же метки для дообучения детектора (models/anomaly_labels.py).</summary>
+public static class AnomalyStatuses
+{
+    public const string Open = "open";
+    public const string Acknowledged = "acknowledged";
+    public const string Dismissed = "dismissed";
+
+    public static readonly IReadOnlyList<string> Closing = [Acknowledged, Dismissed];
+}
+
+/// <summary>Решение человека по сигналу. RegionScope — регион, которым ограничен пользователь (главврач), иначе null.</summary>
+public sealed record AnomalyAckCommand(string AnomalyId, string Status, string? Comment, string Actor, string Role, string? RegionScope);
+
+public enum AckOutcome
+{
+    Acknowledged,
+    NotFound,
+    OutOfScope,
+}
+
 public sealed record IndexItemDto(string RegionKato, string Name, double ShareOver30, double P90Days, double IndexValue, int Rank, long N);
 
 public sealed record LosItemDto(string RegionKato, string ProfileName, string? ProfileCode, long N, double LosMedianFact, double? LosP50Model);

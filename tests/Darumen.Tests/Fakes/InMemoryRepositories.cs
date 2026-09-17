@@ -51,16 +51,26 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
 
     public List<object> Published { get; } = [];
 
-    public Task<bool> AcknowledgeAsync(string anomalyId, string status, string? comment, string actor, Func<object> outboxEvent, CancellationToken cancellationToken)
+    /// <summary>Команды, дошедшие до хранилища: проверка того, что актор, роль и регион передаются дальше.</summary>
+    public List<AnomalyAckCommand> Commands { get; } = [];
+
+    public Task<AckOutcome> AcknowledgeAsync(AnomalyAckCommand command, Func<object> outboxEvent, CancellationToken cancellationToken)
     {
-        if (Anomalies.All(a => a.Id != anomalyId))
+        var anomaly = Anomalies.FirstOrDefault(a => a.Id == command.AnomalyId);
+        if (anomaly is null)
         {
-            return Task.FromResult(false);
+            return Task.FromResult(AckOutcome.NotFound);
         }
 
-        _acks[anomalyId] = (status, comment);
+        if (command.RegionScope is not null && anomaly.RegionKato != command.RegionScope)
+        {
+            return Task.FromResult(AckOutcome.OutOfScope);
+        }
+
+        Commands.Add(command);
+        _acks[command.AnomalyId] = (command.Status, command.Comment);
         Published.Add(outboxEvent());
-        return Task.FromResult(true);
+        return Task.FromResult(AckOutcome.Acknowledged);
     }
 
     public Task<IReadOnlyList<string>> IndexMonthsAsync(CancellationToken cancellationToken) =>
