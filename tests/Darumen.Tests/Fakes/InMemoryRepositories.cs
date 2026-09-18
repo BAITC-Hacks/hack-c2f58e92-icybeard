@@ -54,7 +54,7 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
         var items = Anomalies
             .Select(a => _acks.TryGetValue(a.Id, out var ack) ? a with { Status = ack.Status, Comment = ack.Comment } : a)
             .Where(a => (filter.RegionKato is null || a.RegionKato == filter.RegionKato) && (filter.Status is null || a.Status == filter.Status)
-                        && (filter.MoCode is null || a.MoCode == filter.MoCode))
+                        && (filter.MoCode is null || a.MoCode == filter.MoCode) && (filter.StreamId is null || a.StreamId == filter.StreamId))
             .ToList();
         return Task.FromResult(new Paged<AnomalyDto>(items.Skip((page - 1) * size).Take(size).ToList(), page, size, items.Count));
     }
