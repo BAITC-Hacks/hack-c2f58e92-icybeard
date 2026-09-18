@@ -54,6 +54,44 @@ const STREAMS = computed(() => STREAM_DEFS.map((s) => ({ ...s, label: t(`gov.reg
 const streamMeta = computed(() => STREAMS.value.find((s) => s.value === streamKind.value)!)
 const selectedOrganization = computed(() => organizations.value.find((o) => o.moCode === moCode.value) ?? null)
 
+const bedForecast = ref<ForecastResponse | null>(null)
+const bedForecastHint = ref<string | null>(null)
+
+/** Дни в месяце периода "YYYY-MM" (без новых зависимостей: следующий месяц минус один день). */
+function daysInPeriod(period: string): number {
+  const [y, m] = period.split('-').map(Number)
+  return new Date(y, m, 0).getDate()
+}
+
+const TARGET_OCCUPANCY = 0.85
+
+/** Потребность в койках (5.1): прогноз bed_days того же потока admissions_monthly (профильный срез региона),
+ * переведённый в число коек по занятости TARGET_OCCUPANCY — формула поверх ML-прогноза, не отдельная модель. */
+const bedDemand = computed(() => {
+  if (!bedForecast.value) return []
+  const short = t('gov.region.monthsShort').split(',')
+  return bedForecast.value.points.map((p) => {
+    const beds = Math.ceil(p.yhat / (daysInPeriod(p.period) * TARGET_OCCUPANCY))
+    const m = Number(p.period.slice(5, 7))
+    const y = p.period.slice(0, 4)
+    return { period: p.period, label: `${short[m]} ${y}`, beds }
+  })
+})
+
+async function loadBedForecast() {
+  bedForecast.value = null
+  bedForecastHint.value = null
+  try {
+    bedForecast.value = await analytics.forecast('bed_days_monthly', { region_kato: kato.value, profile_code: profile.value }, 3)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      bedForecastHint.value = t('gov.region.forecastNotBuiltProfile')
+      return
+    }
+    throw e
+  }
+}
+
 /** Для плоского прогноза: месяцы горизонта с сезонным множителем NHS (форма плановых госпитализаций). Ориентир
  * подобран только для потока госпитализаций — для приёмного покоя и вакцинации сезонность другая. */
 const flatSeasonHint = computed(() => {
@@ -104,6 +142,7 @@ async function loadRegion() {
     anomalies.value = (await analytics.anomalies({ regionKato: kato.value, status: 'open', size: 10 })).items
     overloaded.value = (await queue.overloaded(kato.value)).items
     await loadForecast()
+    await loadBedForecast()
   } catch (e) {
     error.value = e
   }
@@ -252,6 +291,14 @@ watch(vaccinationPlan, () => {
       <div class="card">
         <h2>{{ t('gov.map.overloaded') }} <OriginTag kind="formula" /></h2>
         <OverloadedTable :items="overloaded" @organization="goToOrganization" @simulate="goToSimulator" />
+      </div>
+      <div class="card">
+        <h2>{{ t('gov.region.bedDemand.title') }}: {{ refdata.profileName(profile) }} <OriginTag kind="ml" /> <OriginTag kind="formula" /></h2>
+        <ul v-if="bedDemand.length" class="muted">
+          <li v-for="d in bedDemand" :key="d.period">{{ d.label }}: {{ d.beds }} {{ t('gov.region.bedDemand.unit') }}</li>
+        </ul>
+        <p v-else-if="bedForecastHint" class="muted">{{ bedForecastHint }}</p>
+        <p class="muted">{{ t('gov.region.bedDemand.formula') }}</p>
       </div>
     </div>
   </main>

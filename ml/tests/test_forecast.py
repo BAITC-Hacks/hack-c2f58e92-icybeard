@@ -15,8 +15,10 @@ def _monthly_gold(tmp_path, months=60, seed=1):
             for i in range(months):
                 month = pd.Timestamp("2021-01-01") + pd.DateOffset(months=i)
                 seasonal = 1 + 0.15 * np.sin(2 * np.pi * (i % 12) / 12)
+                cases = int(level * seasonal + rng.normal(0, 8))
+                los_mean = {"021": 9.0, "381": 4.0}[profile]  # разная длительность лечения по профилю, чтобы bed_days != cases
                 rows.append({"month": month.date(), "region_kato": region, "profile_code": profile,
-                             "cases": int(level * seasonal + rng.normal(0, 8)), "bed_days": 0, "los_mean": 7.0, "deaths": 0, "mo_count": 3})
+                             "cases": cases, "bed_days": int(cases * los_mean), "los_mean": los_mean, "deaths": 0, "mo_count": 3})
     gold = tmp_path / "lake" / "gold"
     gold.mkdir(parents=True)
     pd.DataFrame(rows).to_parquet(gold / "admissions_monthly.parquet", index=False)
@@ -27,6 +29,32 @@ def test_streams_are_declared():
     streams = load_streams()
     assert {"er_visits_daily", "admissions_monthly", "vac_monthly"} <= set(streams)
     assert streams["admissions_monthly"].freq == "MS" and streams["er_visits_daily"].freq == "D"
+
+
+def test_bed_days_stream_is_declared():
+    # 5.1: поток строится на том же gold-срезе admissions_monthly, только y = bed_days (сумма, а не count)
+    streams = load_streams()
+    assert "bed_days_monthly" in streams
+    stream = streams["bed_days_monthly"]
+    assert stream.table == "admissions_monthly" and stream.y_col == "bed_days"
+    assert stream.entity == ("region_kato", "profile_code") and stream.freq == "MS"
+
+
+def test_bed_days_series_matches_gold_column(tmp_path):
+    root = _monthly_gold(tmp_path)
+    stream = load_streams()["bed_days_monthly"]
+    series = load_series(Lakehouse(root), stream)
+    gold = pd.read_parquet(root / "gold" / "admissions_monthly.parquet")
+    # для каждой сущности сумма bed_days из ряда совпадает с суммой bed_days в gold (без хвоста, отброшенного как неполный)
+    for uid, part in series.groupby("unique_id"):
+        region, profile_code = uid.split("|")
+        gold_part = gold[(gold["region_kato"] == region) & (gold["profile_code"] == profile_code)]
+        gold_part = gold_part[pd.to_datetime(gold_part["month"]) <= part["ds"].max()]
+        assert part["y"].sum() == gold_part["bed_days"].sum()
+        assert part["y"].sum() > 0
+    # bed_days не совпадает с cases для того же профиля — проверяет, что мы не сложили не ту колонку
+    cases_series = load_series(Lakehouse(root), load_streams()["admissions_monthly"])
+    assert cases_series["y"].sum() != series["y"].sum()
 
 
 def test_incomplete_tail_is_dropped(tmp_path):

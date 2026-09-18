@@ -1,0 +1,10 @@
+stream: bed_days_monthly
+title: Койко-дни по региону и профилю, по месяцам, из списка пролеченных с 2012 года
+from: silver.ersb_cases
+gold: { table: admissions_monthly, time: month, y: bed_days }
+entity: [region_kato, profile_code]
+time: { column: p_outdate, grain: month }
+measure: { agg: sum }
+peer_group: [profile_code]
+forecast: { horizons: [1, 2, 3], min_history: 36, season: 12, backtest_windows: 4, backtest_step: 3 }
+anomaly: { method: robust_z, window: 36, threshold: 3.0 }  # три года того же месяца
