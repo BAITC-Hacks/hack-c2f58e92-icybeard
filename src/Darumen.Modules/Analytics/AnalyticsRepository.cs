@@ -61,7 +61,8 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
             $"""
             SELECT a.id AS Id, a.stream_id AS StreamId, a.entity AS Entity, a.period AS Period, a.observed AS Observed,
                    a.expected AS Expected, a.score AS Score, a.peer_score AS PeerScore, a.severity AS Severity, a.kind AS Kind,
-                   coalesce(k.status, a.status) AS Status, a.region_kato AS RegionKato, k.comment AS Comment, a.mo_code AS MoCode
+                   coalesce(k.status, a.status) AS Status, a.region_kato AS RegionKato, k.comment AS Comment, a.mo_code AS MoCode,
+                   a.affected AS Affected
             FROM gold.anomalies a LEFT JOIN journal.anomaly_acks k ON k.anomaly_id = a.id
             {where}
             ORDER BY a.period DESC, abs(a.score) DESC
@@ -70,7 +71,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
             parameters, cancellationToken: cancellationToken));
         var items = rows.Select(r => new AnomalyDto(
             r.Id, r.StreamId, EntityJson.Parse(r.Entity), r.Period, r.Observed, r.Expected, r.Score, r.PeerScore,
-            r.Severity, r.Kind, r.Status, r.RegionKato, r.Comment, r.MoCode)).ToList();
+            r.Severity, r.Kind, r.Status, r.RegionKato, r.Comment, r.MoCode, r.Affected)).ToList();
         return new Paged<AnomalyDto>(items, page, size, total);
     }
 
@@ -192,7 +193,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
 
     private sealed record AnomalyRow(
         string Id, string StreamId, string Entity, string Period, double Observed, double Expected, double Score, double PeerScore,
-        string Severity, string Kind, string Status, string? RegionKato, string? Comment, string? MoCode);
+        string Severity, string Kind, string Status, string? RegionKato, string? Comment, string? MoCode, int? Affected);
 
     private sealed record IndexRow(string RegionKato, string NameRu, string NameKz, double ShareOver30, double P90Days, double IndexValue, long Rank, long N);
 }

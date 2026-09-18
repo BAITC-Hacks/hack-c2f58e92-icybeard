@@ -1,0 +1,10 @@
+stream: queue_daily
+title: Регистрация направлений (поток в очередь на госпитализацию), по организациям, по дням
+from: gold.queue_daily
+gold: { table: queue_daily, time: day, y: registered }
+entity: [region_kato, mo_code, profile_code]
+time: { column: day, grain: day }
+measure: { agg: sum }
+peer_group: [region_kato, profile_code]
+forecast: { horizons: [7, 14, 30], min_history: 60, season: 7, backtest_windows: 3, backtest_step: 7 }
+anomaly: { method: robust_z, window: 28, threshold: 3.5 }

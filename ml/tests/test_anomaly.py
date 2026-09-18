@@ -29,12 +29,27 @@ def test_spike_is_detected_and_quiet_series_is_not():
     assert len(flagged) <= 8  # no more than a handful of false alarms on Poisson noise
 
 
-def test_shared_wave_is_marked_shared():
+def test_shared_wave_collapses_into_one_signal_per_region_and_period():
+    """3.3: a region-wide wave used to flag every organisation separately, flooding the feed with one row per
+    organisation for what is really one event. It now collapses to a single row per (peer group, period) —
+    here peer_group is (region_kato,), so one row for the whole region, not six for the six organisations."""
     df = _daily()
     df.loc[df["ds"] == "2025-03-20", "y"] *= 4  # every organisation in the region spikes the same day
     flagged = detect(df, STREAM)
     wave = flagged[flagged["ds"] == "2025-03-20"]
-    assert len(wave) == 6 and (wave["kind"] == "shared").all()
+    assert len(wave) == 1
+    row = wave.iloc[0]
+    assert row["kind"] == "shared" and row["affected"] == 6
+    assert row["region_kato"] == "10" and pd.isna(row["mo_key"])  # различающий ключ пуст — сигнал не про одну организацию
+
+
+def test_entity_specific_spike_is_not_collapsed():
+    """Обычный сигнал по одной организации (kind == entity) не трогается: affected остаётся NaN, mo_key на месте."""
+    df = _daily()
+    df.loc[(df["unique_id"] == "10|org0") & (df["ds"] == "2025-03-15"), "y"] = 200.0
+    flagged = detect(df, STREAM)
+    hit = flagged[(flagged["unique_id"] == "10|org0") & (flagged["ds"] == "2025-03-15")].iloc[0]
+    assert hit["kind"] == "entity" and pd.isna(hit["affected"]) and hit["mo_key"] == "org0"
 
 
 def test_robust_z_excludes_current_point():

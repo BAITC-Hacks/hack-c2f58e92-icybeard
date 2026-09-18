@@ -34,6 +34,8 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
     [
         new("a1", "er_visits_daily", new Dictionary<string, string> { ["region_kato"] = "75", ["mo_key"] = "org a" }, "2025-03-15", 120, 40, 6.1, 5.0, "critical", "entity", "open", "75", null, "028B"),
         new("a2", "admissions_monthly", new Dictionary<string, string> { ["region_kato"] = "10", ["profile_code"] = "381" }, "2025-02", 50, 80, -3.4, -1.0, "warning", "shared", "open", "10", null),
+        // 3.3: региональная волна очереди — различающие ключи (mo_code) уже свёрнуты в модели, Affected = сколько организаций затронуто
+        new("a3", "queue_daily", new Dictionary<string, string> { ["region_kato"] = "10", ["profile_code"] = "381" }, "2025-03-20", 340, 90, 5.2, 5.2, "critical", "shared", "open", "10", null, null, 6),
     ];
 
     public Task<IReadOnlyList<StreamDto>> StreamsAsync(CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<StreamDto>>(

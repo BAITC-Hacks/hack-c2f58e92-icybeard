@@ -43,6 +43,8 @@ export interface Anomaly {
   score: number; peerScore: number; severity: string; kind: string; status: string; regionKato: string | null; comment: string | null
   /** не у всех потоков сигнал привязан к организации (например, у помесячных региональных) */
   moCode: string | null
+  /** только у kind === 'shared': сколько сущностей (например, организаций) затронула волна — differentiating-ключи в entity для неё пусты */
+  affected: number | null
 }
 /** Внешняя сезонная форма (NHS): множитель месяца при среднегодовом = 1. */
 export interface Seasonality { seriesId: string; month: number; multiplier: number; title: string; source: string; sourceYear: number; windowLabel: string }

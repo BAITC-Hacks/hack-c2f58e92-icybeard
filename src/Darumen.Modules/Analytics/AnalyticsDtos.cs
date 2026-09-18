@@ -17,7 +17,7 @@ public sealed record ForecastResponseDto(
 public sealed record AnomalyDto(
     string Id, string StreamId, IReadOnlyDictionary<string, string> Entity, string Period, double Observed, double Expected,
     double Score, double PeerScore, string Severity, string Kind, string Status, string? RegionKato, string? Comment,
-    string? MoCode = null);
+    string? MoCode = null, int? Affected = null);
 
 /// <summary>MoCode — необязательно: не у всех потоков сигнал привязан к организации (see gold.anomalies.mo_code).</summary>
 public sealed record AnomalyFilter(string? RegionKato, string? StreamId, string? Severity, string? Status, string? MoCode = null);

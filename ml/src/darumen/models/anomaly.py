@@ -71,6 +71,30 @@ def peer_adjust(scored: pd.DataFrame, peer_keys: tuple[str, ...]) -> pd.DataFram
     return scored
 
 
+def collapse_shared_waves(flagged: pd.DataFrame, stream: Stream) -> pd.DataFrame:
+    """3.3: a region-wide (or other peer-group-wide) wave flags every entity in the group at once — without
+    this, the feed would show one row per organisation for what is really one event. Rows with kind == "entity"
+    (this entity alone, not the group) pass through untouched; "shared" rows collapse to one row per
+    (peer group, period). The entity keys that are NOT part of the peer group (e.g. mo_code — the group is
+    the whole region) are blanked out, so the signal reads as the region, not as whichever one organisation
+    happened to have the worst score; "affected" says how many entities the wave covered instead.
+    """
+    peer_keys = [k for k in stream.peer_group if k in flagged.columns]
+    if flagged.empty or not peer_keys or "kind" not in flagged.columns:
+        return flagged.assign(affected=np.nan) if not flagged.empty else flagged
+    entity_only = flagged[flagged["kind"] == "entity"].assign(affected=np.nan)
+    shared = flagged[flagged["kind"] == "shared"]
+    if shared.empty:
+        return entity_only
+    worst = shared.loc[shared.groupby([*peer_keys, "ds"])["z"].transform(lambda s: s.abs().idxmax()) == shared.index].copy()
+    totals = shared.groupby([*peer_keys, "ds"], as_index=False).agg(y=("y", "sum"), expected=("expected", "sum"), affected=("y", "size"))
+    collapsed = worst.drop(columns=["y", "expected"]).merge(totals, on=[*peer_keys, "ds"])
+    for key in stream.entity:
+        if key not in peer_keys:
+            collapsed[key] = None
+    return pd.concat([entity_only, collapsed], ignore_index=True, sort=False)
+
+
 def detect(series: pd.DataFrame, stream: Stream) -> pd.DataFrame:
     cfg = stream.anomaly
     window = int(cfg.get("window", 28))
@@ -81,7 +105,7 @@ def detect(series: pd.DataFrame, stream: Stream) -> pd.DataFrame:
     flagged["severity"] = np.where(flagged["z"].abs() >= 1.5 * threshold, "critical", "warning")
     # shared = the peer group as a whole moved (a regional wave), entity = this organisation alone
     flagged["kind"] = np.where(flagged["peer_median_z"].abs() >= threshold / 2, "shared", "entity")
-    return flagged
+    return collapse_shared_waves(flagged, stream)
 
 
 def evaluate_injection(series: pd.DataFrame, stream: Stream, n_spikes: int = 200, factor: float = 3.0, seed: int = 42) -> dict:
@@ -130,14 +154,16 @@ def detect_all(lake: Lakehouse, only: list[str] | None = None) -> dict[str, dict
         write_json(out_dir / "report.json", report)
         reports[stream_id] = report
         if len(flagged):
+            # у "shared" (региональная волна) строк различающие ключи (не входящие в peer_group) пусты —
+            # entity в сигнале честно содержит только то, что действительно объединяет затронутые сущности
             frames.append(pd.DataFrame({
                 "stream_id": stream_id,
-                "entity": flagged[list(stream.entity)].apply(lambda r: json.dumps(dict(r), ensure_ascii=False), axis=1),
+                "entity": flagged[list(stream.entity)].apply(lambda r: json.dumps({k: v for k, v in dict(r).items() if pd.notna(v)}, ensure_ascii=False), axis=1),
                 "period": flagged["ds"].dt.strftime(period_format(stream.grain)),
                 "observed": flagged["y"].to_numpy(), "expected": flagged["expected"].to_numpy(),
                 "score": flagged["z"].to_numpy(), "peer_score": flagged["peer_z"].to_numpy(),
                 "severity": flagged["severity"].to_numpy(), "kind": flagged["kind"].to_numpy(), "status": "open",
-                "model": f"robust_z@{VERSION}",
+                "affected": flagged["affected"].to_numpy(), "model": f"robust_z@{VERSION}",
                 **{k: flagged[k].to_numpy() for k in stream.entity},
             }))
     gold = lake.root / "gold"

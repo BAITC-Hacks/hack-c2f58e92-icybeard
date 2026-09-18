@@ -27,6 +27,7 @@ const names: EntityNames = {
       <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
         <Tag :value="severityLabel(anomaly.severity)" :severity="severityTone(anomaly.severity)" />
         <Tag :value="anomaly.kind === 'shared' ? 'общая волна' : 'отдельная сущность'" severity="secondary" />
+        <span v-if="anomaly.affected" class="muted">затронуто: {{ anomaly.affected }}</span>
         <strong>{{ streamTitle(anomaly.streamId) }}</strong>
         <span class="muted">{{ anomaly.period }}</span>
         <span v-if="anomaly.status !== 'open'" class="muted">· {{ statusLabel(anomaly.status) }}</span>

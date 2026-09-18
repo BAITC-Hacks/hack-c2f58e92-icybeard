@@ -69,6 +69,18 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Anomalies_carry_the_affected_count_for_a_collapsed_regional_wave()
+    {
+        // 3.3: волна очереди по региону — одна строка в ленте (не по строке на организацию), с числом затронутых организаций
+        var client = app.CreateClient("chief", "chief-10", "10");
+        var body = await client.GetFromJsonAsync<Paged<AnomalyDto>>("/api/v1/anomalies?regionKato=10&streamId=queue_daily");
+        Assert.Single(body!.Items);
+        Assert.Equal("a3", body.Items[0].Id);
+        Assert.Equal(6, body.Items[0].Affected);
+        Assert.False(body.Items[0].Entity.ContainsKey("mo_code")); // различающий ключ пуст — сигнал не про одну организацию
+    }
+
+    [Fact]
     public async Task Chief_cannot_close_signals_of_another_region()
     {
         var chief = app.CreateClient("chief", "chief-75", "75");
