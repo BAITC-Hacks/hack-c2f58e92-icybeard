@@ -2,6 +2,7 @@
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { analytics, queue, refdata as refdataApi } from '@/api/endpoints'
 import type { AlternativesResponse, IndexItem, PredictResponse, Seasonality } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
@@ -9,6 +10,7 @@ import OriginTag from '@/components/OriginTag.vue'
 import { days, pct } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
+const { t } = useI18n()
 const refdata = useRefdataStore()
 const region = ref('75')
 const profile = ref('381')
@@ -27,12 +29,12 @@ const seasonalHint = computed(() => {
   const now = new Date().getMonth() + 1
   const current = byMonth.get(now)
   if (!current) return null
-  const names = ['', 'январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре']
+  const names = t('citizen.wait.monthsIn').split(',')
   const parts = [1, 2, 3].map((step) => {
     const m = ((now - 1 + step) % 12) + 1
     const delta = ((byMonth.get(m)! - current) / current) * 100
     const sign = delta > 0.05 ? '+' : delta < -0.05 ? '−' : '±'
-    return `в ${names[m]} ${sign}${Math.abs(delta).toFixed(1)} %`
+    return `${t('citizen.wait.inMonth')} ${names[m]} ${sign}${Math.abs(delta).toFixed(1)} %`
   })
   return parts.join(', ')
 })
@@ -66,37 +68,34 @@ onMounted(async () => {
 
 <template>
   <main class="page">
-    <h1>Сколько ждать плановую госпитализацию</h1>
-    <p class="lead">Оценка по региону и профилю койки на данных I квартала 2025 года. Без персональных данных.</p>
+    <h1>{{ t('citizen.wait.title') }}</h1>
+    <p class="lead">{{ t('citizen.wait.lead') }}</p>
     <div class="card">
       <div class="form-grid">
-        <div class="field"><label>Регион</label><Select v-model="region" :options="refdata.regions" option-label="name" option-value="regionKato" filter /></div>
-        <div class="field"><label>Профиль койки</label><Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter /></div>
+        <div class="field"><label>{{ t('common.region') }}</label><Select v-model="region" :options="refdata.regions" option-label="name" option-value="regionKato" filter /></div>
+        <div class="field"><label>{{ t('common.profile') }}</label><Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter /></div>
       </div>
-      <div class="actions"><Button label="Узнать" icon="pi pi-search" :loading="busy" @click="run" /></div>
+      <div class="actions"><Button :label="t('citizen.wait.findOut')" icon="pi pi-search" :loading="busy" @click="run" /></div>
       <ErrorBox :error="error" />
     </div>
     <div v-if="prediction" class="grid cols-2" style="margin-top: 16px">
       <div class="card">
-        <h2>В среднем по региону <OriginTag kind="ml" /></h2>
+        <h2>{{ t('citizen.wait.regionAverage') }} <OriginTag kind="ml" /></h2>
         <div class="kpi">
-          <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">половина госпитализированных ждёт не дольше, дн.</div></div>
-          <div class="item"><div class="value">{{ days(prediction.p90Days) }}</div><div class="label">9 из 10 ждут не дольше, дн.</div></div>
-          <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">попадают за 30 дней</div></div>
+          <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">{{ t('citizen.wait.p50Label') }}</div></div>
+          <div class="item"><div class="value">{{ days(prediction.p90Days) }}</div><div class="label">{{ t('citizen.wait.p90Label') }}</div></div>
+          <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">{{ t('citizen.wait.within30') }}</div></div>
         </div>
-        <p v-if="indexItem" class="muted" style="margin-top: 8px">Индекс доступности региона {{ indexItem.indexValue.toFixed(1) }}, место {{ indexItem.rank }} среди регионов. <OriginTag kind="formula" /></p>
-        <p v-else class="muted" style="margin-top: 8px">Индекс для региона не показан: слишком мало наблюдений (малые числа подавлены).</p>
-        <p v-if="seasonalHint" class="muted" style="margin-top: 8px">
-          Сезонный ориентир: в системах типа NHS лист ожидания к текущему месяцу обычно меняется {{ seasonalHint }}
-          (форма сезона NHS England RTT, 2017–2019 — внешний ориентир, наши данные пока покрывают один квартал).
-        </p>
+        <p v-if="indexItem" class="muted" style="margin-top: 8px">{{ t('citizen.wait.indexInfo', { value: indexItem.indexValue.toFixed(1), rank: indexItem.rank }) }} <OriginTag kind="formula" /></p>
+        <p v-else class="muted" style="margin-top: 8px">{{ t('citizen.wait.indexHidden') }}</p>
+        <p v-if="seasonalHint" class="muted" style="margin-top: 8px">{{ t('citizen.wait.seasonalHint') }} {{ seasonalHint }} {{ t('citizen.wait.seasonalHintSuffix') }}</p>
       </div>
       <div class="card">
-        <h2>Где быстрее</h2>
-        <p v-if="!alternatives || alternatives.items.length === 0" class="muted">Данных об организациях с этим профилем нет.</p>
+        <h2>{{ t('citizen.wait.whereFaster') }}</h2>
+        <p v-if="!alternatives || alternatives.items.length === 0" class="muted">{{ t('citizen.wait.noOrganizations') }}</p>
         <div v-for="a in alternatives?.items ?? []" :key="a.mo.moCode" class="factor">
           <span>{{ a.mo.name }}</span>
-          <span class="contribution">{{ days(a.p50Days) }} дн.</span>
+          <span class="contribution">{{ days(a.p50Days) }} {{ t('common.days') }}</span>
         </div>
       </div>
     </div>
