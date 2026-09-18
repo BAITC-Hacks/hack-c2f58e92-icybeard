@@ -17,6 +17,13 @@ public sealed class InMemoryQueueStates : IQueueStateRepository
         Task.FromResult<OrganizationSeriesDto?>(moCode == "028B"
             ? new OrganizationSeriesDto(moCode, profileCode, [new QueueDayDto("2025-03-31", 3, 2, 0, 1784, 21)], new ThroughputDto("2025-03-31", 6.1, 0.03, 90, 130))
             : null);
+
+    public Task<IReadOnlyList<OverloadedOrganizationDto>> OverloadedAsync(string? regionKato, string? profileCode, int limit, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<OverloadedOrganizationDto>>(new List<OverloadedOrganizationDto>
+        {
+            new("028B", "Казахский ордена институт глазных болезней", "75", "381", 3.5, 1784, 130, 0.32),
+            new("22GN", "Городская больница №2", "75", "381", null, 12, 8, 0.02), // throughput_per_day = 0 при живом потоке
+        }.Where(o => (regionKato is null || o.RegionKato == regionKato) && (profileCode is null || o.ProfileCode == profileCode)).Take(limit).ToList());
 }
 
 public sealed class InMemoryAnalytics : IAnalyticsRepository

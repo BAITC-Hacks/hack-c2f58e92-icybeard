@@ -52,6 +52,31 @@ public sealed class QueueStateRepository(IDbConnectionFactory db) : IQueueStateR
             throughput is null ? null : new ThroughputDto(throughput.Day.ToString(DateFormat), throughput.ThroughputPerDay, throughput.RefusalRate4w, throughput.WaitP50Days, throughput.WaitP90Days));
     }
 
+    /// <summary>Нагрузка = поток направлений в день (registered_4w / 28) делить на пропускную способность
+    /// (throughput_per_day). Больше 1 — очередь растёт; throughput_per_day = 0 при живом потоке направлений —
+    /// организация вообще не госпитализирует по профилю, это тоже перегрузка (Load = null, показывать как «нет
+    /// госпитализаций», а не как обычное число).</summary>
+    public async Task<IReadOnlyList<OverloadedOrganizationDto>> OverloadedAsync(string? regionKato, string? profileCode, int limit, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var rows = await connection.QueryAsync<OverloadedOrganizationDto>(new CommandDefinition(
+            """
+            SELECT s.mo_code AS MoCode, r.name_canonical AS Name, s.region_kato AS RegionKato, s.profile_code AS ProfileCode,
+                   CASE WHEN s.throughput_per_day > 0 THEN (s.registered_4w / 28.0) / s.throughput_per_day END AS Load,
+                   s.queue_len::int AS QueueLen, s.queue_age_p90 AS QueueAgeP90, s.refusal_rate_4w AS RefusalRate4w
+            FROM gold.queue_state s
+            JOIN refdata.mo_registry r ON r.mo_code = s.mo_code
+            WHERE (@regionKato IS NULL OR s.region_kato = @regionKato)
+              AND (@profileCode IS NULL OR s.profile_code = @profileCode)
+              AND s.registered_4w > 0
+              AND (s.throughput_per_day = 0 OR (s.registered_4w / 28.0) / s.throughput_per_day > 1.0)
+            ORDER BY (s.throughput_per_day = 0) DESC, Load DESC
+            LIMIT @limit
+            """,
+            new { regionKato, profileCode, limit }, cancellationToken: cancellationToken));
+        return rows.ToList();
+    }
+
     private sealed record SnapshotRow(long QueueLen, double? QueueAgeP50, double ThroughputPerDay);
 
     private sealed record DayRow(DateOnly Day, long Registered, long Hospitalized, long Refused, long QueueLen, double? QueueAgeP50);

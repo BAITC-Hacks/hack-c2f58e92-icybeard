@@ -5,6 +5,7 @@ import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
 import Slider from 'primevue/slider'
 import { onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { analytics, simulation } from '@/api/endpoints'
 import type { LosItem, RedistributeResponse, SimulateResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
@@ -13,8 +14,10 @@ import { days, num, signed } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
 const refdata = useRefdataStore()
-const region = ref('75')
-const profile = ref('381')
+const route = useRoute()
+// 3.2: список перегруженных организаций (RegionView, GovMapView) ведёт сюда с конкретным регионом/профилем
+const region = ref(typeof route.query.region === 'string' ? route.query.region : '75')
+const profile = ref(typeof route.query.profile === 'string' ? route.query.profile : '381')
 const capacity = ref(15)
 const redirect = ref(0)
 const horizon = ref(90)

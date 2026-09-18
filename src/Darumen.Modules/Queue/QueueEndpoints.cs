@@ -6,6 +6,8 @@ namespace Darumen.Modules.Queue;
 public static class QueueEndpoints
 {
     private const int DefaultSeriesDays = 90;
+    private const int DefaultOverloadedLimit = 20;
+    private const int MaxOverloadedLimit = 200;
 
     public static void Map(IEndpointRouteBuilder api)
     {
@@ -41,6 +43,12 @@ public static class QueueEndpoints
             .WithSummary("Ряд очереди и пропускной способности организации по профилю")
             .Produces<OrganizationSeriesDto>()
             .Produces(StatusCodes.Status404NotFound);
+
+        group.MapGet("/overloaded", async (string? regionKato, string? profileCode, int? limit, IQueueStateRepository repository, CancellationToken ct) =>
+                Results.Ok(new { items = await repository.OverloadedAsync(regionKato, profileCode, Math.Clamp(limit ?? DefaultOverloadedLimit, 1, MaxOverloadedLimit), ct) }))
+            .RequireAuthorization(Policies.ChiefOrRegulator)
+            .WithName("QueueOverloaded")
+            .WithSummary("Организации с нагрузкой (поток / госпитализации) больше 1, самые загруженные — первыми");
     }
 
     internal static ValidationErrors Validate(PredictRequestDto body)

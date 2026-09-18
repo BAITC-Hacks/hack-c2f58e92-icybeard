@@ -2,13 +2,14 @@
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, queue, refdata as refdataApi } from '@/api/endpoints'
-import type { Anomaly, ForecastResponse, OrganizationItem, OrganizationSeries, Seasonality } from '@/api/types'
+import type { Anomaly, ForecastResponse, OrganizationItem, OrganizationSeries, OverloadedOrganization, Seasonality } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
+import OverloadedTable from '@/components/OverloadedTable.vue'
 import QueueChart from '@/components/QueueChart.vue'
 import SeriesChart from '@/components/SeriesChart.vue'
 import { days, pct } from '@/lib/format'
@@ -26,6 +27,7 @@ const STREAMS = [
 type StreamKind = (typeof STREAMS)[number]['value']
 
 const route = useRoute()
+const router = useRouter()
 const refdata = useRefdataStore()
 const auth = useAuthStore()
 const toast = useToast()
@@ -44,6 +46,7 @@ const anomalies = ref<Anomaly[]>([])
 const error = ref<unknown>(null)
 const seriesError = ref<unknown>(null)
 const seasonality = ref<Seasonality[]>([])
+const overloaded = ref<OverloadedOrganization[]>([])
 
 const streamMeta = computed(() => STREAMS.find((s) => s.value === streamKind.value)!)
 const selectedOrganization = computed(() => organizations.value.find((o) => o.moCode === moCode.value) ?? null)
@@ -96,10 +99,19 @@ async function loadRegion() {
     organizations.value = await refdata.organizationsOf(kato.value, profile.value)
     moCode.value = organizations.value[0]?.moCode ?? null
     anomalies.value = (await analytics.anomalies({ regionKato: kato.value, status: 'open', size: 10 })).items
+    overloaded.value = (await queue.overloaded(kato.value)).items
     await loadForecast()
   } catch (e) {
     error.value = e
   }
+}
+
+function goToOrganization(code: string) {
+  router.push({ name: 'organization', params: { moCode: code }, query: { kato: kato.value, profile: profile.value } })
+}
+
+function goToSimulator(item: OverloadedOrganization) {
+  router.push({ name: 'simulator', query: { region: item.regionKato, profile: item.profileCode } })
 }
 
 async function loadSeries() {
@@ -232,9 +244,15 @@ watch(vaccinationPlan, () => {
         </template>
       </div>
     </div>
-    <div class="card" style="margin-top: 16px">
-      <h2>Сигналы региона <OriginTag kind="formula" /></h2>
-      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
+    <div class="grid cols-2" style="margin-top: 16px">
+      <div class="card">
+        <h2>Сигналы региона <OriginTag kind="formula" /></h2>
+        <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
+      </div>
+      <div class="card">
+        <h2>Перегруженные организации <OriginTag kind="formula" /></h2>
+        <OverloadedTable :items="overloaded" @organization="goToOrganization" @simulate="goToSimulator" />
+      </div>
     </div>
   </main>
 </template>

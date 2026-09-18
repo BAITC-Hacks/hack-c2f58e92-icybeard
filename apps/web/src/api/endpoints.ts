@@ -1,7 +1,7 @@
 import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
-  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
+  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, Stream, VaccinationBenchmark, WorklistItem,
 } from './types'
 
@@ -11,6 +11,8 @@ export const queue = {
     api<AlternativesResponse>('/api/v1/queue/alternatives', { body }),
   organization: (moCode: string, profileCode: string, days = 90) =>
     api<OrganizationSeries>(`/api/v1/queue/organizations/${encodeURIComponent(moCode)}`, { query: { profileCode, days } }),
+  overloaded: (regionKato?: string, profileCode?: string, limit = 20) =>
+    api<{ items: OverloadedOrganization[] }>('/api/v1/queue/overloaded', { query: { regionKato, profileCode, limit } }),
 }
 
 export const analytics = {

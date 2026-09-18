@@ -131,4 +131,16 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
         Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("chief").PostAsJsonAsync("/api/v1/simulate", new { regionKato = "75", profileCode = "381" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await app.CreateClient("admin").GetAsync("/api/v1/queue/organizations/028B?profileCode=381")).StatusCode);
     }
+
+    [Fact]
+    public async Task Overloaded_lists_organizations_by_region_and_profile_with_the_most_loaded_first()
+    {
+        var client = app.CreateClient("chief", "chief-75", "75");
+        var body = await client.GetFromJsonAsync<ItemsDto<OverloadedOrganizationDto>>("/api/v1/queue/overloaded?regionKato=75&profileCode=381");
+        Assert.Equal(2, body!.Items.Count);
+        Assert.Equal("028B", body.Items[0].MoCode);
+        Assert.Null(body.Items[1].Load); // throughput_per_day = 0 при живом потоке — перегрузка без числового значения
+    }
+
+    private sealed record ItemsDto<T>(IReadOnlyList<T> Items);
 }

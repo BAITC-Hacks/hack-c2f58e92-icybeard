@@ -5,12 +5,13 @@ import { useToast } from 'primevue/usetoast'
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
-import { analytics, insight } from '@/api/endpoints'
-import type { Anomaly, ForecastResponse, IndexResponse } from '@/api/types'
+import { analytics, insight, queue } from '@/api/endpoints'
+import type { Anomaly, ForecastResponse, IndexResponse, OverloadedOrganization } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import IndexTable from '@/components/IndexTable.vue'
 import OriginTag from '@/components/OriginTag.vue'
+import OverloadedTable from '@/components/OverloadedTable.vue'
 import RegionMap from '@/components/RegionMap.vue'
 import SeriesChart from '@/components/SeriesChart.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -25,6 +26,7 @@ const month = ref<string | null>(null)
 const profile = ref<string>('all')
 const index = ref<IndexResponse | null>(null)
 const anomalies = ref<Anomaly[]>([])
+const overloaded = ref<OverloadedOrganization[]>([])
 const error = ref<unknown>(null)
 const loading = ref(false)
 /** 3.1: отдельная карточка по онкологии — поток onco_monthly не имеет региона в сущности (только локализация ЗН),
@@ -36,18 +38,28 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const [idx, an] = await Promise.all([
+    const [idx, an, ov] = await Promise.all([
       analytics.index(month.value ?? undefined, profile.value === 'all' ? undefined : profile.value),
       analytics.anomalies({ status: 'open', size: 12 }),
+      queue.overloaded(undefined, profile.value === 'all' ? undefined : profile.value),
     ])
     index.value = idx
     month.value = idx.month
     anomalies.value = an.items
+    overloaded.value = ov.items
   } catch (e) {
     error.value = e
   } finally {
     loading.value = false
   }
+}
+
+function goToOrganization(code: string) {
+  router.push({ name: 'organization', params: { moCode: code } })
+}
+
+function goToSimulator(item: OverloadedOrganization) {
+  router.push({ name: 'simulator', query: { region: item.regionKato, profile: item.profileCode } })
 }
 
 async function loadOnco() {
@@ -155,6 +167,10 @@ watch([month, profile], load)
           {{ onco.model.name }} {{ onco.model.version }}. Реестр накопительный, честная помесячная интенсивность только с 2024-09 — прогноз ориентировочный.
         </p>
       </div>
+    </div>
+    <div class="card" style="margin-top: 16px">
+      <h2>Перегруженные организации <OriginTag kind="formula" /></h2>
+      <OverloadedTable :items="overloaded" @organization="goToOrganization" @simulate="goToSimulator" />
     </div>
   </main>
 </template>

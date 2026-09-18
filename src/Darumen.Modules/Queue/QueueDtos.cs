@@ -31,3 +31,9 @@ public sealed record QueueDayDto(string Day, int Registered, int Hospitalized, i
 public sealed record ThroughputDto(string Day, double ThroughputPerDay, double? RefusalRate4w, double? WaitP50Days, double? WaitP90Days);
 
 public sealed record OrganizationSeriesDto(string MoCode, string ProfileCode, IReadOnlyList<QueueDayDto> Days, ThroughputDto? Throughput);
+
+/// <summary>3.2: нагрузка = поток направлений в день (registered_4w / 28) / госпитализаций в день (throughput_per_day) —
+/// больше 1 значит поток превышает пропускную способность, очередь растёт.</summary>
+public sealed record OverloadedOrganizationDto(
+    string MoCode, string Name, string RegionKato, string ProfileCode, double? Load,
+    int QueueLen, double? QueueAgeP90, double? RefusalRate4w);
