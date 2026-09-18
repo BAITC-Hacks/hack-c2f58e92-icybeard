@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { Map as MapLibreMap, Marker, NavigationControl } from 'maplibre-gl'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { i18n } from '@/i18n'
 import type { IndexItem, Region } from '@/api/types'
 import { indexColor } from '@/lib/format'
 
 const props = defineProps<{ regions: Region[]; index: IndexItem[] }>()
 const emit = defineEmits<{ select: [kato: string] }>()
+const t = i18n.global.t
 
 const container = ref<HTMLDivElement | null>(null)
 let map: MapLibreMap | null = null
@@ -27,7 +29,7 @@ function render() {
     element.className = 'region-marker'
     element.style.setProperty('--size', `${size}px`)
     element.style.setProperty('--color', item ? indexColor(item.indexValue) : '#9aa5b1')
-    element.title = `${region.name}: индекс ${item ? item.indexValue.toFixed(1) : '—'}${item ? `, место ${item.rank}` : ''}`
+    element.title = t('regionMap.tooltip', { name: region.name, value: item ? item.indexValue.toFixed(1) : '—', rank: item ? t('regionMap.rank', { rank: item.rank }) : '' })
     element.setAttribute('aria-label', element.title)
     element.innerHTML = `<span class="dot">${item ? Math.round(item.indexValue) : '·'}</span><span class="label">${region.name}</span>`
     element.addEventListener('click', () => emit('select', region.regionKato))

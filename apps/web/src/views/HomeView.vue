@@ -26,8 +26,8 @@ const route = useRoute()
     </Message>
     <div class="grid cols-2" style="margin-top: 16px">
       <RouterLink class="card" to="/gov"><h2>Darumen Gov</h2><p>{{ t('home.gov') }}</p></RouterLink>
-      <RouterLink class="card" to="/doctor/referral"><h2>Darumen Care · врач</h2><p>{{ t('home.doctor') }}</p></RouterLink>
-      <RouterLink class="card" to="/wait"><h2>Darumen Care · гражданин</h2><p>{{ t('home.citizen') }}</p></RouterLink>
+      <RouterLink class="card" to="/doctor/referral"><h2>Darumen Care · {{ t('home.roleDoctor') }}</h2><p>{{ t('home.doctor') }}</p></RouterLink>
+      <RouterLink class="card" to="/wait"><h2>Darumen Care · {{ t('home.roleCitizen') }}</h2><p>{{ t('home.citizen') }}</p></RouterLink>
       <RouterLink class="card" to="/steward"><h2>Data Intake Fabric</h2><p>{{ t('home.steward') }}</p></RouterLink>
     </div>
   </main>

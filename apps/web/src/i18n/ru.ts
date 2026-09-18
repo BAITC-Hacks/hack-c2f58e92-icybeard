@@ -32,6 +32,28 @@ export const ru = {
     title: 'Почему так',
     model: 'Модель {name} {version}, обучена по {through}',
   },
+  overloadedTable: {
+    noAdmissions: 'нет госпитализаций', load: 'Нагрузка', queue: 'Очередь', refusals: 'Отказы',
+    toSimulator: 'в симулятор', none: 'Перегруженных организаций не найдено.',
+  },
+  indexTable: { index: 'Индекс' },
+  queueChart: { queue: 'Очередь', registered: 'Зарегистрировано', hospitalized: 'Госпитализировано', refused: 'Отказы', perDay: 'в день' },
+  seriesChart: { fact: 'Факт', forecast: 'Прогноз', lower: 'нижняя', interval80: 'интервал 80 %' },
+  regionMap: { tooltip: '{name}: индекс {value}{rank}', rank: ', место {rank}' },
+  steward: {
+    title: 'Консоль стюарда',
+    lead: 'Партии загрузки Data Intake Fabric: событие intake.batch.loaded приходит из Python через Kafka, строки в карантине ждут проверки.',
+    batches: 'Партии', received: 'Получено', dataset: 'Набор', status: 'Статус',
+    loaded: 'Загружено', quarantined: 'В карантине', partitions: 'Партиции', batch: 'Партия',
+    noBatches: 'Партий пока нет: запустите', noBatchesSuffix: 'с заданными KAFKA_BOOTSTRAP и SCHEMA_REGISTRY_URL.',
+    contractsTitle: 'Контракты на утверждение',
+    contractsHint: 'Черновики контрактов для файлов с неизвестной схемой лежат в lakehouse/drafts; утверждение из интерфейса появится вместе с загрузкой файлов через API.',
+    quarantineTitle: 'Карантин',
+    quarantineHint: 'Строки, не прошедшие правила контракта, хранятся по партиям в lakehouse/quarantine с причиной; переработка после правки контракта.',
+  },
+  leaflet: {
+    title: 'Памятка после приёма', approvedBy: 'Утверждена врачом',
+  },
   medicines: {
     title: 'Проверка рецепта',
     lead: 'Покрыт ли препарат программой, за сколько дней его обычно получают и нет ли признаков дефицита. По открытым данным о выписанных и обеспеченных рецептах с 2018 года; названия МНН и аптек появятся со справочниками.',

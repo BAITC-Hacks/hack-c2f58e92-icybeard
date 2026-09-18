@@ -32,6 +32,28 @@ export const kk = {
     title: 'Неге солай',
     model: 'Модель {name} {version}, {through} дейін оқытылған',
   },
+  overloadedTable: {
+    noAdmissions: 'госпитализация жоқ', load: 'Жүктеме', queue: 'Кезек', refusals: 'Бас тартулар',
+    toSimulator: 'симуляторға', none: 'Жүктемесі асып кеткен ұйымдар табылмады.',
+  },
+  indexTable: { index: 'Индекс' },
+  queueChart: { queue: 'Кезек', registered: 'Тіркелді', hospitalized: 'Госпитализацияланды', refused: 'Бас тартулар', perDay: 'күніне' },
+  seriesChart: { fact: 'Факт', forecast: 'Болжам', lower: 'төменгі', interval80: '80 % аралық' },
+  regionMap: { tooltip: '{name}: индекс {value}{rank}', rank: ', {rank}-орын' },
+  steward: {
+    title: 'Стюард консолі',
+    lead: 'Data Intake Fabric жүктеу партиялары: intake.batch.loaded оқиғасы Python-нан Kafka арқылы келеді, карантиндегі жолдар тексеруді күтеді.',
+    batches: 'Партиялар', received: 'Алынды', dataset: 'Жиынтық', status: 'Статус',
+    loaded: 'Жүктелді', quarantined: 'Карантинде', partitions: 'Партициялар', batch: 'Партия',
+    noBatches: 'Партиялар әлі жоқ: іске қосыңыз', noBatchesSuffix: 'KAFKA_BOOTSTRAP пен SCHEMA_REGISTRY_URL берілген түрде.',
+    contractsTitle: 'Бекітуге контрактілер',
+    contractsHint: 'Схемасы белгісіз файлдар үшін контракт жобалары lakehouse/drafts қалтасында жатыр; интерфейстен бекіту файлдарды API арқылы жүктеумен бірге пайда болады.',
+    quarantineTitle: 'Карантин',
+    quarantineHint: 'Контракт ережелерінен өтпеген жолдар себебімен бірге lakehouse/quarantine қалтасында партиялар бойынша сақталады; контрактіні түзеткеннен кейін қайта өңделеді.',
+  },
+  leaflet: {
+    title: 'Қабылдаудан кейінгі естелік', approvedBy: 'Дәрігер бекіткен',
+  },
   medicines: {
     title: 'Рецепт тексеру',
     lead: 'Дәрі бағдарламамен қамтылған ба, оны әдетте қанша күнде алады және тапшылық белгілері бар ма. 2018 жылдан бергі жазылған және қамтамасыз етілген рецепттердің ашық деректері бойынша; МНН мен дәріхана атаулары анықтамалықтармен пайда болады.',

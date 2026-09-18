@@ -4,24 +4,26 @@ import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/compon
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import VChart from 'vue-echarts'
 import type { QueueDay } from '@/api/types'
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
 const props = defineProps<{ days: QueueDay[]; title?: string }>()
+const { t } = useI18n()
 
 const option = computed(() => ({
   tooltip: { trigger: 'axis' },
-  legend: { data: ['Очередь', 'Зарегистрировано', 'Госпитализировано', 'Отказы'] },
+  legend: { data: [t('queueChart.queue'), t('queueChart.registered'), t('queueChart.hospitalized'), t('queueChart.refused')] },
   grid: { left: 48, right: 48, top: 36, bottom: 32 },
   xAxis: { type: 'category', data: props.days.map((d) => d.day) },
-  yAxis: [{ type: 'value', name: 'очередь' }, { type: 'value', name: 'в день' }],
+  yAxis: [{ type: 'value', name: t('queueChart.queue') }, { type: 'value', name: t('queueChart.perDay') }],
   series: [
-    { name: 'Очередь', type: 'line', data: props.days.map((d) => d.queueLen), showSymbol: false, lineStyle: { width: 2 } },
-    { name: 'Зарегистрировано', type: 'bar', yAxisIndex: 1, data: props.days.map((d) => d.registered), stack: 'flow' },
-    { name: 'Госпитализировано', type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.hospitalized), stack: 'flow' },
-    { name: 'Отказы', type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.refused), stack: 'flow' },
+    { name: t('queueChart.queue'), type: 'line', data: props.days.map((d) => d.queueLen), showSymbol: false, lineStyle: { width: 2 } },
+    { name: t('queueChart.registered'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => d.registered), stack: 'flow' },
+    { name: t('queueChart.hospitalized'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.hospitalized), stack: 'flow' },
+    { name: t('queueChart.refused'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.refused), stack: 'flow' },
   ],
 }))
 </script>
