@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import Tag from 'primevue/tag'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { analytics, refdata as refdataApi } from '@/api/endpoints'
 import type { QualityBreakdownRow, QualityReport, VaccinationBenchmark } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import { pct } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
+const { t, locale } = useI18n()
 const refdata = useRefdataStore()
 const report = ref<QualityReport | null>(null)
 const vaccination = ref<VaccinationBenchmark[]>([])
@@ -18,17 +20,17 @@ const wuenicLine = computed(() => {
   const dtp3 = latest('DTP3')
   const mcv1 = latest('MCV1')
   if (!dtp3 || !mcv1) return ''
-  return `Внешний ориентир WUENIC (ВОЗ/ЮНИСЕФ, ${dtp3.year}): охват АКДС-3 ${dtp3.coveragePct.toFixed(0)} %, кори-1 ${mcv1.coveragePct.toFixed(0)} % — оценки заметно ниже административной отчётности, сигналы вакцинации стоит читать с этим контекстом.`
+  return t('gov.quality.wuenic', { year: dtp3.year, dtp3: dtp3.coveragePct.toFixed(0), mcv1: mcv1.coveragePct.toFixed(0) })
 })
 
-const streamTitles: Record<string, string> = {
-  admissions_monthly: 'Госпитализации, помесячно',
-  er_visits_daily: 'Приёмные покои, по дням',
-  rx_weekly: 'Рецепты, по неделям',
-  vac_monthly: 'Вакцинация, помесячно',
-  onco_monthly: 'Онкология: впервые выявленные, помесячно',
-  lab_estimate_monthly: 'Лаборатории (оценка), помесячно',
-}
+const streamTitles = computed<Record<string, string>>(() => ({
+  admissions_monthly: t('gov.quality.stream.admissions_monthly'),
+  er_visits_daily: t('gov.quality.stream.er_visits_daily'),
+  rx_weekly: t('gov.quality.stream.rx_weekly'),
+  vac_monthly: t('gov.quality.stream.vac_monthly'),
+  onco_monthly: t('gov.quality.stream.onco_monthly'),
+  lab_estimate_monthly: t('gov.quality.stream.lab_estimate_monthly'),
+}))
 
 /** Всего сигналов, размеченных людьми (подтверждено + закрыто и т.д.). */
 function labelledTotal(labels?: Record<string, number>): number {
@@ -48,7 +50,7 @@ function rowName(row: QualityBreakdownRow): string {
 function gain(model: number, baseline: number): string {
   if (!baseline) return '—'
   const share = 1 - model / baseline
-  return `${share >= 0 ? '−' : '+'}${Math.abs(share * 100).toFixed(0)} % к ошибке`
+  return `${share >= 0 ? '−' : '+'}${Math.abs(share * 100).toFixed(0)} % ${t('gov.quality.toError')}`
 }
 
 onMounted(async () => {
@@ -68,49 +70,46 @@ onMounted(async () => {
 
 <template>
   <main class="page">
-    <h1>Качество моделей</h1>
-    <p class="lead">
-      Метрики из отчётов обучения (make train / make eval): модель против простого правила на отложенной выборке.
-      Это тот же источник, что цитируют карточки моделей и презентация.
-    </p>
+    <h1>{{ t('gov.quality.title') }}</h1>
+    <p class="lead">{{ t('gov.quality.lead') }}</p>
     <ErrorBox :error="error" />
 
     <template v-if="report?.wait">
       <div class="card">
-        <h2>Ожидание и риск отказа (LightGBM)</h2>
-        <p class="muted">Обучение по {{ report.wait.trainedThrough }}, {{ report.wait.trainRows?.toLocaleString('ru-RU') }} направлений; проверка — март 2025 и 10 % организаций вне обучения.</p>
+        <h2>{{ t('gov.quality.waitTitle') }}</h2>
+        <p class="muted">{{ t('gov.quality.waitTrained', { through: report.wait.trainedThrough, rows: report.wait.trainRows?.toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }) }}</p>
         <div v-if="report.wait.test_time" class="kpi" style="margin-top: 10px">
           <div class="item">
             <div class="value">{{ report.wait.test_time.pinball_p50.toFixed(2) }} <span class="muted">/ {{ report.wait.test_time.pinball_p50_baseline.toFixed(2) }}</span></div>
-            <div class="label">пинбол p50, модель / baseline ({{ gain(report.wait.test_time.pinball_p50, report.wait.test_time.pinball_p50_baseline) }})</div>
+            <div class="label">{{ t('gov.quality.pinballModelBaseline') }} ({{ gain(report.wait.test_time.pinball_p50, report.wait.test_time.pinball_p50_baseline) }})</div>
           </div>
           <div class="item">
             <div class="value">{{ report.wait.test_time.coverage_p90.toFixed(3) }}</div>
-            <div class="label">покрытие интервала p90 (цель 0.900)</div>
+            <div class="label">{{ t('gov.quality.coverageP90') }}</div>
           </div>
           <div class="item">
             <div class="value">{{ report.wait.test_time.auc_refusal.toFixed(2) }} <span class="muted">/ {{ report.wait.test_time.auc_refusal_baseline.toFixed(2) }}</span></div>
-            <div class="label">AUC отказа, модель / baseline</div>
+            <div class="label">{{ t('gov.quality.aucRefusal') }}</div>
           </div>
           <div class="item" v-if="report.wait.test_mo">
             <div class="value">{{ report.wait.test_mo.pinball_p50.toFixed(2) }} <span class="muted">/ {{ report.wait.test_mo.pinball_p50_baseline.toFixed(2) }}</span></div>
-            <div class="label">пинбол p50 на организациях вне обучения</div>
+            <div class="label">{{ t('gov.quality.pinballOutOfSample') }}</div>
           </div>
         </div>
       </div>
 
       <div class="grid cols-2" style="margin-top: 16px">
         <div class="card">
-          <h2>Ошибка по регионам</h2>
-          <p class="muted">Пинбол p50 модели против baseline, март 2025. Красным — регионы, где модель хуже простого правила.</p>
+          <h2>{{ t('gov.quality.errorByRegion') }}</h2>
+          <p class="muted">{{ t('gov.quality.errorByRegionHint') }}</p>
           <div v-for="row in report.wait.by_region ?? []" :key="row.region_kato" class="factor">
             <span>{{ rowName(row) }} <span class="muted">· {{ row.n.toLocaleString('ru-RU') }}</span></span>
             <span class="contribution" :class="worse(row) ? 'minus' : 'plus'">{{ row.pinball_p50.toFixed(2) }} / {{ row.pinball_p50_baseline.toFixed(2) }}</span>
           </div>
         </div>
         <div class="card">
-          <h2>Ошибка по профилям</h2>
-          <p class="muted">Те же метрики по профилям коек: видно, где модели не хватает данных.</p>
+          <h2>{{ t('gov.quality.errorByProfile') }}</h2>
+          <p class="muted">{{ t('gov.quality.errorByProfileHint') }}</p>
           <div v-for="row in report.wait.by_profile ?? []" :key="row.profile_code" class="factor">
             <span>{{ rowName(row) }} <span class="muted">· {{ row.n.toLocaleString('ru-RU') }}</span></span>
             <span class="contribution" :class="worse(row) ? 'minus' : 'plus'">{{ row.pinball_p50.toFixed(2) }} / {{ row.pinball_p50_baseline.toFixed(2) }}</span>
@@ -120,11 +119,11 @@ onMounted(async () => {
     </template>
 
     <div v-if="report" class="card" style="margin-top: 16px">
-      <h2>Прогнозы потоков</h2>
+      <h2>{{ t('gov.quality.forecastsTitle') }}</h2>
       <table style="width: 100%; border-collapse: collapse">
         <thead>
           <tr class="muted" style="text-align: left">
-            <th style="padding: 6px 4px">Поток</th><th>Рядов</th><th>MASE / наив</th><th>Выбор моделей по рядам</th><th>Плоские</th>
+            <th style="padding: 6px 4px">{{ t('gov.quality.colStream') }}</th><th>{{ t('gov.quality.colSeries') }}</th><th>{{ t('gov.quality.colMase') }}</th><th>{{ t('gov.quality.colChoice') }}</th><th>{{ t('gov.quality.colFlat') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -134,7 +133,7 @@ onMounted(async () => {
             <td>
               <template v-if="f.models && f.chosen && f.baseline">
                 {{ f.models[f.chosen]?.mase.toFixed(2) }} / {{ f.models[f.baseline]?.mase.toFixed(2) }}
-                <Tag v-if="(f.models[f.chosen]?.mase ?? 1) <= (f.models[f.baseline]?.mase ?? 1)" value="лучше наива" severity="success" style="margin-left: 6px" />
+                <Tag v-if="(f.models[f.chosen]?.mase ?? 1) <= (f.models[f.baseline]?.mase ?? 1)" :value="t('gov.quality.betterThanNaive')" severity="success" style="margin-left: 6px" />
               </template>
               <span v-else class="muted">{{ f.skipped ?? '—' }}</span>
             </td>
@@ -148,86 +147,80 @@ onMounted(async () => {
           </tr>
         </tbody>
       </table>
-      <p class="muted" style="margin-top: 8px">«Плоские» — доля рядов, где прогноз повторяет один уровень («уровень последнего месяца»); такие ряды подписаны на графиках.</p>
+      <p class="muted" style="margin-top: 8px">{{ t('gov.quality.flatExplain') }}</p>
     </div>
 
     <div v-if="report" class="grid cols-2" style="margin-top: 16px">
       <div class="card">
-        <h2>Аномалии</h2>
+        <h2>{{ t('gov.quality.anomaliesTitle') }}</h2>
         <div v-for="(a, id) in report.anomalies" :key="id" class="factor">
           <span>{{ streamTitles[id] ?? id }}</span>
-          <span class="contribution">{{ a.alerts ?? '—' }} сигн. · полнота {{ a.recall_at_threshold !== undefined ? pct(a.recall_at_threshold) : '—' }}</span>
+          <span class="contribution">{{ a.alerts ?? '—' }} {{ t('gov.quality.alertsShort') }} · {{ t('gov.quality.recall') }} {{ a.recall_at_threshold !== undefined ? pct(a.recall_at_threshold) : '—' }}</span>
         </div>
-        <p class="muted" style="margin-top: 8px">Проверка на подсаженных всплесках ×3.</p>
+        <p class="muted" style="margin-top: 8px">{{ t('gov.quality.syntheticSpikes') }}</p>
         <p class="muted" style="margin-top: 4px">
-          Разметка людьми: {{ labelledTotal(report.anomalyLabels) }} сигналов
+          {{ t('gov.quality.labelledBy') }}: {{ labelledTotal(report.anomalyLabels) }} {{ t('gov.quality.signalsShort') }}
           <template v-if="labelledTotal(report.anomalyLabels) > 0">
             ({{ Object.entries(report.anomalyLabels ?? {}).map(([s, n]) => `${s}: ${n}`).join(' · ') }})
           </template>
-          — каждое подтверждение из журнала становится меткой, на которой детектор получит измеримую точность.
+          — {{ t('gov.quality.labelledExplain') }}
         </p>
         <p v-if="report.anomalyLabelsModel" class="muted" style="margin-top: 4px">
-          Дообучение детектора на разметке:
-          <template v-if="report.anomalyLabelsModel.skipped">{{ report.anomalyLabelsModel.skipped }} — кнопки «Подтвердить» и «Ложный сигнал» копят метки.</template>
-          <template v-else>CV-AUC {{ report.anomalyLabelsModel.auc_cv }} против {{ report.anomalyLabelsModel.auc_baseline_abs_score }} у ранжирования по силе.</template>
+          {{ t('gov.quality.retrainTitle') }}:
+          <template v-if="report.anomalyLabelsModel.skipped">{{ report.anomalyLabelsModel.skipped }} — {{ t('gov.quality.retrainSkippedHint') }}</template>
+          <template v-else>CV-AUC {{ report.anomalyLabelsModel.auc_cv }} {{ t('gov.map.vsNaive') }} {{ report.anomalyLabelsModel.auc_baseline_abs_score }} {{ t('gov.quality.rankingByScore') }}.</template>
         </p>
         <p v-if="wuenicLine" class="muted" style="margin-top: 4px">{{ wuenicLine }}</p>
       </div>
       <div class="card" v-if="report.simulate">
-        <h2>Симулятор</h2>
+        <h2>{{ t('gov.simulator.title') }}</h2>
         <div class="kpi">
           <div class="item">
             <div class="value">{{ pct(report.simulate.saved_share) }}</div>
-            <div class="label">экономия дней ожидания за {{ report.simulate.horizon_days }} дней, оценка сверху (интервал {{ pct(report.simulate.saved_share_band?.[0]) }}…{{ pct(report.simulate.saved_share_band?.[1]) }})</div>
+            <div class="label">{{ t('gov.quality.savedShare', { horizon: report.simulate.horizon_days, lo: pct(report.simulate.saved_share_band?.[0]), hi: pct(report.simulate.saved_share_band?.[1]) }) }}</div>
           </div>
           <div class="item">
             <div class="value">{{ report.simulate.consistency_spearman?.toFixed(2) ?? '—' }}</div>
-            <div class="label">Спирмен с фактическим ожиданием (порог 0.5)</div>
+            <div class="label">{{ t('gov.quality.spearman') }}</div>
           </div>
         </div>
-        <p class="muted" style="margin-top: 8px">Сценарии корректно сравнивать между собой; абсолютные дни модель занижает — это ограничение написано в карточке.</p>
+        <p class="muted" style="margin-top: 8px">{{ t('gov.quality.simulateCaveat') }}</p>
       </div>
       <div class="card" v-if="report.survival?.splits">
-        <h2>Вероятность госпитализации к дате (survival AFT)</h2>
+        <h2>{{ t('gov.quality.survivalTitle') }}</h2>
         <div class="kpi">
           <div class="item" v-if="report.survival.splits.test_time">
             <div class="value">{{ report.survival.splits.test_time.c_index.toFixed(3) }} <span class="muted">/ {{ report.survival.splits.test_time.c_index_baseline.toFixed(3) }}</span></div>
-            <div class="label">C-index, модель / baseline (март 2025)</div>
+            <div class="label">{{ t('gov.quality.cIndex') }}</div>
           </div>
           <div class="item" v-if="report.survival.splits.test_mo">
             <div class="value">{{ report.survival.splits.test_mo.c_index.toFixed(3) }} <span class="muted">/ {{ report.survival.splits.test_mo.c_index_baseline.toFixed(3) }}</span></div>
-            <div class="label">C-index на организациях вне обучения</div>
+            <div class="label">{{ t('gov.quality.cIndexOutOfSample') }}</div>
           </div>
           <div class="item" v-if="report.survival.splits.test_time?.p_admit_mean?.['30'] !== undefined">
             <div class="value">{{ pct(report.survival.splits.test_time.p_admit_mean?.['30'] ?? 0) }} <span class="muted">/ {{ pct(report.survival.splits.test_time.observed_share?.['30'] ?? 0) }}</span></div>
-            <div class="label">P(госпитализация ≤ 30 дн.): предсказано / факт</div>
+            <div class="label">{{ t('gov.quality.pAdmit30') }}</div>
           </div>
         </div>
-        <p class="muted" style="margin-top: 8px">
-          Лог-логистическое AFT с честным цензурированием: отказы и открытые направления не выбрасываются,
-          поэтому вероятность безусловная — с учётом риска не попасть вовсе. {{ report.survival.note }}.
-        </p>
+        <p class="muted" style="margin-top: 8px">{{ t('gov.quality.survivalExplain') }} {{ report.survival.note }}.</p>
       </div>
       <div class="card" v-if="report.los">
-        <h2>Длительность лечения (LOS, LightGBM)</h2>
+        <h2>{{ t('gov.quality.losTitle') }}</h2>
         <div class="kpi">
           <div class="item">
             <div class="value">{{ report.los.pinball_p50?.toFixed(2) }} <span class="muted">/ {{ report.los.pinball_p50_baseline?.toFixed(2) }}</span></div>
-            <div class="label">пинбол p50, модель / baseline ({{ gain(report.los.pinball_p50 ?? 0, report.los.pinball_p50_baseline ?? 0) }})</div>
+            <div class="label">{{ t('gov.quality.pinballModelBaseline') }} ({{ gain(report.los.pinball_p50 ?? 0, report.los.pinball_p50_baseline ?? 0) }})</div>
           </div>
           <div class="item">
             <div class="value">{{ report.los.mae?.toFixed(2) }} <span class="muted">/ {{ report.los.mae_baseline?.toFixed(2) }}</span></div>
-            <div class="label">MAE, дней</div>
+            <div class="label">{{ t('gov.quality.maeDays') }}</div>
           </div>
           <div class="item">
             <div class="value">{{ report.los.cells?.toLocaleString('ru-RU') }}</div>
-            <div class="label">ячеек регион×профиль в витрине</div>
+            <div class="label">{{ t('gov.quality.losCells') }}</div>
           </div>
         </div>
-        <p class="muted" style="margin-top: 8px">
-          Обучение на {{ report.los.train_rows?.toLocaleString('ru-RU') }} пролеченных случаях ЭРСБ, проверка по времени на {{ report.los.test_rows?.toLocaleString('ru-RU') }}.
-          Медиана длительности лечения переводит койки в пропускную способность: одна койка ≈ 1/LOS госпитализаций в день — это использует симулятор.
-        </p>
+        <p class="muted" style="margin-top: 8px">{{ t('gov.quality.losTrained', { train: report.los.train_rows?.toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU'), test: report.los.test_rows?.toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }) }}</p>
       </div>
     </div>
   </main>

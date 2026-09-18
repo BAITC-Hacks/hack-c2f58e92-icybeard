@@ -2,6 +2,7 @@
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, queue } from '@/api/endpoints'
@@ -14,6 +15,7 @@ import { days, pct } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
+const { t } = useI18n()
 const route = useRoute()
 const refdata = useRefdataStore()
 const auth = useAuthStore()
@@ -52,7 +54,7 @@ async function ack(id: string, comment: string) {
   try {
     await analytics.ack(id, comment)
     anomalies.value = anomalies.value.filter((a) => a.id !== id)
-    toast.add({ severity: 'success', summary: 'Сигнал подтверждён', life: 2500 })
+    toast.add({ severity: 'success', summary: t('gov.map.ackToast'), life: 2500 })
   } catch (e) {
     error.value = e
   }
@@ -62,7 +64,7 @@ async function dismiss(id: string, comment: string) {
   try {
     await analytics.ack(id, comment, 'dismissed')
     anomalies.value = anomalies.value.filter((a) => a.id !== id)
-    toast.add({ severity: 'info', summary: 'Отмечен как ложный', life: 2500 })
+    toast.add({ severity: 'info', summary: t('gov.map.dismissToast'), life: 2500 })
   } catch (e) {
     error.value = e
   }
@@ -79,8 +81,8 @@ watch([moCode, profile], load)
   <main class="page">
     <h1>{{ orgName }}</h1>
     <p class="lead">
-      Кабинет организации: очередь и пропускная способность по профилю, сравнение с регионом, сигналы.
-      <RouterLink :to="`/gov/regions/${kato}`">← регион {{ refdata.regionName(kato) }}</RouterLink>
+      {{ t('gov.org.lead') }}
+      <RouterLink :to="`/gov/regions/${kato}`">← {{ t('common.region') }} {{ refdata.regionName(kato) }}</RouterLink>
     </p>
     <div class="actions" style="margin: 0 0 12px">
       <Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter size="small" style="min-width: 280px" />
@@ -88,39 +90,39 @@ watch([moCode, profile], load)
     <ErrorBox :error="error" />
     <div class="grid cols-2">
       <div class="card">
-        <h2>Организация · факт за 4 недели</h2>
+        <h2>{{ t('gov.org.factHeader') }}</h2>
         <template v-if="series">
           <div class="kpi">
-            <div class="item"><div class="value">{{ series.days.at(-1)?.queueLen ?? '—' }}</div><div class="label">в очереди сейчас</div></div>
-            <div class="item"><div class="value">{{ days(series.throughput?.throughputPerDay, 1) }}</div><div class="label">госпитализаций в день</div></div>
-            <div class="item"><div class="value">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</div><div class="label">факт p50 / p90 среди госпитализированных, дн.</div></div>
-            <div class="item"><div class="value">{{ pct(series.throughput?.refusalRate4w) }}</div><div class="label">отказы</div></div>
+            <div class="item"><div class="value">{{ series.days.at(-1)?.queueLen ?? '—' }}</div><div class="label">{{ t('gov.region.queueNow') }}</div></div>
+            <div class="item"><div class="value">{{ days(series.throughput?.throughputPerDay, 1) }}</div><div class="label">{{ t('gov.org.admissionsPerDay') }}</div></div>
+            <div class="item"><div class="value">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</div><div class="label">{{ t('gov.region.factP50P90') }}</div></div>
+            <div class="item"><div class="value">{{ pct(series.throughput?.refusalRate4w) }}</div><div class="label">{{ t('gov.org.refusals') }}</div></div>
           </div>
         </template>
-        <p v-else class="muted">По этому профилю у организации нет ряда очереди.</p>
+        <p v-else class="muted">{{ t('gov.org.noQueueSeries') }}</p>
       </div>
       <div class="card">
-        <h2>Регион для сравнения <OriginTag kind="ml" /></h2>
+        <h2>{{ t('gov.org.regionForComparison') }} <OriginTag kind="ml" /></h2>
         <template v-if="regionPrediction">
           <div class="kpi">
-            <div class="item"><div class="value">{{ days(regionPrediction.p50Days) }} / {{ days(regionPrediction.p90Days) }}</div><div class="label">прогноз p50 / p90 по региону среди госпитализированных, дн.</div></div>
-            <div class="item"><div class="value">{{ pct(regionPrediction.pWithin30Days) }}</div><div class="label">попадают за 30 дней</div></div>
-            <div class="item"><div class="value">{{ pct(regionPrediction.pRefusal) }}</div><div class="label">риск отказа по региону</div></div>
+            <div class="item"><div class="value">{{ days(regionPrediction.p50Days) }} / {{ days(regionPrediction.p90Days) }}</div><div class="label">{{ t('gov.org.regionForecast') }}</div></div>
+            <div class="item"><div class="value">{{ pct(regionPrediction.pWithin30Days) }}</div><div class="label">{{ t('gov.org.within30') }}</div></div>
+            <div class="item"><div class="value">{{ pct(regionPrediction.pRefusal) }}</div><div class="label">{{ t('gov.org.regionRefusalRisk') }}</div></div>
           </div>
           <p class="muted" style="margin-top: 8px">
-            {{ (series?.throughput?.waitP50Days ?? 0) > regionPrediction.p50Days ? 'Организация ждёт дольше регионального прогноза — кандидат на перераспределение.' : 'Ожидание не хуже регионального прогноза.' }}
+            {{ (series?.throughput?.waitP50Days ?? 0) > regionPrediction.p50Days ? t('gov.org.worseThanRegion') : t('gov.org.notWorseThanRegion') }}
           </p>
         </template>
-        <p v-else class="muted">Прогноз по региону недоступен.</p>
+        <p v-else class="muted">{{ t('gov.org.regionForecastUnavailable') }}</p>
       </div>
     </div>
     <div style="margin-top: 16px">
-      <QueueChart v-if="series" :days="series.days" title="Очередь организации за 90 дней" />
+      <QueueChart v-if="series" :days="series.days" :title="t('gov.org.queueChart90')" />
     </div>
     <div class="card" style="margin-top: 16px">
-      <h2>Сигналы организации <OriginTag kind="formula" /></h2>
+      <h2>{{ t('gov.org.signals') }} <OriginTag kind="formula" /></h2>
       <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
-      <p v-if="anomalies.length === 0" class="muted">Открытых сигналов по этой организации нет.</p>
+      <p v-if="anomalies.length === 0" class="muted">{{ t('gov.org.noOpenSignals') }}</p>
     </div>
   </main>
 </template>
