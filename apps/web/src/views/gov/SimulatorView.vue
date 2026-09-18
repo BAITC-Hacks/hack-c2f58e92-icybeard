@@ -89,7 +89,7 @@ onMounted(async () => {
           {{ t('gov.simulator.oneBed') }} ≈ {{ (1 / los.losMedianFact).toFixed(2) }} {{ t('gov.simulator.admissionsPerDayShort') }}<template v-if="beds > 0">, {{ t('gov.simulator.soBedsDelta') }} +{{ beds }} {{ t('gov.simulator.bedsUnit') }} ≈ +{{ (beds / los.losMedianFact).toFixed(2) }} {{ t('gov.simulator.admissionsPerDayShort') }}</template>.
         </p>
         <p class="muted" v-else-if="beds > 0">
-          {{ t('gov.simulator.losMissing', { beds }) }}
+          {{ t('gov.simulator.losMissing', { beds: beds }) }}
         </p>
         <p class="muted">{{ result.model.name }} {{ result.model.version }}</p>
         <!-- значения и источники: refdata/external_benchmarks.yaml (beds) -->
