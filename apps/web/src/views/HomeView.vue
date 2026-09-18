@@ -14,14 +14,15 @@ const route = useRoute()
     <h1>{{ t('home.title') }}</h1>
     <p class="lead">{{ t('home.lead') }}</p>
     <Message v-if="route.query.denied" severity="warn" :closable="false">
-      Для страницы {{ route.query.denied }} нужна другая роль. Выберите роль в шапке{{ auth.mode === 'keycloak' ? ' или войдите' : '' }}.
+      {{ t(auth.mode === 'keycloak' ? 'home.deniedKeycloak' : 'home.denied', { page: route.query.denied }) }}
     </Message>
     <Message v-if="auth.mode === 'keycloak' && !auth.isAuthenticated" severity="info" :closable="false">
-      Вход через Keycloak (кнопка «Войти» в шапке). Демо-пользователи с паролем <code>darumen</code>: regulator1 (регулятор), chief1 (главврач), doctor1 (врач), steward1 (стюард), citizen1 (гражданин), admin1 (всё).
-      Публичные страницы «Ожидание для граждан» и «Проверка рецепта» открываются без входа.
+      {{ t('home.keycloakIntro') }} <code>darumen</code>: regulator1 ({{ t('home.roleRegulator') }}), chief1 ({{ t('home.roleChief') }}), doctor1 ({{ t('home.roleDoctor') }}),
+      steward1 ({{ t('home.roleSteward') }}), citizen1 ({{ t('home.roleCitizen') }}), admin1 ({{ t('home.roleAll') }}).
+      {{ t('home.publicPages') }}
     </Message>
     <Message v-else-if="auth.mode === 'headers' && !auth.isAuthenticated" severity="info" :closable="false">
-      Демо-режим: выберите роль в шапке справа, вход не нужен.
+      {{ t('home.demoModeHint') }}
     </Message>
     <div class="grid cols-2" style="margin-top: 16px">
       <RouterLink class="card" to="/gov"><h2>Darumen Gov</h2><p>{{ t('home.gov') }}</p></RouterLink>

@@ -2,6 +2,7 @@
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, queue, refdata as refdataApi } from '@/api/endpoints'
@@ -19,13 +20,14 @@ import { useRefdataStore } from '@/stores/refdata'
 /** Переключатель потока для прогноза справа (3.1): у каждого потока свой второй ключ сущности и единица измерения —
  * госпитализации по профилю, приёмный покой по конкретной организации региона (нужен entity.mo_key, не mo_code —
  * см. gold.anomalies/mo_registry.name_key), вакцинация по коду плана. */
-const STREAMS = [
-  { value: 'admissions', label: 'Госпитализации', streamId: 'admissions_monthly', unit: 'случаев' },
-  { value: 'er_visits', label: 'Приёмный покой', streamId: 'er_visits_daily', unit: 'обращений' },
-  { value: 'vac', label: 'Вакцинация', streamId: 'vac_monthly', unit: 'доз' },
+const STREAM_DEFS = [
+  { value: 'admissions', streamId: 'admissions_monthly' },
+  { value: 'er_visits', streamId: 'er_visits_daily' },
+  { value: 'vac', streamId: 'vac_monthly' },
 ] as const
-type StreamKind = (typeof STREAMS)[number]['value']
+type StreamKind = (typeof STREAM_DEFS)[number]['value']
 
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const refdata = useRefdataStore()
@@ -48,7 +50,8 @@ const seriesError = ref<unknown>(null)
 const seasonality = ref<Seasonality[]>([])
 const overloaded = ref<OverloadedOrganization[]>([])
 
-const streamMeta = computed(() => STREAMS.find((s) => s.value === streamKind.value)!)
+const STREAMS = computed(() => STREAM_DEFS.map((s) => ({ ...s, label: t(`gov.region.stream.${s.value}`), unit: t(`gov.region.streamUnit.${s.value}`) })))
+const streamMeta = computed(() => STREAMS.value.find((s) => s.value === streamKind.value)!)
 const selectedOrganization = computed(() => organizations.value.find((o) => o.moCode === moCode.value) ?? null)
 
 /** Для плоского прогноза: месяцы горизонта с сезонным множителем NHS (форма плановых госпитализаций). Ориентир
@@ -57,7 +60,7 @@ const flatSeasonHint = computed(() => {
   if (streamKind.value !== 'admissions' || !forecast.value?.flat) return null
   const adm = new Map(seasonality.value.filter((s) => s.seriesId === 'rtt_admitted_per_day').map((s) => [s.month, s.multiplier]))
   if (adm.size !== 12) return null
-  const short = ['', 'янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
+  const short = t('gov.region.monthsShort').split(',')
   return forecast.value.points
     .map((p) => {
       const m = Number(p.period.slice(5, 7))
@@ -79,14 +82,14 @@ async function loadForecast() {
   forecastHint.value = null
   const entity = forecastEntity()
   if (!entity) {
-    forecastHint.value = streamKind.value === 'er_visits' ? 'Выберите организацию, чтобы увидеть прогноз приёмного покоя.' : 'Выберите план вакцинации, чтобы увидеть прогноз.'
+    forecastHint.value = streamKind.value === 'er_visits' ? t('gov.region.pickOrganization') : t('gov.region.pickVaccinationPlan')
     return
   }
   try {
     forecast.value = await analytics.forecast(streamMeta.value.streamId, entity, 3)
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) {
-      forecastHint.value = 'Прогноз для этого выбора не строился (мало истории).'
+      forecastHint.value = t('gov.region.forecastNotBuilt')
       return
     }
     throw e
@@ -139,7 +142,7 @@ async function ack(id: string, comment: string) {
   try {
     await analytics.ack(id, comment)
     anomalies.value = anomalies.value.filter((a) => a.id !== id)
-    toast.add({ severity: 'success', summary: 'Сигнал подтверждён', life: 2500 })
+    toast.add({ severity: 'success', summary: t('gov.map.ackToast'), life: 2500 })
   } catch (e) {
     error.value = e
   }
@@ -149,7 +152,7 @@ async function dismiss(id: string, comment: string) {
   try {
     await analytics.ack(id, comment, 'dismissed')
     anomalies.value = anomalies.value.filter((a) => a.id !== id)
-    toast.add({ severity: 'info', summary: 'Отмечен как ложный', life: 2500 })
+    toast.add({ severity: 'info', summary: t('gov.map.dismissToast'), life: 2500 })
   } catch (e) {
     error.value = e
   }
@@ -185,24 +188,24 @@ watch(vaccinationPlan, () => {
 <template>
   <main class="page">
     <h1>{{ refdata.regionName(kato) }}</h1>
-    <p class="lead">Организации региона, очередь за 90 дней, прогноз госпитализаций и сигналы.</p>
+    <p class="lead">{{ t('gov.region.lead') }}</p>
     <div class="actions" style="margin: 0 0 12px">
       <Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter size="small" style="min-width: 280px" />
-      <Select v-model="moCode" :options="organizations" option-label="name" option-value="moCode" filter size="small" placeholder="Организация" style="min-width: 360px; max-width: 100%" />
-      <RouterLink v-if="moCode" :to="{ name: 'organization', params: { moCode }, query: { kato, profile } }">кабинет организации →</RouterLink>
+      <Select v-model="moCode" :options="organizations" option-label="name" option-value="moCode" filter size="small" :placeholder="t('common.organization')" style="min-width: 360px; max-width: 100%" />
+      <RouterLink v-if="moCode" :to="{ name: 'organization', params: { moCode }, query: { kato, profile } }">{{ t('gov.region.toOrganization') }} →</RouterLink>
     </div>
     <ErrorBox :error="error" />
     <div class="grid cols-2">
       <div>
         <ErrorBox :error="seriesError" />
         <div v-if="series" class="kpi" style="margin-bottom: 12px">
-          <div class="item"><div class="value">{{ series.days.at(-1)?.queueLen ?? '—' }}</div><div class="label">в очереди сейчас</div></div>
-          <div class="item"><div class="value">{{ days(series.throughput?.throughputPerDay, 1) }}</div><div class="label">госпитализаций в день, 4 нед.</div></div>
-          <div class="item"><div class="value">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</div><div class="label">факт p50 / p90 среди госпитализированных, дн.</div></div>
-          <div class="item"><div class="value">{{ pct(series.throughput?.refusalRate4w) }}</div><div class="label">отказы, 4 нед.</div></div>
+          <div class="item"><div class="value">{{ series.days.at(-1)?.queueLen ?? '—' }}</div><div class="label">{{ t('gov.region.queueNow') }}</div></div>
+          <div class="item"><div class="value">{{ days(series.throughput?.throughputPerDay, 1) }}</div><div class="label">{{ t('gov.region.admissionsPerDay4w') }}</div></div>
+          <div class="item"><div class="value">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</div><div class="label">{{ t('gov.region.factP50P90') }}</div></div>
+          <div class="item"><div class="value">{{ pct(series.throughput?.refusalRate4w) }}</div><div class="label">{{ t('gov.region.refusals4w') }}</div></div>
         </div>
-        <QueueChart v-if="series" :days="series.days" title="Очередь организации по профилю" />
-        <p v-else class="muted">Для этой организации и профиля нет ряда очереди.</p>
+        <QueueChart v-if="series" :days="series.days" :title="t('gov.region.queueChartTitle')" />
+        <p v-else class="muted">{{ t('gov.region.noQueueSeries') }}</p>
       </div>
       <div>
         <div class="actions" style="margin: 0 0 8px">
@@ -213,7 +216,7 @@ watch(vaccinationPlan, () => {
             :options="vaccinationPlans"
             filter
             size="small"
-            placeholder="План вакцинации"
+            :placeholder="t('gov.region.vaccinationPlan')"
             style="min-width: 240px"
           />
         </div>
@@ -221,36 +224,33 @@ watch(vaccinationPlan, () => {
           v-if="forecast"
           :history="forecast.history"
           :points="forecast.points"
-          :title="streamKind === 'admissions' ? `Госпитализации в регионе, профиль ${refdata.profileName(profile)}` : streamKind === 'er_visits' ? `Приёмный покой, ${selectedOrganization?.name ?? ''}` : `Вакцинация, ${vaccinationPlan ?? ''}`"
+          :title="streamKind === 'admissions' ? `${t('gov.region.stream.admissions')}: ${refdata.profileName(profile)}` : streamKind === 'er_visits' ? `${t('gov.region.stream.er_visits')}: ${selectedOrganization?.name ?? ''}` : `${t('gov.region.stream.vac')}: ${vaccinationPlan ?? ''}`"
           :unit="streamMeta.unit"
         />
         <p v-else-if="forecastHint" class="muted">{{ forecastHint }}</p>
         <p v-if="forecast" class="muted">
-          Бэктест: sMAPE {{ pct(forecast.backtest.smape, 1) }} против наивного {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}.
+          {{ t('gov.map.backtest') }}: sMAPE {{ pct(forecast.backtest.smape, 1) }} {{ t('gov.map.vsNaive') }} {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}.
           {{ forecast.model.name }} {{ forecast.model.version }}. <OriginTag kind="ml" />
-          <span v-if="forecast.flat" class="synthetic" style="margin-left: 6px">уровень последнего месяца: модель выбрала константу, для планирования малоинформативно</span>
+          <span v-if="forecast.flat" class="synthetic" style="margin-left: 6px">{{ t('gov.region.flatForecastHint') }}</span>
         </p>
         <template v-if="streamKind === 'admissions'">
-          <p v-if="flatSeasonHint" class="muted">
-            Сезонная форма плановых госпитализаций в системах типа NHS для этих месяцев: {{ flatSeasonHint }} к среднему
-            (NHS England RTT, 2017–2019 — внешний ориентир, не поправка модели).
-          </p>
+          <p v-if="flatSeasonHint" class="muted">{{ t('gov.region.seasonHint') }}: {{ flatSeasonHint }} {{ t('gov.region.seasonHintSuffix') }}</p>
           <!-- коэффициент и источник: refdata/external_benchmarks.yaml (diagnostics.dm01_tests_per_admission) -->
           <p v-if="forecast && forecast.points.length" class="muted">
-            Оценка нагрузки на диагностику: ≈ {{ Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5).toLocaleString('ru-RU') }}
-            исследований в месяц по этому профилю (прогноз × 1,5 исследования на госпитализацию, производная NHS DM01, 2024 — внешний ориентир, не измерение; уточнится с данными ЕИП).
+            {{ t('gov.region.diagnosticsLoad') }}: ≈ {{ Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5).toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }}
+            {{ t('gov.region.diagnosticsLoadSuffix') }}
           </p>
-          <p v-else-if="!forecast && !forecastHint" class="muted">Прогноз для этого профиля в регионе не строился (мало истории).</p>
+          <p v-else-if="!forecast && !forecastHint" class="muted">{{ t('gov.region.forecastNotBuiltProfile') }}</p>
         </template>
       </div>
     </div>
     <div class="grid cols-2" style="margin-top: 16px">
       <div class="card">
-        <h2>Сигналы региона <OriginTag kind="formula" /></h2>
+        <h2>{{ t('gov.region.signals') }} <OriginTag kind="formula" /></h2>
         <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
       </div>
       <div class="card">
-        <h2>Перегруженные организации <OriginTag kind="formula" /></h2>
+        <h2>{{ t('gov.map.overloaded') }} <OriginTag kind="formula" /></h2>
         <OverloadedTable :items="overloaded" @organization="goToOrganization" @simulate="goToSimulator" />
       </div>
     </div>
