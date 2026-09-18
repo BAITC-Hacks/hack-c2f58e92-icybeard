@@ -10,6 +10,49 @@ export const ru = {
     suppressed: 'малые числа подавлены', synthetic: 'синтетические данные', comment: 'Комментарий', confirm: 'Подтвердить',
     save: 'Сохранить', period: 'Период', observed: 'Наблюдение', expected: 'Ожидалось', score: 'Сила', severity: 'Уровень',
   },
+  decision: {
+    subjectReferral: 'направление', subjectAnomaly: 'сигнал',
+    role: { doctor: 'врач', chief: 'главврач', regulator: 'регулятор', steward: 'стюард', admin: 'администратор', citizen: 'гражданин' },
+    anomalyShort: 'сигнал {id}',
+  },
+  anomalyFeed: {
+    empty: 'Открытых сигналов нет', sharedWave: 'общая волна', singleEntity: 'отдельная сущность',
+    affected: 'затронуто', observed: 'наблюдение', atExpected: 'при ожидании', score: 'сила', comment: 'комментарий',
+    commentPlaceholder: 'что выяснили', falseSignal: 'Ложный сигнал',
+  },
+  doctor: {
+    worklist: {
+      title: 'Рабочий список', note: 'Приоритеты рассчитаны моделью ожидания и риска отказа',
+      lead: 'Пациенты на маршруте плановой госпитализации. На кэмпе список синтетический: он собран из реальных очередей организаций без персональных данных.',
+      flagAll: 'все', flagStuck: 'застрял дольше 30 дней', flagRisk: 'высокий риск отказа', flagFaster: 'есть быстрее альтернатива',
+      flagStuckShort: '> 30 дней', flagRiskShort: 'риск отказа', flagFasterShort: 'есть быстрее',
+      patient: 'Пациент', stage: 'Этап', daysWaiting: 'Ждёт, дн.', expectedDate: 'Ожидаемая дата', flags: 'Флаги',
+      priority: 'Приоритет', nextStep: 'Следующий шаг', openReferral: 'открыть направление',
+    },
+    decisions: {
+      title: 'Журнал решений',
+      leadRegulator: 'Решения врачей и подтверждения сигналов: рекомендация системы и выбор человека.',
+      leadSelf: 'Ваши решения: рекомендация системы и ваш выбор.',
+      total: 'Всего', refresh: 'Обновить',
+      when: 'Когда', who: 'Кто', role: 'Роль', subject: 'Предмет', object: 'Объект',
+      recommended: 'Рекомендовано', chosen: 'Выбрано', reason: 'Причина',
+    },
+  },
+  anomaly: {
+    stream: {
+      admissions_monthly: 'Госпитализации', er_visits_daily: 'Приёмный покой', vac_monthly: 'Вакцинация',
+      rx_weekly: 'Обеспеченные рецепты', onco_monthly: 'Онкология, впервые выявленные', queue_daily: 'Очередь на госпитализацию',
+    },
+    severity: { critical: 'критический', warning: 'предупреждение' },
+    status: { open: 'открыт', acknowledged: 'подтверждён', dismissed: 'ложный сигнал' },
+    localization: { ALL: 'все локализации', OTH: 'прочие локализации' },
+    localizationOther: 'локализация {value}',
+    regionUnknown: 'регион не определён',
+    profileLabel: 'профиль «{profile}»',
+    vaccinationPlan: 'план вакцинации {value}',
+    drugMnn: 'МНН {value}',
+    aboveExpected: 'выше ожидания', belowExpected: 'ниже ожидания',
+  },
   gov: {
     quality: {
       title: 'Качество моделей',

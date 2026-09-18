@@ -3,7 +3,8 @@ import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { journal } from '@/api/endpoints'
 import type { WorklistItem } from '@/api/types'
@@ -12,18 +13,19 @@ import OriginTag from '@/components/OriginTag.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
+const { t } = useI18n()
 const refdata = useRefdataStore()
 const auth = useAuthStore()
 const router = useRouter()
 const items = ref<WorklistItem[]>([])
 const flag = ref<string | null>(null)
 const error = ref<unknown>(null)
-const flags = [
-  { label: 'все', value: null },
-  { label: 'застрял дольше 30 дней', value: 'stuck_over_30' },
-  { label: 'высокий риск отказа', value: 'refusal_risk' },
-  { label: 'есть быстрее альтернатива', value: 'faster_alternative' },
-]
+const flags = computed(() => [
+  { label: t('doctor.worklist.flagAll'), value: null },
+  { label: t('doctor.worklist.flagStuck'), value: 'stuck_over_30' },
+  { label: t('doctor.worklist.flagRisk'), value: 'refusal_risk' },
+  { label: t('doctor.worklist.flagFaster'), value: 'faster_alternative' },
+])
 
 async function load() {
   error.value = null
@@ -34,7 +36,7 @@ async function load() {
   }
 }
 
-const flagLabels: Record<string, string> = { stuck_over_30: '> 30 дней', refusal_risk: 'риск отказа', faster_alternative: 'есть быстрее' }
+const flagLabels = computed<Record<string, string>>(() => ({ stuck_over_30: t('doctor.worklist.flagStuckShort'), refusal_risk: t('doctor.worklist.flagRiskShort'), faster_alternative: t('doctor.worklist.flagFasterShort') }))
 
 onMounted(async () => {
   await refdata.load()
@@ -45,20 +47,20 @@ watch(flag, load)
 
 <template>
   <main class="page">
-    <h1>Рабочий список <OriginTag kind="ml" note="Приоритеты рассчитаны моделью ожидания и риска отказа" /></h1>
-    <p class="lead synthetic">Пациенты на маршруте плановой госпитализации. На кэмпе список синтетический: он собран из реальных очередей организаций без персональных данных.</p>
+    <h1>{{ t('doctor.worklist.title') }} <OriginTag kind="ml" :note="t('doctor.worklist.note')" /></h1>
+    <p class="lead synthetic">{{ t('doctor.worklist.lead') }}</p>
     <div class="actions" style="margin: 0 0 12px"><Select v-model="flag" :options="flags" option-label="label" option-value="value" size="small" /></div>
     <ErrorBox :error="error" />
     <DataTable :value="items" size="small" sort-field="priority" :sort-order="-1" paginator :rows="20">
-      <Column field="patientRef" header="Пациент" />
-      <Column header="Профиль"><template #body="{ data }">{{ refdata.profileName(data.profileCode) }}</template></Column>
-      <Column field="stage" header="Этап" />
-      <Column field="daysWaiting" header="Ждёт, дн." sortable />
-      <Column field="expectedDate" header="Ожидаемая дата" />
-      <Column header="Флаги"><template #body="{ data }"><Tag v-for="f in data.riskFlags" :key="f" :value="flagLabels[f] ?? f" severity="warn" style="margin-right: 4px" /></template></Column>
-      <Column field="priority" header="Приоритет" sortable />
-      <Column header="Следующий шаг"><template #body="{ data }"><span>{{ data.nextAction }}</span><br /><span class="muted">{{ data.explanation }}</span></template></Column>
-      <Column header=""><template #body="{ data }"><a href="#" @click.prevent="router.push({ name: 'referral', query: { moCode: data.moCode, profileCode: data.profileCode } })">открыть направление</a></template></Column>
+      <Column field="patientRef" :header="t('doctor.worklist.patient')" />
+      <Column :header="t('common.profile')"><template #body="{ data }">{{ refdata.profileName(data.profileCode) }}</template></Column>
+      <Column field="stage" :header="t('doctor.worklist.stage')" />
+      <Column field="daysWaiting" :header="t('doctor.worklist.daysWaiting')" sortable />
+      <Column field="expectedDate" :header="t('doctor.worklist.expectedDate')" />
+      <Column :header="t('doctor.worklist.flags')"><template #body="{ data }"><Tag v-for="f in data.riskFlags" :key="f" :value="flagLabels[f] ?? f" severity="warn" style="margin-right: 4px" /></template></Column>
+      <Column field="priority" :header="t('doctor.worklist.priority')" sortable />
+      <Column :header="t('doctor.worklist.nextStep')"><template #body="{ data }"><span>{{ data.nextAction }}</span><br /><span class="muted">{{ data.explanation }}</span></template></Column>
+      <Column header=""><template #body="{ data }"><a href="#" @click.prevent="router.push({ name: 'referral', query: { moCode: data.moCode, profileCode: data.profileCode } })">{{ t('doctor.worklist.openReferral') }}</a></template></Column>
     </DataTable>
   </main>
 </template>

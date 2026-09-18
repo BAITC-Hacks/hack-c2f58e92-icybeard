@@ -3,16 +3,15 @@
  * направление — `recommended`/`chosen` вида `{ moCode }`, subjectId `регион.организация.профиль.дата`;
  * сигнал аномалии — `{ status }`, subjectId = id сигнала.
  */
+import { i18n } from '@/i18n'
 import { statusLabel } from '@/lib/anomaly'
+
+const t = i18n.global.t
 
 export const SUBJECT_REFERRAL = 'referral'
 export const SUBJECT_ANOMALY = 'anomaly'
 
-const SUBJECT_LABELS: Record<string, string> = { [SUBJECT_REFERRAL]: 'направление', [SUBJECT_ANOMALY]: 'сигнал' }
-
-const ROLE_LABELS: Record<string, string> = {
-  doctor: 'врач', chief: 'главврач', regulator: 'регулятор', steward: 'стюард', admin: 'администратор', citizen: 'гражданин',
-}
+const ROLE_IDS = ['doctor', 'chief', 'regulator', 'steward', 'admin', 'citizen']
 
 export interface DecisionNames {
   region: (kato: string) => string
@@ -21,11 +20,13 @@ export interface DecisionNames {
 }
 
 export function subjectLabel(subject: string): string {
-  return SUBJECT_LABELS[subject] ?? subject
+  if (subject === SUBJECT_REFERRAL) return t('decision.subjectReferral')
+  if (subject === SUBJECT_ANOMALY) return t('decision.subjectAnomaly')
+  return subject
 }
 
 export function roleLabel(role: string): string {
-  return ROLE_LABELS[role] ?? role
+  return ROLE_IDS.includes(role) ? t(`decision.role.${role}`) : role
 }
 
 /** Идентификатор направления, из которого строится subjectId (см. ReferralView). */
@@ -60,6 +61,6 @@ export function describeSubject(subject: string, subjectId: string, names: Decis
     const [region, , profile, date] = subjectId.split('.')
     if (region && profile && date) return `${names.region(region)} · ${names.profile(profile)} · ${date}`
   }
-  if (subject === SUBJECT_ANOMALY) return `сигнал ${subjectId.slice(0, 8)}`
+  if (subject === SUBJECT_ANOMALY) return t('decision.anomalyShort', { id: subjectId.slice(0, 8) })
   return subjectId
 }

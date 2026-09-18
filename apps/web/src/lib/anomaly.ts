@@ -4,33 +4,31 @@
  * собирается по известным ключам, а неизвестные показываются как есть.
  */
 
-export const STREAM_TITLES: Record<string, string> = {
-  admissions_monthly: 'Госпитализации',
-  er_visits_daily: 'Приёмный покой',
-  vac_monthly: 'Вакцинация',
-  rx_weekly: 'Обеспеченные рецепты',
-  onco_monthly: 'Онкология, впервые выявленные',
-  queue_daily: 'Очередь на госпитализацию',
-}
+import { i18n } from '@/i18n'
 
-const SEVERITY_LABELS: Record<string, string> = { critical: 'критический', warning: 'предупреждение' }
+const t = i18n.global.t
 
-const STATUS_LABELS: Record<string, string> = { open: 'открыт', acknowledged: 'подтверждён', dismissed: 'ложный сигнал' }
-
-const LOCALIZATION_LABELS: Record<string, string> = { ALL: 'все локализации', OTH: 'прочие локализации' }
+const STREAM_IDS = ['admissions_monthly', 'er_visits_daily', 'vac_monthly', 'rx_weekly', 'onco_monthly', 'queue_daily']
+const SEVERITY_IDS = ['critical', 'warning']
+const STATUS_IDS = ['open', 'acknowledged', 'dismissed']
+const LOCALIZATION_IDS = ['ALL', 'OTH']
 
 export const UNKNOWN_REGION = 'unknown'
 
 export function streamTitle(streamId: string): string {
-  return STREAM_TITLES[streamId] ?? streamId
+  return STREAM_IDS.includes(streamId) ? t(`anomaly.stream.${streamId}`) : streamId
 }
 
 export function severityLabel(severity: string): string {
-  return SEVERITY_LABELS[severity] ?? severity
+  return SEVERITY_IDS.includes(severity) ? t(`anomaly.severity.${severity}`) : severity
 }
 
 export function statusLabel(status: string): string {
-  return STATUS_LABELS[status] ?? status
+  return STATUS_IDS.includes(status) ? t(`anomaly.status.${status}`) : status
+}
+
+function localizationLabel(value: string): string {
+  return LOCALIZATION_IDS.includes(value) ? t(`anomaly.localization.${value}`) : t('anomaly.localizationOther', { value })
 }
 
 /** Справочники, через которые коды превращаются в названия. */
@@ -52,10 +50,10 @@ function organizationFromKey(key: string): string {
 export function describeEntity(entity: Record<string, string>, regionKato: string | null, names: EntityNames): string[] {
   const parts: string[] = []
   const region = entity.region_kato ?? regionKato
-  if (region) parts.push(region === UNKNOWN_REGION ? 'регион не определён' : names.region(region))
+  if (region) parts.push(region === UNKNOWN_REGION ? t('anomaly.regionUnknown') : names.region(region))
   if (entity.mo_code) parts.push(names.organization(entity.mo_code))
   else if (entity.mo_key) parts.push(organizationFromKey(entity.mo_key))
-  if (entity.profile_code) parts.push(`профиль «${names.profile(entity.profile_code)}»`)
+  if (entity.profile_code) parts.push(t('anomaly.profileLabel', { profile: names.profile(entity.profile_code) }))
   for (const [key, value] of Object.entries(entity)) {
     switch (key) {
       case 'region_kato':
@@ -64,13 +62,13 @@ export function describeEntity(entity: Record<string, string>, regionKato: strin
       case 'profile_code':
         break
       case 'vaccination_plan':
-        parts.push(`план вакцинации ${value}`)
+        parts.push(t('anomaly.vaccinationPlan', { value }))
         break
       case 'drug_mnn_id':
-        parts.push(`МНН ${value}`)
+        parts.push(t('anomaly.drugMnn', { value }))
         break
       case 'localization':
-        parts.push(LOCALIZATION_LABELS[value] ?? `локализация ${value}`)
+        parts.push(localizationLabel(value))
         break
       default:
         parts.push(`${key}: ${value}`)
@@ -81,5 +79,5 @@ export function describeEntity(entity: Record<string, string>, regionKato: strin
 
 /** Направление отклонения словами: сигнал бывает и на рост, и на провал. */
 export function deviationText(observed: number, expected: number): string {
-  return observed >= expected ? 'выше ожидания' : 'ниже ожидания'
+  return observed >= expected ? t('anomaly.aboveExpected') : t('anomaly.belowExpected')
 }

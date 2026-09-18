@@ -10,6 +10,49 @@ export const kk = {
     suppressed: 'аз сандар жасырылған', synthetic: 'синтетикалық деректер', comment: 'Түсініктеме', confirm: 'Растау',
     save: 'Сақтау', period: 'Кезең', observed: 'Бақылау', expected: 'Күтілді', score: 'Күш', severity: 'Деңгей',
   },
+  decision: {
+    subjectReferral: 'жолдама', subjectAnomaly: 'сигнал',
+    role: { doctor: 'дәрігер', chief: 'бас дәрігер', regulator: 'реттеуші', steward: 'стюард', admin: 'әкімші', citizen: 'азамат' },
+    anomalyShort: 'сигнал {id}',
+  },
+  anomalyFeed: {
+    empty: 'Ашық сигналдар жоқ', sharedWave: 'ортақ толқын', singleEntity: 'жеке нысан',
+    affected: 'қамтылды', observed: 'бақылау', atExpected: 'күтуде', score: 'күш', comment: 'түсініктеме',
+    commentPlaceholder: 'не анықталды', falseSignal: 'Жалған сигнал',
+  },
+  doctor: {
+    worklist: {
+      title: 'Жұмыс тізімі', note: 'Басымдықтар күту және бас тарту тәуекелі моделімен есептелген',
+      lead: 'Жоспарлы госпитализация маршрутындағы науқастар. Кэмпте тізім синтетикалық: ол ұйымдардың нақты кезектерінен жеке деректерсіз жиналған.',
+      flagAll: 'барлығы', flagStuck: '30 күннен көп тұрып қалды', flagRisk: 'бас тарту тәуекелі жоғары', flagFaster: 'жылдамырақ балама бар',
+      flagStuckShort: '> 30 күн', flagRiskShort: 'бас тарту тәуекелі', flagFasterShort: 'жылдамырақ бар',
+      patient: 'Науқас', stage: 'Кезең', daysWaiting: 'Күтуде, күн', expectedDate: 'Күтілетін күн', flags: 'Жалаушалар',
+      priority: 'Басымдық', nextStep: 'Келесі қадам', openReferral: 'жолдаманы ашу',
+    },
+    decisions: {
+      title: 'Шешімдер журналы',
+      leadRegulator: 'Дәрігерлердің шешімдері мен сигналдарды растау: жүйе ұсынымы және адамның таңдауы.',
+      leadSelf: 'Сіздің шешімдеріңіз: жүйе ұсынымы және сіздің таңдауыңыз.',
+      total: 'Барлығы', refresh: 'Жаңарту',
+      when: 'Қашан', who: 'Кім', role: 'Рөл', subject: 'Мәні', object: 'Нысан',
+      recommended: 'Ұсынылды', chosen: 'Таңдалды', reason: 'Себебі',
+    },
+  },
+  anomaly: {
+    stream: {
+      admissions_monthly: 'Госпитализация', er_visits_daily: 'Қабылдау бөлімі', vac_monthly: 'Вакцинация',
+      rx_weekly: 'Қамтамасыз етілген рецепттер', onco_monthly: 'Онкология, алғаш анықталған', queue_daily: 'Госпитализацияға кезек',
+    },
+    severity: { critical: 'сыни', warning: 'ескерту' },
+    status: { open: 'ашық', acknowledged: 'расталды', dismissed: 'жалған сигнал' },
+    localization: { ALL: 'барлық локализациялар', OTH: 'басқа локализациялар' },
+    localizationOther: 'локализация {value}',
+    regionUnknown: 'өңір анықталмаған',
+    profileLabel: '«{profile}» бейіні',
+    vaccinationPlan: '{value} вакцинация жоспары',
+    drugMnn: 'ХАА {value}',
+    aboveExpected: 'күтуден жоғары', belowExpected: 'күтуден төмен',
+  },
   gov: {
     quality: {
       title: 'Модельдер сапасы',
