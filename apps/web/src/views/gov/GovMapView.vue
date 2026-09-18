@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
@@ -7,7 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, insight, queue } from '@/api/endpoints'
-import type { Anomaly, ForecastResponse, IndexResponse, OverloadedOrganization } from '@/api/types'
+import type { Anomaly, ForecastResponse, IndexResponse, OverloadedOrganization, StaffingRegion } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import IndexTable from '@/components/IndexTable.vue'
@@ -15,6 +17,7 @@ import OriginTag from '@/components/OriginTag.vue'
 import OverloadedTable from '@/components/OverloadedTable.vue'
 import RegionMap from '@/components/RegionMap.vue'
 import SeriesChart from '@/components/SeriesChart.vue'
+import { num } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
@@ -78,6 +81,22 @@ async function loadOnco() {
   }
 }
 
+/** 5.2: сравнение регионов по кадрам — своя загрузка, витрина может быть ещё не опубликована. */
+const staffing = ref<StaffingRegion[]>([])
+const staffingHint = ref<string | null>(null)
+
+async function loadStaffing() {
+  staffing.value = []
+  staffingHint.value = null
+  try {
+    const res = await analytics.staffing()
+    staffing.value = res.items
+    if (res.items.length === 0) staffingHint.value = t('gov.map.staffingNotPublished')
+  } catch {
+    staffingHint.value = t('gov.map.staffingNotPublished')
+  }
+}
+
 const downloading = ref(false)
 
 /** Отчёт по индексу за выбранный месяц и профиль — PDF или Excel. */
@@ -116,6 +135,7 @@ onMounted(async () => {
   await refdata.load()
   await load()
   await loadOnco()
+  await loadStaffing()
 })
 watch([month, profile], load)
 </script>
@@ -170,6 +190,34 @@ watch([month, profile], load)
     <div class="card" style="margin-top: 16px">
       <h2>{{ t('gov.map.overloaded') }} <OriginTag kind="formula" /></h2>
       <OverloadedTable :items="overloaded" @organization="goToOrganization" @simulate="goToSimulator" />
+    </div>
+    <div class="card" style="margin-top: 16px">
+      <h2>{{ t('gov.map.staffingTitle') }} <OriginTag kind="formula" /></h2>
+      <DataTable
+        v-if="staffing.length"
+        :value="staffing"
+        size="small"
+        scrollable
+        scroll-height="420px"
+        selection-mode="single"
+        data-key="regionKato"
+        @row-click="router.push({ name: 'region', params: { kato: $event.data.regionKato } })"
+      >
+        <Column field="regionName" :header="t('common.region')" />
+        <Column :header="t('gov.map.staffingPer10k')" style="width: 10rem">
+          <template #body="{ data }">{{ num(data.ratePer10kPopulation, 1) }}</template>
+        </Column>
+        <Column :header="t('gov.map.staffingPer1000')" style="width: 10rem">
+          <template #body="{ data }">
+            <span v-if="data.ratePer1000Admissions !== null">{{ num(data.ratePer1000Admissions, 1) }}</span>
+            <span v-else class="muted">{{ t('gov.map.staffingNoAdmissions') }}</span>
+          </template>
+        </Column>
+      </DataTable>
+      <p v-else class="muted">{{ staffingHint }}</p>
+      <p v-if="staffing.length" class="muted" style="margin-top: 8px">
+        {{ t('gov.map.staffingSnapshot') }} {{ staffing[0].snapshotDate }}
+      </p>
     </div>
   </main>
 </template>

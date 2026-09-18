@@ -9,6 +9,7 @@
     rx_weekly            prescriptions issued and fulfilled per week and MNN, fill-time quantiles (needs silver.rx_*)
     rx_nosology_monthly  the same per month, nosology and category
     drug_programs        active drug specifications per nosology, category and programme (needs silver.drug_specs)
+    staffing_by_region   sum of staffing position rates per region, snapshot (needs silver.staffing)
     rx_mnn               MNN per nosology with volumes of the last 12 months of data (needs silver.rx_*)
 
 Every builder is a pure function of silver + refdata and overwrites its table, so rebuilding is idempotent.
@@ -299,6 +300,18 @@ def build_drug_programs(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Pa
         FROM {lake.silver_sql('drug_specs')} GROUP BY ALL ORDER BY 1, 2, 3""")
 
 
+def build_staffing_by_region(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Path) -> int:
+    """Занимаемые ставки медперсонала по региону: сырая сумма ставок на дату снапшота (staffing —
+    это не временной ряд, а точечный срез). Деление на численность населения и на объём госпитализаций
+    (per 10k / per 1000) считается в SQL на стороне API (5.2), где уже доступны refdata.regions и
+    gold.admissions_monthly — здесь только простая агрегация, без межвитринных джойнов."""
+    if not _has_silver(lake, "staffing"):
+        return 0
+    return _write(con, out, "staffing_by_region", f"""
+        SELECT region_kato, sum(position_rate) AS total_rate, max(sdu_load_date)::DATE AS snapshot_date
+        FROM {lake.silver_sql('staffing')} GROUP BY ALL ORDER BY 1""")
+
+
 def build_onco_monthly(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Path) -> int:
     """Впервые выявленные ЗН по месяцам и локализациям из расширенного реестра ЭРОБ.
     Реестр накопительный: полная помесячная интенсивность только с сентября 2024, более ранние
@@ -333,6 +346,7 @@ BUILDERS: dict[str, Callable[[duckdb.DuckDBPyConnection, Lakehouse, Path], int]]
     "rx_weekly": build_rx_weekly,
     "rx_nosology_monthly": build_rx_nosology_monthly,
     "drug_programs": build_drug_programs,
+    "staffing_by_region": build_staffing_by_region,
     "rx_mnn": build_rx_mnn,
 }
 

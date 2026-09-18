@@ -51,3 +51,10 @@ public sealed record LosItemDto(string RegionKato, string ProfileName, string? P
 public sealed record LosResponseDto(IReadOnlyList<LosItemDto> Items, string Method);
 
 public sealed record IndexResponseDto(string Month, string ProfileCode, IReadOnlyList<IndexItemDto> Items, IReadOnlyList<string> Months, string Method);
+
+/// <summary>5.2: ставки на 10 тыс. населения и на 1 000 госпитализаций (12 мес.) из gold.staffing_by_region,
+/// refdata.regions и gold.admissions_monthly. RatePer1000Admissions — null, если за 12 месяцев госпитализаций нет.</summary>
+public sealed record StaffingRegionDto(
+    string RegionKato, string RegionName, double RatePer10kPopulation, double? RatePer1000Admissions, DateOnly SnapshotDate);
+
+public sealed record StaffingResponseDto(IReadOnlyList<StaffingRegionDto> Items, string Method);

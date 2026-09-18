@@ -58,6 +58,16 @@ export interface IndexResponse { month: string; profileCode: string; items: Inde
 export interface LosItem { regionKato: string; profileName: string; profileCode: string | null; n: number; losMedianFact: number; losP50Model: number | null }
 export interface LosResponse { items: LosItem[]; method: string }
 
+/** 5.2: ставки на 10 тыс. населения и на 1 000 госпитализаций (12 мес.) по региону, из gold.staffing_by_region. */
+export interface StaffingRegion {
+  regionKato: string
+  regionName: string
+  ratePer10kPopulation: number
+  ratePer1000Admissions: number | null
+  snapshotDate: string
+}
+export interface StaffingResponse { items: StaffingRegion[]; method: string }
+
 /** Срез ошибки wait-модели по региону или профилю из отчёта обучения. */
 export interface QualityBreakdownRow {
   region_kato?: string; profile_code?: string; n: number

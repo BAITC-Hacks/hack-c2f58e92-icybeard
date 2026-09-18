@@ -110,6 +110,19 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Staffing_by_region_is_sorted_ascending_by_rate_per_10k_population()
+    {
+        var body = await app.CreateClient("citizen").GetFromJsonAsync<StaffingResponseDto>("/api/v1/staffing");
+        Assert.NotNull(body);
+        Assert.Equal(2, body.Items.Count);
+        Assert.Equal("10", body.Items[0].RegionKato);
+        Assert.Equal(12.5, body.Items[0].RatePer10kPopulation);
+        Assert.Equal(3.1, body.Items[0].RatePer1000Admissions);
+        Assert.Null(body.Items[1].RatePer1000Admissions);
+        Assert.Contains("10 тыс.", body.Method);
+    }
+
+    [Fact]
     public async Task Index_defaults_to_latest_month_and_validates_month()
     {
         var client = app.CreateClient();

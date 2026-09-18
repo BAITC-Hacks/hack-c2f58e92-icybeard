@@ -3,7 +3,7 @@ import type {
   AlternativesResponse, Anomaly, AskResponse, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
   LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
-  SimulateResponse, Stream, VaccinationBenchmark, WorklistItem,
+  SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, WorklistItem,
 } from './types'
 
 export const queue = {
@@ -30,6 +30,7 @@ export const analytics = {
   index: (month?: string, profileCode?: string) => api<IndexResponse>('/api/v1/index', { query: { month, profileCode } }),
   quality: () => api<QualityReport>('/api/v1/quality'),
   los: (regionKato?: string, profileCode?: string) => api<LosResponse>('/api/v1/los', { query: { regionKato, profileCode } }),
+  staffing: () => api<StaffingResponse>('/api/v1/staffing'),
 }
 
 export const simulation = {

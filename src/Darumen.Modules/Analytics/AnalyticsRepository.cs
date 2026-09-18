@@ -187,6 +187,43 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
         }
     }
 
+    public async Task<IReadOnlyList<StaffingRegionDto>> StaffingByRegionAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            // total_rate — сумма занимаемых ставок на дату снапшота (gold.staffing_by_region, 5.2); знаменатели считаются
+            // здесь: население региона из refdata.regions, госпитализации — сумма cases за последние 12 месяцев из
+            // gold.admissions_monthly относительно последнего загруженного месяца (последний месяц может быть неполным,
+            // но так же считается forecast/index, оставляем единообразно).
+            var rows = await connection.QueryAsync<StaffingRegionDto>(new CommandDefinition(
+                """
+                WITH latest AS (SELECT max(month) AS last_month FROM gold.admissions_monthly),
+                admissions_12m AS (
+                    SELECT a.region_kato, sum(a.cases)::float8 AS admissions
+                    FROM gold.admissions_monthly a, latest
+                    WHERE a.month > latest.last_month - INTERVAL '12 months'
+                    GROUP BY a.region_kato
+                )
+                SELECT s.region_kato AS RegionKato, r.name_ru AS RegionName,
+                       (s.total_rate::float8 * 10.0) / r.population_thousands AS RatePer10kPopulation,
+                       CASE WHEN a.admissions > 0 THEN (s.total_rate::float8 * 1000.0) / a.admissions END AS RatePer1000Admissions,
+                       s.snapshot_date AS SnapshotDate
+                FROM gold.staffing_by_region s
+                JOIN refdata.regions r ON r.region_kato = s.region_kato
+                LEFT JOIN admissions_12m a ON a.region_kato = s.region_kato
+                ORDER BY RatePer10kPopulation ASC
+                """,
+                cancellationToken: cancellationToken));
+            return rows.ToList();
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            // витрина ещё не опубликована — страница /gov живёт без блока кадров
+            return [];
+        }
+    }
+
     private sealed record SignalScopeRow(string? RegionKato);
 
     private sealed record StreamRow(string StreamId, string Title, string Grain, string EntityKeys, string Horizons);

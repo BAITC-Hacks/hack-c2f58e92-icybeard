@@ -16,6 +16,11 @@ public static class AnalyticsEndpoints
         "Индекс = 100 − среднее перцентильных рангов региона по доле ожидавших дольше 30 дней и по 90-му перцентилю ожидания внутри месяца и профиля; " +
         "100 у самого доступного региона. Строки с числом госпитализаций меньше 5 подавлены.";
 
+    private const string StaffingMethod =
+        "Занимаемые ставки медперсонала (сумма staffing.position_rate на дату снапшота) на 10 тыс. населения (refdata.regions) " +
+        "и на 1 000 госпитализаций за последние 12 месяцев (gold.admissions_monthly); регионы отсортированы по возрастанию первого " +
+        "показателя, наименее укомплектованные — первыми.";
+
     public static void Map(IEndpointRouteBuilder api)
     {
         api.MapGet("/streams", async (IAnalyticsRepository repository, CancellationToken ct) =>
@@ -87,6 +92,13 @@ public static class AnalyticsEndpoints
             .WithTags("Quality").WithName("LengthOfStay")
             .WithSummary("Длительность лечения по ячейкам регион×профиль: факт-медиана за 12 месяцев и p50 модели")
             .Produces<LosResponseDto>();
+
+        api.MapGet("/staffing", async (IAnalyticsRepository repository, CancellationToken ct) =>
+                Results.Ok(new StaffingResponseDto(await repository.StaffingByRegionAsync(ct), StaffingMethod)))
+            .RequireAuthorization(Policies.Authenticated)
+            .WithTags("Quality").WithName("StaffingByRegion")
+            .WithSummary("Ставки медперсонала на 10 тыс. населения и на 1 000 госпитализаций по регионам")
+            .Produces<StaffingResponseDto>();
 
         api.MapGet("/index", async (string? month, string? profileCode, HttpRequest http, IAnalyticsRepository repository, CancellationToken ct) =>
             {

@@ -1,7 +1,13 @@
+from pathlib import Path
+
 import duckdb
 
+from darumen.intake.contracts import load_contracts
+from darumen.intake.pipeline import Lakehouse, run_batch
 from darumen.lakehouse.gold import build_gold
 from darumen.refdata.build import build_refdata
+
+CONTRACTS_DIR = Path(__file__).resolve().parents[2] / "contracts"
 
 
 def _q(lake, table, sql):
@@ -53,3 +59,42 @@ def test_features_wait_is_leak_free_and_split(synthetic_lake):
     assert by_code["10.00AA.021.3"][4] is True and by_code["10.00AA.021.3"][5] is False
     assert by_code["10.00BB.381.1"][7] == "VII" and by_code["10.00BB.381.1"][8] is False
     assert by_code["10.00AA.021.6"][6] in ("test_time", "test_mo") and by_code["10.00AA.021.1"][6] in ("train", "test_mo")
+
+
+STAFFING_HEADER = ("organization_name,locality_category,nomenclature,legal_address,position_category,position_rate,"
+                    "position_type,post_id,region_id,region_name,region_kato,country_name,subordination_type,sdu_load_date")
+LOAD = "2026-05-13 03:28:05.149000"
+
+
+def staffing_row(post_id, region, rate, org="Городская больница №1"):
+    # organization_name,locality_category,nomenclature,legal_address,position_category,position_rate,
+    # position_type,post_id,region_id,region_name,region_kato,country_name,subordination_type,sdu_load_date
+    return f"{org},,,,,{rate},,{post_id},,,{region},Казахстан,,{LOAD}"
+
+
+def test_staffing_by_region_sums_rates_per_region(tmp_path, synthetic_lake):
+    contracts = {c.dataset: c for c in load_contracts(CONTRACTS_DIR)}
+    lake = synthetic_lake
+    rows = [
+        staffing_row("P1", "Область Абай", "1.0"),
+        staffing_row("P2", "Область Абай", "0.5"),
+        staffing_row("P3", "Акмолинская область", "0.75"),
+        staffing_row("P4", "", "1.0"),  # region not resolvable: to_kato -> NULL, partitioned into region_kato="unknown"
+    ]
+    path = tmp_path / "staffing.csv"
+    path.write_text("\ufeff" + STAFFING_HEADER + "\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    result = run_batch([path], contracts["staffing"], lake)
+    assert result.status == "loaded"
+    assert result.rows_quarantine == 0  # unresolved region lands in the "unknown" partition bucket, not quarantine
+
+    counts = build_gold(lake)
+    assert counts["staffing_by_region"] == 3  # "10", "11", "unknown"
+
+    rows = duckdb.connect().execute(
+        f"SELECT region_kato, total_rate, snapshot_date FROM read_parquet('{lake.root}/gold/staffing_by_region.parquet') ORDER BY region_kato").fetchall()
+    by_region = {r[0]: r[1:] for r in rows}
+    assert abs(by_region["10"][0] - 1.5) < 1e-9        # Область Абай: P1 + P2
+    assert abs(by_region["11"][0] - 0.75) < 1e-9       # Акмолинская область: P3
+    assert abs(by_region["unknown"][0] - 1.0) < 1e-9   # P4, unresolved region ("unknown" is not a real KATO code,
+                                                        # so the API's join against refdata.regions drops it naturally)
+    assert by_region["10"][1].isoformat() == "2026-05-13"

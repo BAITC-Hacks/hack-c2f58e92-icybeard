@@ -103,6 +103,13 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
             new("75", "Кардиологические для взрослых", "031", 4200, 7.0, 6.8),
             new("10", "Терапевтические", "021", 1800, 8.5, 8.1),
         ]);
+
+    public Task<IReadOnlyList<StaffingRegionDto>> StaffingByRegionAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<StaffingRegionDto>>(
+        [
+            new("10", "Область Абай", 12.5, 3.1, new DateOnly(2026, 5, 13)),
+            new("75", "город Алматы", 18.2, null, new DateOnly(2026, 5, 13)), // регион без госпитализаций за 12 мес.
+        ]);
 }
 
 public sealed class InMemoryDecisions : IDecisionRepository

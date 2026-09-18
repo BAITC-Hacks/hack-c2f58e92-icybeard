@@ -35,6 +35,8 @@ PG_TABLES: dict[str, tuple[str, str, str, list[str]]] = {
     "gold.drug_programs": ("gold/drug_programs.parquet", "*", "", ["nosology_id"]),
     "gold.rx_mnn": ("gold/rx_mnn.parquet", "*", "", ["nosology_id", "drug_mnn_id"]),
     "gold.los_by_profile": ("gold/los_by_profile.parquet", "*", "", ["region_kato", "profile_code"]),
+    "gold.admissions_monthly": ("gold/admissions_monthly.parquet", "month::DATE AS month, * EXCLUDE (month)", "", ["region_kato", "profile_code", "month"]),
+    "gold.staffing_by_region": ("gold/staffing_by_region.parquet", "*", "", ["region_kato"]),
 }
 CH_TABLES: dict[str, tuple[str, str, list[str]]] = {
     "queue_daily": ("gold/queue_daily.parquet", "*", ["region_kato", "mo_code", "profile_code", "day"]),

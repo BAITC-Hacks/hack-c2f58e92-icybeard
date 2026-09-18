@@ -23,4 +23,8 @@ public interface IAnalyticsRepository
 
     /// <summary>Длительность лечения по ячейкам регион×профиль из gold.los_by_profile; пусто, пока витрина не опубликована.</summary>
     Task<IReadOnlyList<LosItemDto>> LosAsync(string? regionKato, string? profileCode, CancellationToken cancellationToken);
+
+    /// <summary>5.2: ставки на 10 тыс. населения и на 1 000 госпитализаций по регионам, для сравнения на /gov;
+    /// пусто, пока gold.staffing_by_region не опубликован.</summary>
+    Task<IReadOnlyList<StaffingRegionDto>> StaffingByRegionAsync(CancellationToken cancellationToken);
 }
