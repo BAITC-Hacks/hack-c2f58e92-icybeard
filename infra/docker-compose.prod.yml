@@ -61,6 +61,26 @@ services:
     depends_on:
       - models
 
+  # 4.1: консоль загрузки данных. lakehouse — на запись (в отличие от api/scribe :ro), сборка
+  # витрин без Kafka здесь не публикуется в ClickHouse (его нет в прод-стеке, см. заголовок файла).
+  intake:
+    image: darumen-models   # уже собран сервисом models (SCRIBE_EXTRAS в x-models-build ставит и openai, нужный 4.6)
+    entrypoint: ["python", "-m", "darumen.intake.app", "--host", "0.0.0.0", "--port", "8020"]
+    environment:
+      DARUMEN_LAKEHOUSE: /lakehouse
+      DARUMEN_CONTRACTS_DIR: /app/contracts
+      DARUMEN_LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
+      DARUMEN_INTAKE_MODEL: ${INTAKE_MODEL:-deepseek-chat}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      POSTGRES_DSN: host=postgres port=5432 dbname=darumen user=darumen password=${POSTGRES_PASSWORD}
+    volumes:
+      - ${LAKEHOUSE_DIR:-../lakehouse}:/lakehouse
+      - ../contracts:/app/contracts
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      models: { condition: service_started }
+
   api:
     build:
       context: ..
@@ -74,6 +94,7 @@ services:
       Messaging__Mode: local   # outbox в Postgres, без Kafka
       Cors__Origins__0: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}
       ReverseProxy__Clusters__scribe__Destinations__local__Address: http://scribe:8010/
+      ReverseProxy__Clusters__intake__Destinations__local__Address: http://intake:8020/
       Insight__Provider: ${LLM_PROVIDER:-deepseek}
       Insight__Model: ${INSIGHT_MODEL:-deepseek-chat}
       Insight__BaseUrl: ${INSIGHT_BASE_URL:-https://api.deepseek.com/v1}
@@ -87,6 +108,7 @@ services:
       postgres: { condition: service_healthy }
       models: { condition: service_started }
       scribe: { condition: service_started }
+      intake: { condition: service_started }
 
   web:
     build:

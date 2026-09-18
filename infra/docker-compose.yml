@@ -129,6 +129,36 @@ services:
     ports: ["8010:8010"]
     profiles: [app]
 
+  # 4.1: консоль загрузки данных — POST /intake/files (см. src/Darumen.Modules/Steward), GET /intake/drafts,
+  # POST /intake/drafts/{dataset}/approve, GET /intake/quarantine. lakehouse и contracts — на запись (в
+  # отличие от models/scribe, которым для инференса и стенограмм хватает :ro).
+  intake:
+    build:
+      context: ..
+      dockerfile: infra/models.Dockerfile
+      args:
+        INTAKE_EXTRAS: "1"
+    entrypoint: ["python", "-m", "darumen.intake.app", "--host", "0.0.0.0", "--port", "8020"]
+    environment:
+      DARUMEN_LAKEHOUSE: /lakehouse
+      DARUMEN_CONTRACTS_DIR: /app/contracts
+      DARUMEN_LLM_PROVIDER: ollama
+      DARUMEN_LLM_BASE_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/v1}
+      DARUMEN_INTAKE_MODEL: ${OLLAMA_MODEL:-darumen-qwen3.8:27b}
+      KAFKA_BOOTSTRAP: kafka:9092
+      SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      POSTGRES_DSN: host=postgres port=5432 dbname=darumen user=darumen password=darumen
+      CLICKHOUSE_URL: http://darumen:darumen@clickhouse:8123/darumen
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ../lakehouse:/lakehouse
+      - ../contracts:/app/contracts
+    ports: ["8020:8020"]
+    depends_on:
+      kafka: { condition: service_started }
+      schema-registry: { condition: service_started }
+    profiles: [app]
+
   # Конвейер данных в контейнере: intake → refdata → gold → train → publish. Запуск: make pipeline
   pipeline:
     build:
@@ -198,6 +228,7 @@ services:
       Auth__Mode: ${API_AUTH_MODE:-keycloak}
       Auth__Authority: http://keycloak:8080/realms/darumen
       ReverseProxy__Clusters__scribe__Destinations__local__Address: http://scribe:8010/
+      ReverseProxy__Clusters__intake__Destinations__local__Address: http://intake:8020/
       Insight__Provider: ollama
       Insight__BaseUrl: ${OLLAMA_URL:-http://host.docker.internal:11434/v1}
       Insight__Model: ${OLLAMA_MODEL:-darumen-qwen3.8:27b}
@@ -215,6 +246,7 @@ services:
       keycloak: { condition: service_started }
       models: { condition: service_started }
       scribe: { condition: service_started }
+      intake: { condition: service_started }
     profiles: [app]
 
 volumes:

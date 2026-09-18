@@ -9,9 +9,13 @@ COPY proto proto
 COPY streams streams
 COPY contracts contracts
 COPY refdata refdata
-# SCRIBE_EXTRAS=1 ставит faster-whisper и openai для сервиса скрайба (прод); по умолчанию — только модели
+# SCRIBE_EXTRAS=1 ставит faster-whisper и openai для сервиса скрайба (прод); INTAKE_EXTRAS=1 — openai для
+# LLM-черновика контракта (4.6) в сервисе загрузки; по умолчанию (оба 0) — только модели
 ARG SCRIBE_EXTRAS=0
-RUN if [ "$SCRIBE_EXTRAS" = "1" ]; then uv pip install --system --no-cache -e "ml[scribe]"; else uv pip install --system --no-cache -e ml; fi \
+ARG INTAKE_EXTRAS=0
+RUN if [ "$SCRIBE_EXTRAS" = "1" ]; then uv pip install --system --no-cache -e "ml[scribe]"; \
+    elif [ "$INTAKE_EXTRAS" = "1" ]; then uv pip install --system --no-cache -e "ml[intake]"; \
+    else uv pip install --system --no-cache -e ml; fi \
  && python -m grpc_tools.protoc -I proto --python_out=ml/src --grpc_python_out=ml/src --pyi_out=ml/src proto/darumen/v1/*.proto \
  && touch ml/src/darumen/v1/__init__.py
 ENV DARUMEN_LAKEHOUSE=/lakehouse DARUMEN_MODELS_PORT=50051
