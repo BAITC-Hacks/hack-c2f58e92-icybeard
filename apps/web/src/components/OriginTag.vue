@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 
 /**
@@ -8,19 +9,10 @@ import { useAuthStore } from '@/stores/auth'
  */
 const props = defineProps<{ kind: 'ml' | 'formula' | 'ai'; note?: string }>()
 const auth = useAuthStore()
+const { t } = useI18n()
 
-const label = computed(
-  () => ({ ml: 'ML-модель', formula: 'расчёт по формуле', ai: 'AI-черновик' })[props.kind],
-)
-const title = computed(
-  () =>
-    props.note ??
-    {
-      ml: 'Число рассчитано моделью машинного обучения; метрика против baseline — на странице качества моделей',
-      formula: 'Число рассчитано по открытой формуле или статистическому правилу без обучения',
-      ai: 'Текст сгенерирован языковой моделью; числа берутся только из инструментов, применение требует человека',
-    }[props.kind],
-)
+const label = computed(() => t(`originTag.label.${props.kind}`))
+const title = computed(() => props.note ?? t(`originTag.title.${props.kind}`))
 const linkable = computed(() => auth.hasRole('chief', 'regulator'))
 </script>
 

@@ -4,7 +4,8 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, journal, queue } from '@/api/endpoints'
@@ -16,6 +17,7 @@ import { days, pct, refusalWords } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
+const { t } = useI18n()
 const refdata = useRefdataStore()
 const auth = useAuthStore()
 const toast = useToast()
@@ -52,8 +54,11 @@ let decisionKey = ''
 // метрики модели против baseline из отчёта обучения — та же цифра, что на странице качества (§7.4)
 const waitQuality = ref<QualitySplit | null>(null)
 
-const purposes = ['Оперативное лечение', 'Консервативное лечение', 'Диагностика', 'Реабилитация']
-const territorial = ['Город', 'Село']
+// Значения — часть контракта API/модели (категориальные признаки на русском), меняется только подпись в UI
+const PURPOSE_VALUES = ['Оперативное лечение', 'Консервативное лечение', 'Диагностика', 'Реабилитация'] as const
+const TERRITORIAL_VALUES = ['Город', 'Село'] as const
+const purposes = computed(() => PURPOSE_VALUES.map((value, i) => ({ value, label: t(`doctor.referral.purpose.${i}`) })))
+const territorial = computed(() => TERRITORIAL_VALUES.map((value, i) => ({ value, label: t(`doctor.referral.territorial.${i}`) })))
 
 async function loadOrganizations() {
   organizations.value = await refdata.organizationsOf(form.regionKato, form.profileCode)
@@ -109,7 +114,7 @@ async function record(chosen: string) {
       decisionKey,
     )
     recorded.value = created.decisionId
-    toast.add({ severity: 'success', summary: 'Решение записано в журнал', detail: created.decisionId, life: 3000 })
+    toast.add({ severity: 'success', summary: t('doctor.referral.decisionRecorded'), detail: created.decisionId, life: 3000 })
   } catch (e) {
     error.value = e
   } finally {
@@ -133,73 +138,74 @@ watch(() => form.regionKato, loadReferringOrganizations)
 
 <template>
   <main class="page">
-    <h1>Ассистент направления</h1>
-    <p class="lead">Ожидание и риск отказа для направления в выбранную организацию, альтернативы в том же регионе и профиле, запись решения в журнал.</p>
+    <h1>{{ t('doctor.referral.title') }}</h1>
+    <p class="lead">{{ t('doctor.referral.lead') }}</p>
     <div class="grid cols-2">
       <div class="card">
-        <h2>Направление</h2>
+        <h2>{{ t('doctor.referral.formTitle') }}</h2>
         <div class="form-grid">
-          <div class="field"><label>Регион</label><Select v-model="form.regionKato" :options="refdata.regions" option-label="name" option-value="regionKato" filter /><span class="error">{{ fieldErrors.regionKato }}</span></div>
-          <div class="field"><label>Организация</label><Select v-model="form.moCode" :options="organizations" option-label="name" option-value="moCode" filter /></div>
-          <div class="field"><label>Профиль койки</label><Select v-model="form.profileCode" :options="refdata.profiles" option-label="name" option-value="profileCode" filter /><span class="error">{{ fieldErrors.profileCode }}</span></div>
-          <div class="field"><label>МКБ-10</label><InputText v-model="form.icd10" placeholder="H25.1" /></div>
+          <div class="field"><label>{{ t('common.region') }}</label><Select v-model="form.regionKato" :options="refdata.regions" option-label="name" option-value="regionKato" filter /><span class="error">{{ fieldErrors.regionKato }}</span></div>
+          <div class="field"><label>{{ t('common.organization') }}</label><Select v-model="form.moCode" :options="organizations" option-label="name" option-value="moCode" filter /></div>
+          <div class="field"><label>{{ t('common.profile') }}</label><Select v-model="form.profileCode" :options="refdata.profiles" option-label="name" option-value="profileCode" filter /><span class="error">{{ fieldErrors.profileCode }}</span></div>
+          <div class="field"><label>{{ t('doctor.referral.icd10') }}</label><InputText v-model="form.icd10" placeholder="H25.1" /></div>
           <div class="field">
-            <label>Направляющая организация</label>
-            <Select v-model="form.referringMoCode" :options="referringOrganizations" option-label="name" option-value="moCode" filter show-clear placeholder="не указана" />
+            <label>{{ t('doctor.referral.referringOrg') }}</label>
+            <Select v-model="form.referringMoCode" :options="referringOrganizations" option-label="name" option-value="moCode" filter show-clear :placeholder="t('doctor.referral.notSpecified')" />
           </div>
-          <div class="field"><label>Цель</label><Select v-model="form.referralPurpose" :options="purposes" /></div>
-          <div class="field"><label>Город или село</label><Select v-model="form.territorialType" :options="territorial" /></div>
-          <div class="field"><label>Дата постановки в очередь</label><InputText v-model="form.registrationDate" placeholder="пусто — по последним данным (I кв. 2025)" /><span class="error">{{ fieldErrors.registrationDate }}</span></div>
+          <div class="field"><label>{{ t('doctor.referral.purposeLabel') }}</label><Select v-model="form.referralPurpose" :options="purposes" option-label="label" option-value="value" /></div>
+          <div class="field"><label>{{ t('doctor.referral.territorialLabel') }}</label><Select v-model="form.territorialType" :options="territorial" option-label="label" option-value="value" /></div>
+          <div class="field"><label>{{ t('doctor.referral.registrationDate') }}</label><InputText v-model="form.registrationDate" :placeholder="t('doctor.referral.registrationDatePlaceholder')" /><span class="error">{{ fieldErrors.registrationDate }}</span></div>
         </div>
-        <div class="actions"><Button label="Рассчитать" icon="pi pi-calculator" :loading="busy" @click="predict" /></div>
+        <div class="actions"><Button :label="t('common.apply')" icon="pi pi-calculator" :loading="busy" @click="predict" /></div>
         <ErrorBox :error="error" />
       </div>
       <div v-if="prediction">
         <div class="card">
-          <h2>Прогноз для {{ organizations.find((o) => o.moCode === form.moCode)?.name ?? form.moCode }}</h2>
+          <h2>{{ t('doctor.referral.forecastFor') }} {{ organizations.find((o) => o.moCode === form.moCode)?.name ?? form.moCode }}</h2>
           <div class="kpi">
-            <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">медианное ожидание среди госпитализированных, дн.</div></div>
-            <div class="item"><div class="value">{{ days(prediction.p90Days) }}</div><div class="label">p90, дн.</div></div>
-            <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">госпитализация за 30 дней</div></div>
+            <div class="item"><div class="value">{{ days(prediction.p50Days) }}</div><div class="label">{{ t('doctor.referral.medianWait') }}</div></div>
+            <div class="item"><div class="value">{{ days(prediction.p90Days) }}</div><div class="label">p90, {{ t('common.days') }}</div></div>
+            <div class="item"><div class="value">{{ pct(prediction.pWithin30Days) }}</div><div class="label">{{ t('doctor.referral.within30') }}</div></div>
             <div class="item">
               <div class="value">{{ prediction.refusalOrgInTraining === false ? refusalWords(prediction.pRefusal) : pct(prediction.pRefusal) }}</div>
-              <div class="label">риск отказа</div>
+              <div class="label">{{ t('doctor.referral.refusalRisk') }}</div>
             </div>
           </div>
-          <p v-if="prediction.refusalOrgInTraining === false" class="muted" style="margin-top: 8px">
-            Организации не было в обучении, поэтому риск отказа показан словами: на незнакомых организациях модель переоценивает проценты.
-          </p>
+          <p v-if="prediction.refusalOrgInTraining === false" class="muted" style="margin-top: 8px">{{ t('doctor.referral.unseenOrgHint') }}</p>
           <p v-if="prediction.queue" class="muted" style="margin-top: 8px">
-            В очереди {{ prediction.queue.len }} направлений, медианный возраст {{ days(prediction.queue.ageP50) }} дн., {{ prediction.queue.throughputPerDay.toFixed(1) }} госпитализаций в день.
+            {{ t('doctor.referral.queueInfo', { len: prediction.queue.len, age: days(prediction.queue.ageP50), throughput: prediction.queue.throughputPerDay.toFixed(1) }) }}
           </p>
         </div>
-        <ExplanationCard :explanation="prediction.explanation" :model="prediction.model" unit="дн." style="margin-top: 16px" />
+        <ExplanationCard :explanation="prediction.explanation" :model="prediction.model" :unit="t('common.days')" style="margin-top: 16px" />
         <p v-if="waitQuality" class="muted" style="margin-top: 8px">
-          Качество на отложенном марте 2025: пинбол p50 {{ waitQuality.pinball_p50.toFixed(2) }} против {{ waitQuality.pinball_p50_baseline.toFixed(2) }} у простого правила
-          ({{ ((1 - waitQuality.pinball_p50 / waitQuality.pinball_p50_baseline) * 100).toFixed(0) }} % точнее), AUC отказа {{ waitQuality.auc_refusal.toFixed(2) }} против {{ waitQuality.auc_refusal_baseline.toFixed(2) }}.
+          {{ t('doctor.referral.qualityNote', {
+            p50: waitQuality.pinball_p50.toFixed(2), base: waitQuality.pinball_p50_baseline.toFixed(2),
+            pct: ((1 - waitQuality.pinball_p50 / waitQuality.pinball_p50_baseline) * 100).toFixed(0),
+            auc: waitQuality.auc_refusal.toFixed(2), aucBase: waitQuality.auc_refusal_baseline.toFixed(2),
+          }) }}
         </p>
       </div>
     </div>
     <div v-if="alternatives" class="card" style="margin-top: 16px">
-      <h2>Альтернативы в регионе</h2>
-      <p v-if="alternatives.items.length === 0" class="muted">Других организаций с этим профилем в регионе нет.</p>
+      <h2>{{ t('doctor.referral.alternativesTitle') }}</h2>
+      <p v-if="alternatives.items.length === 0" class="muted">{{ t('doctor.referral.noAlternatives') }}</p>
       <table v-else style="width: 100%; border-collapse: collapse">
-        <thead><tr class="muted" style="text-align: left"><th>Организация</th><th>p50, дн.</th><th>p90, дн.</th><th>отказ</th><th>расстояние</th><th></th></tr></thead>
+        <thead><tr class="muted" style="text-align: left"><th>{{ t('common.organization') }}</th><th>p50, {{ t('common.days') }}</th><th>p90, {{ t('common.days') }}</th><th>{{ t('doctor.referral.refusalShort') }}</th><th>{{ t('doctor.referral.distance') }}</th><th></th></tr></thead>
         <tbody>
           <tr v-for="a in alternatives.items" :key="a.mo.moCode" style="border-top: 1px solid var(--darumen-border)">
             <td style="padding: 8px 4px">{{ a.mo.name }} <span class="muted">({{ a.mo.moCode }})</span></td>
             <td>{{ days(a.p50Days) }}</td>
             <td>{{ days(a.p90Days) }}</td>
             <td>{{ pct(a.pRefusal) }}</td>
-            <td class="muted">{{ a.distanceKm > 0 ? `${a.distanceKm.toFixed(0)} км` : 'нет координат' }}</td>
-            <td><Button label="Направить сюда" size="small" severity="secondary" :disabled="!!recorded" :loading="recording" @click="record(a.mo.moCode)" /></td>
+            <td class="muted">{{ a.distanceKm > 0 ? `${a.distanceKm.toFixed(0)} ${t('doctor.referral.km')}` : t('doctor.referral.noCoordinates') }}</td>
+            <td><Button :label="t('doctor.referral.referHere')" size="small" severity="secondary" :disabled="!!recorded" :loading="recording" @click="record(a.mo.moCode)" /></td>
           </tr>
         </tbody>
       </table>
-      <div class="field" style="margin-top: 12px"><label>Причина выбора (попадает в журнал)</label><Textarea v-model="reason" rows="2" auto-resize /></div>
+      <div class="field" style="margin-top: 12px"><label>{{ t('doctor.referral.reasonLabel') }}</label><Textarea v-model="reason" rows="2" auto-resize /></div>
       <div class="actions">
-        <Button label="Оставить в выбранной организации" icon="pi pi-check" :disabled="!!recorded" :loading="recording" @click="record(form.moCode)" />
-        <span v-if="recorded" class="muted">записано: {{ recorded }}</span>
+        <Button :label="t('doctor.referral.keepSelected')" icon="pi pi-check" :disabled="!!recorded" :loading="recording" @click="record(form.moCode)" />
+        <span v-if="recorded" class="muted">{{ t('doctor.referral.recorded') }}: {{ recorded }}</span>
       </div>
     </div>
   </main>
