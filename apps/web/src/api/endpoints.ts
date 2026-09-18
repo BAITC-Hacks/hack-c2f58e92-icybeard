@@ -44,7 +44,7 @@ export const journal = {
   decisions: (filter: { actor?: string; subject?: string; page?: number; size?: number }) =>
     api<Paged<Decision>>('/api/v1/journal/decisions', { query: filter }),
   worklist: (filter: { regionKato?: string; flag?: string } = {}) =>
-    api<{ items: WorklistItem[]; synthetic: boolean }>('/api/v1/journal/worklist', { query: filter }),
+    api<{ items: WorklistItem[]; synthetic: boolean; modelBacked: boolean }>('/api/v1/journal/worklist', { query: filter }),
 }
 
 export const refdata = {

@@ -18,6 +18,7 @@ const refdata = useRefdataStore()
 const auth = useAuthStore()
 const router = useRouter()
 const items = ref<WorklistItem[]>([])
+const modelBacked = ref(false)
 const flag = ref<string | null>(null)
 const error = ref<unknown>(null)
 const flags = computed(() => [
@@ -30,7 +31,9 @@ const flags = computed(() => [
 async function load() {
   error.value = null
   try {
-    items.value = (await journal.worklist({ regionKato: auth.region ?? undefined, flag: flag.value ?? undefined })).items
+    const response = await journal.worklist({ regionKato: auth.region ?? undefined, flag: flag.value ?? undefined })
+    items.value = response.items
+    modelBacked.value = response.modelBacked
   } catch (e) {
     error.value = e
   }
@@ -47,7 +50,7 @@ watch(flag, load)
 
 <template>
   <main class="page">
-    <h1>{{ t('doctor.worklist.title') }} <OriginTag kind="ml" :note="t('doctor.worklist.note')" /></h1>
+    <h1>{{ t('doctor.worklist.title') }} <OriginTag :kind="modelBacked ? 'ml' : 'formula'" :note="modelBacked ? t('doctor.worklist.note') : t('doctor.worklist.noteFallback')" /></h1>
     <p class="lead synthetic">{{ t('doctor.worklist.lead') }}</p>
     <div class="actions" style="margin: 0 0 12px"><Select v-model="flag" :options="flags" option-label="label" option-value="value" size="small" /></div>
     <ErrorBox :error="error" />

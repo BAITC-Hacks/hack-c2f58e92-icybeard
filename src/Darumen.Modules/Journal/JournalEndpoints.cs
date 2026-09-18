@@ -1,4 +1,5 @@
 using Darumen.Contracts.V1;
+using Darumen.Modules.Queue;
 using Darumen.Shared.Api;
 using Darumen.Shared.Auth;
 using Darumen.Shared.Messaging;
@@ -50,13 +51,14 @@ public static class JournalEndpoints
             })
             .WithName("Decisions").WithSummary("Журнал решений").Produces<Paged<DecisionDto>>();
 
-        group.MapGet("/worklist", async (string? regionKato, string? flag, HttpContext http, IWorklistRepository repository, CancellationToken ct) =>
+        group.MapGet("/worklist", async (string? regionKato, string? flag, HttpContext http, IWorklistRepository repository, QueueService queueService, CancellationToken ct) =>
             {
                 var user = CurrentUser.From(http);
                 var region = regionKato ?? user.RegionKato ?? "75";
                 var states = await repository.QueueStatesAsync(region, ct);
                 var asOf = states.Count > 0 ? states[0].AsOf.ToString("yyyy-MM-dd") : string.Empty;
-                return Results.Ok(new WorklistResponseDto(WorklistBuilder.Build(states, flag), true, asOf, region));
+                var (predictions, modelBacked) = await PredictForQueuesAsync(states, queueService, ct);
+                return Results.Ok(new WorklistResponseDto(WorklistBuilder.Build(states, predictions, flag), true, asOf, region, modelBacked));
             })
             .RequireAuthorization(Policies.Doctor)
             .WithName("Worklist").WithSummary("Рабочий список врача: синтетические пациенты на реальных очередях региона").Produces<WorklistResponseDto>();
@@ -68,5 +70,33 @@ public static class JournalEndpoints
             })
             .RequireAuthorization(Policies.Regulator)
             .WithName("Audit").WithSummary("Журнал аудита запросов врачей и регуляторов").Produces<Paged<AuditEntryDto>>();
+    }
+
+    /// <summary>3.6: один прогноз модели на очередь (mo_code, profile_code), не на синтетического пациента —
+    /// той же очереди соответствует несколько строк рабочего списка, им не нужно по отдельному вызову gRPC каждой
+    /// (см. WorklistBuilder.Build). Категориальные признаки запроса неизвестны для синтетических пациентов —
+    /// оставлены пустыми (не выдумываем диагноз), дата регистрации — дата среза витрины, чтобы модель не увидела
+    /// признаки календаря за пределами обучения. Сервис моделей недоступен для конкретной очереди — WorklistBuilder
+    /// сам считает по агрегатам витрины (см. QueuePrediction.FromModel), рабочий список не падает целиком.</summary>
+    private static async Task<(IReadOnlyDictionary<(string MoCode, string ProfileCode), QueuePrediction> Predictions, bool ModelBacked)> PredictForQueuesAsync(
+        IReadOnlyList<QueueStateRow> states, QueueService queueService, CancellationToken ct)
+    {
+        var queues = states.Select(s => (s.RegionKato, s.MoCode, s.ProfileCode, AsOf: s.AsOf)).Distinct().ToList();
+        var results = await Task.WhenAll(queues.Select(async q =>
+        {
+            try
+            {
+                var request = new PredictRequestDto(q.RegionKato, q.MoCode, q.ProfileCode, null, null, null, null, q.AsOf.ToString("yyyy-MM-dd"), null);
+                var prediction = await queueService.PredictAsync(request, "ru", ct);
+                return ((q.MoCode, q.ProfileCode), Prediction: (QueuePrediction?)new QueuePrediction(prediction.P50Days, prediction.P90Days, prediction.PRefusal, true));
+            }
+            catch
+            {
+                // сервис моделей недоступен или организация/профиль не распознаны — WorklistBuilder откатится на агрегаты витрины
+                return ((q.MoCode, q.ProfileCode), Prediction: (QueuePrediction?)null);
+            }
+        }));
+        var predictions = results.Where(r => r.Prediction is not null).ToDictionary(r => r.Item1, r => r.Prediction!);
+        return (predictions, predictions.Count > 0);
     }
 }

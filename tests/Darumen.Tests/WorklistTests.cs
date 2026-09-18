@@ -6,12 +6,22 @@ namespace Darumen.Tests;
 
 public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
 {
+    /// <summary>Прогнозы для тестовых очередей: те же числа, что раньше читались из state.WaitP50/RefusalRate4w
+    /// напрямую, но теперь явно оформлены как прогноз модели (3.6) — предсказанный риск отказа 028B (0.32)
+    /// выше порога, поэтому и приоритет, и флаг риска считаются по нему, а не по сырому агрегату витрины.</summary>
+    private static readonly Dictionary<(string MoCode, string ProfileCode), QueuePrediction> Predictions = new()
+    {
+        [("028B", "381")] = new QueuePrediction(55, 66, 0.32, true),
+        [("22GN", "381")] = new QueuePrediction(9, 20, 0.02, true),
+        [("027O", "021")] = new QueuePrediction(7, 15, 0.05, true),
+    };
+
     [Fact]
     public async Task Builder_is_deterministic_and_flags_real_risks()
     {
         var states = await new InMemoryWorklist().QueueStatesAsync("75", CancellationToken.None);
-        var first = WorklistBuilder.Build(states);
-        var second = WorklistBuilder.Build(states);
+        var first = WorklistBuilder.Build(states, Predictions);
+        var second = WorklistBuilder.Build(states, Predictions);
         Assert.Equal(first.Select(i => i.PatientRef), second.Select(i => i.PatientRef));
         Assert.All(first, i => Assert.True(i.Synthetic));
         var eye = first.Where(i => i.MoCode == "028B").ToList();
@@ -20,8 +30,34 @@ public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
         Assert.All(eye, i => Assert.Contains(WorklistBuilder.FasterAlternative, i.RiskFlags));
         Assert.Contains(first, i => i.RiskFlags.Contains(WorklistBuilder.StuckOver30));
         Assert.True(first[0].Priority >= first[^1].Priority);
-        Assert.Empty(WorklistBuilder.Build([]));
-        Assert.All(WorklistBuilder.Build(states, WorklistBuilder.RefusalRisk), i => Assert.Contains(WorklistBuilder.RefusalRisk, i.RiskFlags));
+        Assert.Empty(WorklistBuilder.Build([], Predictions));
+        Assert.All(WorklistBuilder.Build(states, Predictions, WorklistBuilder.RefusalRisk), i => Assert.Contains(WorklistBuilder.RefusalRisk, i.RiskFlags));
+    }
+
+    /// <summary>3.6: приоритет и флаг риска отказа считаются по прогнозу модели, а не по числу флагов —
+    /// одна и та же очередь с более высоким предсказанным риском отказа получает более высокий приоритет
+    /// и флаг risk_refusal, с более низким — нет, без обращения к настоящему gRPC-сервису.</summary>
+    [Fact]
+    public void Priority_and_refusal_flag_follow_the_models_refusal_prediction_not_the_flag_count()
+    {
+        var state = new QueueStateRow(InMemoryWorklist.AsOf, "M1", "Тест", "021", "75", 10, 5, 10, 2.0, 0.0, 5, 10);
+        var lowRisk = new Dictionary<(string, string), QueuePrediction> { [("M1", "021")] = new QueuePrediction(5, 10, 0.05, true) };
+        var highRisk = new Dictionary<(string, string), QueuePrediction> { [("M1", "021")] = new QueuePrediction(5, 10, 0.9, true) };
+        var low = WorklistBuilder.Build([state], lowRisk)[0];
+        var high = WorklistBuilder.Build([state], highRisk)[0];
+        Assert.True(high.Priority > low.Priority);
+        Assert.Contains(WorklistBuilder.RefusalRisk, high.RiskFlags);
+        Assert.DoesNotContain(WorklistBuilder.RefusalRisk, low.RiskFlags);
+    }
+
+    /// <summary>Сервис моделей недоступен для какой-то очереди (её нет в словаре прогнозов) — рабочий список
+    /// не падает, а считает эту очередь по агрегатам витрины (QueuePrediction.FromModel = false).</summary>
+    [Fact]
+    public async Task Missing_prediction_falls_back_to_aggregates_instead_of_failing()
+    {
+        var states = await new InMemoryWorklist().QueueStatesAsync("75", CancellationToken.None);
+        var items = WorklistBuilder.Build(states, new Dictionary<(string, string), QueuePrediction>());
+        Assert.NotEmpty(items);
     }
 
     [Fact]

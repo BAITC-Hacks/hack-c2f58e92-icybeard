@@ -1,13 +1,23 @@
 using Dapper;
+using Darumen.Modules.Queue;
 using Darumen.Shared.Data;
 
 namespace Darumen.Modules.Journal;
+
+/// <summary>3.6: прогноз ожидания и риска отказа от модели (QueueIntelligence) для одной очереди
+/// (организация × профиль), с которым строится приоритет рабочего списка. Категориальные признаки запроса
+/// (МКБ-10, цель, город/село, источник финансирования) не известны для синтетических пациентов рабочего
+/// списка — берутся типичные значения (см. WorklistPrediction.TypicalRequest), это не выдаётся за прогноз
+/// по конкретному диагнозу пациента, только за оценку по организации и профилю.</summary>
+public sealed record QueuePrediction(double P50Days, double P90Days, double PRefusal, bool FromModel);
 
 public sealed record WorklistItemDto(
     string PatientRef, bool Synthetic, string Stage, string? ExpectedDate, IReadOnlyList<string> RiskFlags, int Priority,
     string NextAction, string Explanation, string MoCode, string MoName, string ProfileCode, string RegionKato, int DaysWaiting);
 
-public sealed record WorklistResponseDto(IReadOnlyList<WorklistItemDto> Items, bool Synthetic, string AsOf, string RegionKato);
+/// <summary>ModelBacked — прогноз модели получен хотя бы для одной очереди (иначе показывать в UI
+/// как формулу/агрегаты, а не как «ML-модель», см. WorklistView.vue).</summary>
+public sealed record WorklistResponseDto(IReadOnlyList<WorklistItemDto> Items, bool Synthetic, string AsOf, string RegionKato, bool ModelBacked);
 
 /// <summary>Состояние очереди организации по профилю на дату среза (gold.queue_state + реестр).</summary>
 public sealed record QueueStateRow(
@@ -50,7 +60,13 @@ public static class WorklistBuilder
     public const double RefusalRiskThreshold = 0.2;
     public const double FasterByDays = 7;
 
-    public static IReadOnlyList<WorklistItemDto> Build(IReadOnlyList<QueueStateRow> states, string? flag = null)
+    /// <summary>predictions — прогноз модели по одной очереди (mo_code, profile_code), см. <see cref="QueuePrediction"/>.
+    /// Приоритет и флаг риска отказа считаются по нему, а не по формуле на сырых полях витрины (3.6): при
+    /// отсутствии прогноза для очереди (сервис моделей недоступен) используется тот же расчёт с агрегатами
+    /// витрины вместо прогноза, помеченный FromModel = false — так метка «ML-модель» на экране остаётся честной
+    /// (см. WorklistResponseDto.ModelBacked).</summary>
+    public static IReadOnlyList<WorklistItemDto> Build(
+        IReadOnlyList<QueueStateRow> states, IReadOnlyDictionary<(string MoCode, string ProfileCode), QueuePrediction> predictions, string? flag = null)
     {
         var total = states.Sum(s => s.QueueLen);
         if (total == 0)
@@ -63,10 +79,11 @@ public static class WorklistBuilder
         var items = new List<WorklistItemDto>();
         foreach (var state in states)
         {
+            var prediction = predictions.GetValueOrDefault((state.MoCode, state.ProfileCode)) ?? Fallback(state);
             var count = (int)Math.Clamp(Math.Round(MaxItems * (double)state.QueueLen / total), 1, MaxPerQueue);
             for (var i = 0; i < count; i++)
             {
-                items.Add(Item(state, i, fastest.GetValueOrDefault(state.ProfileCode, double.NaN)));
+                items.Add(Item(state, i, prediction, fastest.GetValueOrDefault(state.ProfileCode, double.NaN)));
             }
         }
 
@@ -74,22 +91,31 @@ public static class WorklistBuilder
         return filtered.OrderByDescending(i => i.Priority).ThenByDescending(i => i.DaysWaiting).Take(MaxItems).ToList();
     }
 
-    private static WorklistItemDto Item(QueueStateRow state, int index, double fastestP50)
+    /// <summary>Прогноз недоступен (сервис моделей упал или организация вне обучения) — тот же расчёт,
+    /// что был единственным до 3.6, на агрегатах витрины вместо модели; FromModel = false.</summary>
+    private static QueuePrediction Fallback(QueueStateRow state)
+    {
+        var p50 = state.QueueAgeP50 ?? 10;
+        return new QueuePrediction(state.WaitP50 ?? p50, state.WaitP90 ?? p50 * 2, state.RefusalRate4w ?? 0, false);
+    }
+
+    private static WorklistItemDto Item(QueueStateRow state, int index, QueuePrediction prediction, double fastestP50)
     {
         var seed = Seed($"{state.MoCode}|{state.ProfileCode}|{index}");
         var p50 = state.QueueAgeP50 ?? 10;
         var p90 = Math.Max(state.QueueAgeP90 ?? p50 * 2, p50 + 1);
-        // возраст ожидания: половина пациентов около медианы, хвост до p90 и дальше
+        // возраст ожидания: половина пациентов около медианы, хвост до p90 и дальше (из фактической витрины очереди,
+        // не из прогноза — сколько пациент УЖЕ ждёт, это наблюдаемый факт, а не оценка модели)
         var quantile = (seed % 1000) / 1000.0;
         var daysWaiting = (int)Math.Round(quantile < 0.5 ? p50 * quantile * 2 : p50 + (p90 - p50) * (quantile - 0.5) * 2.4);
-        var expectedWait = state.WaitP50 ?? p50;
+        var expectedWait = prediction.P50Days;
         var flags = new List<string>();
         if (daysWaiting > 30)
         {
             flags.Add(StuckOver30);
         }
 
-        if ((state.RefusalRate4w ?? 0) > RefusalRiskThreshold)
+        if (prediction.PRefusal > RefusalRiskThreshold)
         {
             flags.Add(RefusalRisk);
         }
@@ -101,7 +127,10 @@ public static class WorklistBuilder
 
         var remaining = Math.Max(0, expectedWait - daysWaiting);
         var stage = daysWaiting == 0 ? "зарегистрирован" : remaining <= 3 ? "вызов на госпитализацию" : "ожидает";
-        var priority = (int)Math.Round(daysWaiting / 7.0) + flags.Count * 2;
+        // 3.6: приоритет = насколько пациент уже пережидает прогноз модели (не абсолютные дни) + предсказанный
+        // моделью риск отказа — оба слагаемых из прогноза, а не только число флагов, как было до 3.6
+        var overdue = expectedWait > 0 ? daysWaiting / expectedWait : (daysWaiting > 0 ? 2.0 : 0.0);
+        var priority = (int)Math.Round(overdue * 5) + (int)Math.Round(prediction.PRefusal * 10) + (flags.Contains(FasterAlternative) ? 2 : 0);
         var nextAction = flags.Contains(FasterAlternative)
             ? "предложить перенаправление в организацию с меньшим ожиданием"
             : flags.Contains(RefusalRisk)
@@ -109,8 +138,8 @@ public static class WorklistBuilder
                 : flags.Contains(StuckOver30)
                     ? "уточнить дату в организации"
                     : "ждать вызова";
-        var explanation = $"очередь {state.QueueLen} направлений, медианное ожидание {expectedWait:0} дн., " +
-                          $"отказы за 4 недели {(state.RefusalRate4w ?? 0):P0}";
+        var explanation = $"очередь {state.QueueLen} направлений, {(prediction.FromModel ? "прогноз ожидания" : "медианное ожидание")} {expectedWait:0} дн., " +
+                          $"{(prediction.FromModel ? "прогноз риска отказа" : "отказы за 4 недели")} {prediction.PRefusal:P0}";
         return new WorklistItemDto(
             $"SYN-{state.RegionKato}-{state.MoCode}-{index + 1:00}", true, stage,
             state.AsOf.AddDays((int)Math.Round(remaining)).ToString("yyyy-MM-dd"), flags, priority, nextAction, explanation,
