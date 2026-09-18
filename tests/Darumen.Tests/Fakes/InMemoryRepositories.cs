@@ -134,8 +134,8 @@ public sealed class InMemoryRefData : IRefDataRepository
     public Task<IReadOnlyList<OrganizationItemDto>> OrganizationsAsync(string? regionKato, string? query, string? profileCode, int limit, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<OrganizationItemDto>>(new List<OrganizationItemDto>
         {
-            new("028B", "Казахский ордена институт глазных болезней", "75", "center", "L", null, null),
-            new("22GN", "Городская больница №2", "75", "hospital", "M", null, null),
+            new("028B", "Казахский ордена институт глазных болезней", "75", "center", "L", null, null, "институт глазных болезней"),
+            new("22GN", "Городская больница №2", "75", "hospital", "M", null, null, "городская больница 2"),
         }.Where(o => (regionKato is null || o.RegionKato == regionKato) && (query is null || o.Name.Contains(query, StringComparison.OrdinalIgnoreCase))).Take(limit).ToList());
 
     public Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken) =>
@@ -147,6 +147,9 @@ public sealed class InMemoryRefData : IRefDataRepository
     public Task<IReadOnlyList<VaccinationBenchmarkDto>> VaccinationAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<VaccinationBenchmarkDto>>(
             [new("DTP3", "АКДС, третья доза", 2024, 54.0, "WHO GHO / WUENIC", "внешний ориентир, не факт")]);
+
+    public Task<IReadOnlyList<string>> VaccinationPlansAsync(string? regionKato, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>(regionKato is null or "75" ? ["Национальный календарь", "По эпидпоказаниям"] : []);
 }
 
 public sealed class InMemoryWorklist : IWorklistRepository

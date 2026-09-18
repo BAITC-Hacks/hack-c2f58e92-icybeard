@@ -13,4 +13,8 @@ public interface IRefDataRepository
 
     /// <summary>Оценки охвата WUENIC; пусто, пока витрина не опубликована.</summary>
     Task<IReadOnlyList<VaccinationBenchmarkDto>> VaccinationAsync(CancellationToken cancellationToken);
+
+    /// <summary>Коды планов вакцинации, встречающиеся в данных (для переключателя потока на странице региона);
+    /// пусто, пока витрина не опубликована.</summary>
+    Task<IReadOnlyList<string>> VaccinationPlansAsync(string? regionKato, CancellationToken cancellationToken);
 }

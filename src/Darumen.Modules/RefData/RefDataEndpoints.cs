@@ -31,5 +31,9 @@ public static class RefDataEndpoints
         group.MapGet("/vaccination", async (IRefDataRepository repository, CancellationToken ct) =>
                 Results.Ok(new { items = await repository.VaccinationAsync(ct) }))
             .WithName("VaccinationBenchmarks").WithSummary("Оценки охвата вакцинацией WUENIC (ВОЗ/ЮНИСЕФ) по Казахстану: внешний ориентир для сигналов, не факт");
+
+        group.MapGet("/vaccination-plans", async (string? regionKato, IRefDataRepository repository, CancellationToken ct) =>
+                Results.Ok(new { items = await repository.VaccinationPlansAsync(regionKato, ct) }))
+            .WithName("VaccinationPlans").WithSummary("Коды планов вакцинации, встречающиеся в данных — для переключателя потока на странице региона");
     }
 }

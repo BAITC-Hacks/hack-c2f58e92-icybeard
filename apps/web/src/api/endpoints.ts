@@ -52,6 +52,7 @@ export const refdata = {
   organizations: (regionKato?: string, q?: string, profileCode?: string, limit = 200) =>
     api<{ items: OrganizationItem[] }>('/api/v1/refdata/organizations', { query: { regionKato, q, profileCode, limit } }),
   profiles: () => api<{ items: Profile[] }>('/api/v1/refdata/profiles'),
+  vaccinationPlans: (regionKato?: string) => api<{ items: string[] }>('/api/v1/refdata/vaccination-plans', { query: { regionKato } }),
 }
 
 export const medicines = {

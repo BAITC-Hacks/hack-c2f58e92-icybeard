@@ -124,7 +124,7 @@ export interface WorklistItem {
 }
 
 export interface Region { regionKato: string; name: string; capital: string; lat: number | null; lon: number | null; populationThousands: number | null }
-export interface OrganizationItem { moCode: string; name: string; regionKato: string; moType: string | null; sizeBucket: string | null }
+export interface OrganizationItem { moCode: string; name: string; regionKato: string; moType: string | null; sizeBucket: string | null; moKey: string | null }
 export interface Profile { profileCode: string; name: string; isDayHospital: boolean; referrals: number }
 
 export interface Shortage { flag: boolean; score: number; basis: string }

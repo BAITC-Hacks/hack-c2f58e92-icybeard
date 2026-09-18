@@ -15,6 +15,16 @@ import { days, pct } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
+/** Переключатель потока для прогноза справа (3.1): у каждого потока свой второй ключ сущности и единица измерения —
+ * госпитализации по профилю, приёмный покой по конкретной организации региона (нужен entity.mo_key, не mo_code —
+ * см. gold.anomalies/mo_registry.name_key), вакцинация по коду плана. */
+const STREAMS = [
+  { value: 'admissions', label: 'Госпитализации', streamId: 'admissions_monthly', unit: 'случаев' },
+  { value: 'er_visits', label: 'Приёмный покой', streamId: 'er_visits_daily', unit: 'обращений' },
+  { value: 'vac', label: 'Вакцинация', streamId: 'vac_monthly', unit: 'доз' },
+] as const
+type StreamKind = (typeof STREAMS)[number]['value']
+
 const route = useRoute()
 const refdata = useRefdataStore()
 const auth = useAuthStore()
@@ -24,16 +34,24 @@ const kato = computed(() => String(route.params.kato))
 const organizations = ref<OrganizationItem[]>([])
 const moCode = ref<string | null>(null)
 const profile = ref<string>('381')
+const streamKind = ref<StreamKind>('admissions')
+const vaccinationPlans = ref<string[]>([])
+const vaccinationPlan = ref<string | null>(null)
 const series = ref<OrganizationSeries | null>(null)
 const forecast = ref<ForecastResponse | null>(null)
+const forecastHint = ref<string | null>(null)
 const anomalies = ref<Anomaly[]>([])
 const error = ref<unknown>(null)
 const seriesError = ref<unknown>(null)
 const seasonality = ref<Seasonality[]>([])
 
-/** Для плоского прогноза: месяцы горизонта с сезонным множителем NHS (форма плановых госпитализаций). */
+const streamMeta = computed(() => STREAMS.find((s) => s.value === streamKind.value)!)
+const selectedOrganization = computed(() => organizations.value.find((o) => o.moCode === moCode.value) ?? null)
+
+/** Для плоского прогноза: месяцы горизонта с сезонным множителем NHS (форма плановых госпитализаций). Ориентир
+ * подобран только для потока госпитализаций — для приёмного покоя и вакцинации сезонность другая. */
 const flatSeasonHint = computed(() => {
-  if (!forecast.value?.flat) return null
+  if (streamKind.value !== 'admissions' || !forecast.value?.flat) return null
   const adm = new Map(seasonality.value.filter((s) => s.seriesId === 'rtt_admitted_per_day').map((s) => [s.month, s.multiplier]))
   if (adm.size !== 12) return null
   const short = ['', 'янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
@@ -46,18 +64,39 @@ const flatSeasonHint = computed(() => {
     .join(', ')
 })
 
+/** Сущность для выбранного потока — null, если для неё ещё не выбран нужный второй ключ (организация/план). */
+function forecastEntity(): Record<string, string> | null {
+  if (streamKind.value === 'admissions') return { region_kato: kato.value, profile_code: profile.value }
+  if (streamKind.value === 'er_visits') return selectedOrganization.value?.moKey ? { region_kato: kato.value, mo_key: selectedOrganization.value.moKey } : null
+  return vaccinationPlan.value ? { region_kato: kato.value, vaccination_plan: vaccinationPlan.value } : null
+}
+
+async function loadForecast() {
+  forecast.value = null
+  forecastHint.value = null
+  const entity = forecastEntity()
+  if (!entity) {
+    forecastHint.value = streamKind.value === 'er_visits' ? 'Выберите организацию, чтобы увидеть прогноз приёмного покоя.' : 'Выберите план вакцинации, чтобы увидеть прогноз.'
+    return
+  }
+  try {
+    forecast.value = await analytics.forecast(streamMeta.value.streamId, entity, 3)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      forecastHint.value = 'Прогноз для этого выбора не строился (мало истории).'
+      return
+    }
+    throw e
+  }
+}
+
 async function loadRegion() {
   error.value = null
   try {
     organizations.value = await refdata.organizationsOf(kato.value, profile.value)
     moCode.value = organizations.value[0]?.moCode ?? null
     anomalies.value = (await analytics.anomalies({ regionKato: kato.value, status: 'open', size: 10 })).items
-    forecast.value = null
-    try {
-      forecast.value = await analytics.forecast('admissions_monthly', { region_kato: kato.value, profile_code: profile.value }, 3)
-    } catch (e) {
-      if (!(e instanceof ApiError && e.status === 404)) throw e
-    }
+    await loadForecast()
   } catch (e) {
     error.value = e
   }
@@ -72,6 +111,15 @@ async function loadSeries() {
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) return
     seriesError.value = e
+  }
+}
+
+async function loadVaccinationPlans() {
+  try {
+    vaccinationPlans.value = (await refdataApi.vaccinationPlans(kato.value)).items
+    vaccinationPlan.value = vaccinationPlans.value[0] ?? null
+  } catch {
+    vaccinationPlans.value = [] // витрина ещё не опубликована
   }
 }
 
@@ -97,6 +145,7 @@ async function dismiss(id: string, comment: string) {
 
 onMounted(async () => {
   await refdata.load()
+  await loadVaccinationPlans()
   await loadRegion()
   await loadSeries()
   try {
@@ -106,6 +155,7 @@ onMounted(async () => {
   }
 })
 watch(kato, async () => {
+  await loadVaccinationPlans()
   await loadRegion()
   await loadSeries()
 })
@@ -114,6 +164,10 @@ watch(profile, async () => {
   await loadSeries()
 })
 watch(moCode, loadSeries)
+watch(streamKind, loadForecast)
+watch(vaccinationPlan, () => {
+  if (streamKind.value === 'vac') loadForecast()
+})
 </script>
 
 <template>
@@ -139,28 +193,43 @@ watch(moCode, loadSeries)
         <p v-else class="muted">Для этой организации и профиля нет ряда очереди.</p>
       </div>
       <div>
+        <div class="actions" style="margin: 0 0 8px">
+          <Select v-model="streamKind" :options="STREAMS" option-label="label" option-value="value" size="small" style="min-width: 220px" />
+          <Select
+            v-if="streamKind === 'vac'"
+            v-model="vaccinationPlan"
+            :options="vaccinationPlans"
+            filter
+            size="small"
+            placeholder="План вакцинации"
+            style="min-width: 240px"
+          />
+        </div>
         <SeriesChart
           v-if="forecast"
           :history="forecast.history"
           :points="forecast.points"
-          :title="`Госпитализации в регионе, профиль ${refdata.profileName(profile)}`"
-          unit="случаев"
+          :title="streamKind === 'admissions' ? `Госпитализации в регионе, профиль ${refdata.profileName(profile)}` : streamKind === 'er_visits' ? `Приёмный покой, ${selectedOrganization?.name ?? ''}` : `Вакцинация, ${vaccinationPlan ?? ''}`"
+          :unit="streamMeta.unit"
         />
+        <p v-else-if="forecastHint" class="muted">{{ forecastHint }}</p>
         <p v-if="forecast" class="muted">
           Бэктест: sMAPE {{ pct(forecast.backtest.smape, 1) }} против наивного {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}.
           {{ forecast.model.name }} {{ forecast.model.version }}. <OriginTag kind="ml" />
           <span v-if="forecast.flat" class="synthetic" style="margin-left: 6px">уровень последнего месяца: модель выбрала константу, для планирования малоинформативно</span>
         </p>
-        <p v-if="flatSeasonHint" class="muted">
-          Сезонная форма плановых госпитализаций в системах типа NHS для этих месяцев: {{ flatSeasonHint }} к среднему
-          (NHS England RTT, 2017–2019 — внешний ориентир, не поправка модели).
-        </p>
-        <!-- коэффициент и источник: refdata/external_benchmarks.yaml (diagnostics.dm01_tests_per_admission) -->
-        <p v-if="forecast && forecast.points.length" class="muted">
-          Оценка нагрузки на диагностику: ≈ {{ Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5).toLocaleString('ru-RU') }}
-          исследований в месяц по этому профилю (прогноз × 1,5 исследования на госпитализацию, производная NHS DM01, 2024 — внешний ориентир, не измерение; уточнится с данными ЕИП).
-        </p>
-        <p v-else class="muted">Прогноз для этого профиля в регионе не строился (мало истории).</p>
+        <template v-if="streamKind === 'admissions'">
+          <p v-if="flatSeasonHint" class="muted">
+            Сезонная форма плановых госпитализаций в системах типа NHS для этих месяцев: {{ flatSeasonHint }} к среднему
+            (NHS England RTT, 2017–2019 — внешний ориентир, не поправка модели).
+          </p>
+          <!-- коэффициент и источник: refdata/external_benchmarks.yaml (diagnostics.dm01_tests_per_admission) -->
+          <p v-if="forecast && forecast.points.length" class="muted">
+            Оценка нагрузки на диагностику: ≈ {{ Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5).toLocaleString('ru-RU') }}
+            исследований в месяц по этому профилю (прогноз × 1,5 исследования на госпитализацию, производная NHS DM01, 2024 — внешний ориентир, не измерение; уточнится с данными ЕИП).
+          </p>
+          <p v-else-if="!forecast && !forecastHint" class="muted">Прогноз для этого профиля в регионе не строился (мало истории).</p>
+        </template>
       </div>
     </div>
     <div class="card" style="margin-top: 16px">

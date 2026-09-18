@@ -4,13 +4,15 @@ import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ApiError } from '@/api/client'
 import { analytics, insight } from '@/api/endpoints'
-import type { Anomaly, IndexResponse } from '@/api/types'
+import type { Anomaly, ForecastResponse, IndexResponse } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import IndexTable from '@/components/IndexTable.vue'
 import OriginTag from '@/components/OriginTag.vue'
 import RegionMap from '@/components/RegionMap.vue'
+import SeriesChart from '@/components/SeriesChart.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
@@ -25,6 +27,10 @@ const index = ref<IndexResponse | null>(null)
 const anomalies = ref<Anomaly[]>([])
 const error = ref<unknown>(null)
 const loading = ref(false)
+/** 3.1: отдельная карточка по онкологии — поток onco_monthly не имеет региона в сущности (только локализация ЗН),
+ * 'ALL' — зарезервированное значение локализации в build_onco_monthly (сумма по всем локализациям), не наша выдумка. */
+const onco = ref<ForecastResponse | null>(null)
+const oncoHint = ref<string | null>(null)
 
 async function load() {
   loading.value = true
@@ -41,6 +47,20 @@ async function load() {
     error.value = e
   } finally {
     loading.value = false
+  }
+}
+
+async function loadOnco() {
+  onco.value = null
+  oncoHint.value = null
+  try {
+    onco.value = await analytics.forecast('onco_monthly', { localization: 'ALL' }, 3)
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) {
+      oncoHint.value = 'Прогноз по онкологии не строился (мало истории).'
+      return
+    }
+    oncoHint.value = 'Витрина по онкологии пока не опубликована.'
   }
 }
 
@@ -81,6 +101,7 @@ async function dismiss(id: string, comment: string) {
 onMounted(async () => {
   await refdata.load()
   await load()
+  await loadOnco()
 })
 watch([month, profile], load)
 </script>
@@ -120,9 +141,20 @@ watch([month, profile], load)
         <IndexTable :items="index?.items ?? []" @select="router.push({ name: 'region', params: { kato: $event } })" />
       </div>
     </div>
-    <div class="card" style="margin-top: 16px">
-      <h2>Открытые сигналы <OriginTag kind="formula" /></h2>
-      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
+    <div class="grid cols-2" style="margin-top: 16px">
+      <div class="card">
+        <h2>Открытые сигналы <OriginTag kind="formula" /></h2>
+        <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
+      </div>
+      <div class="card">
+        <h2>Онкология: впервые выявленные случаи по РК <OriginTag kind="ml" /></h2>
+        <SeriesChart v-if="onco" :history="onco.history" :points="onco.points" title="Все локализации, помесячно" unit="случаев" />
+        <p v-else class="muted">{{ oncoHint }}</p>
+        <p v-if="onco" class="muted">
+          Бэктест: sMAPE {{ (onco.backtest.smape * 100).toFixed(1) }} % против наивного {{ (onco.backtest.baselineSmape * 100).toFixed(1) }} %.
+          {{ onco.model.name }} {{ onco.model.version }}. Реестр накопительный, честная помесячная интенсивность только с 2024-09 — прогноз ориентировочный.
+        </p>
+      </div>
     </div>
   </main>
 </template>

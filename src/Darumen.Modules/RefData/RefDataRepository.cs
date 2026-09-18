@@ -20,7 +20,7 @@ public sealed class RefDataRepository(IDbConnectionFactory db) : IRefDataReposit
         await using var connection = await db.OpenAsync(cancellationToken);
         var rows = await connection.QueryAsync<OrganizationItemDto>(new CommandDefinition(
             """
-            SELECT r.mo_code AS MoCode, r.name_canonical AS Name, r.region_kato AS RegionKato, r.mo_type AS MoType, r.size_bucket AS SizeBucket, r.lat AS Lat, r.lon AS Lon
+            SELECT r.mo_code AS MoCode, r.name_canonical AS Name, r.region_kato AS RegionKato, r.mo_type AS MoType, r.size_bucket AS SizeBucket, r.lat AS Lat, r.lon AS Lon, r.name_key AS MoKey
             FROM refdata.mo_registry r
             LEFT JOIN gold.queue_state s ON @profileCode IS NOT NULL AND s.mo_code = r.mo_code AND s.profile_code = @profileCode
             WHERE (@regionKato IS NULL OR r.region_kato = @regionKato)
@@ -74,6 +74,24 @@ public sealed class RefDataRepository(IDbConnectionFactory db) : IRefDataReposit
                 FROM refdata.vaccination_wuenic ORDER BY vaccine, year
                 """,
                 cancellationToken: cancellationToken));
+            return rows.ToList();
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            return []; // витрина появится после make publish
+        }
+    }
+
+    /// <summary>Коды планов вакцинации, встречающиеся в gold.vac_monthly — переключатель потока на странице региона
+    /// использует их как второй ключ сущности (entity[vaccinationPlan]) для /api/v1/forecast/vac_monthly.</summary>
+    public async Task<IReadOnlyList<string>> VaccinationPlansAsync(string? regionKato, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            var rows = await connection.QueryAsync<string>(new CommandDefinition(
+                "SELECT DISTINCT vaccination_plan FROM gold.vac_monthly WHERE vaccination_plan IS NOT NULL AND (@regionKato IS NULL OR region_kato = @regionKato) ORDER BY 1",
+                new { regionKato }, cancellationToken: cancellationToken));
             return rows.ToList();
         }
         catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
