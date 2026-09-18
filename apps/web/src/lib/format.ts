@@ -8,9 +8,9 @@ export function pct(value: number | null | undefined, digits = 0): string {
   return `${(value * 100).toFixed(digits)} %`
 }
 
-export function num(value: number | null | undefined): string {
+export function num(value: number | null | undefined, digits = 0): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—'
-  return new Intl.NumberFormat('ru-RU').format(Math.round(value))
+  return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value)
 }
 
 export function signed(value: number, digits = 1): string {
