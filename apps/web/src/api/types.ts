@@ -159,3 +159,27 @@ export interface Batch {
   batchId: string; dataset: string; status: string; rowsLoaded: number; rowsQuarantined: number
   partitions: string[]; occurredAt: string | null; receivedAt: string
 }
+
+// 4.1/4.3: консоль загрузки данных (сервис ml/src/darumen/intake/app.py, проксируется YARP под /api/v1/intake)
+export interface IntakeGoldRefresh { rebuilt: { table: string; rows: number }[]; published: boolean; warning: string | null }
+
+export interface IntakeBatchResult {
+  batchId: string; dataset: string; status: string; rowsBronze: number; rowsParseRejected: number
+  rowsSilver: number; rowsQuarantine: number; warnings: string[]; partitions: string[]; error: string | null
+  gold?: IntakeGoldRefresh; eventId?: string; eventWarning?: string
+}
+
+export interface IntakeDraftColumn { type: string; nullable?: boolean; semantic?: string }
+export interface IntakeDraft {
+  dataset: string; title: string; columns: Record<string, IntakeDraftColumn>
+  source_file?: string; draft_model?: string
+}
+export interface IntakeDraftSummary { dataset: string; title: string; columns: string[]; sourceFile: string | null }
+
+export interface IntakeUploadResult {
+  status: string; matchKind?: string; matchScore?: number; batch?: IntakeBatchResult
+  dataset?: string; draft?: IntakeDraft
+}
+
+export interface IntakeApproveResult { contract: string; reprocessed: IntakeUploadResult | null }
+export interface IntakeQuarantineResponse { items: Record<string, unknown>[]; total: number }

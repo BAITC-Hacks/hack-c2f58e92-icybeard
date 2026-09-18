@@ -1,6 +1,7 @@
 import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
+  IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
   LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, Stream, VaccinationBenchmark, WorklistItem,
 } from './types'
@@ -84,4 +85,11 @@ export const scribe = {
 export const intake = {
   batches: (filter: { status?: string; dataset?: string; page?: number; size?: number } = {}) =>
     api<Paged<Batch>>('/api/v1/intake/batches', { query: filter }),
+  upload: (file: Blob, filename: string) => apiUpload<IntakeUploadResult>('/api/v1/intake/files', file, filename),
+  drafts: () => api<{ items: IntakeDraftSummary[] }>('/api/v1/intake/drafts'),
+  draft: (dataset: string) => api<IntakeDraft>(`/api/v1/intake/drafts/${encodeURIComponent(dataset)}`),
+  approveDraft: (dataset: string, body: { dataset?: string; title?: string; columnSemantics?: Record<string, string> } = {}) =>
+    api<IntakeApproveResult>(`/api/v1/intake/drafts/${encodeURIComponent(dataset)}/approve`, { body }),
+  quarantine: (dataset: string, batchId?: string) =>
+    api<IntakeQuarantineResponse>('/api/v1/intake/quarantine', { query: { dataset, batchId } }),
 }

@@ -55,7 +55,7 @@ def test_upload_of_a_known_schema_loads_straight_to_silver_and_publishes(tmp_pat
     body = response.json()
     assert body["status"] == "loaded" and body["matchKind"] == "exact"
     assert body["batch"]["dataset"] == "bg_referrals"
-    assert body["batch"]["rows_silver"] == 3
+    assert body["batch"]["rowsSilver"] == 3
     assert (lake.silver("bg_referrals")).exists()
     assert len(publisher.calls) == 1 and publisher.calls[0][0] == "bg_referrals"
 
@@ -108,7 +108,7 @@ def test_quarantine_lists_rows_that_failed_the_contracts_required_columns(tmp_pa
         writer.writerows(rows)
     with bad_csv.open("rb") as fh:
         result = client.post("/intake/files", files={"file": ("referrals_bad.csv", fh, "text/csv")}).json()
-    assert result["batch"]["rows_quarantine"] == 1
+    assert result["batch"]["rowsQuarantine"] == 1
     q = client.get("/intake/quarantine", params={"dataset": "bg_referrals"}).json()
     assert q["total"] == 1
     assert q["items"][0]["_quarantine_reason"] == "missing:icd10_ref_diag_code"

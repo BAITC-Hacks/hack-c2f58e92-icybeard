@@ -21,7 +21,7 @@ from typing import Annotated
 import duckdb
 import yaml
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from .contracts import load_contracts, match_signature
 from .events import EventPublisher
@@ -36,10 +36,13 @@ DRAFT_SOURCE_DIR = "incoming"  # lake.root/incoming: keeps the uploaded file so 
 
 class ApproveIn(BaseModel):
     """Точечные правки стюарда перед утверждением: сменить dataset/title или добавить semantic колонке
-    без необходимости редактировать YAML руками. Пусто по умолчанию — черновик утверждается как есть."""
+    без необходимости редактировать YAML руками. Пусто по умолчанию — черновик утверждается как есть.
+    Alias camelCase — весь остальной JSON в этом API (через .NET) тоже camelCase, консоль на это рассчитывает."""
+    model_config = ConfigDict(populate_by_name=True)
+
     dataset: str | None = None
     title: str | None = None
-    column_semantics: dict[str, str] = {}
+    column_semantics: dict[str, str] = Field(default_factory=dict, alias="columnSemantics")
 
 
 def _sample_values(path: Path, header: list[str], delimiter: str) -> dict[str, list[str]]:
@@ -182,10 +185,18 @@ def create_app(lake: Lakehouse, contracts_dir: Path, drafter: LlmContractDrafter
     return app
 
 
+def _camel(name: str) -> str:
+    head, *tail = name.split("_")
+    return head + "".join(w.capitalize() for w in tail)
+
+
 def _batch_dict(result: BatchResult, extra: dict) -> dict:
+    """BatchResult's own fields are snake_case (Python dataclass convention); every other route in this
+    API is served through .NET's System.Text.Json, which camelCases automatically — converted here so a
+    batch looks the same whether it came from POST /intake/files or GET /intake/batches (Postgres)."""
     from dataclasses import asdict
 
-    payload = asdict(result)
+    payload = {_camel(k): v for k, v in asdict(result).items()}
     payload.update(extra)
     return payload
 
