@@ -112,6 +112,39 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
         Assert.True(body.Items[0].P50Days <= body.Items[1].P50Days);
     }
 
+    /// <summary>3.7: includeNeighbors из тела запроса доходит до gRPC-вызова модели, а её IsNeighborRegion
+    /// на альтернативе доходит обратно до DTO — без этого фронтенд не сможет честно пометить соседний регион.</summary>
+    [Fact]
+    public async Task Alternatives_forwards_include_neighbors_and_returns_the_neighbor_region_flag()
+    {
+        AlternativesRequest? captured = null;
+        var previous = app.Queue.OnAlternatives;
+        app.Queue.OnAlternatives = r =>
+        {
+            captured = r;
+            return new AlternativesResponse
+            {
+                Model = new ModelInfo { Name = "wait_quantile", Version = "1.0.0", TrainedThrough = "2025-02-28" },
+                Alternatives =
+                {
+                    new Alternative { Organization = new OrganizationRef { MoCode = "22GN", Name = "Больница 2", Region = new RegionRef { Kato = "11" } }, P50Days = 8.8, P90Days = 20, PRefusal = 0.05, DistanceKm = 40, IsNeighborRegion = true },
+                },
+            };
+        };
+        try
+        {
+            var response = await app.CreateClient().PostAsJsonAsync("/api/v1/queue/alternatives", new AlternativesRequestDto("75", "028B", "381", null, null, null, null, null, 3, null, IncludeNeighbors: true));
+            var body = await response.Content.ReadFromJsonAsync<AlternativesResponseDto>();
+            Assert.True(captured!.IncludeNeighbors);
+            Assert.True(body!.Items[0].IsNeighborRegion);
+            Assert.Equal("11", body.Items[0].Mo.RegionKato);
+        }
+        finally
+        {
+            app.Queue.OnAlternatives = previous;
+        }
+    }
+
     [Fact]
     public async Task Organisation_series_is_served_or_404()
     {

@@ -7,7 +7,7 @@ import type {
 
 export const queue = {
   predict: (body: PredictRequest) => api<PredictResponse>('/api/v1/queue/predict', { body }),
-  alternatives: (body: PredictRequest & { limit?: number; maxDistanceKm?: number }) =>
+  alternatives: (body: PredictRequest & { limit?: number; maxDistanceKm?: number; includeNeighbors?: boolean }) =>
     api<AlternativesResponse>('/api/v1/queue/alternatives', { body }),
   organization: (moCode: string, profileCode: string, days = 90) =>
     api<OrganizationSeries>(`/api/v1/queue/organizations/${encodeURIComponent(moCode)}`, { query: { profileCode, days } }),

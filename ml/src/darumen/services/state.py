@@ -76,6 +76,17 @@ def _registry(lake: Lakehouse, queue: pd.DataFrame) -> pd.DataFrame:
     return fallback.assign(name_canonical=fallback["mo_code"], mo_type=None, size_bucket=None, lat=np.nan, lon=np.nan)[REGISTRY_COLUMNS]
 
 
+def _region_neighbors(lake: Lakehouse) -> dict[str, list[str]]:
+    """3.7: region_kato → список смежных region_kato, из refdata/region_neighbors.parquet
+    (построена build_refdata из refdata/regions.yaml). Пусто, если витрина ещё не собрана —
+    includeNeighbors тогда просто не расширяет поиск ни на один регион."""
+    path = lake.root / "refdata" / "region_neighbors.parquet"
+    if not path.exists():
+        return {}
+    df = pd.read_parquet(path)
+    return df.groupby("region_kato")["neighbor_kato"].apply(list).to_dict()
+
+
 @dataclass(frozen=True)
 class ModelState:
     wait: WaitModel
@@ -89,6 +100,7 @@ class ModelState:
     reports: dict[str, dict]
     backtests: dict[str, pd.DataFrame]
     los: pd.DataFrame
+    region_neighbors: dict[str, list[str]]
 
     @classmethod
     def load(cls, lake: Lakehouse, streams: dict[str, Stream] | None = None) -> ModelState:
@@ -112,7 +124,8 @@ class ModelState:
                       else pd.DataFrame(columns=["mo_code", "profile_code", "region_kato", "arrivals_per_day", "admissions_per_day", "queue_len", "wait_p50_4w", "calibration"]))
         los_path = lake.root / "gold" / "los_by_profile.parquet"
         los = pd.read_parquet(los_path) if los_path.exists() else pd.DataFrame(columns=["region_kato", "profile_code", "los_median_fact"])
-        return cls(wait, as_of, queue, registry, by_code, forecasts, sim_states, streams, reports, backtests, los)
+        region_neighbors = _region_neighbors(lake)
+        return cls(wait, as_of, queue, registry, by_code, forecasts, sim_states, streams, reports, backtests, los, region_neighbors)
 
     # ---------- lookups ----------
     def los_days(self, region_kato: str, profile_code: str) -> float | None:
@@ -152,6 +165,10 @@ class ModelState:
     def organisations(self, region_kato: str, profile_code: str) -> pd.DataFrame:
         """Organisations of a region with a queue state for the profile at as_of."""
         return self.queue[(self.queue["region_kato"] == region_kato) & (self.queue["profile_code"] == profile_code)]
+
+    def neighbors_of(self, region_kato: str) -> list[str]:
+        """3.7: смежные регионы (refdata/regions.yaml neighbors), только известные модели."""
+        return [n for n in self.region_neighbors.get(region_kato, []) if n in self.known_regions]
 
     # ---------- features for inference ----------
     def feature_rows(self, mo_codes: list[str], profile_code: str, icd10: str = "", referral_purpose: str = "",

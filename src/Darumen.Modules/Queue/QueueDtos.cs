@@ -15,14 +15,16 @@ public sealed record PredictResponseDto(
 public sealed record AlternativesRequestDto(
     string? RegionKato, string? MoCode, string? ProfileCode, string? Icd10, string? ReferralPurpose,
     string? TerritorialType, string? FinanceSource, string? RegistrationDate, int? Limit, double? MaxDistanceKm,
-    string? ReferringMoCode = null)
+    string? ReferringMoCode = null, bool IncludeNeighbors = false)
 {
     public PredictRequestDto Base => new(RegionKato, MoCode, ProfileCode, Icd10, ReferralPurpose, TerritorialType, FinanceSource, RegistrationDate, ReferringMoCode);
 }
 
 public sealed record OrganizationDto(string MoCode, string Name, string RegionKato);
 
-public sealed record AlternativeDto(OrganizationDto Mo, double P50Days, double P90Days, double PRefusal, double DistanceKm);
+/// <summary>3.7: IsNeighborRegion — организация из региона, смежного запрошенному (regions.yaml neighbors),
+/// а не из региона, в котором ищем изначально; помечается моделью, не пересчитывается на бэкенде.</summary>
+public sealed record AlternativeDto(OrganizationDto Mo, double P50Days, double P90Days, double PRefusal, double DistanceKm, bool IsNeighborRegion = false);
 
 public sealed record AlternativesResponseDto(IReadOnlyList<AlternativeDto> Items, ModelInfoDto Model);
 

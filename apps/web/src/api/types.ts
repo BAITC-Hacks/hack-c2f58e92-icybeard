@@ -23,7 +23,7 @@ export interface PredictResponse {
   queue: QueueSnapshot | null; explanation: Explanation; model: ModelInfo
 }
 export interface Organization { moCode: string; name: string; regionKato: string }
-export interface Alternative { mo: Organization; p50Days: number; p90Days: number; pRefusal: number; distanceKm: number }
+export interface Alternative { mo: Organization; p50Days: number; p90Days: number; pRefusal: number; distanceKm: number; isNeighborRegion: boolean }
 export interface AlternativesResponse { items: Alternative[]; model: ModelInfo }
 export interface QueueDay { day: string; registered: number; hospitalized: number; refused: number; queueLen: number; queueAgeP50: number | null }
 export interface Throughput { day: string; throughputPerDay: number; refusalRate4w: number | null; waitP50Days: number | null; waitP90Days: number | null }

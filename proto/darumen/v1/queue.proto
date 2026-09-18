@@ -44,6 +44,7 @@ message AlternativesRequest {
   PredictWaitRequest base = 1;
   int32 limit = 2;
   double max_distance_km = 3; // 0 означает без ограничения
+  bool include_neighbors = 4; // 3.7: искать и в регионах, смежных base.region (refdata/regions.yaml neighbors)
 }
 
 message Alternative {
@@ -52,6 +53,7 @@ message Alternative {
   double p90_days = 3;
   double p_refusal = 4;
   double distance_km = 5;
+  bool is_neighbor_region = 6; // true, если organization.region отличается от запрошенного base.region
 }
 
 message AlternativesResponse {

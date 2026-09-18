@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import Select from 'primevue/select'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -20,6 +21,7 @@ const indexItem = ref<IndexItem | null>(null)
 const error = ref<unknown>(null)
 const busy = ref(false)
 const seasonality = ref<Seasonality[]>([])
+const includeNeighbors = ref(false)
 
 /** Сезонный ориентир: лист ожидания в ближайшие месяцы относительно текущего (форма NHS RTT). */
 const seasonalHint = computed(() => {
@@ -44,7 +46,11 @@ async function run() {
   error.value = null
   try {
     const body = { regionKato: region.value, profileCode: profile.value }
-    const [p, a, idx] = await Promise.all([queue.predict(body), queue.alternatives({ ...body, limit: 3 }), analytics.index(undefined, profile.value)])
+    const [p, a, idx] = await Promise.all([
+      queue.predict(body),
+      queue.alternatives({ ...body, limit: 3, includeNeighbors: includeNeighbors.value }),
+      analytics.index(undefined, profile.value),
+    ])
     prediction.value = p
     alternatives.value = a
     indexItem.value = idx.items.find((i) => i.regionKato === region.value) ?? null
@@ -75,6 +81,10 @@ onMounted(async () => {
         <div class="field"><label>{{ t('common.region') }}</label><Select v-model="region" :options="refdata.regions" option-label="name" option-value="regionKato" filter /></div>
         <div class="field"><label>{{ t('common.profile') }}</label><Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter /></div>
       </div>
+      <div class="field" style="display: flex; align-items: center; gap: 8px">
+        <Checkbox v-model="includeNeighbors" binary input-id="includeNeighbors" @change="run" />
+        <label for="includeNeighbors">{{ t('citizen.wait.includeNeighbors') }}</label>
+      </div>
       <div class="actions"><Button :label="t('citizen.wait.findOut')" icon="pi pi-search" :loading="busy" @click="run" /></div>
       <ErrorBox :error="error" />
     </div>
@@ -94,7 +104,7 @@ onMounted(async () => {
         <h2>{{ t('citizen.wait.whereFaster') }}</h2>
         <p v-if="!alternatives || alternatives.items.length === 0" class="muted">{{ t('citizen.wait.noOrganizations') }}</p>
         <div v-for="a in alternatives?.items ?? []" :key="a.mo.moCode" class="factor">
-          <span>{{ a.mo.name }}</span>
+          <span>{{ a.mo.name }} <span v-if="a.isNeighborRegion" class="muted">({{ t('citizen.wait.neighborRegion', { region: refdata.regionName(a.mo.regionKato) }) }})</span></span>
           <span class="contribution">{{ days(a.p50Days) }} {{ t('common.days') }}</span>
         </div>
       </div>

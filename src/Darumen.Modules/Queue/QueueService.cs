@@ -30,12 +30,16 @@ public sealed class QueueService(
     public async Task<AlternativesResponseDto> AlternativesAsync(AlternativesRequestDto dto, CancellationToken cancellationToken)
     {
         var response = await client.AlternativesAsync(
-            new AlternativesRequest { Base = ToProto(dto.Base), Limit = dto.Limit ?? 0, MaxDistanceKm = dto.MaxDistanceKm ?? 0 },
+            new AlternativesRequest
+            {
+                Base = ToProto(dto.Base), Limit = dto.Limit ?? 0, MaxDistanceKm = dto.MaxDistanceKm ?? 0,
+                IncludeNeighbors = dto.IncludeNeighbors,
+            },
             deadline: Deadline(), cancellationToken: cancellationToken);
         var items = response.Alternatives
             .Select(a => new AlternativeDto(
                 new OrganizationDto(a.Organization.MoCode, a.Organization.Name, a.Organization.Region?.Kato ?? string.Empty),
-                a.P50Days, a.P90Days, a.PRefusal, a.DistanceKm))
+                a.P50Days, a.P90Days, a.PRefusal, a.DistanceKm, a.IsNeighborRegion))
             .ToList();
         return new AlternativesResponseDto(items, response.Model.ToDto());
     }

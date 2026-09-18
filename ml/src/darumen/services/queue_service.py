@@ -76,7 +76,11 @@ class QueueIntelligenceServicer(queue_pb2_grpc.QueueIntelligenceServicer):
         region = base.region.kato or state.region_of(base.mo_code)
         if region not in state.known_regions:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, f"unknown region '{region}'")
-        orgs = state.organisations(region, base.profile_code)
+        # 3.7: по умолчанию — только свой регион, как раньше; include_neighbors добавляет смежные
+        # регионы (refdata/regions.yaml neighbors), у каждой организации в ответе — её настоящий
+        # region_kato (а не region базового запроса, как было раньше для всех строк без исключения).
+        search_regions = [region] + (state.neighbors_of(region) if request.include_neighbors else [])
+        orgs = pd.concat([state.organisations(r, base.profile_code) for r in search_regions], ignore_index=True)             if len(search_regions) > 1 else state.organisations(region, base.profile_code)
         orgs = orgs[orgs["mo_code"] != base.mo_code]
         if orgs.empty:
             return queue_pb2.AlternativesResponse(model=model_info(state))
@@ -85,16 +89,17 @@ class QueueIntelligenceServicer(queue_pb2_grpc.QueueIntelligenceServicer):
         pred = state.wait.predict(rows)
         origin = state.registry_by_code.get(base.mo_code, {})
         items = []
-        for i, mo in enumerate(orgs["mo_code"]):
+        for i, (mo, org_region) in enumerate(zip(orgs["mo_code"], orgs["region_kato"], strict=True)):
             rg = state.registry_by_code.get(mo, {})
             distance = haversine_km(origin.get("lat"), origin.get("lon"), rg.get("lat"), rg.get("lon"))
             if request.max_distance_km > 0 and distance > request.max_distance_km:
                 continue
             items.append(queue_pb2.Alternative(
                 organization=common_pb2.OrganizationRef(mo_code=mo, name=str(rg.get("name_canonical") or mo),
-                                                        region=common_pb2.RegionRef(kato=region)),
+                                                        region=common_pb2.RegionRef(kato=str(org_region))),
                 p50_days=float(pred["p50_days"].iloc[i]), p90_days=float(pred["p90_days"].iloc[i]),
-                p_refusal=float(pred["p_refusal"].iloc[i]), distance_km=distance))
+                p_refusal=float(pred["p_refusal"].iloc[i]), distance_km=distance,
+                is_neighbor_region=str(org_region) != region))
         items.sort(key=lambda a: a.p50_days)
         limit = request.limit or DEFAULT_LIMIT
         return queue_pb2.AlternativesResponse(alternatives=items[:limit], model=model_info(state))

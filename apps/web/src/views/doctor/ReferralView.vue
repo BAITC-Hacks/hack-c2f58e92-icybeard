@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Textarea from 'primevue/textarea'
@@ -43,6 +44,7 @@ const organizations = ref<OrganizationItem[]>([])
 const referringOrganizations = ref<OrganizationItem[]>([])
 const prediction = ref<PredictResponse | null>(null)
 const alternatives = ref<AlternativesResponse | null>(null)
+const includeNeighbors = ref(false)
 const error = ref<unknown>(null)
 const fieldErrors = ref<Record<string, string>>({})
 const busy = ref(false)
@@ -79,7 +81,7 @@ async function predict() {
   recorded.value = null
   decisionKey = ''
   try {
-    ;[prediction.value, alternatives.value] = await Promise.all([queue.predict(form), queue.alternatives({ ...form, limit: 5 })])
+    ;[prediction.value, alternatives.value] = await Promise.all([queue.predict(form), queue.alternatives({ ...form, limit: 5, includeNeighbors: includeNeighbors.value })])
     decisionKey = crypto.randomUUID()
   } catch (e) {
     if (e instanceof ApiError && e.status === 422 && e.errors) {
@@ -156,6 +158,10 @@ watch(() => form.regionKato, loadReferringOrganizations)
           <div class="field"><label>{{ t('doctor.referral.territorialLabel') }}</label><Select v-model="form.territorialType" :options="territorial" option-label="label" option-value="value" /></div>
           <div class="field"><label>{{ t('doctor.referral.registrationDate') }}</label><InputText v-model="form.registrationDate" :placeholder="t('doctor.referral.registrationDatePlaceholder')" /><span class="error">{{ fieldErrors.registrationDate }}</span></div>
         </div>
+        <div class="field" style="display: flex; align-items: center; gap: 8px">
+          <Checkbox v-model="includeNeighbors" binary input-id="includeNeighbors" />
+          <label for="includeNeighbors">{{ t('doctor.referral.includeNeighbors') }}</label>
+        </div>
         <div class="actions"><Button :label="t('common.apply')" icon="pi pi-calculator" :loading="busy" @click="predict" /></div>
         <ErrorBox :error="error" />
       </div>
@@ -193,7 +199,10 @@ watch(() => form.regionKato, loadReferringOrganizations)
         <thead><tr class="muted" style="text-align: left"><th>{{ t('common.organization') }}</th><th>p50, {{ t('common.days') }}</th><th>p90, {{ t('common.days') }}</th><th>{{ t('doctor.referral.refusalShort') }}</th><th>{{ t('doctor.referral.distance') }}</th><th></th></tr></thead>
         <tbody>
           <tr v-for="a in alternatives.items" :key="a.mo.moCode" style="border-top: 1px solid var(--darumen-border)">
-            <td style="padding: 8px 4px">{{ a.mo.name }} <span class="muted">({{ a.mo.moCode }})</span></td>
+            <td style="padding: 8px 4px">
+              {{ a.mo.name }} <span class="muted">({{ a.mo.moCode }})</span>
+              <span v-if="a.isNeighborRegion" class="muted">— {{ t('doctor.referral.neighborRegion', { region: refdata.regionName(a.mo.regionKato) }) }}</span>
+            </td>
             <td>{{ days(a.p50Days) }}</td>
             <td>{{ days(a.p90Days) }}</td>
             <td>{{ pct(a.pRefusal) }}</td>

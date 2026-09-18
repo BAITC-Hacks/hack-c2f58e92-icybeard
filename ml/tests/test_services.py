@@ -41,8 +41,25 @@ def _write_lake(root) -> Lakehouse:
                    "throughput_per_day": 2.0, "refusal_rate_4w": 0.03, "wait_p50_4w": 4.0 + i, "wait_p90_4w": 9.0 + i}
                   for i, m in enumerate(mos) for p in PROFILES]).to_parquet(gold / "throughput_4w.parquet", index=False)
     (root / "refdata").mkdir()
-    pd.DataFrame([{"mo_code": m, "name_canonical": f"Больница {m}", "region_kato": "10", "mo_type": "hospital", "size_bucket": "M",
-                   "lat": 49.0 + i * 0.1, "lon": 80.0} for i, m in enumerate(mos)]).to_parquet(root / "refdata" / "mo_registry.parquet", index=False)
+    # 3.7: одна организация региона-соседа ("11"), не входящего в основную выборку — чтобы проверить,
+    # что includeNeighbors находит её, а без флага — нет.
+    registry_rows = [{"mo_code": m, "name_canonical": f"Больница {m}", "region_kato": "10", "mo_type": "hospital", "size_bucket": "M",
+                      "lat": 49.0 + i * 0.1, "lon": 80.0} for i, m in enumerate(mos)]
+    registry_rows.append({"mo_code": "9999", "name_canonical": "Больница-сосед", "region_kato": "11", "mo_type": "hospital",
+                          "size_bucket": "M", "lat": 49.0, "lon": 80.0})
+    pd.DataFrame(registry_rows).to_parquet(root / "refdata" / "mo_registry.parquet", index=False)
+    pd.DataFrame(pd.concat([
+        pd.read_parquet(gold / "queue_daily.parquet"),
+        pd.DataFrame([{"day": as_of, "region_kato": "11", "mo_code": "9999", "profile_code": p, "registered": 3, "hospitalized": 2,
+                       "refused": 0, "queue_len": 5, "queue_age_p50": 3.0, "queue_age_p90": 8.0} for p in PROFILES]),
+    ], ignore_index=True)).to_parquet(gold / "queue_daily.parquet", index=False)
+    pd.DataFrame(pd.concat([
+        pd.read_parquet(gold / "throughput_4w.parquet"),
+        pd.DataFrame([{"day": as_of, "mo_code": "9999", "profile_code": p, "hospitalized_4w": 56, "registered_4w": 61, "refused_4w": 2,
+                       "throughput_per_day": 2.0, "refusal_rate_4w": 0.03, "wait_p50_4w": 3.0, "wait_p90_4w": 8.0} for p in PROFILES]),
+    ], ignore_index=True)).to_parquet(gold / "throughput_4w.parquet", index=False)
+    pd.DataFrame([{"region_kato": "10", "neighbor_kato": "11"}, {"region_kato": "11", "neighbor_kato": "10"}]
+                 ).to_parquet(root / "refdata" / "region_neighbors.parquet", index=False)
     pd.DataFrame([{"stream_id": "er_visits_daily", "entity": json.dumps({"region_kato": "10", "mo_key": "org a"}), "period": f"2025-04-{d:02d}",
                    "horizon": d, "yhat": 20.0 + d, "lo": 15.0, "hi": 25.0 + d, "model": "AutoETS@1.0.0", "region_kato": "10", "mo_key": "org a"}
                   for d in range(1, 8)]).to_parquet(gold / "forecasts.parquet", index=False)
@@ -76,7 +93,7 @@ def _request(mo_code="0003", region="10", profile_code="381"):
 
 def test_state_as_of_and_feature_layout(served):
     state = served[0]
-    assert str(state.as_of.date()) == "2025-03-31" and len(state.queue) == 24
+    assert str(state.as_of.date()) == "2025-03-31" and len(state.queue) == 26
     row = state.feature_rows(["0003"], "381", icd10=" h25.1", registration_date="2025-04-01").iloc[0]
     assert row["queue_len"] == 40 and row["icd_block"] == "H25" and row["icd_chapter"] == "VII"
     assert row["dow"] == 2 and row["week_of_year"] == 14  # Tuesday in DuckDB numbering (0 = Sunday)
@@ -135,6 +152,22 @@ def test_alternatives_sorted_excluding_base_and_within_distance(served):
     assert all(a.distance_km > 0 and a.organization.name.startswith("Больница") for a in res.alternatives)
     near = queue.Alternatives(queue_pb2.AlternativesRequest(base=_request(), max_distance_km=15))
     assert {a.organization.mo_code for a in near.alternatives} == {"0002", "0004"}
+    assert all(a.is_neighbor_region is False for a in res.alternatives)
+
+
+def test_alternatives_include_neighbors_flag_adds_and_tags_the_adjacent_region(served):
+    """3.7: без include_neighbors сосед из региона "11" не попадает в выдачу; с флагом — попадает,
+    помечен is_neighbor_region и несёт свой настоящий region_kato, а не region_kato базового запроса."""
+    _, queue, _, _ = served
+    without = queue.Alternatives(queue_pb2.AlternativesRequest(base=_request(), limit=50))
+    assert "9999" not in {a.organization.mo_code for a in without.alternatives}
+
+    with_neighbors = queue.Alternatives(queue_pb2.AlternativesRequest(base=_request(), limit=50, include_neighbors=True))
+    neighbor = next(a for a in with_neighbors.alternatives if a.organization.mo_code == "9999")
+    assert neighbor.is_neighbor_region is True
+    assert neighbor.organization.region.kato == "11"
+    same_region = [a for a in with_neighbors.alternatives if a.organization.mo_code != "9999"]
+    assert all(a.is_neighbor_region is False and a.organization.region.kato == "10" for a in same_region)
 
 
 def test_forecast_points_and_backtest(served):
@@ -169,7 +202,7 @@ def test_health_and_distance(served):
 def test_simulation_scenarios_and_redistribution(served):
     state, _, _, channel = served
     sim = simulation_pb2_grpc.SimulationStub(channel)
-    assert len(state.sim_states) == 24
+    assert len(state.sim_states) == 26
     res = sim.Simulate(simulation_pb2.SimulateRequest(region=common_pb2.RegionRef(kato="10"), profile_code="381", capacity_delta_pct=25))
     assert res.organisations == 12 and res.delta_days < 0 and res.ci_low <= res.delta_days <= res.ci_high and res.assumptions
     assert res.model.name == "fluid_queue" and res.model.trained_through == "2025-03-31"

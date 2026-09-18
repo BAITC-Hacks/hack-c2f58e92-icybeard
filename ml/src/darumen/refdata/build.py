@@ -1,6 +1,7 @@
 """Build reference tables under <lakehouse>/refdata from seeds and silver data.
 
     regions           seed refdata/regions.yaml
+    region_neighbors  seed refdata/regions.yaml (neighbors) — join-таблица для «включить соседние регионы»
     bed_profiles      profile_code → name, from silver.bg_referrals
     mo_registry       mo_code → canonical name, name variants, region, type, size bucket, peer group
     mo_name_index     (region_kato, name_key) → mo_code, to resolve datasets that only carry names
@@ -76,6 +77,16 @@ def build_refdata(lake: Lakehouse, out: Path | None = None, seed_dir: Path = SEE
                     [(r["region_kato"], r["name_ru"], r["name_kz"], r["capital"], r["lat"], r["lon"], r["population_thousands"]) for r in regions])
     con.execute(f"COPY regions TO {_sql_path(out / 'regions.parquet')} (FORMAT PARQUET)")
     report["tables"]["regions"] = len(regions)
+
+    # 3.7: соседи региона (для «где быстрее» с флагом includeNeighbors) — список смежных КАТО из
+    # regions.yaml, разложен в join-таблицу (region_kato, neighbor_kato), а не массив в колонке,
+    # чтобы читался обычным SELECT/join без специфичных для DuckDB операций над списками.
+    neighbor_pairs = [(r["region_kato"], n) for r in regions for n in r.get("neighbors", [])]
+    con.execute("CREATE OR REPLACE TABLE region_neighbors (region_kato VARCHAR, neighbor_kato VARCHAR)")
+    if neighbor_pairs:
+        con.executemany("INSERT INTO region_neighbors VALUES (?, ?)", neighbor_pairs)
+    con.execute(f"COPY region_neighbors TO {_sql_path(out / 'region_neighbors.parquet')} (FORMAT PARQUET)")
+    report["tables"]["region_neighbors"] = len(neighbor_pairs)
 
     if not _exists(lake, "bg_referrals"):
         report["warnings"].append("silver.bg_referrals отсутствует: реестр организаций не построен")
