@@ -88,6 +88,7 @@ class ModelState:
     streams: dict[str, Stream]
     reports: dict[str, dict]
     backtests: dict[str, pd.DataFrame]
+    los: pd.DataFrame
 
     @classmethod
     def load(cls, lake: Lakehouse, streams: dict[str, Stream] | None = None) -> ModelState:
@@ -109,9 +110,20 @@ class ModelState:
         throughput = lake.root / "gold" / "throughput_4w.parquet"
         sim_states = (load_states(lake, as_of=as_of.strftime("%Y-%m-%d"), calibration=load_calibration(lake)) if throughput.exists()
                       else pd.DataFrame(columns=["mo_code", "profile_code", "region_kato", "arrivals_per_day", "admissions_per_day", "queue_len", "wait_p50_4w", "calibration"]))
-        return cls(wait, as_of, queue, registry, by_code, forecasts, sim_states, streams, reports, backtests)
+        los_path = lake.root / "gold" / "los_by_profile.parquet"
+        los = pd.read_parquet(los_path) if los_path.exists() else pd.DataFrame(columns=["region_kato", "profile_code", "los_median_fact"])
+        return cls(wait, as_of, queue, registry, by_code, forecasts, sim_states, streams, reports, backtests, los)
 
     # ---------- lookups ----------
+    def los_days(self, region_kato: str, profile_code: str) -> float | None:
+        """Средняя длительность лечения (факт) для «+N коек» → госпитализации в день; None, если пусто."""
+        if self.los.empty or "profile_code" not in self.los.columns:
+            return None
+        row = self.los[(self.los["region_kato"] == region_kato) & (self.los["profile_code"] == profile_code)]
+        if row.empty or pd.isna(row.iloc[0]["los_median_fact"]):
+            return None
+        return float(row.iloc[0]["los_median_fact"])
+
     @property
     def model_info(self) -> dict[str, str]:
         meta = self.wait.metadata

@@ -1,6 +1,6 @@
 import pandas as pd
 
-from darumen.models.simulate import QueueState, calibrate, fluid_wait, redistribute, simulate
+from darumen.models.simulate import QueueState, calibrate, fluid_wait, redistribute, simulate, simulate_states
 
 
 def test_fluid_queue_drains_when_capacity_exceeds_arrivals():
@@ -15,6 +15,34 @@ def test_capacity_scenario_reduces_wait_and_ci_brackets_delta():
     assert out["delta_days"] < 0
     assert out["ci"][0] <= out["delta_days"] <= out["ci"][1]
     assert out["scenario"]["admissions_per_day"] == 5.0
+
+
+def test_beds_delta_adds_admissions_capacity_via_fluid_wait():
+    st = QueueState("A", "021", "10", arrivals_per_day=5.0, admissions_per_day=4.0, queue_len=100.0, calibration=1.0)
+    out = simulate(st, horizon_days=60, admissions_delta=2.0)
+    assert out["scenario"]["admissions_per_day"] == 6.0
+    assert out["delta_days"] < 0
+    assert any("коек" in a for a in out["assumptions"])
+
+
+def test_simulate_states_distributes_beds_delta_by_arrival_share_and_reports_admissions():
+    states = pd.DataFrame([
+        {"mo_code": "BIG", "profile_code": "381", "region_kato": "75", "arrivals_per_day": 8.0, "admissions_per_day": 4.0, "queue_len": 100.0, "calibration": 1.0},
+        {"mo_code": "SMALL", "profile_code": "381", "region_kato": "75", "arrivals_per_day": 2.0, "admissions_per_day": 4.0, "queue_len": 10.0, "calibration": 1.0},
+    ])
+    without = simulate_states(states, "75", "381", horizon_days=60)
+    assert without["admissions_per_day"] == 8.0
+
+    with_beds = simulate_states(states, "75", "381", horizon_days=60, beds_delta=10.0, los_days=5.0)
+    assert with_beds["admissions_per_day"] == 10.0  # +10 коек / 5 дней LOS = +2 госпитализации/день суммарно
+    assert with_beds["scenario"]["mean_wait_days"] < without["scenario"]["mean_wait_days"]
+
+
+def test_simulate_states_ignores_beds_delta_without_los():
+    states = pd.DataFrame([{"mo_code": "ONLY", "profile_code": "381", "region_kato": "75", "arrivals_per_day": 2.0,
+                            "admissions_per_day": 4.0, "queue_len": 10.0, "calibration": 1.0}])
+    result = simulate_states(states, "75", "381", horizon_days=60, beds_delta=10.0, los_days=None)
+    assert result["admissions_per_day"] == 4.0
 
 
 def test_redistribution_moves_from_slow_to_fast():

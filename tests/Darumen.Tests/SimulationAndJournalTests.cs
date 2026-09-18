@@ -21,6 +21,15 @@ public sealed class SimulationAndJournalTests(TestApp app) : IClassFixture<TestA
     }
 
     [Fact]
+    public async Task Simulate_forwards_beds_delta_and_returns_admissions_per_day()
+    {
+        var response = await app.CreateClient("regulator").PostAsJsonAsync("/api/v1/simulate", new SimulateRequestDto("75", "381", new ScenarioDto(null, null, 90, BedsDelta: 10)));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<SimulateResponseDto>();
+        Assert.Equal(22, body!.AdmissionsPerDay);
+    }
+
+    [Fact]
     public async Task Redistribute_lists_moves_and_validates_region()
     {
         var client = app.CreateClient("regulator");

@@ -18,6 +18,7 @@ message SimulateRequest {
   double capacity_delta_pct = 3;   // +15 означает пропускная способность на 15 % выше
   double redirect_share_pct = 4;   // доля направлений, перенаправленных из группы
   int32 horizon_days = 5;          // 0 означает 90
+  double beds_delta = 6;           // +N коек: переводится в госпитализации в день через LOS
 }
 
 message ScenarioOutcome {
@@ -33,6 +34,7 @@ message SimulateResponse {
   double ci_high = 6;
   repeated string assumptions = 7;
   ModelInfo model = 8;
+  double admissions_per_day = 9;   // пропускная способность сценария (с учётом +N коек)
 }
 
 message RedistributeRequest {

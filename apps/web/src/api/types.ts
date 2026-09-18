@@ -106,6 +106,8 @@ export interface QualityReport {
 export interface SimulateResponse {
   organisations: number; baseline: { meanWaitDays: number }; scenario: { meanWaitDays: number }
   deltaDays: number; ci: number[]; assumptions: string[]; model: ModelInfo
+  /** 3.4: пропускная способность сценария (госпитализации в день), с учётом «+N коек»; null, если сервис старый. */
+  admissionsPerDay: number | null
 }
 export interface OrganizationRef { moCode: string; name: string; regionKato: string }
 export interface Move {

@@ -27,8 +27,10 @@ class SimulationServicer(simulation_pb2_grpc.SimulationServicer):
 
     def Simulate(self, request, context):
         self._check(request.region.kato, request.profile_code, context)
+        los_days = (self.state.los_days(request.region.kato, request.profile_code) if request.beds_delta else None)
         result = simulate_states(self.state.sim_states, request.region.kato, request.profile_code, request.capacity_delta_pct,
-                                 request.redirect_share_pct, request.horizon_days or DEFAULT_HORIZON_DAYS)
+                                 request.redirect_share_pct, request.horizon_days or DEFAULT_HORIZON_DAYS,
+                                 beds_delta=request.beds_delta, los_days=los_days)
         if "error" in result:
             context.abort(grpc.StatusCode.NOT_FOUND, result["error"])
         return simulation_pb2.SimulateResponse(
@@ -36,7 +38,8 @@ class SimulationServicer(simulation_pb2_grpc.SimulationServicer):
             baseline=simulation_pb2.ScenarioOutcome(mean_wait_days=result["baseline"]["mean_wait_days"]),
             scenario=simulation_pb2.ScenarioOutcome(mean_wait_days=result["scenario"]["mean_wait_days"]),
             delta_days=result["delta_days"], ci_low=result["ci"][0], ci_high=result["ci"][1],
-            assumptions=result["assumptions"], model=_model_info(self.state))
+            assumptions=result["assumptions"], model=_model_info(self.state),
+            admissions_per_day=result["admissions_per_day"])
 
     def Redistribute(self, request, context):
         self._check(request.region.kato, request.profile_code, context)

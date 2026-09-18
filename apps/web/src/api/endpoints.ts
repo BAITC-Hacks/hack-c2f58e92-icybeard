@@ -32,7 +32,7 @@ export const analytics = {
 }
 
 export const simulation = {
-  simulate: (regionKato: string, profileCode: string, scenario: { capacityDeltaPct?: number; redistributeSharePct?: number; horizonDays?: number }) =>
+  simulate: (regionKato: string, profileCode: string, scenario: { capacityDeltaPct?: number; redistributeSharePct?: number; horizonDays?: number; bedsDelta?: number }) =>
     api<SimulateResponse>('/api/v1/simulate', { body: { regionKato, profileCode, scenario } }),
   redistribute: (regionKato: string, profileCode: string, constraints: { maxShareMovedPct?: number; maxDistanceKm?: number; horizonDays?: number }) =>
     api<RedistributeResponse>('/api/v1/redistribute', { body: { regionKato, profileCode, constraints } }),

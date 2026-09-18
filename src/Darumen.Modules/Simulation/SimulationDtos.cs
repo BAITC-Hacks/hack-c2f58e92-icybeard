@@ -2,7 +2,8 @@ using Darumen.Shared.Api;
 
 namespace Darumen.Modules.Simulation;
 
-public sealed record ScenarioDto(double? CapacityDeltaPct, double? RedistributeSharePct, int? HorizonDays);
+/// <summary>3.4: BedsDelta — «+N коек»; переводится в дополнительные госпитализации в день через LOS на стороне ML-сервиса.</summary>
+public sealed record ScenarioDto(double? CapacityDeltaPct, double? RedistributeSharePct, int? HorizonDays, double? BedsDelta = null);
 
 public sealed record SimulateRequestDto(string? RegionKato, string? ProfileCode, ScenarioDto? Scenario);
 
@@ -10,7 +11,7 @@ public sealed record OutcomeDto(double MeanWaitDays);
 
 public sealed record SimulateResponseDto(
     int Organisations, OutcomeDto Baseline, OutcomeDto Scenario, double DeltaDays, double[] Ci,
-    IReadOnlyList<string> Assumptions, ModelInfoDto Model);
+    IReadOnlyList<string> Assumptions, ModelInfoDto Model, double? AdmissionsPerDay = null);
 
 public sealed record ConstraintsDto(double? MaxDistanceKm, double? MaxShareMovedPct, int? HorizonDays);
 

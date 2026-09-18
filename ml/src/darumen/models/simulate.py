@@ -36,9 +36,13 @@ class QueueState:
     calibration: float = 1.0
 
 
-def fluid_wait(state: QueueState, horizon_days: int = 90, capacity_delta_pct: float = 0.0, arrivals_delta_pct: float = 0.0) -> dict:
-    """Mean and end-of-horizon wait (days) under the fluid model for a scenario."""
-    mu = max(state.admissions_per_day * (1 + capacity_delta_pct / 100), 1e-6)
+def fluid_wait(state: QueueState, horizon_days: int = 90, capacity_delta_pct: float = 0.0, arrivals_delta_pct: float = 0.0,
+              admissions_delta: float = 0.0) -> dict:
+    """Mean and end-of-horizon wait (days) under the fluid model for a scenario.
+
+    admissions_delta: дополнительные госпитализации в день сверх capacity_delta_pct — используется для
+    сценария «+N коек», где N коек переводится в admissions_delta = N / LOS (см. simulate_states)."""
+    mu = max(state.admissions_per_day * (1 + capacity_delta_pct / 100) + admissions_delta, 1e-6)
     lam = max(state.arrivals_per_day * (1 + arrivals_delta_pct / 100), 0.0)
     queue = state.queue_len
     waits = []
@@ -49,21 +53,26 @@ def fluid_wait(state: QueueState, horizon_days: int = 90, capacity_delta_pct: fl
             "end_queue": float(queue), "arrivals_per_day": lam, "admissions_per_day": mu}
 
 
-def simulate(state: QueueState, capacity_delta_pct: float = 0.0, redirect_share_pct: float = 0.0, horizon_days: int = 90) -> dict:
+def simulate(state: QueueState, capacity_delta_pct: float = 0.0, redirect_share_pct: float = 0.0, horizon_days: int = 90,
+            admissions_delta: float = 0.0) -> dict:
     base = fluid_wait(state, horizon_days)
-    scenario = fluid_wait(state, horizon_days, capacity_delta_pct, -redirect_share_pct)
-    band = [fluid_wait(replace(state, arrivals_per_day=state.arrivals_per_day * f), horizon_days, capacity_delta_pct, -redirect_share_pct)
+    scenario = fluid_wait(state, horizon_days, capacity_delta_pct, -redirect_share_pct, admissions_delta)
+    band = [fluid_wait(replace(state, arrivals_per_day=state.arrivals_per_day * f), horizon_days, capacity_delta_pct, -redirect_share_pct,
+                       admissions_delta)
             for f in (1 - ARRIVAL_BAND, 1 + ARRIVAL_BAND)]
     delta = scenario["mean_wait_days"] - base["mean_wait_days"]
+    assumptions = [
+        (f"поток направлений {state.arrivals_per_day:.2f} в день и пропускная способность {state.admissions_per_day:.2f} в день "
+         f"взяты за последние {WINDOW_DAYS} дней"),
+        f"калибровка профиля k = {state.calibration:.2f}: ожидание ≈ k × очередь / пропускная способность",
+        f"интервал: поток направлений ±{ARRIVAL_BAND:.0%}",
+    ]
+    if admissions_delta:
+        assumptions.append(f"+{admissions_delta:.2f} госпитализации в день от дополнительных коек (через LOS)")
     return {
         "baseline": base, "scenario": scenario, "delta_days": float(delta),
         "ci": sorted(float(b["mean_wait_days"] - base["mean_wait_days"]) for b in band),
-        "assumptions": [
-            (f"поток направлений {state.arrivals_per_day:.2f} в день и пропускная способность {state.admissions_per_day:.2f} в день "
-             f"взяты за последние {WINDOW_DAYS} дней"),
-            f"калибровка профиля k = {state.calibration:.2f}: ожидание ≈ k × очередь / пропускная способность",
-            f"интервал: поток направлений ±{ARRIVAL_BAND:.0%}",
-        ],
+        "assumptions": assumptions,
         "model": f"fluid_queue@{VERSION}",
     }
 
@@ -222,25 +231,53 @@ def load_calibration(lake: Lakehouse) -> dict[str, float]:
 
 
 def simulate_states(states: pd.DataFrame, region_kato: str, profile_code: str, capacity_delta_pct: float = 0.0,
-                    redirect_share_pct: float = 0.0, horizon_days: int = 90) -> dict:
-    """Scenario for all organisations of a region and profile, aggregated with arrival weights."""
+                    redirect_share_pct: float = 0.0, horizon_days: int = 90, beds_delta: float = 0.0,
+                    los_days: float | None = None) -> dict:
+    """Scenario for all organisations of a region and profile, aggregated with arrival weights.
+
+    beds_delta: +N коек для группы, распределяется между организациями пропорционально потоку направлений
+    и переводится в дополнительные госпитализации в день через los_days (средняя длительность лечения);
+    без los_days (LOS не опубликован) beds_delta игнорируется."""
     group = states[(states["region_kato"] == region_kato) & (states["profile_code"] == profile_code)]
     if group.empty:
         return {"error": "no organisations for this region and profile"}
-    results = [simulate(_state(r), capacity_delta_pct, redirect_share_pct, horizon_days) for r in group.itertuples()]
     raw = group["arrivals_per_day"].to_numpy()
     weights = raw / raw.sum() if raw.sum() else np.full(len(group), 1.0 / len(group))
+    extra_admissions_per_day = beds_delta / los_days if beds_delta and los_days else 0.0
+    admissions_deltas = extra_admissions_per_day * weights
+    results = [simulate(_state(r), capacity_delta_pct, redirect_share_pct, horizon_days, admissions_delta=float(d))
+               for r, d in zip(group.itertuples(), admissions_deltas)]
 
     def agg(values) -> float:
         return float(np.dot(np.asarray(list(values)), weights))
 
     baseline, scenario = agg(r["baseline"]["mean_wait_days"] for r in results), agg(r["scenario"]["mean_wait_days"] for r in results)
+    admissions_per_day = float(sum(r["scenario"]["admissions_per_day"] for r in results))
     return {"organisations": len(group), "baseline": {"mean_wait_days": baseline}, "scenario": {"mean_wait_days": scenario},
             "delta_days": scenario - baseline, "ci": [agg(r["ci"][0] for r in results), agg(r["ci"][1] for r in results)],
-            "assumptions": results[0]["assumptions"], "model": f"fluid_queue@{VERSION}"}
+            "assumptions": results[0]["assumptions"], "model": f"fluid_queue@{VERSION}",
+            "admissions_per_day": admissions_per_day}
+
+
+def load_los_days(lake: Lakehouse, region_kato: str, profile_code: str) -> float | None:
+    """Средняя длительность лечения (факт, медиана за 12 мес.) для региона и профиля, для перевода
+    «+N коек» в госпитализации в день; None, если витрина ещё не опубликована или ячейка пуста."""
+    path = lake.root / "gold" / "los_by_profile.parquet"
+    if not path.exists():
+        return None
+    cells = pd.read_parquet(path)
+    if "profile_code" not in cells.columns:
+        return None
+    row = cells[(cells["region_kato"] == region_kato) & (cells["profile_code"] == profile_code)]
+    if row.empty or pd.isna(row.iloc[0]["los_median_fact"]):
+        return None
+    return float(row.iloc[0]["los_median_fact"])
 
 
 def simulate_group(lake: Lakehouse, region_kato: str, profile_code: str, capacity_delta_pct: float = 0.0,
-                   redirect_share_pct: float = 0.0, horizon_days: int = 90, as_of: str | None = None) -> dict:
+                   redirect_share_pct: float = 0.0, horizon_days: int = 90, as_of: str | None = None,
+                   beds_delta: float = 0.0) -> dict:
     states = load_states(lake, as_of=as_of, calibration=load_calibration(lake))
-    return simulate_states(states, region_kato, profile_code, capacity_delta_pct, redirect_share_pct, horizon_days)
+    los_days = load_los_days(lake, region_kato, profile_code) if beds_delta else None
+    return simulate_states(states, region_kato, profile_code, capacity_delta_pct, redirect_share_pct, horizon_days,
+                           beds_delta, los_days)

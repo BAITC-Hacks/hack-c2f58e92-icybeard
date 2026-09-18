@@ -22,6 +22,8 @@ const capacity = ref(15)
 const redirect = ref(0)
 const horizon = ref(90)
 const maxShare = ref(20)
+// 3.4: «+N коек» — переводится в госпитализации в день через LOS на стороне ML-сервиса (см. подсказку под результатом)
+const beds = ref(0)
 const result = ref<SimulateResponse | null>(null)
 const moves = ref<RedistributeResponse | null>(null)
 const los = ref<LosItem | null>(null)
@@ -33,7 +35,7 @@ async function run() {
   error.value = null
   try {
     ;[result.value, moves.value] = await Promise.all([
-      simulation.simulate(region.value, profile.value, { capacityDeltaPct: capacity.value, redistributeSharePct: redirect.value, horizonDays: horizon.value }),
+      simulation.simulate(region.value, profile.value, { capacityDeltaPct: capacity.value, redistributeSharePct: redirect.value, horizonDays: horizon.value, bedsDelta: beds.value }),
       simulation.redistribute(region.value, profile.value, { maxShareMovedPct: maxShare.value, horizonDays: horizon.value }),
     ])
     // длительность лечения — отдельная витрина; её отсутствие не должно ломать расчёт
@@ -66,6 +68,7 @@ onMounted(async () => {
         <div class="field" style="margin-top: 12px"><label>Перенаправить из группы: {{ redirect }} %</label><Slider v-model="redirect" :min="0" :max="50" /></div>
         <div class="field" style="margin-top: 12px"><label>Горизонт: {{ horizon }} дней</label><Slider v-model="horizon" :min="30" :max="180" :step="30" /></div>
         <div class="field" style="margin-top: 12px"><label>Максимум переноса от одной организации: {{ maxShare }} %</label><Slider v-model="maxShare" :min="5" :max="50" :step="5" /></div>
+        <div class="field" style="margin-top: 12px"><label>+N коек: {{ beds }}</label><Slider v-model="beds" :min="0" :max="100" :step="5" /></div>
         <div class="actions"><Button label="Рассчитать" icon="pi pi-play" :loading="busy" @click="run" /></div>
         <ErrorBox :error="error" />
       </div>
@@ -75,12 +78,16 @@ onMounted(async () => {
           <div class="item"><div class="value">{{ days(result.baseline.meanWaitDays, 1) }}</div><div class="label">ожидание сейчас, дн.</div></div>
           <div class="item"><div class="value">{{ days(result.scenario.meanWaitDays, 1) }}</div><div class="label">ожидание в сценарии, дн.</div></div>
           <div class="item"><div class="value">{{ signed(result.deltaDays) }}</div><div class="label">изменение, дн. (чувствительность к потоку ±20 %: {{ signed(result.ci[0] ?? 0) }} … {{ signed(result.ci[1] ?? 0) }})</div></div>
+          <div class="item" v-if="result.admissionsPerDay !== null"><div class="value">{{ num(result.admissionsPerDay, 1) }}</div><div class="label">пропускная способность в сценарии, госпитализаций/день</div></div>
         </div>
         <ul class="muted"><li v-for="a in result.assumptions" :key="a">{{ a }}</li></ul>
         <p class="muted" v-if="los && los.losMedianFact > 0">
           Средняя длительность лечения в этой ячейке: {{ los.losMedianFact.toFixed(1) }} дн. (медиана факта за 12 мес,
           {{ los.n.toLocaleString('ru-RU') }} случаев<template v-if="los.losP50Model !== null">; p50 LOS-модели {{ los.losP50Model.toFixed(1) }} дн.</template>) —
-          одна койка ≈ {{ (1 / los.losMedianFact).toFixed(2) }} госпитализации в день.
+          одна койка ≈ {{ (1 / los.losMedianFact).toFixed(2) }} госпитализации в день<template v-if="beds > 0">, поэтому +{{ beds }} коек ≈ +{{ (beds / los.losMedianFact).toFixed(2) }} госпитализации в день</template>.
+        </p>
+        <p class="muted" v-else-if="beds > 0">
+          Длительность лечения для этой ячейки не опубликована — «+{{ beds }} коек» не учтено в расчёте пропускной способности.
         </p>
         <p class="muted">{{ result.model.name }} {{ result.model.version }}</p>
         <!-- значения и источники: refdata/external_benchmarks.yaml (beds) -->

@@ -86,6 +86,8 @@ public sealed class FakeSimulationClient : Simulation.SimulationClient
         CiHigh = -request.CapacityDeltaPct / 6,
         Assumptions = { "поток ±20 %" },
         Model = Grpc.Model("fluid_queue"),
+        // 3.4: имитирует ml-сервис — +N коек / 5 (условный LOS) даёт дополнительные госпитализации в день сверх базовых 20.
+        AdmissionsPerDay = 20 + request.BedsDelta / 5,
     });
 
     public override AsyncUnaryCall<RedistributeResponse> RedistributeAsync(RedistributeRequest request, CallOptions options) => Grpc.Unary(new RedistributeResponse

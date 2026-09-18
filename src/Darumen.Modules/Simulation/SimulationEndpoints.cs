@@ -26,10 +26,12 @@ public static class SimulationEndpoints
                     CapacityDeltaPct = scenario.CapacityDeltaPct ?? 0,
                     RedirectSharePct = scenario.RedistributeSharePct ?? 0,
                     HorizonDays = scenario.HorizonDays ?? 0,
+                    BedsDelta = scenario.BedsDelta ?? 0,
                 }, deadline: Deadline(options), cancellationToken: ct);
                 return Results.Ok(new SimulateResponseDto(
                     response.Organisations, new OutcomeDto(response.Baseline.MeanWaitDays), new OutcomeDto(response.Scenario.MeanWaitDays),
-                    response.DeltaDays, [response.CiLow, response.CiHigh], response.Assumptions.ToList(), response.Model.ToDto()));
+                    response.DeltaDays, [response.CiLow, response.CiHigh], response.Assumptions.ToList(), response.Model.ToDto(),
+                    response.AdmissionsPerDay));
             })
             .RequireAuthorization(Policies.Regulator)
             .WithTags("Simulation").WithName("Simulate").WithSummary("Сценарий «что если» для региона и профиля")
