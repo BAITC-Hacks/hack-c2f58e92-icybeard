@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\Darumen.Shared\Darumen.Shared.csproj" />
     <ProjectReference Include="..\Analytics\Darumen.Modules.Analytics.csproj" />
     <ProjectReference Include="..\Queue\Darumen.Modules.Queue.csproj" />
+    <ProjectReference Include="..\Journal\Darumen.Modules.Journal.csproj" />
     <ProjectReference Include="..\Simulation\Darumen.Modules.Simulation.csproj" />
     <ProjectReference Include="..\RefData\Darumen.Modules.RefData.csproj" />
     <ProjectReference Include="..\Medicines\Darumen.Modules.Medicines.csproj" />
