@@ -1,7 +1,7 @@
 export const ru = {
   nav: {
     home: 'Главная', gov: 'Карта регионов', simulator: 'Симулятор', insight: 'Вопросы к данным', quality: 'Качество моделей', referral: 'Ассистент направления',
-    worklist: 'Рабочий список', medicines: 'Проверка рецепта', decisions: 'Журнал решений', scribe: 'AI-скрайб', steward: 'Консоль стюарда', wait: 'Ожидание для граждан',
+    worklist: 'Рабочий список', medicines: 'Проверка рецепта', decisions: 'Журнал решений', scribe: 'AI-скрайб', steward: 'Консоль стюарда', wait: 'Ожидание для граждан', audit: 'Журнал аудита',
   },
   auth: { role: 'Роль', login: 'Войти', logout: 'Выйти', guest: 'Гость', demo: 'демо-режим' },
   common: {
@@ -161,6 +161,13 @@ export const ru = {
     aboveExpected: 'выше ожидания', belowExpected: 'ниже ожидания',
   },
   gov: {
+    audit: {
+      title: 'Журнал аудита',
+      lead: 'Журнал запросов врачей и регуляторов к API: кто, когда и что запрашивал.',
+      actorFilter: 'Актор', actorPlaceholder: 'Логин или ID актора',
+      colWhen: 'Когда', colActor: 'Актор', colRole: 'Роль', colMethod: 'Метод', colPath: 'Путь', colQuery: 'Параметры', colStatus: 'Статус', colDuration: 'Длительность, мс', colTrace: 'Trace ID',
+      total: 'Всего записей', empty: 'Записей не найдено', refresh: 'Обновить',
+    },
     quality: {
       title: 'Качество моделей',
       lead: 'Метрики из отчётов обучения (make train / make eval): модель против простого правила на отложенной выборке. Это тот же источник, что цитируют карточки моделей и презентация.',

@@ -1,6 +1,6 @@
 import { api, apiDownload, apiUpload } from './client'
 import type {
-  AlternativesResponse, Anomaly, AskResponse, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
+  AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
   LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, WorklistItem,
@@ -47,6 +47,8 @@ export const journal = {
     api<Paged<Decision>>('/api/v1/journal/decisions', { query: filter }),
   worklist: (filter: { regionKato?: string; flag?: string } = {}) =>
     api<{ items: WorklistItem[]; synthetic: boolean; modelBacked: boolean }>('/api/v1/journal/worklist', { query: filter }),
+  audit: (filter: { actor?: string; page?: number; size?: number } = {}) =>
+    api<Paged<AuditEntry>>('/api/v1/journal/audit', { query: filter }),
 }
 
 export const refdata = {

@@ -1,7 +1,7 @@
 export const kk = {
   nav: {
     home: 'Басты бет', gov: 'Өңірлер картасы', simulator: 'Симулятор', insight: 'Деректерге сұрақтар', quality: 'Модельдер сапасы', referral: 'Жолдама көмекшісі',
-    worklist: 'Жұмыс тізімі', medicines: 'Рецепт тексеру', decisions: 'Шешімдер журналы', scribe: 'AI-скрайб', steward: 'Стюард консолі', wait: 'Азаматтар үшін күту',
+    worklist: 'Жұмыс тізімі', medicines: 'Рецепт тексеру', decisions: 'Шешімдер журналы', scribe: 'AI-скрайб', steward: 'Стюард консолі', wait: 'Азаматтар үшін күту', audit: 'Аудит журналы',
   },
   auth: { role: 'Рөл', login: 'Кіру', logout: 'Шығу', guest: 'Қонақ', demo: 'демо-режим' },
   common: {
@@ -161,6 +161,13 @@ export const kk = {
     aboveExpected: 'күтуден жоғары', belowExpected: 'күтуден төмен',
   },
   gov: {
+    audit: {
+      title: 'Аудит журналы',
+      lead: 'Дәрігерлер мен реттеушілердің API сұрауларының журналы: кім, қашан және не сұрағаны.',
+      actorFilter: 'Актор', actorPlaceholder: 'Актордың логині немесе ID',
+      colWhen: 'Уақыты', colActor: 'Актор', colRole: 'Рөлі', colMethod: 'Әдіс', colPath: 'Жол', colQuery: 'Параметрлер', colStatus: 'Статус', colDuration: 'Ұзақтығы, мс', colTrace: 'Trace ID',
+      total: 'Барлық жазбалар', empty: 'Жазбалар табылмады', refresh: 'Жаңарту',
+    },
     quality: {
       title: 'Модельдер сапасы',
       lead: 'Оқыту есептерінен алынған көрсеткіштер (make train / make eval): модель мен қарапайым ереже бөлек үлгіде салыстырылады. Бұл модель карталары мен презентация келтіретін дереккөзбен бірдей.',

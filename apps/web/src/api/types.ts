@@ -132,6 +132,9 @@ export interface Decision {
   recommended: unknown; chosen: unknown; reason: string | null; recordedAt: string
 }
 export interface DecisionCreated { decisionId: string; recordedAt: string }
+export interface AuditEntry {
+  id: number; at: string; actor: string; role: string; method: string; path: string; query: string | null; status: number; durationMs: number; traceId: string
+}
 export interface WorklistItem {
   patientRef: string; synthetic: boolean; stage: string; expectedDate: string | null; riskFlags: string[]
   priority: number; nextAction: string; explanation: string; moCode: string; profileCode: string; regionKato: string; daysWaiting: number
