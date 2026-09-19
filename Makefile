@@ -1,8 +1,10 @@
 .DEFAULT_GOAL := help
 DATASETS_DIR ?= DataSets
 PY ?= ml/.venv/bin/python
-COMPOSE ?= docker compose -f infra/docker-compose.yml
 ENV_FILE ?= .env
+# --env-file явно нужен: без него docker compose ищет .env рядом с первым -f (infra/), а не в корне репозитория;
+# если .env ещё не создан (до cp .env.example .env), флаг не добавляем, чтобы compose не падал на отсутствующем файле
+COMPOSE ?= docker compose $(if $(wildcard $(ENV_FILE)),--env-file $(ENV_FILE),) -f infra/docker-compose.yml
 LOAD_ENV = $(if $(wildcard $(ENV_FILE)),set -a; . ./$(ENV_FILE); set +a;,)
 
 help: ## Список целей
@@ -85,7 +87,7 @@ venv-scribe: venv ## Установить faster-whisper и anthropic для с�
 dagster: venv ## Dagster UI с линией активов silver → refdata → gold → models → published
 	$(PY) -m dagster dev -m darumen.orchestration.definitions
 
-ollama-model: ## Локальная модель для Insight и скрайба с контекстом 8k (нужен ollama pull qwen3.8:27b)
+ollama-model: ## Локальная модель для Insight и скрайба с контекстом 16k (нужен ollama pull qwen3.8:27b)
 	ollama create darumen-qwen3.8:27b -f infra/ollama/Modelfile
 
 lint: venv ## Линтеры

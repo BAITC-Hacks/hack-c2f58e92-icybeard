@@ -88,7 +88,7 @@ def train_survival(lake: Lakehouse, out_dir: Path) -> dict:
 
     report: dict = {
         "name": "survival_aft", "version": VERSION, "censor_date": df.attrs["censor_date"],
-        "train_rows": int(len(fit_frame)), "censored_share": round(float(1 - train["event"].mean()), 4),
+        "train_rows": len(fit_frame), "censored_share": round(float(1 - train["event"].mean()), 4),
         "note": "отказ цензурируется, а не моделируется отдельным риском; вероятности безусловные",
         "splits": {},
     }
@@ -112,7 +112,7 @@ def train_survival(lake: Lakehouse, out_dir: Path) -> dict:
         auc30 = float(roc_auc_score(y30, p_by_t[30]))
         auc30_base = float(roc_auc_score(y30, test["org_share30"].to_numpy()))
         report["splits"][split] = {
-            "n": int(len(test)),
+            "n": len(test),
             "c_index": round(float(c_model), 3), "c_index_baseline": round(float(c_base), 3),
             "auc30": round(auc30, 3), "auc30_baseline": round(auc30_base, 3),
             "p_admit_mean": {str(t): round(float(p_by_t[t].mean()), 3) for t in HORIZONS},

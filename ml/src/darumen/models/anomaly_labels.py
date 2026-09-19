@@ -55,7 +55,7 @@ def train_anomaly_labels(lake: Lakehouse, out_dir: Path, dsn: str = DEFAULT_PG_D
 
     report: dict = {
         "name": "anomaly_labels", "version": VERSION,
-        "labels": int(len(joined)),
+        "labels": len(joined),
         "positives": int(joined["y"].sum()), "negatives": int((1 - joined["y"]).sum()),
         "min_labels": MIN_LABELS,
     }

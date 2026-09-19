@@ -12,7 +12,7 @@
 - **Пагинация:** `?page=1&size=50`, ответ `{ items, page, size, total }`.
 - **Идемпотентность записи:** заголовок `Idempotency-Key` на POST журналов и решений.
 - **Ограничение частоты:** `POST /insight/ask` и `/scribe/*` — не больше `RateLimits:ModelCallsPerMinute` запросов в минуту на пользователя (по умолчанию 20), сверх лимита 429.
-- **Порог малых чисел:** публичные агрегаты с числом наблюдений меньше 5 возвращаются как `null` с `suppressed: true`.
+- **Порог малых чисел:** публичные агрегаты со слишком малым числом наблюдений не публикуются, а не отдаются нулями/суррогатами. Порог свой у каждой витрины и указан рядом с ней: индекс доступности (`GET /index`) исключает ячейки региона и профиля с числом направлений с исходом < 20 ещё на этапе сборки `gold.access_index` (см. `ml/src/darumen/models/index.py`); длительность лечения (`GET /los`) — ячейки с числом случаев < 100 в `gold.los_by_profile`. Обе витрины уже не содержат таких строк к моменту, когда до них доходит REST API — подавленные значения просто отсутствуют в `items`, а не возвращаются как `null`.
 
 ## Queue: ожидание госпитализации
 
@@ -112,10 +112,7 @@
 ### `GET /api/v1/journal/worklist` (doctor)
 Рабочий список пациентов на маршруте (на кэмпе синтетический): `{ "items": [ { "patientRef", "synthetic": true, "stage", "expectedDate", "riskFlags": ["stuck_over_30"], "priority", "nextAction", "explanation" } ] }`.
 
-## Explain и Insight
-
-### `GET /api/v1/explain/{predictionId}` (все авторизованные)
-Полное объяснение прогноза с факторами и текстом на двух языках.
+## Insight
 
 ### `POST /api/v1/insight/ask` (chief, regulator)
 Тело `{ "question": "Где в марте самая длинная очередь на офтальмологию?", "regionKato": null }`. Ответ: `{ "answer": "…\nИсточник: access_index", "value": 126, "unit": null, "chart": { "type": "bar | line", "title", "x": [...], "series": [ { "name", "data": [...] } ] } | null, "toolsUsed": ["access_index"], "sources": ["tool:access_index"], "model": "ollama/darumen-qwen3.8:27b" }`. Модель видит только инструменты доменов (`access_index`, `regions`, `bed_profiles`, `organizations`, `queue_state`, `predict_wait`, `anomalies`, `forecast`, `simulate`, `medicines_check`), не сырые данные. Провайдер задаётся в `Insight:Provider`: ollama по умолчанию (локальная модель через OpenAI-совместимый адрес `http://localhost:11434/v1`, ключ не нужен, для Qwen3 в промпт добавляется `/no_think`, теги `<think>` вырезаются), deepseek, openai или anthropic с ключом из `.env`. Сбой модели отдаётся как 503 «Модель недоступна». `GET /api/v1/insight/status` показывает готовность, провайдера и модель. Эталонные вопросы: [insight-questions.md](insight-questions.md), прогон `scripts/insight_eval.py`.
