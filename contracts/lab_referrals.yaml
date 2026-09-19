@@ -1,0 +1,66 @@
+# ЧЕРНОВИК: контракт подготовлен заранее по описанию в docs/data-requests.md #7-8,
+# реальных данных ещё нет — см. finish-plan.md "Что не делаем" и журнал задачи 5.9.
+#
+# Ни один из перечисленных ниже наборов КДУ/лабораторных данных ЕИП не загружен
+# в lakehouse (bronze/silver) этого проекта на момент написания. Колонки ниже —
+# лучшее предположение по структуре "направления на КДУ" по аналогии с
+# contracts/bg_referrals.yaml (направления на плановую госпитализацию, тот же
+# источник ИС БГ/МЗ РК) и по формулировкам из docs/data-requests.md:
+#   - пункт 7: "Лабораторные исследования ЕИП по регионам и периодам, заявленные в ТЗ"
+#   - пункт 8: "Направления на КДУ за I квартал 2025 или агрегаты по организациям и неделям"
+# Ни один из этих документов не даёт точный список полей набора — точная схема
+# станет известна только когда реальный файл появится в lakehouse (через
+# intake-пайплайн, см. Этап 4). Правьте этот файл по факту, не подгоняйте под
+# него данные.
+#
+# НЕ регистрировать в load_streams()/gold-пайплайне, пока датасет реально не
+# загружен: контракт без данных за ним не должен участвовать в сборке gold.
+dataset: lab_referrals
+title: Направления на клинико-диагностические услуги (КДУ)
+source:
+  system: ЕИП (лабораторные исследования) / ИС БГ (направления на КДУ)
+  publisher: МЗ РК
+  portal_id: TBD # неизвестен — набор ни разу не был получен
+format:
+  type: csv
+  encoding: utf-8-sig
+  delimiter: ","
+  quote: '"'
+  escape: '"'
+grain: одно направление на КДУ (одно лабораторное/диагностическое исследование)
+keys: [referral_code]
+signature:
+  - referral_code
+  - referring_mo
+  - region_kato
+  - test_profile
+  - registration_dt
+  - result_dt
+  - sdu_load_date
+columns:
+  referral_code:
+    type: string
+    semantic: composite_key
+    note: "точный формат ключа неизвестен — предположение по образцу hospitalization_code из bg_referrals.yaml"
+  referring_mo: { type: string, semantic: mo_name, resolve: refdata.mo_registry }
+  region_kato:
+    type: string
+    semantic: kato
+    note: "неизвестно, приходит ли регион отдельной колонкой или его придётся выводить через referring_mo -> refdata.mo_registry, как в staffing.yaml (5.2)"
+  test_profile:
+    type: string
+    nullable: true
+    note: "тип/профиль исследования (КДУ) — упомянут в ТЗ как разбивка 'по регионам и периодам', точный справочник значений неизвестен"
+  registration_dt: { type: timestamp, nullable: true, note: "дата направления" }
+  result_dt: { type: timestamp, nullable: true, note: "дата результата — нужна для потока нагрузки лабораторий, наличие в источнике не подтверждено" }
+  sdu_load_date: { type: timestamp, semantic: technical }
+privacy:
+  class: quasi_identifiers
+  direct_identifiers: []
+  public_aggregates_min_count: 5
+rules: []
+# Правила качества и партиционирование (partition:, streams:) сознательно не
+# заполнены — задавать их без единой реальной строки было бы гаданием. Как
+# только появится реальный файл, эта секция дополняется по образцу
+# contracts/bg_referrals.yaml (streams.referrals_daily) и подключается к
+# streams/lab_weekly.yaml + gold-билдеру по аналогии с 5.1/5.2.
