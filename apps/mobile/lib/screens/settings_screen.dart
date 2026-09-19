@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/strings.dart';
 import '../state/session.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -38,19 +39,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
+    final s = S.of(session.locale);
     return Scaffold(
-      appBar: AppBar(title: const Text('Настройки')),
+      appBar: AppBar(title: Text(s.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          TextField(controller: baseUrl, decoration: const InputDecoration(labelText: 'Адрес API', helperText: 'эмулятор Android: http://10.0.2.2:8000')),
+          TextField(controller: baseUrl, decoration: InputDecoration(labelText: s.apiAddressLabel, helperText: s.apiAddressHelper)),
           const SizedBox(height: 8),
-          TextField(controller: region, decoration: const InputDecoration(labelText: 'Регион (КАТО, две цифры)')),
+          TextField(controller: region, decoration: InputDecoration(labelText: s.regionLabelHint)),
           const SizedBox(height: 8),
           SegmentedButton<String>(
             segments: const [ButtonSegment(value: 'ru', label: Text('RU')), ButtonSegment(value: 'kk', label: Text('KK'))],
             selected: {session.locale},
-            onSelectionChanged: (s) => session.update(locale: s.first),
+            onSelectionChanged: (v) => session.update(locale: v.first),
           ),
           const SizedBox(height: 16),
           FilledButton(
@@ -58,30 +60,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
               await session.update(baseUrl: baseUrl.text.trim(), region: region.text.trim());
               if (context.mounted) Navigator.of(context).pop();
             },
-            child: const Text('Сохранить'),
+            child: Text(s.saveButton),
           ),
           const Divider(height: 32),
-          Text('Вход через Keycloak', style: Theme.of(context).textTheme.titleMedium),
+          Text(s.keycloakLoginTitle, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           if (session.isKeycloak) ...[
-            Text('Вы вошли как ${session.actor} (роль: ${session.role}, регион: ${session.region})'),
+            Text(s.loggedInAs(session.actor ?? '', session.role, session.region)),
             const SizedBox(height: 8),
-            OutlinedButton(onPressed: () => session.logout(), child: const Text('Выйти (вернуться в демо-режим)')),
+            OutlinedButton(onPressed: () => session.logout(), child: Text(s.logoutButton)),
           ] else ...[
-            TextField(controller: keycloakUrl, decoration: const InputDecoration(labelText: 'Адрес Keycloak', helperText: 'эмулятор Android: http://10.0.2.2:8080')),
+            TextField(controller: keycloakUrl, decoration: InputDecoration(labelText: s.keycloakAddressLabel, helperText: s.keycloakAddressHelper)),
             const SizedBox(height: 8),
-            TextField(controller: username, decoration: const InputDecoration(labelText: 'Пользователь', helperText: 'демо: doctor1 / citizen1, пароль darumen')),
+            TextField(controller: username, decoration: InputDecoration(labelText: s.usernameLabel, helperText: s.usernameHelper)),
             const SizedBox(height: 8),
-            TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'Пароль')),
+            TextField(controller: password, obscureText: true, decoration: InputDecoration(labelText: s.passwordLabel)),
             const SizedBox(height: 8),
             FilledButton.tonal(
               onPressed: loggingIn ? null : _login,
-              child: loggingIn ? const Text('Вход…') : const Text('Войти'),
+              child: Text(loggingIn ? s.loggingInButton : s.loginButton),
             ),
             if (loginError != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(loginError!, style: const TextStyle(color: Colors.red, fontSize: 12))),
             const SizedBox(height: 8),
-            const Text('Без входа работает демо-режим с заголовками X-Actor/X-Role. После входа роль и регион берутся из токена (клиент darumen-mobile).',
-                style: TextStyle(fontSize: 12)),
+            Text(s.demoModeHint, style: const TextStyle(fontSize: 12)),
           ],
         ],
       ),

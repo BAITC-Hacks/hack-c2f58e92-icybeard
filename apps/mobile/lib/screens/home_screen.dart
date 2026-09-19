@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../l10n/strings.dart';
 import '../state/session.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -10,11 +11,14 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
+    final s = S.of(session.locale);
     final cards = <(String, String, String, IconData)>[
-      ('/wait', 'Сколько ждать', 'Ожидание плановой госпитализации по региону и профилю, где быстрее', Icons.hourglass_bottom),
-      ('/medicines', 'Проверка рецепта', 'Покрытие, сроки обеспечения, признаки дефицита', Icons.medication),
-      if (session.isDoctor) ('/worklist', 'Рабочий список', 'Пациенты на маршруте с приоритетами и флагами', Icons.list_alt),
-      if (session.isDoctor) ('/referral', 'Ассистент направления', 'Прогноз, альтернативы и запись решения', Icons.assignment),
+      ('/wait', s.waitTitle, s.waitSubtitle, Icons.hourglass_bottom),
+      ('/medicines', s.medicinesTitle, s.medicinesSubtitle, Icons.medication),
+      ('/vaccination', s.vaccinationTitle, s.vaccinationSubtitle, Icons.vaccines),
+      if (session.isDoctor) ('/worklist', s.worklistTitle, s.worklistSubtitle, Icons.list_alt),
+      if (session.isDoctor) ('/referral', s.referralTitle, s.referralSubtitle, Icons.assignment),
+      if (session.isDoctor) ('/decisions', s.decisionsTitle, s.decisionsSubtitle, Icons.history_edu),
     ];
     return Scaffold(
       appBar: AppBar(
@@ -25,15 +29,15 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'citizen', label: Text('Гражданин'), icon: Icon(Icons.person)),
-              ButtonSegment(value: 'doctor', label: Text('Врач'), icon: Icon(Icons.medical_services)),
+            segments: [
+              ButtonSegment(value: 'citizen', label: Text(s.roleCitizen), icon: const Icon(Icons.person)),
+              ButtonSegment(value: 'doctor', label: Text(s.roleDoctor), icon: const Icon(Icons.medical_services)),
             ],
             selected: {session.role},
-            onSelectionChanged: (s) => session.update(role: s.first),
+            onSelectionChanged: (v) => session.update(role: v.first),
           ),
           const SizedBox(height: 8),
-          Text('${Session.demoActors[session.role]} · демо-режим · регион ${session.region}', style: Theme.of(context).textTheme.bodySmall),
+          Text(s.demoStatus(Session.demoActors[session.role] ?? '', session.region), style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 8),
           for (final c in cards)
             Card(
@@ -46,7 +50,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 16),
-          Text('Данные МЗ РК, I квартал 2025. Без персональных данных.', style: Theme.of(context).textTheme.bodySmall),
+          Text(s.footerNote, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );

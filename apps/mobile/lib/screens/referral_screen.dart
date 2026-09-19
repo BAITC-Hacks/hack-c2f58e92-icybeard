@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../api/client.dart';
 import '../api/models.dart';
+import '../l10n/strings.dart';
 import '../state/session.dart';
 import '../widgets/common.dart';
 
@@ -85,6 +86,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
 
   Future<void> _record(String chosen) async {
     final session = context.read<Session>();
+    final s = S.of(session.locale);
     try {
       final id = await session.api.recordDecision({
         'subject': 'referral',
@@ -94,7 +96,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
         'reason': reason.text,
       }, DateTime.now().microsecondsSinceEpoch.toString());
       setState(() => recorded = id);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Решение записано: $id')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.snackRecorded(id))));
     } on ApiException catch (e) {
       setState(() => error = e);
     }
@@ -102,14 +104,15 @@ class _ReferralScreenState extends State<ReferralScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context.watch<Session>().locale);
     return Scaffold(
-      appBar: AppBar(title: const Text('Ассистент направления')),
+      appBar: AppBar(title: Text(s.referralTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           DropdownButtonFormField<String>(
             initialValue: profiles.any((p) => p.code == profile) ? profile : null,
-            decoration: const InputDecoration(labelText: 'Профиль койки'),
+            decoration: InputDecoration(labelText: s.profileLabel),
             isExpanded: true,
             items: [for (final p in profiles) DropdownMenuItem(value: p.code, child: Text(p.name, overflow: TextOverflow.ellipsis))],
             onChanged: (v) async {
@@ -120,48 +123,48 @@ class _ReferralScreenState extends State<ReferralScreen> {
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             initialValue: organizations.any((o) => o.moCode == moCode) ? moCode : null,
-            decoration: const InputDecoration(labelText: 'Организация'),
+            decoration: InputDecoration(labelText: s.organizationLabel),
             isExpanded: true,
             items: [for (final o in organizations) DropdownMenuItem(value: o.moCode, child: Text(o.name, overflow: TextOverflow.ellipsis))],
             onChanged: (v) => setState(() => moCode = v),
           ),
           const SizedBox(height: 8),
-          TextField(controller: icd, decoration: const InputDecoration(labelText: 'МКБ-10')),
+          TextField(controller: icd, decoration: InputDecoration(labelText: s.icdLabel)),
           const SizedBox(height: 12),
-          FilledButton.icon(onPressed: busy ? null : _predict, icon: const Icon(Icons.calculate), label: const Text('Рассчитать')),
+          FilledButton.icon(onPressed: busy ? null : _predict, icon: const Icon(Icons.calculate), label: Text(s.calculateButton)),
           ErrorBox(error: error),
           if (prediction != null) ...[
-            const SectionTitle('Прогноз'),
+            SectionTitle(s.forecastSection),
             Row(children: [
-              Expanded(child: KpiTile(value: days(prediction!.p50Days), label: 'медиана, дн.')),
+              Expanded(child: KpiTile(value: days(prediction!.p50Days), label: s.kpiMedianDays)),
               const SizedBox(width: 8),
-              Expanded(child: KpiTile(value: days(prediction!.p90Days), label: 'p90, дн.')),
+              Expanded(child: KpiTile(value: days(prediction!.p90Days), label: s.kpiP90Days)),
             ]),
             const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: KpiTile(value: pct(prediction!.pWithin30Days), label: 'за 30 дней')),
+              Expanded(child: KpiTile(value: pct(prediction!.pWithin30Days), label: s.kpiWithin30)),
               const SizedBox(width: 8),
-              Expanded(child: KpiTile(value: pct(prediction!.pRefusal), label: 'риск отказа')),
+              Expanded(child: KpiTile(value: pct(prediction!.pRefusal), label: s.flagRefusalRisk)),
             ]),
             if (prediction!.queue != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
-                child: Text('В очереди ${prediction!.queue!.len}, медианный возраст ${days(prediction!.queue!.ageP50)} дн., ${prediction!.queue!.throughputPerDay.toStringAsFixed(1)} госпитализаций в день.'),
+                child: Text(s.queueInfo(prediction!.queue!.len, days(prediction!.queue!.ageP50), prediction!.queue!.throughputPerDay.toStringAsFixed(1))),
               ),
             const SizedBox(height: 8),
             ExplanationCard(explanation: prediction!.explanation, model: prediction!.model),
-            const SectionTitle('Альтернативы в регионе'),
+            SectionTitle(s.alternativesSection),
             for (final a in alternatives)
               ListTile(
                 dense: true,
                 title: Text(a.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-                subtitle: Text('p50 ${days(a.p50Days)} · p90 ${days(a.p90Days)} · отказ ${pct(a.pRefusal)}'),
-                trailing: TextButton(onPressed: () => _record(a.moCode), child: const Text('Направить')),
+                subtitle: Text(s.altSubtitle(days(a.p50Days), days(a.p90Days), pct(a.pRefusal))),
+                trailing: TextButton(onPressed: () => _record(a.moCode), child: Text(s.referButton)),
               ),
-            TextField(controller: reason, decoration: const InputDecoration(labelText: 'Причина выбора (в журнал)')),
+            TextField(controller: reason, decoration: InputDecoration(labelText: s.reasonLabel)),
             const SizedBox(height: 8),
-            OutlinedButton.icon(onPressed: moCode == null ? null : () => _record(moCode!), icon: const Icon(Icons.check), label: const Text('Оставить в выбранной организации')),
-            if (recorded != null) Text('записано: $recorded', style: Theme.of(context).textTheme.bodySmall),
+            OutlinedButton.icon(onPressed: moCode == null ? null : () => _record(moCode!), icon: const Icon(Icons.check), label: Text(s.keepButton)),
+            if (recorded != null) Text(s.recordedLabel(recorded!), style: Theme.of(context).textTheme.bodySmall),
           ],
         ],
       ),

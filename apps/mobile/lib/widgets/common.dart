@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../api/client.dart';
 import '../api/models.dart';
+import '../l10n/strings.dart';
+import '../state/session.dart';
 
 String days(double? value) => value == null ? '—' : value.round().toString();
 String pct(double? value) => value == null ? '—' : '${(value * 100).round()} %';
@@ -35,7 +38,8 @@ class ErrorBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (error == null) return const SizedBox.shrink();
-    final text = error is ApiException ? error.toString() : 'Сервер недоступен: $error';
+    final s = S.of(context.watch<Session>().locale);
+    final text = error is ApiException ? error.toString() : s.serverUnavailable(error!);
     return Card(
       color: Theme.of(context).colorScheme.errorContainer,
       child: Padding(padding: const EdgeInsets.all(12), child: Text(text)),
@@ -51,13 +55,14 @@ class ExplanationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final s = S.of(context.watch<Session>().locale);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Почему так', style: theme.textTheme.titleMedium),
+            Text(s.whySo, style: theme.textTheme.titleMedium),
             const SizedBox(height: 4),
             Text(explanation.summary),
             const Divider(),
@@ -74,7 +79,7 @@ class ExplanationCard extends StatelessWidget {
                   ],
                 ),
               ),
-            if (model != null) Text('Модель ${model!.name} ${model!.version}, обучена по ${model!.trainedThrough}', style: theme.textTheme.bodySmall),
+            if (model != null) Text(s.modelTrained(model!.name, model!.version, model!.trainedThrough), style: theme.textTheme.bodySmall),
           ],
         ),
       ),

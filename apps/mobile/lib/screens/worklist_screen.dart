@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../api/models.dart';
+import '../l10n/strings.dart';
 import '../state/session.dart';
 import '../widgets/common.dart';
 
@@ -14,7 +15,6 @@ class WorklistScreen extends StatefulWidget {
 }
 
 class _WorklistScreenState extends State<WorklistScreen> {
-  static const flagLabels = {'stuck_over_30': '> 30 дней', 'refusal_risk': 'риск отказа', 'faster_alternative': 'есть быстрее'};
   List<WorklistItem> items = [];
   String? flag;
   Object? error;
@@ -39,8 +39,10 @@ class _WorklistScreenState extends State<WorklistScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context.watch<Session>().locale);
+    final flagLabels = {'stuck_over_30': s.flagOver30, 'refusal_risk': s.flagRefusalRisk, 'faster_alternative': s.flagFasterAlt};
     return Scaffold(
-      appBar: AppBar(title: const Text('Рабочий список')),
+      appBar: AppBar(title: Text(s.worklistTitle)),
       body: Column(
         children: [
           Padding(
@@ -48,15 +50,15 @@ class _WorklistScreenState extends State<WorklistScreen> {
             child: Wrap(
               spacing: 8,
               children: [
-                ChoiceChip(label: const Text('все'), selected: flag == null, onSelected: (_) => setState(() { flag = null; _load(); })),
+                ChoiceChip(label: Text(s.flagAll), selected: flag == null, onSelected: (_) => setState(() { flag = null; _load(); })),
                 for (final f in flagLabels.entries)
                   ChoiceChip(label: Text(f.value), selected: flag == f.key, onSelected: (_) => setState(() { flag = f.key; _load(); })),
               ],
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Text('Синтетические пациенты на реальных очередях региона, без персональных данных.', style: TextStyle(fontSize: 12)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(s.worklistCaption, style: const TextStyle(fontSize: 12)),
           ),
           ErrorBox(error: error),
           Expanded(
@@ -67,7 +69,7 @@ class _WorklistScreenState extends State<WorklistScreen> {
                 return Card(
                   margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   child: ListTile(
-                    title: Text('${item.patientRef} · ждёт ${item.daysWaiting} дн. · приоритет ${item.priority}'),
+                    title: Text(s.waitingHeadline(item.patientRef, item.daysWaiting, item.priority)),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

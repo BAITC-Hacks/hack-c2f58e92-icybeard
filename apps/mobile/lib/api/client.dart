@@ -108,4 +108,12 @@ class ApiClient {
 
   Future<CheckResponse> checkMedicine({String? mnnId, String? nosologyId, String? regionKato}) async =>
       CheckResponse.fromJson(await post('/api/v1/medicines/check', {'mnnId': mnnId, 'nosologyId': nosologyId, 'regionKato': regionKato}) as Map<String, dynamic>);
+
+  Future<List<VaccinationEstimate>> vaccination() async =>
+      ((await get('/api/v1/refdata/vaccination'))['items'] as List<dynamic>).map((v) => VaccinationEstimate.fromJson(v as Map<String, dynamic>)).toList();
+
+  Future<List<DecisionRecord>> myDecisions({int page = 1, int size = 50}) async =>
+      ((await get('/api/v1/journal/decisions', {'actor': 'me', 'page': '$page', 'size': '$size'}))['items'] as List<dynamic>)
+          .map((d) => DecisionRecord.fromJson(d as Map<String, dynamic>))
+          .toList();
 }

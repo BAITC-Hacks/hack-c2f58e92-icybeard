@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/models.dart';
+import '../l10n/strings.dart';
 import '../state/session.dart';
 import '../widgets/common.dart';
 
@@ -63,15 +64,16 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = S.of(context.watch<Session>().locale);
     return Scaffold(
-      appBar: AppBar(title: const Text('Проверка рецепта')),
+      appBar: AppBar(title: Text(s.medicinesTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           DropdownButtonFormField<String>(
             initialValue: nosologyId,
-            decoration: const InputDecoration(labelText: 'Нозология (по объёму рецептов)'),
-            items: [for (final n in nosologies) DropdownMenuItem(value: n.id, child: Text('Нозология ${n.id} · ${n.issued12m} рецептов/год'))],
+            decoration: InputDecoration(labelText: s.nosologyLabel),
+            items: [for (final n in nosologies) DropdownMenuItem(value: n.id, child: Text(s.nosologyItem(n.id, n.issued12m)))],
             onChanged: (v) async {
               setState(() => nosologyId = v);
               await _loadMnn();
@@ -80,36 +82,36 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             initialValue: mnns.any((m) => m.id == mnnId) ? mnnId : null,
-            decoration: const InputDecoration(labelText: 'МНН'),
-            items: [for (final m in mnns) DropdownMenuItem(value: m.id, child: Text('МНН ${m.id} · ${m.issued12m} рецептов/год'))],
+            decoration: InputDecoration(labelText: s.mnnLabel),
+            items: [for (final m in mnns) DropdownMenuItem(value: m.id, child: Text(s.mnnItem(m.id, m.issued12m)))],
             onChanged: (v) => setState(() => mnnId = v),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(onPressed: busy ? null : _check, icon: const Icon(Icons.check_circle), label: const Text('Проверить')),
+          FilledButton.icon(onPressed: busy ? null : _check, icon: const Icon(Icons.check_circle), label: Text(s.checkButton)),
           ErrorBox(error: error),
           if (result != null) ...[
-            const SectionTitle('Покрытие'),
+            SectionTitle(s.coverageSection),
             Chip(
-              label: Text(result!.covered ? 'покрыт программой${result!.program != null ? ' · ${result!.program}' : ''}' : 'активных спецификаций нет'),
+              label: Text(result!.covered ? s.coveredBy(result!.program) : s.notCovered),
               backgroundColor: result!.covered ? Colors.green.shade100 : Colors.orange.shade100,
             ),
-            const SectionTitle('Сроки обеспечения'),
+            SectionTitle(s.fillTimeSection),
             Row(children: [
-              Expanded(child: KpiTile(value: days(result!.fillDaysP50), label: 'медиана, дн.')),
+              Expanded(child: KpiTile(value: days(result!.fillDaysP50), label: s.kpiMedianDays)),
               const SizedBox(width: 8),
-              Expanded(child: KpiTile(value: days(result!.fillDaysP90), label: 'p90, дн.')),
+              Expanded(child: KpiTile(value: days(result!.fillDaysP90), label: s.kpiP90Days)),
               const SizedBox(width: 8),
-              Expanded(child: KpiTile(value: pct(result!.pFilled14d), label: 'за 14 дней')),
+              Expanded(child: KpiTile(value: pct(result!.pFilled14d), label: s.kpiWithin14)),
             ]),
             Text(result!.basis, style: Theme.of(context).textTheme.bodySmall),
-            const SectionTitle('Дефицит'),
+            SectionTitle(s.shortageSection),
             Chip(
-              label: Text(result!.shortage.flag ? 'признаки дефицита, балл ${result!.shortage.score}' : 'без признаков дефицита'),
+              label: Text(result!.shortage.flag ? s.shortageFlag(result!.shortage.score) : s.noShortage),
               backgroundColor: result!.shortage.flag ? Colors.red.shade100 : Colors.green.shade100,
             ),
             Text(result!.shortage.basis, style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 8),
-            Text('Аптеки рядом появятся после справочника аптек с координатами.', style: Theme.of(context).textTheme.bodySmall),
+            Text(s.pharmacyHint, style: Theme.of(context).textTheme.bodySmall),
           ],
         ],
       ),

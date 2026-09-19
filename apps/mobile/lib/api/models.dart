@@ -205,3 +205,41 @@ class Mnn {
   final int issued12m;
   factory Mnn.fromJson(Map<String, dynamic> json) => Mnn(id: json['mnnId'] as String, issued12m: (json['issued12m'] as num).toInt());
 }
+
+class VaccinationEstimate {
+  const VaccinationEstimate({required this.vaccine, required this.title, required this.year, required this.coveragePct, required this.source, this.note});
+  final String vaccine;
+  final String title;
+  final int year;
+  final double coveragePct;
+  final String source;
+  final String? note;
+  factory VaccinationEstimate.fromJson(Map<String, dynamic> json) => VaccinationEstimate(
+        vaccine: json['vaccine'] as String,
+        title: json['titleRu'] as String? ?? json['vaccine'] as String,
+        year: (json['year'] as num).toInt(),
+        coveragePct: (json['coveragePct'] as num).toDouble(),
+        source: json['source'] as String? ?? '',
+        note: json['note'] as String?,
+      );
+}
+
+class DecisionRecord {
+  const DecisionRecord({required this.decisionId, required this.subject, this.subjectId, this.recommendedMoCode, this.chosenMoCode, this.reason, required this.recordedAt});
+  final String decisionId;
+  final String subject;
+  final String? subjectId;
+  final String? recommendedMoCode;
+  final String? chosenMoCode;
+  final String? reason;
+  final String recordedAt;
+  factory DecisionRecord.fromJson(Map<String, dynamic> json) => DecisionRecord(
+        decisionId: json['decisionId'] as String,
+        subject: json['subject'] as String? ?? '',
+        subjectId: json['subjectId'] as String?,
+        recommendedMoCode: (json['recommended'] as Map<String, dynamic>?)?['moCode'] as String?,
+        chosenMoCode: (json['chosen'] as Map<String, dynamic>?)?['moCode'] as String?,
+        reason: json['reason'] as String?,
+        recordedAt: json['recordedAt'] as String? ?? '',
+      );
+}
