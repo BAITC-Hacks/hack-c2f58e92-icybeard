@@ -47,4 +47,8 @@ a { color: var(--darumen-accent); }
 .contribution.plus { color: #c92a2a; }
 .contribution.minus { color: #2b8a3e; }
 .footer { text-align: center; color: var(--darumen-muted); font-size: 0.8rem; padding: 16px; }
+.segment { padding: 4px 6px; border-radius: 6px; margin: 0 0 2px; transition: background-color 0.1s ease; }
+.segment-highlight { background: #e6f4f6; }
+mark.drug-hint { background: #fff3bf; padding: 0 2px; border-radius: 3px; }
+.qr-block img { border: 1px solid var(--darumen-border); border-radius: 8px; background: #fff; padding: 8px; }
 @media (max-width: 640px) { .map { height: 360px; } .chart { height: 260px; } }

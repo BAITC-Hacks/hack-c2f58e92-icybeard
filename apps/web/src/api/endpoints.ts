@@ -2,7 +2,7 @@ import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
-  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
+  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, WorklistItem,
 } from './types'
 
@@ -77,8 +77,10 @@ export const insight = {
 export const scribe = {
   health: () => api<ScribeHealth>('/api/v1/scribe/health'),
   createSession: (consent: boolean, language: string) => api<{ sessionId: string }>('/api/v1/scribe/sessions', { body: { consent, language } }),
-  uploadAudio: (sessionId: string, file: Blob, filename: string) => apiUpload<{ text: string }>(`/api/v1/scribe/sessions/${sessionId}/audio`, file, filename),
-  setTranscript: (sessionId: string, text: string) => api<unknown>(`/api/v1/scribe/sessions/${sessionId}/transcript`, { body: { text } }),
+  uploadAudio: (sessionId: string, file: Blob, filename: string) =>
+    apiUpload<ScribeTranscriptResponse>(`/api/v1/scribe/sessions/${sessionId}/audio`, file, filename),
+  setTranscript: (sessionId: string, text: string) =>
+    api<ScribeTranscriptResponse>(`/api/v1/scribe/sessions/${sessionId}/transcript`, { body: { text } }),
   draft: (sessionId: string) => api<ScribeDraft>(`/api/v1/scribe/sessions/${sessionId}/draft`, { method: 'POST', body: {} }),
   approve: (sessionId: string, sections: { name: string; text: string }[], patientLeaflet: string) =>
     api<{ leafletToken: string }>(`/api/v1/scribe/sessions/${sessionId}/approve`, { body: { sections, patientLeaflet } }),

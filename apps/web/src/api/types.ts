@@ -165,8 +165,10 @@ export interface InsightStatus { available: boolean; provider: string; model: st
 export interface AskResponse { answer: string; value: number | null; unit: string | null; chart: Chart | null; toolsUsed: string[]; sources: string[]; model: string }
 
 export interface ScribeHealth { status: string; transcriber: string; drafter: string }
+export interface ScribeSegment { t0: number; t1: number; text: string }
 export interface ScribeSection { name: string; text: string; spans?: { t0: number; t1: number }[] }
 export interface ScribeDraft { sections: ScribeSection[]; leaflet: string; model: string; patientLeaflet: { text: string } }
+export interface ScribeTranscriptResponse { transcript: ScribeSegment[]; text?: string; transcriber?: string }
 
 export interface Batch {
   batchId: string; dataset: string; status: string; rowsLoaded: number; rowsQuarantined: number

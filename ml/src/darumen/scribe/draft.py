@@ -74,10 +74,14 @@ class LlmDrafter:
     output is validated JSON, otherwise the rules take over. Nothing is sent without an API key."""
 
     PROMPT = (
-        "Ты помощник врача. Из стенограммы приёма составь черновик записи по разделам "
+        "Ты помощник врача. Стенограмма дана построчно, каждая строка начинается с индекса фрагмента в "
+        "квадратных скобках, например [0], [1]. Из стенограммы составь черновик записи по разделам "
         f"{', '.join(SECTIONS[:-1])} и короткую памятку пациенту простым языком. Ничего не выдумывай: "
-        "если раздела нет в стенограмме, оставь пустую строку. Ответь только JSON вида "
-        '{"sections": {"Жалобы": "...", "Анамнез": "...", "Осмотр": "...", "Диагноз": "...", "Назначения": "..."}, "leaflet": "..."}.'
+        "если раздела нет в стенограмме, оставь пустую строку и пустой список segments. Для каждого раздела "
+        "укажи индексы фрагментов стенограммы (segments), из которых взят текст раздела. Ответь только JSON вида "
+        '{"sections": {"Жалобы": {"text": "...", "segments": [0]}, "Анамнез": {"text": "...", "segments": []}, '
+        '"Осмотр": {"text": "...", "segments": []}, "Диагноз": {"text": "...", "segments": []}, '
+        '"Назначения": {"text": "...", "segments": []}}, "leaflet": "..."}.'
     )
     DEFAULTS: ClassVar[dict[str, tuple[str, str, str]]] = {
         "ollama": ("http://localhost:11434/v1", "darumen-qwen3.8:27b", "OLLAMA_API_KEY"),
@@ -100,13 +104,28 @@ class LlmDrafter:
     def available(self) -> bool:
         return bool(self._api_key)
 
+    @staticmethod
+    def _section(name: str, raw: object, segments: list[Segment]) -> Section:
+        """Строка (старый/сломанный формат ответа модели) -> раздел без ссылок; словарь {text, segments} ->
+        раздел со spans, индексы вне диапазона и не-числа отбрасываются, а не роняют весь черновик."""
+        if isinstance(raw, dict):
+            text = str(raw.get("text", "")).strip()
+            spans = []
+            for idx in raw.get("segments") or []:
+                if isinstance(idx, bool) or not isinstance(idx, int) or not (0 <= idx < len(segments)):
+                    continue
+                seg = segments[idx]
+                spans.append({"t0": seg.t0, "t1": seg.t1})
+            return Section(name, text, spans)
+        return Section(name, str(raw).strip())
+
     def draft(self, segments: list[Segment], language: str) -> Draft:
         if not self.available():
             return self._fallback.draft(segments, language)
         try:
             from openai import OpenAI
 
-            transcript = "\n".join(f"[{s.t0:.0f}-{s.t1:.0f}] {s.text}" for s in segments)
+            transcript = "\n".join(f"[{i}] [{s.t0:.0f}-{s.t1:.0f}] {s.text}" for i, s in enumerate(segments))
             client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=float(os.environ.get("DARUMEN_LLM_TIMEOUT", "180")), max_retries=0)
             system = self.PROMPT + ("\n/no_think" if self._provider == "ollama" else "")
             effort = os.environ.get("DARUMEN_LLM_REASONING", "none" if self._provider == "ollama" else "")
@@ -117,7 +136,7 @@ class LlmDrafter:
                 **({"extra_body": {"reasoning_effort": effort}} if effort else {}))
             content = self.THINK.sub("", completion.choices[0].message.content or "")
             payload = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
-            sections = [Section(name, str(payload["sections"].get(name, "")).strip()) for name in SECTIONS[:-1]]
+            sections = [self._section(name, payload["sections"].get(name, ""), segments) for name in SECTIONS[:-1]]
             return Draft([s for s in sections if s.text], str(payload["leaflet"]).strip(), self.name)
         except Exception:  # noqa: BLE001 - демо: любая ошибка модели означает черновик по правилам
             return self._fallback.draft(segments, language)
