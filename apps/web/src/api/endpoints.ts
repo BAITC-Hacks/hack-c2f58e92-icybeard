@@ -3,7 +3,7 @@ import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
   LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
-  SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, WorklistItem,
+  SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistItem,
 } from './types'
 
 export const queue = {
@@ -31,6 +31,8 @@ export const analytics = {
   quality: () => api<QualityReport>('/api/v1/quality'),
   los: (regionKato?: string, profileCode?: string) => api<LosResponse>('/api/v1/los', { query: { regionKato, profileCode } }),
   staffing: () => api<StaffingResponse>('/api/v1/staffing'),
+  vaccinationRefusals: () => api<VaccinationRefusalsResponse>('/api/v1/vaccination-refusals'),
+  oncologyLateStage: () => api<OncologyLateStageResponse>('/api/v1/oncology-late-stage'),
 }
 
 export const simulation = {

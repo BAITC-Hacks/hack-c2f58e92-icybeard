@@ -22,6 +22,15 @@ public static class AnalyticsEndpoints
         "и на 1 000 госпитализаций за последние 12 месяцев (gold.admissions_monthly); регионы отсортированы по возрастанию первого " +
         "показателя, наименее укомплектованные — первыми.";
 
+    private const string VacRefusalsMethod =
+        "Отказы от вакцинации и противопоказания (gold.vac_refusals_by_reason / _by_contraindication). В исходных данных нет " +
+        "колонки региона и нет организации, из которой регион можно было бы вывести, поэтому разбивка только общенациональная, " +
+        "по причине и отдельно по противопоказанию (это разные измерения одной строки, не вложенные друг в друга).";
+
+    private const string OncoLateMethod =
+        "Доля запущенных случаев (III и IV стадии) среди выявленных ЗН по локализациям (gold.onco_late) за последнюю дату " +
+        "загрузки. Источник — ЭРОБ, уже общенациональный агрегат по локализации, региона в нём нет и быть не может.";
+
     public static void Map(IEndpointRouteBuilder api)
     {
         api.MapGet("/streams", async (IAnalyticsRepository repository, CancellationToken ct) =>
@@ -132,6 +141,23 @@ public static class AnalyticsEndpoints
             })
             .WithTags("Index").WithName("AccessIndex").WithSummary("Индекс доступности плановой госпитализации по регионам")
             .Produces<IndexResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        api.MapGet("/vaccination-refusals", async (IAnalyticsRepository repository, CancellationToken ct) =>
+            {
+                var data = await repository.VaccinationRefusalsAsync(ct);
+                return Results.Ok(new VaccinationRefusalsResponseDto(data.ByReason, data.ByContraindication, VacRefusalsMethod));
+            })
+            .RequireAuthorization(Policies.Authenticated)
+            .WithTags("Quality").WithName("VaccinationRefusals")
+            .WithSummary("Отказы от вакцинации по причине и по противопоказанию, общенационально")
+            .Produces<VaccinationRefusalsResponseDto>();
+
+        api.MapGet("/oncology-late-stage", async (IAnalyticsRepository repository, CancellationToken ct) =>
+                Results.Ok(new OncologyLateStageResponseDto(await repository.OncologyLateStageAsync(ct), OncoLateMethod)))
+            .RequireAuthorization(Policies.Authenticated)
+            .WithTags("Quality").WithName("OncologyLateStage")
+            .WithSummary("Доля запущенных случаев (III/IV стадии) по локализациям, общенационально")
+            .Produces<OncologyLateStageResponseDto>();
     }
 
     /// <summary>entity[regionKato]=75 → region_kato: 75; ключи в snake_case тоже принимаются.</summary>

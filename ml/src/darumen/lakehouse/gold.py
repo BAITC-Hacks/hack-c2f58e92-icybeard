@@ -11,6 +11,8 @@
     drug_programs        active drug specifications per nosology, category and programme (needs silver.drug_specs)
     staffing_by_region   sum of staffing position rates per region, snapshot (needs silver.staffing)
     rx_mnn               MNN per nosology with volumes of the last 12 months of data (needs silver.rx_*)
+    vac_refusals_by_reason / _by_contraindication  nationwide vaccination-refusal breakdown (needs silver.vac_refusals; no region column in the source)
+    onco_late            advanced-stage (III/IV) share per localization, nationwide (needs silver.onco_late; already a country-level aggregate)
 
 Every builder is a pure function of silver + refdata and overwrites its table, so rebuilding is idempotent.
 """
@@ -312,6 +314,45 @@ def build_staffing_by_region(con: duckdb.DuckDBPyConnection, lake: Lakehouse, ou
         FROM {lake.silver_sql('staffing')} GROUP BY ALL ORDER BY 1""")
 
 
+def build_vac_refusals(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Path) -> int:
+    """5.8: структура отказов от вакцинации. У `vac_refusals` нет колонки региона и нет идентификатора
+    организации, из которого регион можно было бы вывести (contracts/vac_refusals.yaml: id, reason,
+    contraindication, vaccination_plan_code, sdu_load_date) — разбивка только общенациональная, по причине
+    и отдельно по противопоказанию (это разные, не вложенные друг в друга измерения одной строки)."""
+    if not _has_silver(lake, "vac_refusals"):
+        return 0
+    rows = _write(con, out, "vac_refusals_by_reason", f"""
+        SELECT coalesce(reason, '{UNKNOWN}') AS reason, count(*) AS n
+        FROM {lake.silver_sql('vac_refusals')} GROUP BY ALL ORDER BY n DESC""")
+    _write(con, out, "vac_refusals_by_contraindication", f"""
+        SELECT coalesce(contraindication, '{UNKNOWN}') AS contraindication, count(*) AS n
+        FROM {lake.silver_sql('vac_refusals')} GROUP BY ALL ORDER BY n DESC""")
+    return rows
+
+
+def build_onco_late(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Path) -> int:
+    """5.8: доля запущенных случаев (стадии III/IV) по локализациям. `onco_late` (contracts/onco_late.yaml)
+    уже общенациональный агрегат по локализации (`grain: одна локализация, агрегат по стране`), региона в нём
+    нет и быть не может — витрина почти проходная (типизация + доля), берём последнюю дату загрузки, если
+    в silver накопилось несколько снапшотов."""
+    if not _has_silver(lake, "onco_late"):
+        return 0
+    return _write(con, out, "onco_late", f"""
+        WITH latest AS (SELECT max(sdu_load_date) AS d FROM {lake.silver_sql('onco_late')})
+        SELECT localization_id, localization_name, icd_code,
+               total_patients::BIGINT AS total_patients,
+               advanced_stage_3_count::BIGINT AS advanced_stage_3_count, advanced_stage_3_pct::DOUBLE AS advanced_stage_3_pct,
+               advanced_stage_4_count::BIGINT AS advanced_stage_4_count, advanced_stage_4_pct::DOUBLE AS advanced_stage_4_pct,
+               (coalesce(advanced_stage_3_count, 0) + coalesce(advanced_stage_4_count, 0))::BIGINT AS advanced_total_count,
+               CASE WHEN total_patients > 0
+                    THEN (coalesce(advanced_stage_3_count, 0) + coalesce(advanced_stage_4_count, 0))::DOUBLE / total_patients
+               END AS advanced_share,
+               sdu_load_date::DATE AS snapshot_date
+        FROM {lake.silver_sql('onco_late')}, latest
+        WHERE sdu_load_date = latest.d
+        ORDER BY advanced_share DESC NULLS LAST""")
+
+
 def build_onco_monthly(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Path) -> int:
     """Впервые выявленные ЗН по месяцам и локализациям из расширенного реестра ЭРОБ.
     Реестр накопительный: полная помесячная интенсивность только с сентября 2024, более ранние
@@ -342,6 +383,8 @@ BUILDERS: dict[str, Callable[[duckdb.DuckDBPyConnection, Lakehouse, Path], int]]
     "admissions_monthly": build_admissions_monthly,
     "vac_monthly": build_vac_monthly,
     "onco_monthly": build_onco_monthly,
+    "vac_refusals": build_vac_refusals,
+    "onco_late": build_onco_late,
     "features_wait": build_features_wait,
     "rx_weekly": build_rx_weekly,
     "rx_nosology_monthly": build_rx_nosology_monthly,

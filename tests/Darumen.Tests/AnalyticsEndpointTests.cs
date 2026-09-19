@@ -134,6 +134,33 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Vaccination_refusals_are_grouped_nationwide_by_reason_and_contraindication()
+    {
+        // 5.8: vac_refusals не содержит региона — обе разбивки общенациональные
+        var body = await app.CreateClient("citizen").GetFromJsonAsync<VaccinationRefusalsResponseDto>("/api/v1/vaccination-refusals");
+        Assert.NotNull(body);
+        Assert.Equal(2, body.ByReason.Count);
+        Assert.Equal("родители отказались", body.ByReason[0].Reason);
+        Assert.Equal(120, body.ByReason[0].N);
+        Assert.Equal(2, body.ByContraindication.Count);
+        Assert.Contains(body.ByContraindication, c => c.Contraindication == "unknown");
+        Assert.Contains("общенациональная", body.Method);
+    }
+
+    [Fact]
+    public async Task Oncology_late_stage_share_is_reported_per_localization_nationwide()
+    {
+        // 5.8: onco_late уже общенациональный агрегат по локализации — региона в ответе нет
+        var body = await app.CreateClient("citizen").GetFromJsonAsync<OncologyLateStageResponseDto>("/api/v1/oncology-late-stage");
+        Assert.NotNull(body);
+        Assert.Equal(2, body.Items.Count);
+        var c50 = body.Items.Single(i => i.LocalizationId == "C50");
+        Assert.Equal(400, c50.AdvancedTotalCount);
+        Assert.Equal(0.4, c50.AdvancedShare);
+        Assert.Contains("общенациональный", body.Method);
+    }
+
+    [Fact]
     public async Task Index_defaults_to_latest_month_and_validates_month()
     {
         var client = app.CreateClient();

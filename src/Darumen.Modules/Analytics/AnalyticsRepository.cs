@@ -224,6 +224,55 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
         }
     }
 
+    public async Task<VacRefusalsDto> VaccinationRefusalsAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            // общенациональные разбивки: у vac_refusals нет колонки региона и нет организации, из которой
+            // регион можно было бы вывести — две отдельные таблицы (5.8), не джойн по строке
+            var byReason = await connection.QueryAsync<VacRefusalReasonDto>(new CommandDefinition(
+                "SELECT reason AS Reason, n::bigint AS N FROM gold.vac_refusals_by_reason ORDER BY n DESC",
+                cancellationToken: cancellationToken));
+            var byContraindication = await connection.QueryAsync<VacRefusalContraindicationDto>(new CommandDefinition(
+                "SELECT contraindication AS Contraindication, n::bigint AS N FROM gold.vac_refusals_by_contraindication ORDER BY n DESC",
+                cancellationToken: cancellationToken));
+            return new VacRefusalsDto(byReason.ToList(), byContraindication.ToList());
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            // витрина ещё не опубликована — страница /gov живёт без блока по вакцинации
+            return new VacRefusalsDto([], []);
+        }
+    }
+
+    public async Task<IReadOnlyList<OncoLateItemDto>> OncologyLateStageAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            // gold.onco_late уже общенациональный агрегат по локализации (grain контракта) — региона в источнике нет
+            var rows = await connection.QueryAsync<OncoLateItemDto>(new CommandDefinition(
+                """
+                SELECT localization_id AS LocalizationId, localization_name AS LocalizationName, icd_code AS IcdCode,
+                       total_patients::bigint AS TotalPatients,
+                       advanced_stage_3_count::bigint AS AdvancedStage3Count, advanced_stage_3_pct::float8 AS AdvancedStage3Pct,
+                       advanced_stage_4_count::bigint AS AdvancedStage4Count, advanced_stage_4_pct::float8 AS AdvancedStage4Pct,
+                       advanced_total_count::bigint AS AdvancedTotalCount, advanced_share::float8 AS AdvancedShare,
+                       snapshot_date AS SnapshotDate
+                FROM gold.onco_late
+                ORDER BY advanced_share DESC NULLS LAST
+                """,
+                cancellationToken: cancellationToken));
+            return rows.ToList();
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            // витрина ещё не опубликована — страница /gov живёт без блока по онкологии
+            return [];
+        }
+    }
+
     private sealed record SignalScopeRow(string? RegionKato);
 
     private sealed record StreamRow(string StreamId, string Title, string Grain, string EntityKeys, string Horizons);

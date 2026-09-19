@@ -111,6 +111,25 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
             new("10", "Область Абай", 12.5, 3.1, new DateOnly(2026, 5, 13)),
             new("75", "город Алматы", 18.2, null, new DateOnly(2026, 5, 13)), // регион без госпитализаций за 12 мес.
         ]);
+
+    // 5.8: общенациональные разбивки — vac_refusals не содержит региона
+    public Task<VacRefusalsDto> VaccinationRefusalsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(new VacRefusalsDto(
+            [
+                new("родители отказались", 120),
+                new("медотвод", 45),
+            ],
+            [
+                new("аллергия", 20),
+                new("unknown", 25),
+            ]));
+
+    public Task<IReadOnlyList<OncoLateItemDto>> OncologyLateStageAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<OncoLateItemDto>>(
+        [
+            new("C16", "Желудок", "C16", 400, 100, 0.25, 200, 0.5, 300, 0.75, new DateOnly(2026, 5, 1)),
+            new("C50", "Молочная железа", "C50", 1000, 250, 0.25, 150, 0.15, 400, 0.4, new DateOnly(2026, 5, 1)),
+        ]);
 }
 
 public sealed class InMemoryDecisions : IDecisionRepository

@@ -98,3 +98,75 @@ def test_staffing_by_region_sums_rates_per_region(tmp_path, synthetic_lake):
     assert abs(by_region["unknown"][0] - 1.0) < 1e-9   # P4, unresolved region ("unknown" is not a real KATO code,
                                                         # so the API's join against refdata.regions drops it naturally)
     assert by_region["10"][1].isoformat() == "2026-05-13"
+
+
+VAC_REFUSALS_HEADER = "id,reason,contraindication,vaccination_plan_code,sdu_load_date"
+
+
+def vac_refusal_row(row_id, reason, contraindication=""):
+    return f"{row_id},{reason},{contraindication},PLAN1,{LOAD}"
+
+
+def test_vac_refusals_are_grouped_nationwide_by_reason_and_by_contraindication(tmp_path, synthetic_lake):
+    # 5.8: у vac_refusals нет колонки региона и нет организации, из которой регион выводится — разбивка
+    # только общенациональная, отдельно по причине и отдельно по противопоказанию.
+    contracts = {c.dataset: c for c in load_contracts(CONTRACTS_DIR)}
+    lake = synthetic_lake
+    rows = [
+        vac_refusal_row("R1", "родители отказались", ""),
+        vac_refusal_row("R2", "родители отказались", ""),
+        vac_refusal_row("R3", "медотвод", "аллергия"),
+        vac_refusal_row("R4", "", ""),  # reason not filled: coalesced into "unknown" bucket
+    ]
+    path = tmp_path / "vac_refusals.csv"
+    path.write_text("﻿" + VAC_REFUSALS_HEADER + "\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    result = run_batch([path], contracts["vac_refusals"], lake)
+    assert result.status == "loaded"
+
+    counts = build_gold(lake)
+    assert counts["vac_refusals"] == 3  # by-reason table: "родители отказались", "медотвод", "unknown"
+
+    by_reason = dict(_q(lake, "vac_refusals_by_reason", "SELECT reason, n FROM {t}"))
+    assert by_reason["родители отказались"] == 2
+    assert by_reason["медотвод"] == 1
+    assert by_reason["unknown"] == 1
+
+    by_contra = dict(_q(lake, "vac_refusals_by_contraindication", "SELECT contraindication, n FROM {t}"))
+    assert by_contra["аллергия"] == 1
+    assert by_contra["unknown"] == 3
+
+
+ONCO_LATE_HEADER = ("localization_id,localization_name,icd_code,total_patients,advanced_stage_3_count,"
+                     "advanced_stage_3_pct,advanced_stage_4_count,advanced_stage_4_pct,sdu_load_date")
+
+
+def onco_late_row(loc_id, name, icd, total, stage3, stage4, load=LOAD):
+    stage3_pct = round(stage3 / total, 4) if total else 0
+    stage4_pct = round(stage4 / total, 4) if total else 0
+    return f"{loc_id},{name},{icd},{total},{stage3},{stage3_pct},{stage4},{stage4_pct},{load}"
+
+
+def test_onco_late_shares_are_nationwide_by_localization(tmp_path, synthetic_lake):
+    # 5.8: onco_late уже общенациональный агрегат по локализации (grain), региона в нём нет и быть не может —
+    # витрина считает долю запущенных случаев (III+IV стадии) и берёт последнюю дату загрузки.
+    contracts = {c.dataset: c for c in load_contracts(CONTRACTS_DIR)}
+    lake = synthetic_lake
+    older = "2026-01-10 00:00:00.000000"
+    rows = [
+        onco_late_row("C50", "Молочная железа", "C50", 1000, 200, 100, load=older),  # older snapshot: must not survive
+        onco_late_row("C50", "Молочная железа", "C50", 1000, 250, 150),
+        onco_late_row("C16", "Желудок", "C16", 400, 100, 200),
+    ]
+    path = tmp_path / "onco_late.csv"
+    path.write_text("﻿" + ONCO_LATE_HEADER + "\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    result = run_batch([path], contracts["onco_late"], lake)
+    assert result.status == "loaded"
+
+    counts = build_gold(lake)
+    assert counts["onco_late"] == 2  # one row per localization, latest snapshot only
+
+    rows = _q(lake, "onco_late", "SELECT localization_id, advanced_total_count, advanced_share, snapshot_date FROM {t} ORDER BY localization_id")
+    by_loc = {r[0]: r[1:] for r in rows}
+    assert by_loc["C50"][0] == 400 and abs(by_loc["C50"][1] - 0.4) < 1e-9   # only the newer snapshot counted
+    assert by_loc["C16"][0] == 300 and abs(by_loc["C16"][1] - 0.75) < 1e-9
+    assert by_loc["C50"][2].isoformat() == "2026-05-13"

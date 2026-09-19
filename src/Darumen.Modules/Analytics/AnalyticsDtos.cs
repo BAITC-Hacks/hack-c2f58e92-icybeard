@@ -58,3 +58,25 @@ public sealed record StaffingRegionDto(
     string RegionKato, string RegionName, double RatePer10kPopulation, double? RatePer1000Admissions, DateOnly SnapshotDate);
 
 public sealed record StaffingResponseDto(IReadOnlyList<StaffingRegionDto> Items, string Method);
+
+/// <summary>5.8: разбивка отказов от вакцинации. В `vac_refusals` нет колонки региона и нет организации,
+/// из которой регион выводился бы (contracts/vac_refusals.yaml) — разбивка только общенациональная,
+/// отдельно по причине отказа и отдельно по противопоказанию.</summary>
+public sealed record VacRefusalReasonDto(string Reason, long N);
+
+public sealed record VacRefusalContraindicationDto(string Contraindication, long N);
+
+public sealed record VacRefusalsDto(IReadOnlyList<VacRefusalReasonDto> ByReason, IReadOnlyList<VacRefusalContraindicationDto> ByContraindication);
+
+public sealed record VaccinationRefusalsResponseDto(
+    IReadOnlyList<VacRefusalReasonDto> ByReason, IReadOnlyList<VacRefusalContraindicationDto> ByContraindication, string Method);
+
+/// <summary>5.8: доля запущенных случаев (стадии III/IV) по локализациям из `gold.onco_late` — этот датасет
+/// уже общенациональный агрегат по локализации (grain), региона в нём нет и быть не может.
+/// AdvancedShare — null, если TotalPatients равен 0.</summary>
+public sealed record OncoLateItemDto(
+    string LocalizationId, string LocalizationName, string? IcdCode, long TotalPatients,
+    long AdvancedStage3Count, double? AdvancedStage3Pct, long AdvancedStage4Count, double? AdvancedStage4Pct,
+    long AdvancedTotalCount, double? AdvancedShare, DateOnly SnapshotDate);
+
+public sealed record OncologyLateStageResponseDto(IReadOnlyList<OncoLateItemDto> Items, string Method);

@@ -27,4 +27,12 @@ public interface IAnalyticsRepository
     /// <summary>5.2: ставки на 10 тыс. населения и на 1 000 госпитализаций по регионам, для сравнения на /gov;
     /// пусто, пока gold.staffing_by_region не опубликован.</summary>
     Task<IReadOnlyList<StaffingRegionDto>> StaffingByRegionAsync(CancellationToken cancellationToken);
+
+    /// <summary>5.8: отказы от вакцинации по причине и по противопоказанию, общенационально (нет региона в источнике);
+    /// пустые списки, пока gold.vac_refusals_by_reason/_by_contraindication не опубликованы.</summary>
+    Task<VacRefusalsDto> VaccinationRefusalsAsync(CancellationToken cancellationToken);
+
+    /// <summary>5.8: доля запущенных случаев (III/IV стадии) по локализациям, общенационально из gold.onco_late;
+    /// пусто, пока витрина не опубликована.</summary>
+    Task<IReadOnlyList<OncoLateItemDto>> OncologyLateStageAsync(CancellationToken cancellationToken);
 }

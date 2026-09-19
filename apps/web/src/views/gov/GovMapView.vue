@@ -9,7 +9,9 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, insight, queue } from '@/api/endpoints'
-import type { Anomaly, ForecastResponse, IndexResponse, OverloadedOrganization, StaffingRegion } from '@/api/types'
+import type {
+  Anomaly, ForecastResponse, IndexResponse, OncoLateItem, OverloadedOrganization, StaffingRegion, VacRefusalContraindication, VacRefusalReason,
+} from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import IndexTable from '@/components/IndexTable.vue'
@@ -97,6 +99,41 @@ async function loadStaffing() {
   }
 }
 
+/** 5.8: отказы от вакцинации — только общенационально, в vac_refusals нет региона. */
+const vacByReason = ref<VacRefusalReason[]>([])
+const vacByContraindication = ref<VacRefusalContraindication[]>([])
+const vacHint = ref<string | null>(null)
+
+async function loadVaccinationRefusals() {
+  vacByReason.value = []
+  vacByContraindication.value = []
+  vacHint.value = null
+  try {
+    const res = await analytics.vaccinationRefusals()
+    vacByReason.value = res.byReason
+    vacByContraindication.value = res.byContraindication
+    if (res.byReason.length === 0) vacHint.value = t('gov.map.vacRefusalsNotPublished')
+  } catch {
+    vacHint.value = t('gov.map.vacRefusalsNotPublished')
+  }
+}
+
+/** 5.8: доля запущенных случаев — только общенационально по локализации, onco_late уже агрегат по стране. */
+const oncoLate = ref<OncoLateItem[]>([])
+const oncoLateHint = ref<string | null>(null)
+
+async function loadOncoLate() {
+  oncoLate.value = []
+  oncoLateHint.value = null
+  try {
+    const res = await analytics.oncologyLateStage()
+    oncoLate.value = res.items
+    if (res.items.length === 0) oncoLateHint.value = t('gov.map.oncoLateNotPublished')
+  } catch {
+    oncoLateHint.value = t('gov.map.oncoLateNotPublished')
+  }
+}
+
 const downloading = ref(false)
 
 /** Отчёт по индексу за выбранный месяц и профиль — PDF или Excel. */
@@ -136,6 +173,8 @@ onMounted(async () => {
   await load()
   await loadOnco()
   await loadStaffing()
+  await loadVaccinationRefusals()
+  await loadOncoLate()
 })
 watch([month, profile], load)
 </script>
@@ -218,6 +257,42 @@ watch([month, profile], load)
       <p v-if="staffing.length" class="muted" style="margin-top: 8px">
         {{ t('gov.map.staffingSnapshot') }} {{ staffing[0].snapshotDate }}
       </p>
+    </div>
+    <div class="grid cols-2" style="margin-top: 16px">
+      <div class="card">
+        <h2>{{ t('gov.map.vacRefusalsTitle') }} <OriginTag kind="formula" /></h2>
+        <p class="muted" style="margin-top: -4px">{{ t('gov.map.vacRefusalsNationwide') }}</p>
+        <DataTable v-if="vacByReason.length" :value="vacByReason" size="small" scrollable scroll-height="260px">
+          <Column field="reason" :header="t('gov.map.vacReason')" />
+          <Column field="n" :header="t('common.count')" style="width: 8rem" />
+        </DataTable>
+        <p v-else class="muted">{{ vacHint }}</p>
+        <template v-if="vacByContraindication.length">
+          <h3 style="margin-top: 12px">{{ t('gov.map.vacContraindication') }}</h3>
+          <DataTable :value="vacByContraindication" size="small" scrollable scroll-height="200px">
+            <Column field="contraindication" :header="t('gov.map.vacContraindication')" />
+            <Column field="n" :header="t('common.count')" style="width: 8rem" />
+          </DataTable>
+        </template>
+      </div>
+      <div class="card">
+        <h2>{{ t('gov.map.oncoLateTitle') }} <OriginTag kind="formula" /></h2>
+        <p class="muted" style="margin-top: -4px">{{ t('gov.map.oncoLateNationwide') }}</p>
+        <DataTable v-if="oncoLate.length" :value="oncoLate" size="small" scrollable scroll-height="420px">
+          <Column field="localizationName" :header="t('gov.map.oncoLateLocalization')" />
+          <Column :header="t('gov.map.oncoLateShare')" style="width: 10rem">
+            <template #body="{ data }">
+              <span v-if="data.advancedShare !== null">{{ num(data.advancedShare * 100, 1) }} %</span>
+              <span v-else class="muted">—</span>
+            </template>
+          </Column>
+          <Column field="advancedTotalCount" :header="t('gov.map.oncoLateCount')" style="width: 8rem" />
+        </DataTable>
+        <p v-else class="muted">{{ oncoLateHint }}</p>
+        <p v-if="oncoLate.length" class="muted" style="margin-top: 8px">
+          {{ t('gov.map.staffingSnapshot') }} {{ oncoLate[0].snapshotDate }}
+        </p>
+      </div>
     </div>
   </main>
 </template>

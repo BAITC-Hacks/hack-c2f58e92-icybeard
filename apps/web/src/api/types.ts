@@ -68,6 +68,31 @@ export interface StaffingRegion {
 }
 export interface StaffingResponse { items: StaffingRegion[]; method: string }
 
+/** 5.8: отказ от вакцинации по причине/противопоказанию, только общенационально — в vac_refusals нет региона. */
+export interface VacRefusalReason { reason: string; n: number }
+export interface VacRefusalContraindication { contraindication: string; n: number }
+export interface VaccinationRefusalsResponse {
+  byReason: VacRefusalReason[]
+  byContraindication: VacRefusalContraindication[]
+  method: string
+}
+
+/** 5.8: доля запущенных случаев (III/IV стадии) по локализации, только общенационально из gold.onco_late. */
+export interface OncoLateItem {
+  localizationId: string
+  localizationName: string
+  icdCode: string | null
+  totalPatients: number
+  advancedStage3Count: number
+  advancedStage3Pct: number | null
+  advancedStage4Count: number
+  advancedStage4Pct: number | null
+  advancedTotalCount: number
+  advancedShare: number | null
+  snapshotDate: string
+}
+export interface OncologyLateStageResponse { items: OncoLateItem[]; method: string }
+
 /** Срез ошибки wait-модели по региону или профилю из отчёта обучения. */
 export interface QualityBreakdownRow {
   region_kato?: string; profile_code?: string; n: number
