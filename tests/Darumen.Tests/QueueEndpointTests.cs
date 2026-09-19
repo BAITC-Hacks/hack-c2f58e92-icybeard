@@ -175,5 +175,21 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
         Assert.Null(body.Items[1].Load); // throughput_per_day = 0 при живом потоке — перегрузка без числового значения
     }
 
+    [Fact]
+    public async Task Chief_cannot_see_overloaded_organizations_of_another_region_via_query_param()
+    {
+        // 5.3: клейм region_kato сильнее параметра запроса — главврач региона 75 не увидит организацию региона 10,
+        // даже прямо запросив её регион
+        var client = app.CreateClient("chief", "chief-75", "75");
+        var body = await client.GetFromJsonAsync<ItemsDto<OverloadedOrganizationDto>>("/api/v1/queue/overloaded?regionKato=10&profileCode=381");
+        Assert.Equal(2, body!.Items.Count);
+        Assert.All(body.Items, i => Assert.Equal("75", i.RegionKato));
+
+        var regulator = app.CreateClient("regulator");
+        var forOtherRegion = await regulator.GetFromJsonAsync<ItemsDto<OverloadedOrganizationDto>>("/api/v1/queue/overloaded?regionKato=10&profileCode=381");
+        Assert.Single(forOtherRegion!.Items); // регулятор не ограничен регионом — видит запрошенный регион как есть
+        Assert.Equal("11XY", forOtherRegion.Items[0].MoCode);
+    }
+
     private sealed record ItemsDto<T>(IReadOnlyList<T> Items);
 }

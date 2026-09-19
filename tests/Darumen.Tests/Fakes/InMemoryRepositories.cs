@@ -23,6 +23,7 @@ public sealed class InMemoryQueueStates : IQueueStateRepository
         {
             new("028B", "Казахский ордена институт глазных болезней", "75", "381", 3.5, 1784, 130, 0.32),
             new("22GN", "Городская больница №2", "75", "381", null, 12, 8, 0.02), // throughput_per_day = 0 при живом потоке
+            new("11XY", "Больница региона 10", "10", "381", 2.0, 40, 20, 0.05), // 5.3: другой регион — для проверки, что главврач его не видит
         }.Where(o => (regionKato is null || o.RegionKato == regionKato) && (profileCode is null || o.ProfileCode == profileCode)).Take(limit).ToList());
 }
 

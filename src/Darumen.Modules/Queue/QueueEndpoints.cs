@@ -1,5 +1,6 @@
 using Darumen.Shared.Api;
 using Darumen.Shared.Auth;
+using static Darumen.Shared.Auth.RegionAccess;
 
 namespace Darumen.Modules.Queue;
 
@@ -44,8 +45,12 @@ public static class QueueEndpoints
             .Produces<OrganizationSeriesDto>()
             .Produces(StatusCodes.Status404NotFound);
 
-        group.MapGet("/overloaded", async (string? regionKato, string? profileCode, int? limit, IQueueStateRepository repository, CancellationToken ct) =>
-                Results.Ok(new { items = await repository.OverloadedAsync(regionKato, profileCode, Math.Clamp(limit ?? DefaultOverloadedLimit, 1, MaxOverloadedLimit), ct) }))
+        group.MapGet("/overloaded", async (string? regionKato, string? profileCode, int? limit, HttpContext http, IQueueStateRepository repository, CancellationToken ct) =>
+            {
+                // главврач видит перегруженные организации только своего региона: клейм region_kato сильнее параметра запроса
+                regionKato = RegionScope(CurrentUser.From(http)) ?? regionKato;
+                return Results.Ok(new { items = await repository.OverloadedAsync(regionKato, profileCode, Math.Clamp(limit ?? DefaultOverloadedLimit, 1, MaxOverloadedLimit), ct) });
+            })
             .RequireAuthorization(Policies.ChiefOrRegulator)
             .WithName("QueueOverloaded")
             .WithSummary("Организации с нагрузкой (поток / госпитализации) больше 1, самые загруженные — первыми");

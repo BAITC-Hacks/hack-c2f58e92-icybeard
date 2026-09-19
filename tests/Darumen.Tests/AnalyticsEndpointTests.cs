@@ -29,6 +29,17 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Chief_forecast_is_scoped_to_own_region_even_when_entity_asks_for_another()
+    {
+        // 5.3: клейм region_kato сильнее entity[regionKato] — главврач региона 10 не может спрогнозировать регион 75
+        var body = await app.CreateClient("chief", "chief-10", "10")
+            .GetFromJsonAsync<ForecastResponseDto>("/api/v1/forecast/admissions_monthly?entity[regionKato]=75&entity[profileCode]=381&horizon=3");
+        Assert.NotNull(body);
+        Assert.Equal("10", body.Entity["region_kato"]);
+        Assert.Equal("10", app.Forecast.LastRequest!.Entity["region_kato"]);
+    }
+
+    [Fact]
     public async Task Forecast_unknown_stream_is_404_and_missing_key_is_422()
     {
         var client = app.CreateClient("regulator");

@@ -2,6 +2,7 @@ using Darumen.Contracts.V1;
 using Darumen.Shared.Api;
 using Darumen.Shared.Auth;
 using Darumen.Shared.Messaging;
+using static Darumen.Shared.Auth.RegionAccess;
 
 namespace Darumen.Modules.Analytics;
 
@@ -29,7 +30,18 @@ public static class AnalyticsEndpoints
             .WithTags("Forecast").WithName("Streams").WithSummary("Каталог зарегистрированных потоков");
 
         api.MapGet("/forecast/{streamId}", async (string streamId, int? horizon, HttpRequest http, ForecastService service, CancellationToken ct) =>
-                await service.ForecastAsync(streamId, ParseEntity(http.Query), horizon ?? 0, ct))
+            {
+                // главврач прогнозирует только свой регион: клейм region_kato сильнее entity[regionKato] в запросе,
+                // если сущность вообще ключуется по региону (у некоторых потоков ключ — localization/mo_key, не регион)
+                var entity = new Dictionary<string, string>(ParseEntity(http.Query));
+                var scope = RegionScope(CurrentUser.From(http));
+                if (scope is not null && entity.ContainsKey("region_kato"))
+                {
+                    entity["region_kato"] = scope;
+                }
+
+                return await service.ForecastAsync(streamId, entity, horizon ?? 0, ct);
+            })
             .RequireAuthorization(Policies.ChiefOrRegulator)
             .WithTags("Forecast").WithName("Forecast").WithSummary("Прогноз потока для сущности: entity[regionKato]=75&entity[profileCode]=381")
             .Produces<ForecastResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity).ProducesProblem(StatusCodes.Status404NotFound);
@@ -121,10 +133,6 @@ public static class AnalyticsEndpoints
             .WithTags("Index").WithName("AccessIndex").WithSummary("Индекс доступности плановой госпитализации по регионам")
             .Produces<IndexResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }
-
-    /// <summary>Регион, которым ограничен пользователь: главврач работает только со своим регионом из клейма region_kato.</summary>
-    internal static string? RegionScope(CurrentUser user) =>
-        user.Role == Roles.Chief && !string.IsNullOrWhiteSpace(user.RegionKato) ? user.RegionKato : null;
 
     /// <summary>entity[regionKato]=75 → region_kato: 75; ключи в snake_case тоже принимаются.</summary>
     internal static IReadOnlyDictionary<string, string> ParseEntity(IQueryCollection query)
