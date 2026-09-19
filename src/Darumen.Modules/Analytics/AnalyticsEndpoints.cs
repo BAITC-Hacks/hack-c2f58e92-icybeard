@@ -47,7 +47,7 @@ public static class AnalyticsEndpoints
                 // главврач прогнозирует только свой регион: клейм region_kato сильнее entity[regionKato] в запросе,
                 // если сущность вообще ключуется по региону (у некоторых потоков ключ — localization/mo_key, не регион)
                 var entity = new Dictionary<string, string>(ParseEntity(http.Query));
-                var scope = RegionScope(CurrentUser.From(http));
+                var scope = RegionScope(CurrentUser.From(http.HttpContext));
                 if (scope is not null && entity.ContainsKey("region_kato"))
                 {
                     entity["region_kato"] = scope;
