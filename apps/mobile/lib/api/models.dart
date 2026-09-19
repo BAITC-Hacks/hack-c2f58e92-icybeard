@@ -243,3 +243,43 @@ class DecisionRecord {
         recordedAt: json['recordedAt'] as String? ?? '',
       );
 }
+
+class ScribeSession {
+  const ScribeSession({required this.sessionId});
+  final String sessionId;
+  factory ScribeSession.fromJson(Map<String, dynamic> json) => ScribeSession(sessionId: json['sessionId'] as String);
+}
+
+class TranscriptSegment {
+  const TranscriptSegment({required this.t0, required this.t1, required this.text});
+  final double t0;
+  final double t1;
+  final String text;
+  factory TranscriptSegment.fromJson(Map<String, dynamic> json) =>
+      TranscriptSegment(t0: (json['t0'] as num).toDouble(), t1: (json['t1'] as num).toDouble(), text: json['text'] as String);
+}
+
+class DraftSection {
+  const DraftSection({required this.name, required this.text});
+  final String name;
+  final String text;
+  factory DraftSection.fromJson(Map<String, dynamic> json) => DraftSection(name: json['name'] as String, text: json['text'] as String? ?? '');
+}
+
+class ScribeDraft {
+  const ScribeDraft({required this.sections, required this.leaflet});
+  final List<DraftSection> sections;
+  final String leaflet;
+  factory ScribeDraft.fromJson(Map<String, dynamic> json) => ScribeDraft(
+        sections: (json['sections'] as List<dynamic>? ?? []).map((s) => DraftSection.fromJson(s as Map<String, dynamic>)).toList(),
+        leaflet: json['leaflet'] as String? ?? '',
+      );
+}
+
+class ApproveResult {
+  const ApproveResult({required this.leafletToken, required this.leafletUrl});
+  final String leafletToken;
+  final String leafletUrl;
+  factory ApproveResult.fromJson(Map<String, dynamic> json) =>
+      ApproveResult(leafletToken: json['leafletToken'] as String, leafletUrl: json['leafletUrl'] as String);
+}

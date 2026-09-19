@@ -131,4 +131,49 @@ class S {
       _t('рекомендовано ${recommended ?? '—'} → выбрано ${chosen ?? '—'}', 'ұсынылды ${recommended ?? '—'} → таңдалды ${chosen ?? '—'}');
   String get emptyDecisions => _t('Решений пока нет.', 'Шешімдер әлі жоқ.');
   String reasonPrefix(String reason) => _t('Причина: $reason', 'Себебі: $reason');
+
+  // ---------- скрайб ----------
+  String get scribeTitle => 'AI-скрайб';
+  String get scribeSubtitle => _t('Запись приёма, черновик и утверждение', 'Қабылдауды жазу, жоба және бекіту');
+  String get scribeConsentLabel => _t('Пациент дал согласие на запись', 'Науқас жазуға келісім берді');
+  String get scribeStartButton => _t('Начать сессию', 'Сеансты бастау');
+  String get scribeNoAudioCaption => _t(
+        'Надиктуйте или вставьте текст консультации — запись голосом пока не поддерживается в мобильном приложении.',
+        'Қабылдау мәтінін теріңіз немесе қойыңыз — мобильді қосымшада дауыспен жазу әзірге қолдау таппайды.',
+      );
+  String get scribeTranscriptLabel => 'Стенограмма';
+  String get scribeTranscriptFieldLabel => _t('Текст консультации', 'Қабылдау мәтіні');
+  String get scribeMakeDraftButton => _t('Составить черновик', 'Жоба жасау');
+  String get scribeDraftReviewCaption => _t(
+        'Черновик сгенерирован из стенограммы. Проверьте и при необходимости отредактируйте текст перед утверждением.',
+        'Жоба стенограммадан жасалды. Бекітпес бұрын мәтінді тексеріп, қажет болса түзетіңіз.',
+      );
+  String get scribeLeafletLabel => _t('Памятка пациенту', 'Науқасқа естелік');
+  String get scribeApproveButton => _t('Утвердить и выдать памятку', 'Бекіту және естелік беру');
+  String get scribeDiscardButton => _t('Отменить и начать заново', 'Бас тарту және қайта бастау');
+  String get scribeApprovedTitle => _t('Приём утверждён', 'Қабылдау бекітілді');
+  String get scribeLeafletTokenLabel => _t('Токен памятки', 'Естелік токені');
+  String get scribeLeafletUrlLabel => _t('Ссылка на памятку', 'Естелікке сілтеме');
+  String get scribeAudioDeletedNote => _t(
+        'Аудио удалено сервером (в этом сеансе аудио не записывалось — использован текстовый ввод).',
+        'Аудио сервер тарапынан жойылды (бұл сеансте аудио жазылмады — мәтіндік енгізу пайдаланылды).',
+      );
+  String get scribeNoQrNote => _t(
+        'QR-код памятки пока не генерируется в мобильном приложении — используйте ссылку выше.',
+        'Естелік QR-коды мобильді қосымшада әзірге жасалмайды — жоғарыдағы сілтемені пайдаланыңыз.',
+      );
+  String get scribeNewSessionButton => _t('Новая сессия', 'Жаңа сеанс');
+  String scribeSectionLabel(String name) {
+    if (_locale != 'kk') return name;
+    const map = {
+      'Жалобы': 'Шағымдар',
+      'Анамнез': 'Анамнез',
+      'Осмотр': 'Тексеру',
+      'Диагноз': 'Диагноз',
+      'Назначения': 'Тағайындаулар',
+      'Прочее': 'Басқа',
+    };
+    return map[name] ?? name;
+  }
 }
+

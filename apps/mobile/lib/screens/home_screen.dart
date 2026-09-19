@@ -19,6 +19,7 @@ class HomeScreen extends StatelessWidget {
       if (session.isDoctor) ('/worklist', s.worklistTitle, s.worklistSubtitle, Icons.list_alt),
       if (session.isDoctor) ('/referral', s.referralTitle, s.referralSubtitle, Icons.assignment),
       if (session.isDoctor) ('/decisions', s.decisionsTitle, s.decisionsSubtitle, Icons.history_edu),
+      if (session.isDoctor) ('/scribe', s.scribeTitle, s.scribeSubtitle, Icons.edit_note),
     ];
     return Scaffold(
       appBar: AppBar(

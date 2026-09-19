@@ -57,6 +57,8 @@ class ApiClient {
   Future<dynamic> post(String path, Object body, {Map<String, String>? headers}) async =>
       _decode(await _http.post(_uri(path), headers: {..._headers(await _bearer()), ...?headers}, body: jsonEncode(body)));
 
+  Future<dynamic> delete(String path) async => _decode(await _http.delete(_uri(path), headers: _headers(await _bearer())));
+
   dynamic _decode(http.Response response) {
     final text = utf8.decode(response.bodyBytes);
     final body = text.isEmpty ? null : jsonDecode(text);
@@ -116,4 +118,22 @@ class ApiClient {
       ((await get('/api/v1/journal/decisions', {'actor': 'me', 'page': '$page', 'size': '$size'}))['items'] as List<dynamic>)
           .map((d) => DecisionRecord.fromJson(d as Map<String, dynamic>))
           .toList();
+
+  Future<ScribeSession> createScribeSession(String language) async =>
+      ScribeSession.fromJson(await post('/api/v1/scribe/sessions', {'consent': true, 'language': language}) as Map<String, dynamic>);
+
+  Future<List<TranscriptSegment>> setTranscript(String sessionId, String text) async =>
+      ((await post('/api/v1/scribe/sessions/$sessionId/transcript', {'text': text}))['transcript'] as List<dynamic>)
+          .map((t) => TranscriptSegment.fromJson(t as Map<String, dynamic>))
+          .toList();
+
+  Future<ScribeDraft> makeDraft(String sessionId) async =>
+      ScribeDraft.fromJson(await post('/api/v1/scribe/sessions/$sessionId/draft', {}) as Map<String, dynamic>);
+
+  Future<ApproveResult> approveScribe(String sessionId, List<DraftSection> sections, String leaflet) async => ApproveResult.fromJson(await post(
+    '/api/v1/scribe/sessions/$sessionId/approve',
+    {'sections': [for (final s in sections) {'name': s.name, 'text': s.text}], 'patientLeaflet': leaflet},
+  ) as Map<String, dynamic>);
+
+  Future<void> discardScribe(String sessionId) async => await delete('/api/v1/scribe/sessions/$sessionId');
 }
