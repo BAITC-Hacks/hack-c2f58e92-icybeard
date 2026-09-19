@@ -84,7 +84,7 @@ public sealed class MedicinesService(IMedicinesRepository repository)
         var peerRatio = peer?.Ratio;
         var peerBasis = peer is null
             ? null
-            : $"обеспечено {peer.Ratio:P0} выписанных за последние 12 мес. у {peer.PeerMnnCount} МНН той же категории (без этого МНН)";
+            : $"обеспечено {peer.Ratio:P0} выписанных за последние 12 мес. у {peer.PeerMnnCount} похожих МНН той же категории (без этого МНН)";
         var peerFlag = ratioRecent is not null && peerRatio is > 0 && ratioRecent.Value / peerRatio.Value < 1 - PeerShortageThreshold;
         var peerScore = peerFlag ? Math.Clamp(1 - ratioRecent!.Value / peerRatio!.Value, 0, 1) : 0;
 
