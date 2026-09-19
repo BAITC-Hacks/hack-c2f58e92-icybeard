@@ -80,3 +80,12 @@ public sealed record OncoLateItemDto(
     long AdvancedTotalCount, double? AdvancedShare, DateOnly SnapshotDate);
 
 public sealed record OncologyLateStageResponseDto(IReadOnlyList<OncoLateItemDto> Items, string Method);
+
+/// <summary>5.10: число единиц активной медтехники по региону из gold.equipment_by_region (join с refdata.regions
+/// только за именем — region_kato "unknown" в ответе тоже возможен, если mo_code не резолвится в mo_registry).</summary>
+public sealed record EquipmentRegionDto(string RegionKato, string RegionName, long Units);
+
+public sealed record EquipmentResponseDto(IReadOnlyList<EquipmentRegionDto> Items, string Method);
+
+/// <summary>5.10: число единиц активной медтехники организации, для кабинета организации.</summary>
+public sealed record EquipmentOrganizationDto(string MoCode, long Units);

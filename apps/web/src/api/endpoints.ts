@@ -1,6 +1,6 @@
 import { api, apiDownload, apiUpload } from './client'
 import type {
-  AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, ForecastResponse, IndexResponse,
+  AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, EquipmentOrganization, EquipmentResponse, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
   LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistItem,
@@ -33,6 +33,8 @@ export const analytics = {
   staffing: () => api<StaffingResponse>('/api/v1/staffing'),
   vaccinationRefusals: () => api<VaccinationRefusalsResponse>('/api/v1/vaccination-refusals'),
   oncologyLateStage: () => api<OncologyLateStageResponse>('/api/v1/oncology-late-stage'),
+  equipment: () => api<EquipmentResponse>('/api/v1/equipment'),
+  equipmentForOrganization: (moCode: string) => api<EquipmentOrganization>(`/api/v1/equipment/organizations/${encodeURIComponent(moCode)}`),
 }
 
 export const simulation = {

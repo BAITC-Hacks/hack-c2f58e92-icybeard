@@ -130,6 +130,17 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
             new("C16", "Желудок", "C16", 400, 100, 0.25, 200, 0.5, 300, 0.75, new DateOnly(2026, 5, 1)),
             new("C50", "Молочная железа", "C50", 1000, 250, 0.25, 150, 0.15, 400, 0.4, new DateOnly(2026, 5, 1)),
         ]);
+
+    // 5.10: gold.equipment_by_region / _by_organization - число единиц активной медтехники
+    public Task<IReadOnlyList<EquipmentRegionDto>> EquipmentByRegionAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<EquipmentRegionDto>>(
+        [
+            new("75", "город Алматы", 340),
+            new("10", "Область Абай", 120),
+        ]);
+
+    public Task<long> EquipmentForOrganizationAsync(string moCode, CancellationToken cancellationToken) =>
+        Task.FromResult(moCode == "028B" ? 42L : 0L);
 }
 
 public sealed class InMemoryDecisions : IDecisionRepository

@@ -31,6 +31,10 @@ public static class AnalyticsEndpoints
         "Доля запущенных случаев (III и IV стадии) среди выявленных ЗН по локализациям (gold.onco_late) за последнюю дату " +
         "загрузки. Источник — ЭРОБ, уже общенациональный агрегат по локализации, региона в нём нет и быть не может.";
 
+    private const string EquipmentMethod =
+        "Число единиц активной медицинской техники по регионам (gold.equipment_by_region): сумма quantity (пустое значение " +
+        "считается за одну единицу) по строкам без даты списания. Регионы отсортированы по убыванию числа единиц.";
+
     public static void Map(IEndpointRouteBuilder api)
     {
         api.MapGet("/streams", async (IAnalyticsRepository repository, CancellationToken ct) =>
@@ -158,6 +162,20 @@ public static class AnalyticsEndpoints
             .WithTags("Quality").WithName("OncologyLateStage")
             .WithSummary("Доля запущенных случаев (III/IV стадии) по локализациям, общенационально")
             .Produces<OncologyLateStageResponseDto>();
+
+        api.MapGet("/equipment", async (IAnalyticsRepository repository, CancellationToken ct) =>
+                Results.Ok(new EquipmentResponseDto(await repository.EquipmentByRegionAsync(ct), EquipmentMethod)))
+            .RequireAuthorization(Policies.Authenticated)
+            .WithTags("Quality").WithName("EquipmentByRegion")
+            .WithSummary("Число единиц активной медтехники по регионам, для сравнения на /gov")
+            .Produces<EquipmentResponseDto>();
+
+        api.MapGet("/equipment/organizations/{moCode}", async (string moCode, IAnalyticsRepository repository, CancellationToken ct) =>
+                Results.Ok(new EquipmentOrganizationDto(moCode, await repository.EquipmentForOrganizationAsync(moCode, ct))))
+            .RequireAuthorization(Policies.ChiefOrRegulator)
+            .WithTags("Quality").WithName("EquipmentByOrganization")
+            .WithSummary("Число единиц активной медтехники организации, для кабинета организации")
+            .Produces<EquipmentOrganizationDto>();
     }
 
     /// <summary>entity[regionKato]=75 → region_kato: 75; ключи в snake_case тоже принимаются.</summary>

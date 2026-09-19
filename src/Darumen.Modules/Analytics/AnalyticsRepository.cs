@@ -273,6 +273,47 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
         }
     }
 
+    public async Task<IReadOnlyList<EquipmentRegionDto>> EquipmentByRegionAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            // units - сумма coalesce(quantity, 1) по активному оборудованию (gold.equipment_by_region, 5.10);
+            // название региона подтягивается из refdata.regions, для "unknown" (mo_code без записи в mo_registry) остаётся сам код
+            var rows = await connection.QueryAsync<EquipmentRegionDto>(new CommandDefinition(
+                """
+                SELECT e.region_kato AS RegionKato, coalesce(r.name_ru, e.region_kato) AS RegionName, e.units::bigint AS Units
+                FROM gold.equipment_by_region e
+                LEFT JOIN refdata.regions r ON r.region_kato = e.region_kato
+                ORDER BY e.units DESC
+                """,
+                cancellationToken: cancellationToken));
+            return rows.ToList();
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            // витрина ещё не опубликована - страница /gov живёт без блока по медтехнике
+            return [];
+        }
+    }
+
+    public async Task<long> EquipmentForOrganizationAsync(string moCode, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            var units = await connection.QuerySingleOrDefaultAsync<long?>(new CommandDefinition(
+                "SELECT units::bigint FROM gold.equipment_by_organization WHERE mo_code = @moCode",
+                new { moCode }, cancellationToken: cancellationToken));
+            return units ?? 0;
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            // витрина ещё не опубликована - кабинет организации живёт без карточки медтехники
+            return 0;
+        }
+    }
+
     private sealed record SignalScopeRow(string? RegionKato);
 
     private sealed record StreamRow(string StreamId, string Title, string Grain, string EntityKeys, string Horizons);

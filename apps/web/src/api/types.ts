@@ -93,6 +93,13 @@ export interface OncoLateItem {
 }
 export interface OncologyLateStageResponse { items: OncoLateItem[]; method: string }
 
+/** 5.10: число единиц активной медтехники по региону из gold.equipment_by_region, для сравнения на /gov. */
+export interface EquipmentRegion { regionKato: string; regionName: string; units: number }
+export interface EquipmentResponse { items: EquipmentRegion[]; method: string }
+
+/** 5.10: число единиц активной медтехники организации, для кабинета организации. */
+export interface EquipmentOrganization { moCode: string; units: number }
+
 /** Срез ошибки wait-модели по региону или профилю из отчёта обучения. */
 export interface QualityBreakdownRow {
   region_kato?: string; profile_code?: string; n: number

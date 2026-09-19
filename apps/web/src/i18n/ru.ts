@@ -236,6 +236,8 @@ export const ru = {
       regionForecastUnavailable: 'Прогноз по региону недоступен.',
       queueChart90: 'Очередь организации за 90 дней',
       signals: 'Сигналы организации', noOpenSignals: 'Открытых сигналов по этой организации нет.',
+      equipmentTitle: 'Медтехника', equipmentUnits: 'единиц оборудования на балансе',
+      equipmentUnavailable: 'Данных по медтехнике для этой организации нет.',
     },
     region: {
       lead: 'Организации региона, очередь за 90 дней, прогноз госпитализаций и сигналы.',
@@ -309,6 +311,9 @@ export const ru = {
       oncoLateShare: 'Доля III/IV стадии',
       oncoLateCount: 'Случаев',
       oncoLateNotPublished: 'Витрина по запущенности онкологии пока не опубликована.',
+      equipmentTitle: 'Медтехника: единиц по регионам',
+      equipmentUnits: 'Единиц оборудования',
+      equipmentNotPublished: 'Витрина по медтехнике пока не опубликована.',
     },
   },
   home: {

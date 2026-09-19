@@ -35,4 +35,12 @@ public interface IAnalyticsRepository
     /// <summary>5.8: доля запущенных случаев (III/IV стадии) по локализациям, общенационально из gold.onco_late;
     /// пусто, пока витрина не опубликована.</summary>
     Task<IReadOnlyList<OncoLateItemDto>> OncologyLateStageAsync(CancellationToken cancellationToken);
+
+    /// <summary>5.10: число единиц активной медтехники по регионам, для сравнения на /gov, из gold.equipment_by_region;
+    /// пусто, пока витрина не опубликована.</summary>
+    Task<IReadOnlyList<EquipmentRegionDto>> EquipmentByRegionAsync(CancellationToken cancellationToken);
+
+    /// <summary>5.10: число единиц активной медтехники организации для кабинета организации, из gold.equipment_by_organization;
+    /// 0, если у организации нет строк (или витрина ещё не опубликована).</summary>
+    Task<long> EquipmentForOrganizationAsync(string moCode, CancellationToken cancellationToken);
 }

@@ -170,3 +170,46 @@ def test_onco_late_shares_are_nationwide_by_localization(tmp_path, synthetic_lak
     assert by_loc["C50"][0] == 400 and abs(by_loc["C50"][1] - 0.4) < 1e-9   # only the newer snapshot counted
     assert by_loc["C16"][0] == 300 and abs(by_loc["C16"][1] - 0.75) < 1e-9
     assert by_loc["C50"][2].isoformat() == "2026-05-13"
+
+
+EQUIPMENT_HEADER = ("identifier,mo_id,inventory_number,quantity,release_date,input_date,finance_source_id,"
+                     "decommission_date,is_fixed_asset,ownership_id,condition_id,serial_number,finance_code,"
+                     "finance_name_ru,finance_name_kz,finance_begin_date,finance_end_date,finance_is_active,"
+                     "ownership_code,ownership_name_ru,ownership_name_kz,ownership_begin_date,ownership_end_date,"
+                     "ownership_is_active,sdu_load_date")
+
+
+def equipment_row(identifier, mo_id, quantity="", decommission_date="", is_fixed_asset="1", load=LOAD):
+    fields = [identifier, mo_id, "", str(quantity), "", "", "", decommission_date, is_fixed_asset] + [""] * 15 + [load]
+    assert len(fields) == 25
+    return ",".join(fields)
+
+
+def test_equipment_counts_active_units_by_region_and_organization(tmp_path, synthetic_lake):
+    # 5.10: quantity может быть NULL - строка тогда стоит за одну единицу (coalesce(quantity, 1)); строка с
+    # decommission_date в счёт активного оборудования не идёт (is_active из контракта: "decommission_date is null",
+    # тот же приём, что и is_active у drug_specs); mo_code без записи в mo_registry попадает в бакет "unknown".
+    contracts = {c.dataset: c for c in load_contracts(CONTRACTS_DIR)}
+    lake = synthetic_lake
+    rows = [
+        equipment_row("E1", "00AA", quantity="2"),                                                  # active, quantity=2 -> 2 units
+        equipment_row("E2", "00AA", quantity=""),                                                    # active, null quantity -> fallback to 1 unit
+        equipment_row("E3", "00AA", quantity="5", decommission_date="2020-01-01 00:00:00.000000"),   # decommissioned -> excluded entirely
+        equipment_row("E4", "00ZZ", quantity="3"),                                                   # active, mo_code unknown to mo_registry -> region "unknown"
+    ]
+    path = tmp_path / "equipment.csv"
+    path.write_text("\ufeff" + EQUIPMENT_HEADER + "\n" + "\n".join(rows) + "\n", encoding="utf-8")
+    result = run_batch([path], contracts["equipment"], lake)
+    assert result.status == "loaded"
+    assert result.rows_quarantine == 0
+
+    counts = build_gold(lake)
+    assert counts["equipment"] == 2  # equipment_by_region rows: region "10" and "unknown"
+
+    by_region = dict(_q(lake, "equipment_by_region", "SELECT region_kato, units FROM {t}"))
+    assert by_region["10"] == 3        # E1 (2 units) + E2 (1 unit, null-quantity fallback); E3 excluded (decommissioned)
+    assert by_region["unknown"] == 3   # E4, mo_code not resolvable to a region
+
+    by_org = dict(_q(lake, "equipment_by_organization", "SELECT mo_code, units FROM {t}"))
+    assert by_org["00AA"] == 3
+    assert by_org["00ZZ"] == 3

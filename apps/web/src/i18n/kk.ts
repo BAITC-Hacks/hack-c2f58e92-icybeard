@@ -236,6 +236,8 @@ export const kk = {
       regionForecastUnavailable: 'Өңір бойынша болжам қолжетімсіз.',
       queueChart90: 'Ұйымның 90 күндегі кезегі',
       signals: 'Ұйым сигналдары', noOpenSignals: 'Бұл ұйым бойынша ашық сигналдар жоқ.',
+      equipmentTitle: 'Медтехника', equipmentUnits: 'баланстағы жабдық бірлігі',
+      equipmentUnavailable: 'Бұл ұйым бойынша медтехника деректері жоқ.',
     },
     region: {
       lead: 'Өңір ұйымдары, соңғы 90 күндегі кезек, госпитализация болжамы және сигналдар.',
@@ -309,6 +311,9 @@ export const kk = {
       oncoLateShare: 'III/IV кезең үлесі',
       oncoLateCount: 'Жағдай саны',
       oncoLateNotPublished: 'Онкологияның қараусыз қалу витринасы әлі жарияланбаған.',
+      equipmentTitle: 'Медтехника: өңірлер бойынша саны',
+      equipmentUnits: 'Жабдық бірліктері',
+      equipmentNotPublished: 'Медтехника витринасы әлі жарияланбаған.',
     },
   },
   home: {

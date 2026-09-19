@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, insight, queue } from '@/api/endpoints'
 import type {
-  Anomaly, ForecastResponse, IndexResponse, OncoLateItem, OverloadedOrganization, StaffingRegion, VacRefusalContraindication, VacRefusalReason,
+  Anomaly, EquipmentRegion, ForecastResponse, IndexResponse, OncoLateItem, OverloadedOrganization, StaffingRegion, VacRefusalContraindication, VacRefusalReason,
 } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
@@ -134,6 +134,22 @@ async function loadOncoLate() {
   }
 }
 
+/** 5.10: медтехника по регионам — сравнение "у кого сколько единиц оборудования", по убыванию. */
+const equipment = ref<EquipmentRegion[]>([])
+const equipmentHint = ref<string | null>(null)
+
+async function loadEquipment() {
+  equipment.value = []
+  equipmentHint.value = null
+  try {
+    const res = await analytics.equipment()
+    equipment.value = res.items
+    if (res.items.length === 0) equipmentHint.value = t('gov.map.equipmentNotPublished')
+  } catch {
+    equipmentHint.value = t('gov.map.equipmentNotPublished')
+  }
+}
+
 const downloading = ref(false)
 
 /** Отчёт по индексу за выбранный месяц и профиль — PDF или Excel. */
@@ -175,6 +191,7 @@ onMounted(async () => {
   await loadStaffing()
   await loadVaccinationRefusals()
   await loadOncoLate()
+  await loadEquipment()
 })
 watch([month, profile], load)
 </script>
@@ -293,6 +310,23 @@ watch([month, profile], load)
           {{ t('gov.map.staffingSnapshot') }} {{ oncoLate[0].snapshotDate }}
         </p>
       </div>
+    </div>
+    <div class="card" style="margin-top: 16px">
+      <h2>{{ t('gov.map.equipmentTitle') }} <OriginTag kind="formula" /></h2>
+      <DataTable
+        v-if="equipment.length"
+        :value="equipment"
+        size="small"
+        scrollable
+        scroll-height="420px"
+        selection-mode="single"
+        data-key="regionKato"
+        @row-click="router.push({ name: 'region', params: { kato: $event.data.regionKato } })"
+      >
+        <Column field="regionName" :header="t('common.region')" />
+        <Column field="units" :header="t('gov.map.equipmentUnits')" style="width: 10rem" />
+      </DataTable>
+      <p v-else class="muted">{{ equipmentHint }}</p>
     </div>
   </main>
 </template>

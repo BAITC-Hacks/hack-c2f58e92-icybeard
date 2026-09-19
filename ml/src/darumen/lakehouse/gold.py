@@ -13,6 +13,7 @@
     rx_mnn               MNN per nosology with volumes of the last 12 months of data (needs silver.rx_*)
     vac_refusals_by_reason / _by_contraindication  nationwide vaccination-refusal breakdown (needs silver.vac_refusals; no region column in the source)
     onco_late            advanced-stage (III/IV) share per localization, nationwide (needs silver.onco_late; already a country-level aggregate)
+    equipment_by_region / equipment_by_organization  active medical-equipment units per region and per organisation (needs silver.equipment)
 
 Every builder is a pure function of silver + refdata and overwrites its table, so rebuilding is idempotent.
 """
@@ -376,6 +377,29 @@ def build_onco_monthly(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Pat
         ORDER BY month, localization""")
 
 
+def build_equipment(con: duckdb.DuckDBPyConnection, lake: Lakehouse, out: Path) -> int:
+    """5.10: число единиц медтехники по регионам (для /gov) и по организациям (кабинет организации).
+    `quantity` может быть NULL - тогда строка считается за одну единицу (coalesce(quantity, 1)), это
+    единственная известная величина оборудования на строку (contracts/equipment.yaml: `quantity: decimal,
+    nullable: true`). Активность берём из уже посчитанного на уровне контракта `is_active`
+    (derive: "decommission_date is null" - тот же приём, что и is_active у drug_specs в build_drug_programs),
+    списанное оборудование (decommission_date не пусто) в счёт не идёт. `is_fixed_asset` не описан контрактом
+    как признак активности или учитываемости - это классификация ОС/не ОС на балансе, а не то, стоит ли единица
+    на балансе вообще, поэтому фильтром не используем. Регион получаем джойном mo_code -> mo_registry
+    (mo_id несёт только semantic: mo_code, не сам регион); для среза по организации джойн не нужен."""
+    if not _has_silver(lake, "equipment"):
+        return 0
+    base = f"SELECT mo_code, coalesce(quantity, 1)::DOUBLE AS units FROM {lake.silver_sql('equipment')} WHERE is_active AND mo_code IS NOT NULL"
+    rows = _write(con, out, "equipment_by_region", f"""
+        SELECT coalesce(m.region_kato, '{UNKNOWN}') AS region_kato, sum(e.units)::BIGINT AS units
+        FROM ({base}) e LEFT JOIN mo_registry m ON m.mo_code = e.mo_code
+        GROUP BY ALL ORDER BY 1""")
+    _write(con, out, "equipment_by_organization", f"""
+        SELECT mo_code, sum(units)::BIGINT AS units
+        FROM ({base}) GROUP BY ALL ORDER BY 1""")
+    return rows
+
+
 BUILDERS: dict[str, Callable[[duckdb.DuckDBPyConnection, Lakehouse, Path], int]] = {
     "queue_daily": build_queue_daily,
     "throughput_4w": build_throughput_4w,
@@ -391,6 +415,7 @@ BUILDERS: dict[str, Callable[[duckdb.DuckDBPyConnection, Lakehouse, Path], int]]
     "drug_programs": build_drug_programs,
     "staffing_by_region": build_staffing_by_region,
     "rx_mnn": build_rx_mnn,
+    "equipment": build_equipment,
 }
 
 

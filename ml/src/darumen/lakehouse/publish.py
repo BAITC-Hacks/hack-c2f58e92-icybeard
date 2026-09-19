@@ -41,6 +41,8 @@ PG_TABLES: dict[str, tuple[str, str, str, list[str]]] = {
     "gold.vac_refusals_by_reason": ("gold/vac_refusals_by_reason.parquet", "*", "", ["reason"]),
     "gold.vac_refusals_by_contraindication": ("gold/vac_refusals_by_contraindication.parquet", "*", "", ["contraindication"]),
     "gold.onco_late": ("gold/onco_late.parquet", "*", "", ["localization_id"]),
+    "gold.equipment_by_region": ("gold/equipment_by_region.parquet", "*", "", ["region_kato"]),
+    "gold.equipment_by_organization": ("gold/equipment_by_organization.parquet", "*", "", ["mo_code"]),
 }
 CH_TABLES: dict[str, tuple[str, str, list[str]]] = {
     "queue_daily": ("gold/queue_daily.parquet", "*", ["region_kato", "mo_code", "profile_code", "day"]),

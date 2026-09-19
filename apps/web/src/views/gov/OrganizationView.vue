@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { analytics, queue } from '@/api/endpoints'
-import type { Anomaly, OrganizationItem, OrganizationSeries, PredictResponse } from '@/api/types'
+import type { Anomaly, EquipmentOrganization, OrganizationItem, OrganizationSeries, PredictResponse } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
@@ -28,6 +28,7 @@ const organizations = ref<OrganizationItem[]>([])
 const series = ref<OrganizationSeries | null>(null)
 const regionPrediction = ref<PredictResponse | null>(null)
 const anomalies = ref<Anomaly[]>([])
+const equipment = ref<EquipmentOrganization | null>(null)
 const error = ref<unknown>(null)
 
 const orgName = computed(() => organizations.value.find((o) => o.moCode === moCode.value)?.name ?? moCode.value)
@@ -47,6 +48,11 @@ async function load() {
     anomalies.value = (await analytics.anomalies({ regionKato: kato.value, moCode: moCode.value, status: 'open', size: 50 })).items
   } catch (e) {
     error.value = e
+  }
+  try {
+    equipment.value = await analytics.equipmentForOrganization(moCode.value)
+  } catch {
+    equipment.value = null
   }
 }
 
@@ -123,6 +129,13 @@ watch([moCode, profile], load)
       <h2>{{ t('gov.org.signals') }} <OriginTag kind="formula" /></h2>
       <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
       <p v-if="anomalies.length === 0" class="muted">{{ t('gov.org.noOpenSignals') }}</p>
+    </div>
+    <div class="card" style="margin-top: 16px">
+      <h2>{{ t('gov.org.equipmentTitle') }} <OriginTag kind="formula" /></h2>
+      <div v-if="equipment" class="kpi">
+        <div class="item"><div class="value">{{ equipment.units }}</div><div class="label">{{ t('gov.org.equipmentUnits') }}</div></div>
+      </div>
+      <p v-else class="muted">{{ t('gov.org.equipmentUnavailable') }}</p>
     </div>
   </main>
 </template>

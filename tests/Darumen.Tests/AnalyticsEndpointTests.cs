@@ -161,6 +161,31 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Equipment_by_region_is_sorted_descending_by_units()
+    {
+        var body = await app.CreateClient("citizen").GetFromJsonAsync<EquipmentResponseDto>("/api/v1/equipment");
+        Assert.NotNull(body);
+        Assert.Equal(2, body.Items.Count);
+        Assert.Equal("75", body.Items[0].RegionKato);
+        Assert.Equal(340, body.Items[0].Units);
+        Assert.Equal("10", body.Items[1].RegionKato);
+        Assert.Contains("медицинской техники", body.Method);
+    }
+
+    [Fact]
+    public async Task Equipment_for_organization_returns_units_or_zero()
+    {
+        var chief = app.CreateClient("chief");
+        var known = await chief.GetFromJsonAsync<EquipmentOrganizationDto>("/api/v1/equipment/organizations/028B");
+        Assert.NotNull(known);
+        Assert.Equal(42, known.Units);
+
+        var unknown = await chief.GetFromJsonAsync<EquipmentOrganizationDto>("/api/v1/equipment/organizations/00ZZ");
+        Assert.NotNull(unknown);
+        Assert.Equal(0, unknown.Units);
+    }
+
+    [Fact]
     public async Task Index_defaults_to_latest_month_and_validates_month()
     {
         var client = app.CreateClient();
