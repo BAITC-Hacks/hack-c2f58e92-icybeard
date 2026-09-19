@@ -65,4 +65,59 @@ public sealed class MedicinesRepository(IDbConnectionFactory db) : IMedicinesRep
             new { nosologyId, limit }, cancellationToken: cancellationToken));
         return rows.ToList();
     }
+
+    public async Task<IReadOnlyList<MnnDto>> TopMnnAsync(int limit, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        // gold.rx_mnn: одна строка на (drug_mnn_id, nosology_id, category_id) — МНН выписывается при нескольких
+        // нозологиях. Для национального топа сначала суммируем объём по МНН по всем нозологиям, а нозологию и
+        // категорию для отображения берём ту, где у МНН больше всего рецептов (DISTINCT ON, как самая частая пара).
+        var rows = await connection.QueryAsync<MnnDto>(new CommandDefinition(
+            """
+            WITH totals AS (
+                SELECT drug_mnn_id, sum(issued_12m)::bigint AS issued_12m, sum(fulfilled_12m)::bigint AS fulfilled_12m,
+                       avg(fill_days_p50) AS fill_days_p50
+                FROM gold.rx_mnn WHERE drug_mnn_id <> 'unknown' GROUP BY drug_mnn_id
+            ),
+            top_nosology AS (
+                SELECT DISTINCT ON (drug_mnn_id) drug_mnn_id, nosology_id, category_id
+                FROM gold.rx_mnn WHERE drug_mnn_id <> 'unknown' ORDER BY drug_mnn_id, issued_12m DESC
+            )
+            SELECT t.drug_mnn_id AS MnnId, n.nosology_id AS NosologyId, n.category_id AS CategoryId,
+                   t.issued_12m AS Issued12m, t.fulfilled_12m AS Fulfilled12m, t.fill_days_p50 AS FillDaysP50
+            FROM totals t JOIN top_nosology n USING (drug_mnn_id)
+            ORDER BY t.issued_12m DESC LIMIT @limit
+            """,
+            new { limit }, cancellationToken: cancellationToken));
+        return rows.ToList();
+    }
+
+    public async Task<double?> FillDaysP50ModelAsync(string mnnId, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        try
+        {
+            return await connection.QuerySingleOrDefaultAsync<double?>(new CommandDefinition(
+                "SELECT fill_days_p50_model FROM gold.rx_fill_by_mnn WHERE drug_mnn_id = @mnnId",
+                new { mnnId }, cancellationToken: cancellationToken));
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            // витрина gold.rx_fill_by_mnn ещё не опубликована (5.7 A) — проверка рецепта живёт без p50 модели
+            return null;
+        }
+    }
+
+    public async Task<PeerFulfillmentDto?> PeerFulfillmentAsync(string mnnId, string categoryId, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var row = await connection.QuerySingleOrDefaultAsync<PeerFulfillmentDto>(new CommandDefinition(
+            """
+            SELECT coalesce(sum(fulfilled_12m)::float8 / nullif(sum(issued_12m), 0), 0) AS Ratio, count(*)::bigint AS PeerMnnCount,
+                   coalesce(sum(issued_12m), 0)::bigint AS IssuedRecent, coalesce(sum(fulfilled_12m), 0)::bigint AS FulfilledRecent
+            FROM gold.rx_mnn WHERE category_id = @categoryId AND drug_mnn_id <> @mnnId AND drug_mnn_id <> 'unknown'
+            """,
+            new { mnnId, categoryId }, cancellationToken: cancellationToken));
+        return row is null || row.PeerMnnCount == 0 ? null : row;
+    }
 }

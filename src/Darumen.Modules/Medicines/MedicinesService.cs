@@ -3,7 +3,8 @@ using Darumen.Shared.Api;
 namespace Darumen.Modules.Medicines;
 
 /// <summary>Проверка рецепта: покрытие по активным спецификациям нозологии, сроки обеспечения из фактических
-/// рецептов и сигнал дефицита по падению доли обеспеченных рецептов за последние недели.</summary>
+/// рецептов (плюс, если опубликована, p50 модели LightGBM-квантиль — 5.7 A) и сигнал дефицита по падению доли
+/// обеспеченных рецептов за последние недели против собственной истории МНН и против МНН-ровесников (5.7 B).</summary>
 public sealed class MedicinesService(IMedicinesRepository repository)
 {
     public const string ModelName = "rx_fill";
@@ -12,6 +13,9 @@ public sealed class MedicinesService(IMedicinesRepository repository)
     public const int BaselineWeeks = 12;
     public const int MinIssuedForSignal = 20;
     public const double ShortageThreshold = 0.3;
+    /// <summary>Насколько хуже ровесников по категории нужно обеспечивать рецепты, чтобы это само по себе
+    /// стоило подсветить дефицит — даже когда собственной истории МНН мало для сигнала.</summary>
+    public const double PeerShortageThreshold = 0.2;
 
     public async Task<CheckResponseDto> CheckAsync(CheckRequestDto request, CancellationToken cancellationToken)
     {
@@ -26,14 +30,21 @@ public sealed class MedicinesService(IMedicinesRepository repository)
 
         var active = programs.Where(p => p.ActiveSpecs > 0).ToList();
         var program = active.OrderByDescending(p => p.ActiveSpecs).FirstOrDefault();
+        var category = program?.CategoryId ?? months.LastOrDefault()?.CategoryId;
         var (p50, p90, pFilled, basis) = FillTimes(weeks, months);
-        var shortage = Shortage(weeks);
+        var fillDaysP50Model = string.IsNullOrWhiteSpace(request.MnnId)
+            ? null
+            : await repository.FillDaysP50ModelAsync(request.MnnId, cancellationToken);
+        var peer = !string.IsNullOrWhiteSpace(request.MnnId) && !string.IsNullOrWhiteSpace(category)
+            ? await repository.PeerFulfillmentAsync(request.MnnId, category, cancellationToken)
+            : null;
+        var shortage = Shortage(weeks, peer);
         var trainedThrough = weeks.Count > 0 ? weeks[^1].Week.ToString("yyyy-MM-dd") : months.Count > 0 ? months[^1].Month.ToString("yyyy-MM-dd") : string.Empty;
         return new CheckResponseDto(
             active.Count > 0,
             program is null ? null : $"Программа {program.ProgramId}",
-            program?.CategoryId ?? months.LastOrDefault()?.CategoryId,
-            p50, p90, pFilled, shortage, [], alternatives, basis,
+            category,
+            p50, p90, fillDaysP50Model, pFilled, shortage, [], alternatives, basis,
             new ModelInfoDto(ModelName, ModelVersion, trainedThrough));
     }
 
@@ -59,27 +70,40 @@ public sealed class MedicinesService(IMedicinesRepository repository)
         return (null, null, null, "фактических рецептов нет");
     }
 
-    /// <summary>Доля обеспеченных к выписанным за последние недели против базовых: падение означает дефицит.</summary>
-    public static ShortageDto Shortage(IReadOnlyList<RxWeek> weeks)
+    /// <summary>Доля обеспеченных к выписанным за последние недели против базовых недель того же МНН (own baseline)
+    /// и, если передан, против МНН-ровесников той же категории за последние 12 месяцев (5.7 B). Оба сравнения
+    /// возвращаются отдельно (Score/Basis — own, PeerRatio/PeerBasis — peer); итоговый Flag срабатывает по худшему
+    /// из двух, чтобы дефицит, заметный только на фоне похожих МНН, не терялся при спокойной собственной истории.</summary>
+    public static ShortageDto Shortage(IReadOnlyList<RxWeek> weeks, PeerFulfillmentDto? peer = null)
     {
         var recent = weeks.TakeLast(RecentWeeks).ToList();
         var baseline = weeks.SkipLast(RecentWeeks).ToList();
         var issuedRecent = recent.Sum(w => w.Issued);
+        var ratioRecent = issuedRecent > 0 ? (double)recent.Sum(w => w.Fulfilled) / issuedRecent : (double?)null;
+
+        var peerRatio = peer?.Ratio;
+        var peerBasis = peer is null
+            ? null
+            : $"обеспечено {peer.Ratio:P0} выписанных за последние 12 мес. у {peer.PeerMnnCount} МНН той же категории (без этого МНН)";
+        var peerFlag = ratioRecent is not null && peerRatio is > 0 && ratioRecent.Value / peerRatio.Value < 1 - PeerShortageThreshold;
+        var peerScore = peerFlag ? Math.Clamp(1 - ratioRecent!.Value / peerRatio!.Value, 0, 1) : 0;
+
         if (issuedRecent < MinIssuedForSignal || baseline.Sum(b => b.Issued) < MinIssuedForSignal)
         {
-            return new ShortageDto(false, 0, "мало рецептов для сигнала");
+            // собственной истории мало для сигнала — но сравнение с ровесниками всё ещё может его дать
+            return new ShortageDto(peerFlag, Math.Round(peerScore, 2), "мало рецептов для сигнала по своей истории", peerRatio, peerBasis);
         }
 
-        var ratioRecent = (double)recent.Sum(w => w.Fulfilled) / issuedRecent;
         var ratioBase = (double)baseline.Sum(w => w.Fulfilled) / baseline.Sum(w => w.Issued);
         if (ratioBase <= 0)
         {
-            return new ShortageDto(false, 0, "базовых обеспечений нет");
+            return new ShortageDto(peerFlag, Math.Round(peerScore, 2), "базовых обеспечений нет", peerRatio, peerBasis);
         }
 
-        var score = Math.Clamp(1 - ratioRecent / ratioBase, 0, 1);
-        return new ShortageDto(score >= ShortageThreshold, Math.Round(score, 2),
-            $"обеспечено {ratioRecent:P0} выписанных за {RecentWeeks} нед. против {ratioBase:P0} за предыдущие {baseline.Count}");
+        var ownScore = Math.Clamp(1 - ratioRecent!.Value / ratioBase, 0, 1);
+        var score = Math.Max(ownScore, peerScore);
+        var basis = $"обеспечено {ratioRecent:P0} выписанных за {RecentWeeks} нед. против {ratioBase:P0} за предыдущие {baseline.Count}";
+        return new ShortageDto(score >= ShortageThreshold, Math.Round(score, 2), basis, peerRatio, peerBasis);
     }
 
     private static double? Weighted<T>(IReadOnlyList<T> rows, Func<T, double?> value, Func<T, long> weight)

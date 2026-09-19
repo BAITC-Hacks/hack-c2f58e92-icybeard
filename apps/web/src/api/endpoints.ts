@@ -65,6 +65,7 @@ export const medicines = {
   check: (body: { mnnId?: string | null; nosologyId?: string | null; regionKato?: string | null }) => api<CheckResponse>('/api/v1/medicines/check', { body }),
   nosologies: (limit = 50) => api<{ items: Nosology[] }>('/api/v1/medicines/nosologies', { query: { limit } }),
   mnn: (nosologyId: string, limit = 50) => api<{ items: Mnn[] }>('/api/v1/medicines/mnn', { query: { nosologyId, limit } }),
+  topMnn: (limit = 50) => api<{ items: Mnn[] }>('/api/v1/medicines/mnn/top', { query: { limit } }),
 }
 
 export const insight = {

@@ -4,14 +4,19 @@ namespace Darumen.Modules.Medicines;
 
 public sealed record CheckRequestDto(string? MnnId, string? NosologyId, string? RegionKato);
 
-public sealed record ShortageDto(bool Flag, double Score, string Basis);
+/// <summary>Score/Flag — против собственной истории МНН (own baseline). PeerRatio/PeerBasis — то же самое, но
+/// против МНН-«ровесников» той же категории за последние 12 месяцев (5.7 B); null, если ровесников с данными нет.</summary>
+public sealed record ShortageDto(bool Flag, double Score, string Basis, double? PeerRatio, string? PeerBasis);
 
 public sealed record PharmacyDto(string DrugStoreId, string Name, double? Lat, double? Lon, long Fills30d);
 
 public sealed record AlternativeMnnDto(string MnnId, string Name, long Issued12m);
 
+/// <summary>Обеспеченность МНН-«ровесников» той же категории за последние 12 месяцев, без самого МНН.</summary>
+public sealed record PeerFulfillmentDto(double Ratio, long PeerMnnCount, long IssuedRecent, long FulfilledRecent);
+
 public sealed record CheckResponseDto(
-    bool Covered, string? Program, string? Category, double? FillDaysP50, double? FillDaysP90, double? PFilled14d,
+    bool Covered, string? Program, string? Category, double? FillDaysP50, double? FillDaysP90, double? FillDaysP50Model, double? PFilled14d,
     ShortageDto Shortage, IReadOnlyList<PharmacyDto> Pharmacies, IReadOnlyList<AlternativeMnnDto> Alternatives,
     string Basis, ModelInfoDto Model);
 

@@ -150,10 +150,11 @@ export interface OverloadedOrganization {
 }
 export interface Profile { profileCode: string; name: string; isDayHospital: boolean; referrals: number }
 
-export interface Shortage { flag: boolean; score: number; basis: string }
+export interface Shortage { flag: boolean; score: number; basis: string; peerRatio: number | null; peerBasis: string | null }
 export interface AlternativeMnn { mnnId: string; name: string; issued12m: number }
 export interface CheckResponse {
   covered: boolean; program: string | null; category: string | null; fillDaysP50: number | null; fillDaysP90: number | null
+  fillDaysP50Model: number | null
   pFilled14d: number | null; shortage: Shortage; pharmacies: unknown[]; alternatives: AlternativeMnn[]; basis: string; model: ModelInfo
 }
 export interface Nosology { nosologyId: string; categoryId: string; issued12m: number; fulfilled12m: number; mnnCount: number }

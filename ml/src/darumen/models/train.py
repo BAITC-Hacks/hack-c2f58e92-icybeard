@@ -13,12 +13,13 @@ from .common import load_features, mlflow_log, models_dir
 from .forecast import forecast_all
 from .index import build_index, method_note
 from .los import train_los
+from .rx_fill import train_rx_fill
 from .simulate import counterfactual_q1
 from .survival import train_survival
 from .wait import model_card, train_wait
 
 CARDS_DIR = Path(__file__).resolve().parents[4] / "docs" / "model-cards"
-PARTS = ("wait", "forecast", "anomaly", "simulate", "index", "los", "survival", "anomaly_labels")
+PARTS = ("wait", "forecast", "anomaly", "simulate", "index", "los", "survival", "anomaly_labels", "rx_fill")
 
 
 def parse_only(value: str) -> set[str]:
@@ -34,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="darumen.models.train")
     parser.add_argument("--lakehouse", default="lakehouse")
     parser.add_argument("--only", default=",".join(PARTS),
-                        help="через запятую: wait, forecast, anomaly, simulate, index, los, survival, anomaly_labels")
+                        help="через запятую: wait, forecast, anomaly, simulate, index, los, survival, anomaly_labels, rx_fill")
     parser.add_argument("--cards", default=str(CARDS_DIR))
     parser.add_argument("--streams", default="", help="через запятую: только эти потоки для forecast и anomaly")
     args = parser.parse_args(argv)
@@ -107,6 +108,17 @@ def main(argv: list[str] | None = None) -> int:
             mlflow_log("los", {"train_rows": report["train_rows"]},
                        {k: v for k, v in report.items() if isinstance(v, (int, float))},
                        [lake.root / "models" / "los" / "report.json"])
+    if "rx_fill" in only:
+        report = train_rx_fill(lake, models_dir(lake) / "rx_fill")
+        if report.get("skipped"):
+            print(f"rx_fill  skipped: {report['skipped']}")
+        else:
+            print(f"rx_fill  train={report['train_rows']:,} test={report['test_rows']:,} | pinball p50 {report['pinball_p50']:.3f} "
+                  f"(baseline {report['pinball_p50_baseline']:.3f}) MAE {report['mae']:.2f} (baseline {report['mae_baseline']:.2f}) | "
+                  f"{report['cells']} МНН в gold/rx_fill_by_mnn")
+            mlflow_log("rx_fill", {"train_rows": report["train_rows"]},
+                       {k: v for k, v in report.items() if isinstance(v, (int, float))},
+                       [lake.root / "models" / "rx_fill" / "report.json"])
     if "survival" in only:
         report = train_survival(lake, models_dir(lake) / "survival")
         for split, m in report["splits"].items():

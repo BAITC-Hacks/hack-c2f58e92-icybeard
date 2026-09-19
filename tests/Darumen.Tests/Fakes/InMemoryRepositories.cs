@@ -201,6 +201,18 @@ public sealed class InMemoryMedicines : IMedicinesRepository
 
     public Task<IReadOnlyList<MnnDto>> MnnAsync(string nosologyId, int limit, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<MnnDto>>([new("817", nosologyId, "63", 30000, 29000, 3), new("900", nosologyId, "63", 10000, 9900, 2)]);
+
+    // 5.7 C: тот же топ, но без фильтра по нозологии — здесь просто повторяет MnnAsync для двух известных тестам МНН
+    public Task<IReadOnlyList<MnnDto>> TopMnnAsync(int limit, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<MnnDto>>([new("817", "109", "63", 30000, 29000, 3), new("900", "109", "63", 10000, 9900, 2)]);
+
+    // 5.7 A: модель предсказывает p50 только для 817 — у 900 витрина как будто ещё не насчитала ячейку
+    public Task<double?> FillDaysP50ModelAsync(string mnnId, CancellationToken cancellationToken) =>
+        Task.FromResult<double?>(mnnId == "817" ? 3.2 : null);
+
+    // 5.7 B: у категории 63 есть ровесники, обеспечены хуже, чем 817 в базовый период (0.9), но лучше текущего провала
+    public Task<PeerFulfillmentDto?> PeerFulfillmentAsync(string mnnId, string categoryId, CancellationToken cancellationToken) =>
+        Task.FromResult<PeerFulfillmentDto?>(categoryId == "63" ? new PeerFulfillmentDto(0.85, 4, 5000, 4250) : null);
 }
 
 public sealed class InMemoryIntake : IIntakeRepository

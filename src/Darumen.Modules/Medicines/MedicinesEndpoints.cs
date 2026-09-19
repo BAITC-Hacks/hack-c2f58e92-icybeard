@@ -30,5 +30,9 @@ public static class MedicinesEndpoints
         group.MapGet("/mnn", async (string nosologyId, int? limit, IMedicinesRepository repository, CancellationToken ct) =>
                 Results.Ok(new { items = await repository.MnnAsync(nosologyId, Math.Clamp(limit ?? DefaultLimit, 1, 500), ct) }))
             .WithName("NosologyMnn").WithSummary("МНН, выписываемые при нозологии");
+
+        group.MapGet("/mnn/top", async (int? limit, IMedicinesRepository repository, CancellationToken ct) =>
+                Results.Ok(new { items = await repository.TopMnnAsync(Math.Clamp(limit ?? 50, 1, 200), ct) }))
+            .WithName("TopMnn").WithSummary("Топ-N МНН по объёму выписанных рецептов за год по всем нозологиям (5.7 C, для прогноза спроса)");
     }
 }
