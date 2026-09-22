@@ -1,4 +1,5 @@
 import 'package:darumen/api/models.dart';
+import 'package:darumen/l10n/strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -19,10 +20,18 @@ void main() {
   test('worklist and medicines parse with optional fields', () {
     final w = WorklistItem.fromJson({
       'patientRef': 'SYN-75-028B-01', 'stage': 'ожидает', 'expectedDate': null, 'riskFlags': ['stuck_over_30'], 'priority': 12,
-      'nextAction': 'уточнить дату', 'explanation': 'очередь 1784', 'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'daysWaiting': 72,
+      'nextAction': 'уточнить дату', 'nextActionCode': 'clarify_date', 'explanation': 'очередь 1784', 'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'daysWaiting': 72,
     });
     expect(w.expectedDate, isNull);
     expect(w.riskFlags, ['stuck_over_30']);
+    expect(w.nextActionCode, 'clarify_date');
+    // старый ответ без кода — подпись API как есть, без падения
+    expect(WorklistItem.fromJson({
+      'patientRef': 'SYN-75-028B-381-02', 'stage': 'ожидает', 'riskFlags': [], 'priority': 1,
+      'nextAction': 'ждать вызова', 'explanation': '', 'moCode': '028B', 'profileCode': '381', 'daysWaiting': 3,
+    }).nextActionCode, '');
+    expect(S.of('kk').nextActionText('wait_for_call', 'ждать вызова'), 'шақыруды күту');
+    expect(S.of('kk').nextActionText('', 'ждать вызова'), 'ждать вызова');
     final c = CheckResponse.fromJson({'covered': true, 'program': 'Программа 90', 'fillDaysP50': 3, 'shortage': {'flag': false, 'score': 0.1, 'basis': 'ok'}});
     expect(c.covered, isTrue);
     expect(c.fillDaysP90, isNull);

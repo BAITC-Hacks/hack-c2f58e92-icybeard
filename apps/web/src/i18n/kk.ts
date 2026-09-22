@@ -182,6 +182,13 @@ export const kk = {
       patient: 'Науқас', stage: 'Кезең', daysWaiting: 'Күтуде, күн', expectedDate: 'Күтілетін күн', flags: 'Жалаушалар',
       priority: 'Басымдық', nextStep: 'Келесі қадам', openReferral: 'жолдаманы ашу',
       asOf: 'деректер {date} жағдайы бойынша', empty: 'Тізімде науқастар жоқ',
+      stageCode: { registered: 'тіркелді', waiting: 'күтуде', called: 'емдеуге жатқызуға шақыру' },
+      action: {
+        redirect_faster: 'күту мерзімі қысқарақ ұйымға бағыттауды ұсыну',
+        review_before_call: 'шақыруға дейін көрсетілімдер мен құжаттарды тексеру',
+        clarify_date: 'ұйымнан күнін нақтылау',
+        wait_for_call: 'шақыруды күту',
+      },
     },
     decisions: {
       title: 'Шешімдер журналы',

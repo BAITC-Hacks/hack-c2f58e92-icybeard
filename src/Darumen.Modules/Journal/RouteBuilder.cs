@@ -101,7 +101,7 @@ public static class RouteBuilder
         }
 
         var doctor = input.Audience == RouteAudience.Doctor
-            ? new RouteDoctorPanelDto(item.Priority, item.RiskFlags, item.NextAction, item.Explanation,
+            ? new RouteDoctorPanelDto(item.Priority, item.RiskFlags, item.NextAction, item.NextActionCode, item.Explanation,
                 input.Prediction?.PRefusal ?? fallback.PRefusal, input.Prediction?.RefusalOrgInTraining ?? false, input.Prediction?.Explanation)
             : null;
 

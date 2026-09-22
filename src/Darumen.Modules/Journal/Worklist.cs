@@ -13,10 +13,11 @@ public sealed record QueuePrediction(double P50Days, double P90Days, double PRef
 
 /// <summary>Stage — подпись стадии по-русски для текущих клиентов; StageCode — машинный код той же стадии
 /// (<see cref="WorklistBuilder.StageRegistered"/>, <see cref="WorklistBuilder.StageWaiting"/>, <see cref="WorklistBuilder.StageCalled"/>),
-/// который клиенты локализуют сами (RU/KK). PatientRef — см. <see cref="RoutePatientRef"/>.</summary>
+/// который клиенты локализуют сами (RU/KK); та же пара для следующего шага — NextAction (по-русски) и NextActionCode
+/// (<see cref="WorklistBuilder.ActionRedirectFaster"/> и другие Action*). PatientRef — см. <see cref="RoutePatientRef"/>.</summary>
 public sealed record WorklistItemDto(
     string PatientRef, bool Synthetic, string Stage, string StageCode, string? ExpectedDate, IReadOnlyList<string> RiskFlags, int Priority,
-    string NextAction, string Explanation, string MoCode, string MoName, string ProfileCode, string RegionKato, int DaysWaiting);
+    string NextAction, string NextActionCode, string Explanation, string MoCode, string MoName, string ProfileCode, string RegionKato, int DaysWaiting);
 
 /// <summary>ModelBacked — прогноз модели получен хотя бы для одной очереди (иначе показывать в UI
 /// как формулу/агрегаты, а не как «ML-модель», см. WorklistView.vue).</summary>
@@ -58,6 +59,12 @@ public static class WorklistBuilder
     public const string StuckOver30 = "stuck_over_30";
     public const string RefusalRisk = "refusal_risk";
     public const string FasterAlternative = "faster_alternative";
+
+    /// <summary>Коды следующего шага (NextActionCode) по флагам, от сильного к слабому; подписи RU/KK — на клиентах.</summary>
+    public const string ActionRedirectFaster = "redirect_faster";
+    public const string ActionReviewBeforeCall = "review_before_call";
+    public const string ActionClarifyDate = "clarify_date";
+    public const string ActionWaitForCall = "wait_for_call";
     public const int MaxItems = 60;
     public const int MaxPerQueue = 6;
     public const double RefusalRiskThreshold = 0.2;
@@ -157,18 +164,22 @@ public static class WorklistBuilder
         // моделью риск отказа — оба слагаемых из прогноза, а не только число флагов, как было до 3.6
         var overdue = expectedWait > 0 ? daysWaiting / expectedWait : (daysWaiting > 0 ? 2.0 : 0.0);
         var priority = (int)Math.Round(overdue * 5) + (int)Math.Round(prediction.PRefusal * 10) + (flags.Contains(FasterAlternative) ? 2 : 0);
-        var nextAction = flags.Contains(FasterAlternative)
-            ? "предложить перенаправление в организацию с меньшим ожиданием"
-            : flags.Contains(RefusalRisk)
-                ? "проверить показания и документы до вызова"
-                : flags.Contains(StuckOver30)
-                    ? "уточнить дату в организации"
-                    : "ждать вызова";
+        var nextActionCode = flags.Contains(FasterAlternative) ? ActionRedirectFaster
+            : flags.Contains(RefusalRisk) ? ActionReviewBeforeCall
+            : flags.Contains(StuckOver30) ? ActionClarifyDate
+            : ActionWaitForCall;
+        var nextAction = nextActionCode switch
+        {
+            ActionRedirectFaster => "предложить перенаправление в организацию с меньшим ожиданием",
+            ActionReviewBeforeCall => "проверить показания и документы до вызова",
+            ActionClarifyDate => "уточнить дату в организации",
+            _ => "ждать вызова",
+        };
         var explanation = $"очередь {state.QueueLen} направлений, {(prediction.FromModel ? "прогноз ожидания" : "медианное ожидание")} {expectedWait:0} дн., " +
                           $"{(prediction.FromModel ? "прогноз риска отказа" : "отказы за 4 недели")} {prediction.PRefusal:P0}";
         return new WorklistItemDto(
             new RoutePatientRef(state.RegionKato, state.MoCode, state.ProfileCode, index + 1).Format(), true, stage, stageCode,
-            state.AsOf.AddDays((int)Math.Round(remaining)).ToString("yyyy-MM-dd"), flags, priority, nextAction, explanation,
+            state.AsOf.AddDays((int)Math.Round(remaining)).ToString("yyyy-MM-dd"), flags, priority, nextAction, nextActionCode, explanation,
             state.MoCode, state.MoName, state.ProfileCode, state.RegionKato, daysWaiting);
     }
 

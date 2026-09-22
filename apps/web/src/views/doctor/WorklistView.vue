@@ -11,10 +11,11 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
+import { dateShort, nextActionKey } from '@/lib/route'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const refdata = useRefdataStore()
 const auth = useAuthStore()
 const items = ref<WorklistItem[]>([])
@@ -34,6 +35,18 @@ const flagLabels = computed<Record<string, string>>(() => ({
   stuck_over_30: t('doctor.worklist.flagStuckShort'), refusal_risk: t('doctor.worklist.flagRiskShort'), faster_alternative: t('doctor.worklist.flagFasterShort'),
 }))
 const flagTones: Record<string, 'warn' | 'danger' | 'accent'> = { stuck_over_30: 'warn', refusal_risk: 'danger', faster_alternative: 'accent' }
+
+/** Стадия по коду (registered | waiting | called) на языке интерфейса; незнакомый код — русская подпись API как есть. */
+function stageLabel(item: WorklistItem): string {
+  const key = `doctor.worklist.stageCode.${item.stageCode}`
+  return te(key) ? t(key) : item.stage
+}
+
+/** Следующий шаг по коду из API на языке интерфейса; незнакомый код — русская подпись API как есть. */
+function nextAction(item: WorklistItem): string {
+  const key = nextActionKey(item.nextActionCode)
+  return key ? t(key) : item.nextAction
+}
 
 async function load() {
   error.value = null
@@ -73,14 +86,14 @@ watch(flag, load)
         <template #body="{ data }"><RouterLink :to="{ name: 'patient-route', params: { patientRef: data.patientRef } }" class="mono" data-testid="worklist-patient">{{ data.patientRef }}</RouterLink></template>
       </Column>
       <Column :header="t('common.profile')"><template #body="{ data }">{{ refdata.profileName(data.profileCode) }}</template></Column>
-      <Column field="stage" :header="t('doctor.worklist.stage')" />
+      <Column :header="t('doctor.worklist.stage')"><template #body="{ data }">{{ stageLabel(data) }}</template></Column>
       <Column field="daysWaiting" :header="t('doctor.worklist.daysWaiting')" sortable />
-      <Column field="expectedDate" :header="t('doctor.worklist.expectedDate')" />
+      <Column :header="t('doctor.worklist.expectedDate')"><template #body="{ data }"><span class="tabular">{{ dateShort(data.expectedDate) }}</span></template></Column>
       <Column :header="t('doctor.worklist.flags')">
         <template #body="{ data }"><StatusTag v-for="f in data.riskFlags" :key="f" :value="flagLabels[f] ?? f" :tone="flagTones[f] ?? 'neutral'" style="margin-right: 4px" /></template>
       </Column>
       <Column field="priority" :header="t('doctor.worklist.priority')" sortable />
-      <Column :header="t('doctor.worklist.nextStep')"><template #body="{ data }"><span>{{ data.nextAction }}</span><br /><span class="muted">{{ data.explanation }}</span></template></Column>
+      <Column :header="t('doctor.worklist.nextStep')"><template #body="{ data }"><span>{{ nextAction(data) }}</span><br /><span class="muted">{{ data.explanation }}</span></template></Column>
       <Column header=""><template #body="{ data }"><RouterLink :to="{ name: 'referral', query: { moCode: data.moCode, profileCode: data.profileCode } }">{{ t('doctor.worklist.openReferral') }}</RouterLink></template></Column>
     </DataTable>
   </PageShell>

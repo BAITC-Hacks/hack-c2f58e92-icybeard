@@ -131,6 +131,15 @@ class S {
   String get riskRefusalLabel => _t('риск отказа', 'бас тарту қаупі');
   String get priorityLabel => _t('Приоритет', 'Басымдық');
   String get nextActionLabel => _t('Следующий шаг', 'Келесі қадам');
+
+  /// Следующий шаг по коду из API (WorklistBuilder.Action*); незнакомый код — русская подпись API как есть.
+  String nextActionText(String code, String fallback) => switch (code) {
+        'redirect_faster' => _t('предложить перенаправление в организацию с меньшим ожиданием', 'күту мерзімі қысқарақ ұйымға бағыттауды ұсыну'),
+        'review_before_call' => _t('проверить показания и документы до вызова', 'шақыруға дейін көрсетілімдер мен құжаттарды тексеру'),
+        'clarify_date' => _t('уточнить дату в организации', 'ұйымнан күнін нақтылау'),
+        'wait_for_call' => _t('ждать вызова', 'шақыруды күту'),
+        _ => fallback,
+      };
   String stageLabel(String code) => switch (code) {
         'referral_issued' => _t('Направление выдано', 'Жолдама берілді'),
         'examination' => _t('Обследование', 'Тексеру'),

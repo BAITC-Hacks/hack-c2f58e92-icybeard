@@ -81,6 +81,8 @@ public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
             Assert.Equal(i.ProfileCode, parsed.ProfileCode);
             Assert.Equal(i.PatientRef, parsed.Format());
             Assert.Contains(i.StageCode, new[] { WorklistBuilder.StageRegistered, WorklistBuilder.StageWaiting, WorklistBuilder.StageCalled });
+            Assert.Contains(i.NextActionCode, new[] { WorklistBuilder.ActionRedirectFaster, WorklistBuilder.ActionReviewBeforeCall, WorklistBuilder.ActionClarifyDate, WorklistBuilder.ActionWaitForCall });
+            Assert.NotEmpty(i.NextAction);
         });
         Assert.False(RoutePatientRef.TryParse("SYN-75-028B-01", out _));
         Assert.False(RoutePatientRef.TryParse("SYN-75-028B-381-00", out _));

@@ -72,7 +72,7 @@ class RouteView extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  Text('${s.nextActionLabel}: ${doctor.nextAction}', style: theme.textTheme.bodySmall),
+                  Text('${s.nextActionLabel}: ${s.nextActionText(doctor.nextActionCode, doctor.nextAction)}', style: theme.textTheme.bodySmall),
                 ],
               ],
             ),

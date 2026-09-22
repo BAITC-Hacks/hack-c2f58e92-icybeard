@@ -153,6 +153,7 @@ class WorklistItem {
     required this.profileCode,
     required this.regionKato,
     required this.daysWaiting,
+    this.nextActionCode = '',
     this.synthetic = true,
   });
   final String patientRef;
@@ -165,7 +166,10 @@ class WorklistItem {
   final String? expectedDate;
   final List<String> riskFlags;
   final int priority;
+
+  /// Русская подпись следующего шага от API; для локализации — [nextActionCode] (redirect_faster | review_before_call | clarify_date | wait_for_call).
   final String nextAction;
+  final String nextActionCode;
   final String explanation;
   final String moCode;
   final String moName;
@@ -181,6 +185,7 @@ class WorklistItem {
         riskFlags: (json['riskFlags'] as List<dynamic>? ?? []).cast<String>(),
         priority: (json['priority'] as num).toInt(),
         nextAction: json['nextAction'] as String,
+        nextActionCode: json['nextActionCode'] as String? ?? '',
         explanation: json['explanation'] as String,
         moCode: json['moCode'] as String,
         moName: json['moName'] as String? ?? json['moCode'] as String,
@@ -560,11 +565,13 @@ class RouteDoctorPanel {
     required this.explanation,
     required this.pRefusal,
     required this.refusalOrgInTraining,
+    this.nextActionCode = '',
     this.shap,
   });
   final int priority;
   final List<String> riskFlags;
   final String nextAction;
+  final String nextActionCode;
   final String explanation;
   final double pRefusal;
   final bool refusalOrgInTraining;
@@ -573,6 +580,7 @@ class RouteDoctorPanel {
         priority: (json['priority'] as num?)?.toInt() ?? 0,
         riskFlags: (json['riskFlags'] as List<dynamic>? ?? []).cast<String>(),
         nextAction: json['nextAction'] as String? ?? '',
+        nextActionCode: json['nextActionCode'] as String? ?? '',
         explanation: json['explanation'] as String? ?? '',
         pRefusal: (json['pRefusal'] as num?)?.toDouble() ?? 0,
         refusalOrgInTraining: json['refusalOrgInTraining'] as bool? ?? false,

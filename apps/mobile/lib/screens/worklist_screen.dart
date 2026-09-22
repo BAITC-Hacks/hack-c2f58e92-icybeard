@@ -119,7 +119,7 @@ class _WorklistScreenState extends State<WorklistScreen> {
                               ),
                             ],
                             const SizedBox(height: AppSpacing.sm),
-                            Text(item.nextAction, style: theme.textTheme.bodyMedium),
+                            Text(s.nextActionText(item.nextActionCode, item.nextAction), style: theme.textTheme.bodyMedium),
                           ],
                         ),
                       ),

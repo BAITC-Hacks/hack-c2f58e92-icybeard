@@ -255,7 +255,7 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
     }
 
     private static WorklistItemDto Item(string stageCode, int daysWaiting, string expectedDate) => new(
-        "SYN-75-028B-381-01", true, "ожидает", stageCode, expectedDate, [], 0, "ждать вызова", "тест", "028B", "Институт глазных болезней", "381", "75", daysWaiting);
+        "SYN-75-028B-381-01", true, "ожидает", stageCode, expectedDate, [], 0, "ждать вызова", WorklistBuilder.ActionWaitForCall, "тест", "028B", "Институт глазных болезней", "381", "75", daysWaiting);
 
     private static RouteBuilder.Inputs Inputs(WorklistItemDto item, QueueStateRow state, IReadOnlyList<QueueStateRow> states, RouteStandardDto standard) =>
         new(item, state, states, standard, null, null, [], new Dictionary<string, string>(), RouteAudience.Citizen, "ru");

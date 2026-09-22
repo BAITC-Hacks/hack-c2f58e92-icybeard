@@ -182,6 +182,13 @@ export const ru = {
       patient: 'Пациент', stage: 'Этап', daysWaiting: 'Ждёт, дн.', expectedDate: 'Ожидаемая дата', flags: 'Флаги',
       priority: 'Приоритет', nextStep: 'Следующий шаг', openReferral: 'открыть направление',
       asOf: 'данные на {date}', empty: 'В списке нет пациентов',
+      stageCode: { registered: 'зарегистрирован', waiting: 'ожидает', called: 'вызов на госпитализацию' },
+      action: {
+        redirect_faster: 'предложить перенаправление в организацию с меньшим ожиданием',
+        review_before_call: 'проверить показания и документы до вызова',
+        clarify_date: 'уточнить дату в организации',
+        wait_for_call: 'ждать вызова',
+      },
     },
     decisions: {
       title: 'Журнал решений',

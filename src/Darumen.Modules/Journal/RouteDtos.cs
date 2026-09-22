@@ -37,9 +37,10 @@ public sealed record RouteDecisionDto(
 public sealed record RouteHistoryDto(
     string MoCode, string MoName, string ProfileCode, string ProfileName, string RegisteredAt, string Outcome, string OutcomeAt, int WaitDays);
 
-/// <summary>Служебная панель врача: приоритет и флаги рабочего списка, риск отказа и факторы модели.</summary>
+/// <summary>Служебная панель врача: приоритет и флаги рабочего списка, следующий шаг (русская подпись и код, как в
+/// <see cref="WorklistItemDto"/>), риск отказа и факторы модели.</summary>
 public sealed record RouteDoctorPanelDto(
-    int Priority, IReadOnlyList<string> RiskFlags, string NextAction, string Explanation, double PRefusal, bool RefusalOrgInTraining, ExplanationDto? Shap);
+    int Priority, IReadOnlyList<string> RiskFlags, string NextAction, string NextActionCode, string Explanation, double PRefusal, bool RefusalOrgInTraining, ExplanationDto? Shap);
 
 public sealed record RouteStandardRefDto(string Source, string SourceUrl, string SourceDate, bool Available);
 

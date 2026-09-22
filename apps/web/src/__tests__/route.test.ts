@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { STAGE_CODES, checklistTone, dateShort, outcomeTone, stageIndex, stageTone } from '@/lib/route'
+import { NEXT_ACTION_CODES, STAGE_CODES, checklistTone, dateShort, nextActionKey, outcomeTone, stageIndex, stageTone } from '@/lib/route'
 
 describe('route helpers', () => {
+  it('maps next-action codes to dictionary keys and leaves unknown codes to the raw API text', () => {
+    expect(NEXT_ACTION_CODES).toHaveLength(4)
+    expect(nextActionKey('redirect_faster')).toBe('doctor.worklist.action.redirect_faster')
+    expect(nextActionKey('')).toBeNull()
+    expect(nextActionKey(undefined)).toBeNull()
+    expect(nextActionKey('something_new')).toBeNull()
+  })
+
   it('orders stages as the standard does and tolerates unknown codes', () => {
     expect(STAGE_CODES).toHaveLength(6)
     expect(stageIndex('referral_issued')).toBe(0)

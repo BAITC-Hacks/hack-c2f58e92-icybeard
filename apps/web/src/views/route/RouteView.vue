@@ -19,7 +19,7 @@ import Section from '@/components/ui/Section.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { days, pct, refusalWords } from '@/lib/format'
-import { checklistTone, dateShort, outcomeTone, stageTone } from '@/lib/route'
+import { checklistTone, dateShort, nextActionKey, outcomeTone, stageTone } from '@/lib/route'
 
 /** Один экран для двух ролей: без patientRef — «Мой путь» гражданина (/route/me), с ним — маршрут пациента для врача
  * (/route/{ref}) с панелью врача и перенаправлением. Числа — только из API, каждое с меткой происхождения. */
@@ -107,7 +107,7 @@ watch(() => props.patientRef, load)
             {{ t('route.priority') }}: <b class="tabular">{{ data.doctor.priority }}</b>
             <StatusTag v-for="f in data.doctor.riskFlags" :key="f" :value="t('route.flags.' + f)" tone="warn" style="margin-left: 6px" />
           </p>
-          <p>{{ t('route.nextAction') }}: {{ data.doctor.nextAction }}</p>
+          <p>{{ t('route.nextAction') }}: {{ nextActionKey(data.doctor.nextActionCode) ? t(nextActionKey(data.doctor.nextActionCode)!) : data.doctor.nextAction }}</p>
           <p class="muted">{{ data.doctor.explanation }}</p>
           <RouterLink :to="{ name: 'referral', query: { moCode: data.organization.moCode, profileCode: data.organization.profileCode } }">
             {{ t('route.referralAssistant') }}

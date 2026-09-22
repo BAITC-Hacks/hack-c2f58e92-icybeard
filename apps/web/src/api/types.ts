@@ -169,7 +169,7 @@ export interface AuditEntry {
 }
 export interface WorklistItem {
   patientRef: string; synthetic: boolean; stage: string; stageCode: string; expectedDate: string | null; riskFlags: string[]
-  priority: number; nextAction: string; explanation: string; moCode: string; moName: string; profileCode: string; regionKato: string; daysWaiting: number
+  priority: number; nextAction: string; nextActionCode: string; explanation: string; moCode: string; moName: string; profileCode: string; regionKato: string; daysWaiting: number
 }
 
 /** Маршрут пациента (docs/api.md, раздел Route): один контракт для гражданина (/route/me) и врача (/route/{ref}). */
@@ -189,7 +189,7 @@ export interface RouteHistoryItem {
 }
 /** Только для врача: гражданину API отдаёт doctor = null (риск отказа и приоритет — служебная информация). */
 export interface RouteDoctorPanel {
-  priority: number; riskFlags: string[]; nextAction: string; explanation: string; pRefusal: number; refusalOrgInTraining: boolean; shap: Explanation | null
+  priority: number; riskFlags: string[]; nextAction: string; nextActionCode: string; explanation: string; pRefusal: number; refusalOrgInTraining: boolean; shap: Explanation | null
 }
 export interface RouteStandardRef { source: string; sourceUrl: string; sourceDate: string; available: boolean }
 /** Справочник Стандарта стационарной помощи (GET /refdata/route-standard): стадии, причины отказа, обследования, ориентиры МЗ РК. */

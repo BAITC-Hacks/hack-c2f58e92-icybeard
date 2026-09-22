@@ -2,7 +2,16 @@
 export const STAGE_CODES = ['referral_issued', 'examination', 'waitlisted', 'date_assigned', 'hospitalized', 'refused'] as const
 export type StageCode = (typeof STAGE_CODES)[number]
 
+/** Коды следующего шага рабочего списка (WorklistBuilder.Action* в API); подпись — ключ doctor.worklist.action.<code>. */
+export const NEXT_ACTION_CODES = ['redirect_faster', 'review_before_call', 'clarify_date', 'wait_for_call'] as const
+export type NextActionCode = (typeof NEXT_ACTION_CODES)[number]
+
 export type Tone = 'success' | 'info' | 'warn' | 'danger' | 'secondary'
+
+/** Ключ словаря для кода следующего шага; незнакомый или пустой код → null, и клиент показывает русскую подпись API. */
+export function nextActionKey(code: string | null | undefined): string | null {
+  return NEXT_ACTION_CODES.includes(code as NextActionCode) ? `doctor.worklist.action.${code}` : null
+}
 
 export function stageIndex(code: string): number {
   return STAGE_CODES.indexOf(code as StageCode)
