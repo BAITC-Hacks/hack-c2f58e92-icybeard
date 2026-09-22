@@ -1,4 +1,13 @@
+import 'dart:convert';
+
 import 'package:darumen/api/models.dart';
+import 'package:darumen/screens/scribe_screen.dart';
+import 'package:darumen/state/session.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:darumen/theme/app_theme.dart';
 import 'package:darumen/widgets/checklist_tile.dart';
 import 'package:darumen/widgets/kpi_tile.dart';
@@ -86,6 +95,33 @@ void main() {
     await tester.tap(find.text('Направить сюда'));
     await tester.pumpAndSettle();
     expect(result, 'ожидание короче');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('scribe transcript step lays out the microphone button next to the text field', (tester) async {
+    // кнопки темы растянуты на всю ширину: внутри Row без Expanded они роняли layout («forces an infinite width»)
+    FlutterSecureStorage.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({});
+    final api = MockClient((request) async {
+      if (request.method == 'POST' && request.url.path.endsWith('/scribe/sessions')) {
+        return http.Response(jsonEncode({'sessionId': 's1'}), 200, headers: {'content-type': 'application/json'});
+      }
+      return http.Response('{}', 404);
+    });
+    final session = Session(httpClient: api);
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.light(),
+      locale: const Locale('ru'),
+      supportedLocales: const [Locale('ru'), Locale('kk')],
+      localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
+      home: ChangeNotifierProvider<Session>.value(value: session, child: const ScribeScreen()),
+    ));
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+    await tester.tap(find.text('Начать сессию'));
+    await tester.pumpAndSettle();
+    expect(find.text('Записать с микрофона'), findsOneWidget);
+    expect(find.text('Составить черновик'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -297,6 +297,7 @@ class S {
   String get scribeStopRecording => _t('Остановить и распознать', 'Тоқтату және тану');
   String get scribeTranscribing => _t('Распознаём запись…', 'Жазба танылуда…');
   String get scribeMicDenied => _t('Нет доступа к микрофону — введите текст вручную.', 'Микрофонға қолжетімділік жоқ — мәтінді қолмен енгізіңіз.');
+  String get scribeNothingRecognized => _t('Речь не распознана — запишите ещё раз или введите текст вручную.', 'Сөз танылмады — қайта жазыңыз немесе мәтінді қолмен енгізіңіз.');
   String get scribeQrHint => _t('QR-код ссылки на памятку — покажите пациенту', 'Естелік сілтемесінің QR-коды — науқасқа көрсетіңіз');
   String scribeSectionLabel(String name) {
     if (_locale != 'kk') return name;

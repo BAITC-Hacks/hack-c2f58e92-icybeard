@@ -44,6 +44,7 @@ class _ScribeScreenState extends State<ScribeScreen> {
   final AudioRecorder _recorder = AudioRecorder();
   bool recording = false;
   bool transcribing = false;
+  String? notice;
 
   @override
   void dispose() {
@@ -70,6 +71,7 @@ class _ScribeScreenState extends State<ScribeScreen> {
       leaflet.clear();
       result = null;
       error = null;
+      notice = null;
     });
   }
 
@@ -124,7 +126,11 @@ class _ScribeScreenState extends State<ScribeScreen> {
       final text = await context.read<Session>().api.uploadScribeAudio(sessionId!, await file.readAsBytes(), 'consult.m4a');
       await file.delete();
       if (mounted) {
-        setState(() => transcript.text = text);
+        // тишина или шум дают пустую стенограмму — говорим об этом прямо, а не оставляем пустое поле без объяснения
+        setState(() {
+          transcript.text = text;
+          notice = text.trim().isEmpty ? S.at(context).scribeNothingRecognized : null;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -250,16 +256,27 @@ class _ScribeScreenState extends State<ScribeScreen> {
           FilledButton.icon(onPressed: consent && !busy ? _start : null, icon: const Icon(Icons.play_arrow), label: Text(s.scribeStartButton)),
         ],
         if (step == _Step.transcript) ...[
+          // кнопки темы растянуты на всю ширину (minimumSize с бесконечной шириной) — в Row нужен Expanded
           Row(
             children: [
-              if (!recording)
-                FilledButton.tonalIcon(onPressed: busy || transcribing ? null : _record, icon: const Icon(Icons.mic_none), label: Text(s.scribeRecordMic))
-              else
-                FilledButton.icon(onPressed: _stopRecording, icon: const Icon(Icons.stop_circle_outlined), label: Text(s.scribeStopRecording)),
-              if (transcribing) ...[const SizedBox(width: AppSpacing.md), const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)), const SizedBox(width: AppSpacing.sm), Text(s.scribeTranscribing, style: theme.textTheme.bodySmall)],
+              Expanded(
+                child: !recording
+                    ? FilledButton.tonalIcon(onPressed: busy || transcribing ? null : _record, icon: const Icon(Icons.mic_none), label: Text(s.scribeRecordMic))
+                    : FilledButton.icon(onPressed: _stopRecording, icon: const Icon(Icons.stop_circle_outlined), label: Text(s.scribeStopRecording)),
+              ),
+              if (transcribing) ...[
+                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+                const SizedBox(width: AppSpacing.sm),
+                Flexible(child: Text(s.scribeTranscribing, style: theme.textTheme.bodySmall)),
+              ],
             ],
           ),
           const SizedBox(height: AppSpacing.md),
+          if (notice != null) ...[
+            Text(notice!, style: theme.textTheme.bodySmall?.copyWith(color: AppTones.of(context).warn.fg)),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           Text(s.scribeNoAudioCaption, style: theme.textTheme.bodySmall),
           const SizedBox(height: AppSpacing.sm),
           TextField(
