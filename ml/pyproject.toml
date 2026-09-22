@@ -28,7 +28,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "dagster>=1.9", "dagster-webserver>=1.9"]
+# openai — его импортируют тесты LlmDrafter (scribe/draft.py, intake/llm_draft.py) с подменённым клиентом;
+# без него CI (ставит только ml[dev]) падал с ModuleNotFoundError
+dev = ["pytest>=8", "ruff>=0.6", "dagster>=1.9", "dagster-webserver>=1.9", "openai>=1.50"]
 scribe = ["faster-whisper>=1.0", "openai>=1.50", "python-multipart>=0.0.9"]
 intake = ["openai>=1.50"]  # 4.6: LLM-обогащение черновика контракта, тот же провайдер, что у scribe/Insight
 
