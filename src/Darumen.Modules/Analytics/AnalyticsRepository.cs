@@ -71,7 +71,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
             parameters, cancellationToken: cancellationToken));
         var items = rows.Select(r => new AnomalyDto(
             r.Id, r.StreamId, EntityJson.Parse(r.Entity), r.Period, r.Observed, r.Expected, r.Score, r.PeerScore,
-            r.Severity, r.Kind, r.Status, r.RegionKato, r.Comment, r.MoCode, r.Affected)).ToList();
+            r.Severity, r.Kind, r.Status, r.RegionKato, r.Comment, r.MoCode, Count(r.Affected))).ToList();
         return new Paged<AnomalyDto>(items, page, size, total);
     }
 
@@ -320,7 +320,10 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
 
     private sealed record AnomalyRow(
         string Id, string StreamId, string Entity, string Period, double Observed, double Expected, double Score, double PeerScore,
-        string Severity, string Kind, string Status, string? RegionKato, string? Comment, string? MoCode, int? Affected);
+        string Severity, string Kind, string Status, string? RegionKato, string? Comment, string? MoCode, double? Affected);
+
+    /// <summary>affected публикуется из parquet как double: у сигналов по одной сущности там NaN, а не NULL.</summary>
+    private static int? Count(double? value) => value is { } d && !double.IsNaN(d) ? (int)Math.Round(d) : null;
 
     private sealed record IndexRow(string RegionKato, string NameRu, string NameKz, double ShareOver30, double P90Days, double IndexValue, long Rank, long N);
 }
