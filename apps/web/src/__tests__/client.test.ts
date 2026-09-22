@@ -19,15 +19,14 @@ describe('api client', () => {
     expect(url.searchParams.get('horizon')).toBe('3')
   })
 
-  it('sends demo role headers and parses json', async () => {
-    useAuthStore().setDemoRole('doctor')
+  it('sends the bearer token from the auth store and parses json', async () => {
+    vi.spyOn(useAuthStore(), 'authHeaders').mockResolvedValue({ Authorization: 'Bearer test-token' })
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     const body = await api<{ ok: number }>('/api/v1/streams')
     expect(body.ok).toBe(1)
     const headers = fetchMock.mock.calls[0]![1]!.headers as Headers
-    expect(headers.get('X-Actor')).toBe('doctor1')
-    expect(headers.get('X-Role')).toBe('doctor')
-    expect(headers.get('X-Region')).toBe('75')
+    expect(headers.get('Authorization')).toBe('Bearer test-token')
+    expect(headers.get('X-Actor')).toBeNull()
     expect(headers.get('Accept-Language')).toBe('ru')
   })
 

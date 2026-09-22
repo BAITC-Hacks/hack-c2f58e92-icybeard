@@ -168,8 +168,35 @@ export interface AuditEntry {
   id: number; at: string; actor: string; role: string; method: string; path: string; query: string | null; status: number; durationMs: number; traceId: string
 }
 export interface WorklistItem {
-  patientRef: string; synthetic: boolean; stage: string; expectedDate: string | null; riskFlags: string[]
-  priority: number; nextAction: string; explanation: string; moCode: string; profileCode: string; regionKato: string; daysWaiting: number
+  patientRef: string; synthetic: boolean; stage: string; stageCode: string; expectedDate: string | null; riskFlags: string[]
+  priority: number; nextAction: string; explanation: string; moCode: string; moName: string; profileCode: string; regionKato: string; daysWaiting: number
+}
+
+/** Маршрут пациента (docs/api.md, раздел Route): один контракт для гражданина (/route/me) и врача (/route/{ref}). */
+export interface RouteOrganization { moCode: string; moName: string; profileCode: string; profileName: string }
+export interface RouteStage { code: string; order: number; title: string; date: string | null; status: 'done' | 'current' | 'upcoming'; norm: string | null }
+export interface RouteDates { issuedAt: string; registeredAt: string; plannedAt: string | null; expectedAt: string }
+export interface RouteForecast { p50Days: number; p90Days: number; pWithin30Days: number | null; fromModel: boolean; model: ModelInfo | null }
+export interface RouteBenchmark { code: string; value: number; unit: string; title: string; source: string; sourceDate: string }
+export interface RouteChecklistItem {
+  code: string; title: string; validityDays: number; validityLabel: string; doneAt: string; validUntil: string; status: 'valid' | 'expiring' | 'expired'
+}
+export interface RouteDecision {
+  decisionId: string; role: string; recordedAt: string; fromMoCode: string | null; toMoCode: string; toMoName: string; reason: string | null; kind: 'redirect' | 'keep'
+}
+export interface RouteHistoryItem {
+  moCode: string; moName: string; profileCode: string; profileName: string; registeredAt: string; outcome: 'hospitalized' | 'refused'; outcomeAt: string; waitDays: number
+}
+/** Только для врача: гражданину API отдаёт doctor = null (риск отказа и приоритет — служебная информация). */
+export interface RouteDoctorPanel {
+  priority: number; riskFlags: string[]; nextAction: string; explanation: string; pRefusal: number; refusalOrgInTraining: boolean; shap: Explanation | null
+}
+export interface RouteStandardRef { source: string; sourceUrl: string; sourceDate: string; available: boolean }
+export interface PatientRoute {
+  patientRef: string; synthetic: boolean; audience: 'citizen' | 'doctor'; asOf: string; regionKato: string; organization: RouteOrganization
+  stage: string; stageTitle: string; timeline: RouteStage[]; dates: RouteDates; daysWaiting: number; forecast: RouteForecast
+  benchmarks: RouteBenchmark[]; checklist: RouteChecklistItem[]; alternatives: Alternative[]; alternativesModel: ModelInfo | null
+  decisions: RouteDecision[]; history: RouteHistoryItem[]; doctor: RouteDoctorPanel | null; basis: string; standard: RouteStandardRef
 }
 
 export interface Region { regionKato: string; name: string; capital: string; lat: number | null; lon: number | null; populationThousands: number | null }

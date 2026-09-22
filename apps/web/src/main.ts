@@ -18,18 +18,9 @@ app.use(ToastService)
 app.use(i18n)
 
 // Маршрутизатор подключается только после проверки сессии: его первая навигация сразу запускает защиту
-// маршрутов, и при переходе по прямой ссылке (например /gov/regions/19) роли уже должны быть известны.
+// маршрутов и переход по роли, и при переходе по прямой ссылке (например /gov/regions/19) роли уже должны быть известны.
 const auth = useAuthStore()
-auth
-  .init()
-  .finally(() => {
-    app.use(router)
-    app.mount('#app')
-    // Переход по роли: вошедший пользователь с общей главной попадает на свой домашний экран.
-    router.isReady().then(() => {
-      const current = router.currentRoute.value
-      if (auth.isAuthenticated && current.path === '/' && !current.query.denied) {
-        router.replace(auth.roleHome())
-      }
-    })
-  })
+auth.init().finally(() => {
+  app.use(router)
+  app.mount('#app')
+})

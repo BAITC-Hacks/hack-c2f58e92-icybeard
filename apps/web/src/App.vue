@@ -1,87 +1,16 @@
 <script setup lang="ts">
-import Button from 'primevue/button'
-import Select from 'primevue/select'
-import SelectButton from 'primevue/selectbutton'
 import Toast from 'primevue/toast'
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
-import { setLocale } from '@/i18n'
-import { ROLES, useAuthStore, type Role } from '@/stores/auth'
+import AppTopbar from '@/components/app/AppTopbar.vue'
 
-const { t, locale } = useI18n()
-const auth = useAuthStore()
-const route = useRoute()
-const router = useRouter()
-
-const links = computed(() => {
-  const items: { to: string; label: string; roles?: Role[] }[] = [
-    { to: '/wait', label: t('nav.wait') },
-    { to: '/medicines', label: t('nav.medicines') },
-    { to: '/gov', label: t('nav.gov'), roles: ['chief', 'regulator'] },
-    { to: '/gov/simulator', label: t('nav.simulator'), roles: ['regulator'] },
-    { to: '/gov/audit', label: t('nav.audit'), roles: ['regulator'] },
-    { to: '/gov/insight', label: t('nav.insight'), roles: ['chief', 'regulator'] },
-    { to: '/quality', label: t('nav.quality'), roles: ['chief', 'regulator'] },
-    { to: '/doctor/referral', label: t('nav.referral'), roles: ['doctor'] },
-    { to: '/doctor/worklist', label: t('nav.worklist'), roles: ['doctor'] },
-    { to: '/doctor/decisions', label: t('nav.decisions'), roles: ['doctor', 'regulator'] },
-    { to: '/doctor/scribe', label: t('nav.scribe'), roles: ['doctor'] },
-    { to: '/steward', label: t('nav.steward'), roles: ['steward'] },
-  ]
-  return items.filter((item) => !item.roles || auth.hasRole(...item.roles))
-})
-
-const roleOptions = ROLES.map((role: Role) => ({ label: role, value: role }))
-const localeOptions = [
-  { label: 'RU', value: 'ru' },
-  { label: 'KK', value: 'kk' },
-]
-
-function onLocale(value: 'ru' | 'kk' | null) {
-  if (value) setLocale(value)
-}
-
-/** Выбор демо-роли на главной сразу ведёт на домашний экран роли. */
-function onDemoRole(value: Role | null) {
-  auth.setDemoRole(value)
-  if (value && route.path === '/') router.push(auth.roleHome())
-}
+const { t } = useI18n()
 </script>
 
 <template>
   <div class="shell">
-    <header class="topbar">
-      <div class="inner">
-        <RouterLink class="brand" to="/">Darumen Health</RouterLink>
-        <nav>
-          <RouterLink v-for="link in links" :key="link.to" :to="link.to">{{ link.label }}</RouterLink>
-        </nav>
-        <span class="spacer" />
-        <SelectButton :model-value="locale" :options="localeOptions" option-label="label" option-value="value" size="small" @update:model-value="onLocale" />
-        <template v-if="auth.mode === 'headers'">
-          <Select
-            :model-value="auth.role"
-            :options="roleOptions"
-            option-label="label"
-            option-value="value"
-            :placeholder="t('auth.role')"
-            show-clear
-            size="small"
-            data-testid="role-select"
-            @update:model-value="onDemoRole($event)"
-          />
-          <span class="muted">{{ auth.actor ?? t('auth.guest') }} · {{ t('auth.demo') }}</span>
-        </template>
-        <template v-else>
-          <span class="muted">{{ auth.actor ?? t('auth.guest') }}</span>
-          <Button v-if="!auth.isAuthenticated" :label="t('auth.login')" size="small" @click="auth.login()" />
-          <Button v-else :label="t('auth.logout')" size="small" severity="secondary" @click="auth.logout()" />
-        </template>
-      </div>
-    </header>
+    <AppTopbar />
     <Toast />
     <RouterView />
-    <footer class="footer">Darumen Health · GovTech Camp 2026 · данные МЗ РК, I квартал 2025 и история ЭРСБ с 2012</footer>
+    <footer class="footer">{{ t('app.footer') }}</footer>
   </div>
 </template>

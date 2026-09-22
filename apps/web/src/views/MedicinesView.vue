@@ -11,6 +11,7 @@ import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
 import SeriesChart from '@/components/SeriesChart.vue'
 import { days, num, pct } from '@/lib/format'
+import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
 /** Прогноз спроса (5.7 C) на потоке rx_weekly: gold.rx_weekly хранит region_kato как константу-заглушку
@@ -22,6 +23,7 @@ const FORECAST_HORIZON = 8
 
 const { t } = useI18n()
 const refdata = useRefdataStore()
+const auth = useAuthStore()
 const nosologies = ref<Nosology[]>([])
 const mnns = ref<Mnn[]>([])
 const nosologyId = ref<string | null>(null)
@@ -59,6 +61,13 @@ async function check() {
 
 async function loadDemandForecast() {
   if (!forecastMnnId.value) return
+  // /forecast/{streamId} открыт главврачу и регулятору: гостю и врачу вместо 401/403 — подпись, кому доступен прогноз
+  if (!auth.hasRole('chief', 'regulator')) {
+    forecast.value = null
+    forecastError.value = null
+    forecastHint.value = t('medicines.demandForecastForRoles')
+    return
+  }
   forecastBusy.value = true
   forecastError.value = null
   forecast.value = null

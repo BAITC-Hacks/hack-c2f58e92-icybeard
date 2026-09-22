@@ -2,7 +2,7 @@ import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, EquipmentOrganization, EquipmentResponse, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
-  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
+  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistItem,
 } from './types'
 
@@ -53,6 +53,14 @@ export const journal = {
     api<{ items: WorklistItem[]; synthetic: boolean; modelBacked: boolean }>('/api/v1/journal/worklist', { query: filter }),
   audit: (filter: { actor?: string; page?: number; size?: number } = {}) =>
     api<Paged<AuditEntry>>('/api/v1/journal/audit', { query: filter }),
+}
+
+/** Маршрут пациента: гражданин — свой (/route/me), врач — любой из рабочего списка своего региона, с перенаправлением. */
+export const route = {
+  me: (regionKato?: string) => api<PatientRoute>('/api/v1/route/me', { query: { regionKato } }),
+  patient: (patientRef: string) => api<PatientRoute>(`/api/v1/route/${encodeURIComponent(patientRef)}`),
+  redirect: (patientRef: string, body: { toMoCode: string; reason: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/route/${encodeURIComponent(patientRef)}/redirect`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
 }
 
 export const refdata = {

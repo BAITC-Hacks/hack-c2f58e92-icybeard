@@ -10,8 +10,8 @@ page.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('GL D
 page.on('response', (r) => { if (r.url().includes('/api/v1/')) api.push(`${r.status()} ${r.url().replace('http://localhost:3000', '')}`) })
 try {
   await page.goto('http://localhost:3000/', { waitUntil: 'networkidle' })
-  console.log('home has hint:', await page.getByText('Демо-пользователи').count())
-  await page.getByRole('button', { name: 'Войти' }).click()
+  console.log('home has login panel:', await page.getByTestId('login-egov').count())
+  await page.getByTestId('login-primary').click()
   await page.waitForURL(/realms\/darumen/, { timeout: 30000 })
   await page.fill('#username', 'regulator1')
   await page.fill('#password', 'darumen')

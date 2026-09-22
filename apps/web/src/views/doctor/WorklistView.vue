@@ -55,7 +55,9 @@ watch(flag, load)
     <div class="actions" style="margin: 0 0 12px"><Select v-model="flag" :options="flags" option-label="label" option-value="value" size="small" /></div>
     <ErrorBox :error="error" />
     <DataTable :value="items" size="small" sort-field="priority" :sort-order="-1" paginator :rows="20">
-      <Column field="patientRef" :header="t('doctor.worklist.patient')" />
+      <Column :header="t('doctor.worklist.patient')">
+        <template #body="{ data }"><RouterLink :to="{ name: 'patient-route', params: { patientRef: data.patientRef } }" data-testid="worklist-patient">{{ data.patientRef }}</RouterLink></template>
+      </Column>
       <Column :header="t('common.profile')"><template #body="{ data }">{{ refdata.profileName(data.profileCode) }}</template></Column>
       <Column field="stage" :header="t('doctor.worklist.stage')" />
       <Column field="daysWaiting" :header="t('doctor.worklist.daysWaiting')" sortable />

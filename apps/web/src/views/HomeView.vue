@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import Message from 'primevue/message'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import Message from 'primevue/message'
+import LoginPanel from '@/components/app/LoginPanel.vue'
+import { roleHome } from '@/router/roles'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
@@ -13,22 +15,24 @@ const route = useRoute()
   <main class="page">
     <h1>{{ t('home.title') }}</h1>
     <p class="lead">{{ t('home.lead') }}</p>
-    <Message v-if="route.query.denied" severity="warn" :closable="false">
-      {{ t(auth.mode === 'keycloak' ? 'home.deniedKeycloak' : 'home.denied', { page: route.query.denied }) }}
-    </Message>
-    <Message v-if="auth.mode === 'keycloak' && !auth.isAuthenticated" severity="info" :closable="false">
-      {{ t('home.keycloakIntro') }} <code>darumen</code>: regulator1 ({{ t('home.roleRegulator') }}), chief1 ({{ t('home.roleChief') }}), doctor1 ({{ t('home.roleDoctor') }}),
-      steward1 ({{ t('home.roleSteward') }}), citizen1 ({{ t('home.roleCitizen') }}), admin1 ({{ t('home.roleAll') }}).
-      {{ t('home.publicPages') }}
-    </Message>
-    <Message v-else-if="auth.mode === 'headers' && !auth.isAuthenticated" severity="info" :closable="false">
-      {{ t('home.demoModeHint') }}
+    <Message v-if="route.query.denied" severity="warn" :closable="false" data-testid="denied">
+      <template v-if="auth.isAuthenticated">
+        {{ t('home.deniedRole', { page: route.query.denied }) }}
+        <RouterLink :to="roleHome(auth.role, auth.region)">{{ t('home.goHome') }}</RouterLink>
+      </template>
+      <template v-else>{{ t('home.deniedGuest', { page: route.query.denied }) }}</template>
     </Message>
     <div class="grid cols-2" style="margin-top: 16px">
-      <RouterLink class="card" to="/gov"><h2>Darumen Gov</h2><p>{{ t('home.gov') }}</p></RouterLink>
-      <RouterLink class="card" to="/doctor/referral"><h2>Darumen Care · {{ t('home.roleDoctor') }}</h2><p>{{ t('home.doctor') }}</p></RouterLink>
-      <RouterLink class="card" to="/wait"><h2>Darumen Care · {{ t('home.roleCitizen') }}</h2><p>{{ t('home.citizen') }}</p></RouterLink>
-      <RouterLink class="card" to="/steward"><h2>Data Intake Fabric</h2><p>{{ t('home.steward') }}</p></RouterLink>
+      <LoginPanel v-if="!auth.isAuthenticated" />
+      <RouterLink v-else class="card" :to="roleHome(auth.role, auth.region)" data-testid="continue">
+        <h2>{{ t('home.continueTitle') }}</h2>
+        <p class="muted">{{ auth.actor }}<template v-if="auth.role"> · {{ t('decision.role.' + auth.role) }}</template></p>
+      </RouterLink>
+      <section class="card">
+        <h2>{{ t('home.publicTitle') }}</h2>
+        <p><RouterLink to="/wait">{{ t('nav.wait') }}</RouterLink> — {{ t('home.citizen') }}</p>
+        <p><RouterLink to="/medicines">{{ t('nav.medicines') }}</RouterLink> — {{ t('home.medicines') }}</p>
+      </section>
     </div>
   </main>
 </template>

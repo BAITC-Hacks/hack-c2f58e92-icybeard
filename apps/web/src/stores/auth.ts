@@ -1,49 +1,23 @@
 import Keycloak from 'keycloak-js'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { isRole, roleHome as homeOf, type Role } from '@/router/roles'
 
-export type Role = 'citizen' | 'doctor' | 'chief' | 'regulator' | 'steward' | 'admin'
-export const ROLES: Role[] = ['citizen', 'doctor', 'chief', 'regulator', 'steward', 'admin']
+export type { Role } from '@/router/roles'
 
-/** Демо-пользователи режима заголовков; совпадают с пользователями реалма Keycloak. */
-export const DEMO_USERS: Record<Role, { actor: string; region?: string }> = {
-  citizen: { actor: 'citizen1' },
-  doctor: { actor: 'doctor1', region: '75' },
-  chief: { actor: 'chief1', region: '75' },
-  regulator: { actor: 'regulator1' },
-  steward: { actor: 'steward1' },
-  admin: { actor: 'admin1' },
-}
-
-const STORAGE_KEY = 'darumen.role'
-
-function isRole(value: unknown): value is Role {
-  return typeof value === 'string' && (ROLES as string[]).includes(value)
-}
-
-function readStorage(): Role | null {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    return isRole(saved) ? saved : null
-  } catch {
-    return null
-  }
-}
-
-function writeStorage(role: Role | null) {
-  try {
-    if (role) localStorage.setItem(STORAGE_KEY, role)
-    else localStorage.removeItem(STORAGE_KEY)
-  } catch {
-    // приватный режим браузера: роль не сохраняется
-  }
+/** Клеймы токена, которые читает клиент; region_kato — атрибут пользователя (маппер клиента darumen-web в realm). */
+interface TokenClaims {
+  preferred_username?: string
+  realm_access?: { roles?: string[] }
+  region_kato?: string
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const mode = ref<'headers' | 'keycloak'>(import.meta.env.VITE_AUTH_MODE === 'keycloak' ? 'keycloak' : 'headers')
   const actor = ref<string | null>(null)
   const roles = ref<Role[]>([])
   const region = ref<string | null>(null)
+  /** Keycloak не ответил при старте: вместо кнопки входа — подпись, публичные страницы работают. */
+  const keycloakUnavailable = ref(false)
   let keycloak: Keycloak | null = null
 
   const isAuthenticated = computed(() => actor.value !== null)
@@ -54,17 +28,13 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function readToken() {
-    const parsed = (keycloak?.tokenParsed ?? {}) as { preferred_username?: string; realm_access?: { roles?: string[] }; region_kato?: string }
+    const parsed = (keycloak?.tokenParsed ?? {}) as TokenClaims
     actor.value = parsed.preferred_username ?? null
     roles.value = (parsed.realm_access?.roles ?? []).filter(isRole)
     region.value = parsed.region_kato ?? null
   }
 
   async function init() {
-    if (mode.value === 'headers') {
-      setDemoRole(readStorage())
-      return
-    }
     keycloak = new Keycloak({
       url: import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8080',
       realm: import.meta.env.VITE_KEYCLOAK_REALM ?? 'darumen',
@@ -84,42 +54,13 @@ export const useAuthStore = defineStore('auth', () => {
         window.history.replaceState(null, '', window.location.pathname + window.location.search)
       }
     } catch (error) {
+      keycloakUnavailable.value = true
       console.warn('Keycloak недоступен, вход отключён', error)
     }
   }
 
-  function setDemoRole(next: Role | null) {
-    if (!next) {
-      actor.value = null
-      roles.value = []
-      region.value = null
-      writeStorage(null)
-      return
-    }
-    const user = DEMO_USERS[next]
-    actor.value = user.actor
-    roles.value = [next]
-    region.value = user.region ?? null
-    writeStorage(next)
-  }
-
-  /** Домашний экран роли: гражданин → ожидание, врач → рабочий список, главврач → свой регион, регулятор → карта, стюард → консоль. */
   function roleHome(): string {
-    switch (role.value) {
-      case 'citizen':
-        return '/wait'
-      case 'doctor':
-        return '/doctor/worklist'
-      case 'chief':
-        return region.value ? `/gov/regions/${region.value}` : '/gov'
-      case 'regulator':
-      case 'admin':
-        return '/gov'
-      case 'steward':
-        return '/steward'
-      default:
-        return '/'
-    }
+    return homeOf(role.value, region.value)
   }
 
   /** Куда вернуться после входа: на страницу, с которой отправили домой из-за роли, иначе на текущую. */
@@ -128,32 +69,26 @@ export const useAuthStore = defineStore('auth', () => {
     return denied && denied.startsWith('/') && !denied.startsWith('//') ? denied : window.location.pathname
   }
 
-  async function login() {
-    if (mode.value === 'keycloak') await keycloak?.login({ redirectUri: window.location.origin + returnPath() })
+  /** Вход через Keycloak (PKCE). idpHint — брокер realm (например eGov), когда он настроен: docs/egov-auth.md. */
+  async function login(options: { idpHint?: string } = {}) {
+    await keycloak?.login({ redirectUri: window.location.origin + returnPath(), ...options })
   }
 
   async function logout() {
-    if (mode.value === 'keycloak') await keycloak?.logout({ redirectUri: window.location.origin })
-    else setDemoRole(null)
+    await keycloak?.logout({ redirectUri: window.location.origin })
   }
 
-  /** Заголовки для API: Bearer из Keycloak (с обновлением) или X-Actor/X-Role/X-Region. */
+  /** Заголовки для API: Bearer из Keycloak с обновлением токена; без сессии — пусто (публичные эндпоинты). */
   async function authHeaders(): Promise<Record<string, string>> {
-    if (mode.value === 'keycloak') {
-      if (!keycloak?.token) return {}
-      try {
-        await keycloak.updateToken(30)
-        readToken()
-      } catch {
-        return {}
-      }
-      return { Authorization: `Bearer ${keycloak.token}` }
+    if (!keycloak?.token) return {}
+    try {
+      await keycloak.updateToken(30)
+      readToken()
+    } catch {
+      return {}
     }
-    if (!actor.value) return {}
-    const headers: Record<string, string> = { 'X-Actor': actor.value, 'X-Role': roles.value.join(',') }
-    if (region.value) headers['X-Region'] = region.value
-    return headers
+    return { Authorization: `Bearer ${keycloak.token}` }
   }
 
-  return { mode, actor, roles, role, region, isAuthenticated, hasRole, init, setDemoRole, roleHome, login, logout, authHeaders }
+  return { actor, roles, role, region, isAuthenticated, keycloakUnavailable, hasRole, init, roleHome, login, logout, authHeaders }
 })
