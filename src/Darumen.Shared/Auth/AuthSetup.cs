@@ -41,6 +41,7 @@ public static class AuthSetup
         services.AddAuthorization(policies =>
         {
             policies.AddPolicy(Policies.Authenticated, p => p.RequireAuthenticatedUser());
+            policies.AddPolicy(Policies.Citizen, p => p.RequireRole(Roles.Citizen, Roles.Admin));
             policies.AddPolicy(Policies.Doctor, p => p.RequireRole(Roles.Doctor, Roles.Admin));
             policies.AddPolicy(Policies.Regulator, p => p.RequireRole(Roles.Regulator, Roles.Admin));
             policies.AddPolicy(Policies.Steward, p => p.RequireRole(Roles.Steward, Roles.Admin));

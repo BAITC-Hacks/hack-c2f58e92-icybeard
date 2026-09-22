@@ -35,5 +35,10 @@ public static class RefDataEndpoints
         group.MapGet("/vaccination-plans", async (string? regionKato, IRefDataRepository repository, CancellationToken ct) =>
                 Results.Ok(new { items = await repository.VaccinationPlansAsync(regionKato, ct) }))
             .WithName("VaccinationPlans").WithSummary("Коды планов вакцинации, встречающиеся в данных — для переключателя потока на странице региона");
+
+        group.MapGet("/route-standard", async (HttpRequest http, IRefDataRepository repository, CancellationToken ct) =>
+                Results.Ok(await repository.RouteStandardAsync(Locale.From(http), ct)))
+            .WithName("RouteStandard").WithSummary("Стандарт стационарной помощи (приказ МЗ РК ҚР-ДСМ-27): стадии маршрута, чек-лист приложения 5 со сроками давности, причины отказа и ориентир МЗ РК по ожиданию — логистика, не медицинские рекомендации")
+            .Produces<RouteStandardDto>();
     }
 }

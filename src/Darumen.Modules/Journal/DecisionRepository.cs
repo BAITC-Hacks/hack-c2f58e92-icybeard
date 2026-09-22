@@ -59,11 +59,11 @@ public sealed class DecisionRepository(IDbContextOutbox<DarumenDbContext> outbox
         return (dto, true);
     }
 
-    public async Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, int page, int size, CancellationToken cancellationToken)
+    public async Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, string? subjectId, int page, int size, CancellationToken cancellationToken)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
-        const string where = "WHERE (@actor IS NULL OR actor = @actor) AND (@subject IS NULL OR subject = @subject)";
-        var parameters = new { actor, subject, size, offset = (page - 1) * size };
+        const string where = "WHERE (@actor IS NULL OR actor = @actor) AND (@subject IS NULL OR subject = @subject) AND (@subjectId IS NULL OR subject_id = @subjectId)";
+        var parameters = new { actor, subject, subjectId, size, offset = (page - 1) * size };
         var total = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
             $"SELECT count(*) FROM journal.decisions {where}", parameters, cancellationToken: cancellationToken));
         var rows = await connection.QueryAsync<Row>(new CommandDefinition(

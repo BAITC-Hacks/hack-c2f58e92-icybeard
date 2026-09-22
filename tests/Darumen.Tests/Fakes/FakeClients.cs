@@ -51,6 +51,26 @@ public sealed class FakeQueueClient : QueueIntelligence.QueueIntelligenceClient
     public override AsyncUnaryCall<PredictRefusalResponse> PredictRefusalAsync(PredictWaitRequest request, CallOptions options) => Grpc.Unary(OnPredictRefusal(request));
 
     public override AsyncUnaryCall<AlternativesResponse> AlternativesAsync(AlternativesRequest request, CallOptions options) => Grpc.Unary(OnAlternatives(request));
+
+    /// <summary>Пакетный прогноз собирается из тех же OnPredictWait/OnPredictRefusal, что и одиночные вызовы: сценарий
+    /// «сервис моделей упал» (обработчики бросают RpcException) роняет и пакет, как настоящий сервис.</summary>
+    public override AsyncUnaryCall<PredictQueuesResponse> PredictQueuesAsync(PredictQueuesRequest request, CallOptions options)
+    {
+        var response = new PredictQueuesResponse { Model = Grpc.Model() };
+        foreach (var queue in request.Queues)
+        {
+            var probe = new PredictWaitRequest { Region = request.Region, MoCode = queue.MoCode, ProfileCode = queue.ProfileCode, RegistrationDate = request.RegistrationDate };
+            var wait = OnPredictWait(probe);
+            var refusal = OnPredictRefusal(probe);
+            response.Forecasts.Add(new QueueForecast
+            {
+                Queue = queue, P50Days = wait.P50Days, P90Days = wait.P90Days, PWithin30Days = wait.PWithin30Days,
+                PRefusal = refusal.PRefusal, OrgInTraining = refusal.OrgInTraining,
+            });
+        }
+
+        return Grpc.Unary(response);
+    }
 }
 
 public sealed class FakeForecastClient : LoadForecasting.LoadForecastingClient

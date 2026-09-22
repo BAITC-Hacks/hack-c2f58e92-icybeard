@@ -132,6 +132,24 @@ def test_refusal_explained_as_risk(served):
     assert 0 <= res.p_refusal <= 1 and "риск" in res.explanation.summary_ru and "дн." not in res.explanation.factors[0].text_ru
 
 
+def test_predict_queues_batches_known_queues_and_reports_unknown_ones(served):
+    """Пакет для рабочего списка: известные очереди получают те же числа, что одиночный PredictWait без
+    категориальных признаков; неизвестные организация и профиль — строку error, а не abort всего пакета."""
+    _, queue, _, _ = served
+    res = queue.PredictQueues(queue_pb2.PredictQueuesRequest(
+        region=common_pb2.RegionRef(kato="10"), registration_date="2025-04-01",
+        queues=[queue_pb2.QueueRef(mo_code="0003", profile_code="381"), queue_pb2.QueueRef(mo_code="ZZZZ", profile_code="381"),
+                queue_pb2.QueueRef(mo_code="0003", profile_code="999")]))
+    by_key = {(f.queue.mo_code, f.queue.profile_code): f for f in res.forecasts}
+    assert set(by_key) == {("0003", "381"), ("ZZZZ", "381"), ("0003", "999")} and res.model.name == "wait_quantile"
+    known = by_key[("0003", "381")]
+    assert known.error == "" and known.p90_days >= known.p50_days >= 0 and 0 <= known.p_within_30_days <= 1 and 0 <= known.p_refusal <= 1
+    single = queue.PredictWait(queue_pb2.PredictWaitRequest(region=common_pb2.RegionRef(kato="10"), mo_code="0003", profile_code="381",
+                                                            registration_date="2025-04-01"))
+    assert known.p50_days == pytest.approx(single.p50_days) and known.p90_days == pytest.approx(single.p90_days)
+    assert "unknown mo_code" in by_key[("ZZZZ", "381")].error and "unknown profile_code" in by_key[("0003", "999")].error
+
+
 @pytest.mark.parametrize("request_, code", [
     (_request(profile_code="999"), grpc.StatusCode.INVALID_ARGUMENT),
     (_request(mo_code="ZZZZ"), grpc.StatusCode.NOT_FOUND),

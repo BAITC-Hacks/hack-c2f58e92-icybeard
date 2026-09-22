@@ -69,6 +69,36 @@ class QueueIntelligenceServicer(queue_pb2_grpc.QueueIntelligenceServicer):
             p_refusal=float(pred["p_refusal"].to_numpy() @ weights), org_in_training=org_in_training,
             explanation=explanation(self.state, top, target="refusal"), model=model_info(self.state))
 
+    def PredictQueues(self, request, context):
+        """One forecast per queue of the region for the doctor's worklist: rows are built per profile (feature_rows
+        takes one profile and many organisations), unknown profiles or organisations come back with `error` instead
+        of aborting the whole batch, and there are no explanations — PredictWait gives them for one queue."""
+        state = self.state
+        trained_orgs = set(state.wait.categories.get("mo_code", []))
+        by_profile: dict[str, list[str]] = {}
+        for queue in request.queues:
+            by_profile.setdefault(queue.profile_code, []).append(queue.mo_code)
+        forecasts: list[queue_pb2.QueueForecast] = []
+        for profile, mo_codes in by_profile.items():
+            if profile not in state.known_profiles:
+                forecasts += [queue_pb2.QueueForecast(queue=queue_pb2.QueueRef(mo_code=mo, profile_code=profile),
+                                                      error=f"unknown profile_code '{profile}'") for mo in mo_codes]
+                continue
+            known = [mo for mo in mo_codes if mo in state.known_organisations]
+            forecasts += [queue_pb2.QueueForecast(queue=queue_pb2.QueueRef(mo_code=mo, profile_code=profile),
+                                                  error=f"unknown mo_code '{mo}'") for mo in mo_codes if mo not in state.known_organisations]
+            if not known:
+                continue
+            rows = state.feature_rows(known, profile, "", "", "", "", request.registration_date, "")
+            pred = state.wait.predict(rows)
+            for i, mo in enumerate(known):
+                forecasts.append(queue_pb2.QueueForecast(
+                    queue=queue_pb2.QueueRef(mo_code=mo, profile_code=profile),
+                    p50_days=float(pred["p50_days"].iloc[i]), p90_days=float(pred["p90_days"].iloc[i]),
+                    p_within_30_days=float(pred["p_within_30"].iloc[i]), p_refusal=float(pred["p_refusal"].iloc[i]),
+                    org_in_training=mo in trained_orgs))
+        return queue_pb2.PredictQueuesResponse(forecasts=forecasts, model=model_info(state))
+
     def Alternatives(self, request, context):
         state, base = self.state, request.base
         if base.profile_code not in state.known_profiles:

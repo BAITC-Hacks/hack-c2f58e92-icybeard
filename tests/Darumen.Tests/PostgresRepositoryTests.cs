@@ -1,5 +1,6 @@
 using Darumen.Modules.Analytics;
 using Darumen.Modules.Journal;
+using Darumen.Modules.Medicines;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
 using Darumen.Shared.Data;
@@ -68,8 +69,20 @@ public sealed class PostgresRepositoryTests
 
         // запись решений идёт через outbox и проверяется в KafkaIntegrationTests; здесь только чтение
         var decisions = new DecisionRepository(null!, Factory());
-        var page = await decisions.ListAsync(null, "referral", 1, 5, CancellationToken.None);
+        var page = await decisions.ListAsync(null, "referral", null, 1, 5, CancellationToken.None);
         Assert.True(page.Total >= 0 && page.Items.Count <= 5);
+    }
+
+    /// <summary>Выпадающий список МНН: внутри нозологии каждый МНН один раз. МНН 286 при нозологии 110 лежит в витрине
+    /// в трёх категориях (63, 64, 68); до правки MnnAsync возвращал его трижды и ронял выбор в мобильном клиенте.</summary>
+    [SkippableFact]
+    public async Task Mnn_ids_are_unique_within_nosology()
+    {
+        var repository = new MedicinesRepository(Factory());
+        var rows = await repository.MnnAsync("110", 100, CancellationToken.None);
+        Assert.NotEmpty(rows);
+        Assert.Equal(rows.Count, rows.Select(r => r.MnnId).Distinct().Count());
+        Assert.All(rows, r => Assert.Equal("110", r.NosologyId));
     }
 
     /// <summary>Пропускает тест без DARUMEN_PG_TEST=1, чтобы CI без Postgres оставался зелёным.</summary>

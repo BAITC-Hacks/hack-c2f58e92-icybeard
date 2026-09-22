@@ -60,6 +60,32 @@ public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
         Assert.NotEmpty(items);
     }
 
+    /// <summary>Реф включает профиль: у организации с очередями по двум профилям пациенты не должны получать одинаковые
+    /// номера, иначе маршрут по рефу (/route/{patientRef}) неоднозначен. Заодно фиксируется формат, разбор рефа и
+    /// машинные коды стадий.</summary>
+    [Fact]
+    public void Worklist_refs_are_unique_across_profiles_of_one_organisation()
+    {
+        var states = new List<QueueStateRow>
+        {
+            new(InMemoryWorklist.AsOf, "M1", "Тест", "381", "75", 100, 20, 40, 5.0, 0.1, 20, 40),
+            new(InMemoryWorklist.AsOf, "M1", "Тест", "021", "75", 100, 20, 40, 5.0, 0.1, 20, 40),
+        };
+        var items = WorklistBuilder.Build(states, new Dictionary<(string, string), QueuePrediction>());
+        Assert.True(items.Count >= 2);
+        Assert.Equal(items.Count, items.Select(i => i.PatientRef).Distinct().Count());
+        Assert.All(items, i =>
+        {
+            Assert.True(RoutePatientRef.TryParse(i.PatientRef, out var parsed));
+            Assert.Equal(i.MoCode, parsed!.MoCode);
+            Assert.Equal(i.ProfileCode, parsed.ProfileCode);
+            Assert.Equal(i.PatientRef, parsed.Format());
+            Assert.Contains(i.StageCode, new[] { WorklistBuilder.StageRegistered, WorklistBuilder.StageWaiting, WorklistBuilder.StageCalled });
+        });
+        Assert.False(RoutePatientRef.TryParse("SYN-75-028B-01", out _));
+        Assert.False(RoutePatientRef.TryParse("SYN-75-028B-381-00", out _));
+    }
+
     [Fact]
     public async Task Worklist_endpoint_uses_the_doctor_region()
     {
@@ -70,5 +96,32 @@ public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
         Assert.NotEmpty(body.Items);
         var empty = await app.CreateClient("doctor", "doctor2", "10").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
         Assert.Empty(empty!.Items);
+    }
+
+    /// <summary>Прогнозы по очередям региона запрашиваются пакетом и кэшируются на срез витрины (QueuePredictions):
+    /// повторный запрос списка не обращается к модели вовсе, а состав и порядок строк совпадают с первым.</summary>
+    [Fact]
+    public async Task Worklist_predictions_are_batched_and_cached_between_requests()
+    {
+        var doctor = app.CreateClient("doctor", "doctor1", "75");
+        var first = await doctor.GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
+        var previous = app.Queue.OnPredictWait;
+        var calls = 0;
+        app.Queue.OnPredictWait = request =>
+        {
+            calls++;
+            return previous(request);
+        };
+        try
+        {
+            var second = await doctor.GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
+            Assert.Equal(0, calls);
+            Assert.True(second!.ModelBacked);
+            Assert.Equal(first!.Items.Select(i => i.PatientRef), second.Items.Select(i => i.PatientRef));
+        }
+        finally
+        {
+            app.Queue.OnPredictWait = previous;
+        }
     }
 }

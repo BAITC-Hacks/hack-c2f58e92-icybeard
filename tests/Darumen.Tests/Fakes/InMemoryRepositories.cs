@@ -160,17 +160,25 @@ public sealed class InMemoryDecisions : IDecisionRepository
             }
         }
 
-        var dto = new DecisionDto(Guid.NewGuid(), decision.Actor, decision.Role, decision.Subject, decision.SubjectId, null, null, decision.Reason, DateTimeOffset.UtcNow);
+        var dto = new DecisionDto(Guid.NewGuid(), decision.Actor, decision.Role, decision.Subject, decision.SubjectId,
+            ParseJson(decision.RecommendedJson), ParseJson(decision.ChosenJson), decision.Reason, DateTimeOffset.UtcNow);
         _rows.Add((dto, decision.IdempotencyKey));
         Published.Add(outboxEvent(dto));
         return Task.FromResult((dto, true));
     }
 
-    public Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, int page, int size, CancellationToken cancellationToken)
+    public Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, string? subjectId, int page, int size, CancellationToken cancellationToken)
     {
-        var items = _rows.Select(r => r.Decision).Where(d => (actor is null || d.Actor == actor) && (subject is null || d.Subject == subject)).ToList();
+        var items = _rows.Select(r => r.Decision)
+            .Where(d => (actor is null || d.Actor == actor) && (subject is null || d.Subject == subject) && (subjectId is null || d.SubjectId == subjectId))
+            .OrderByDescending(d => d.RecordedAt)
+            .ToList();
         return Task.FromResult(new Paged<DecisionDto>(items, page, size, items.Count));
     }
+
+    // как DecisionRepository: recommended/chosen хранятся JSON-текстом и отдаются JsonElement — маршрут читает из них moCode
+    private static System.Text.Json.JsonElement? ParseJson(string? json) =>
+        json is null ? null : System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
 }
 
 public sealed class InMemoryRefData : IRefDataRepository
@@ -197,6 +205,35 @@ public sealed class InMemoryRefData : IRefDataRepository
 
     public Task<IReadOnlyList<string>> VaccinationPlansAsync(string? regionKato, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<string>>(regionKato is null or "75" ? ["Национальный календарь", "По эпидпоказаниям"] : []);
+
+    /// <summary>Сокращённый Стандарт: те же коды стадий и типичные сроки давности приложения 5, что в refdata/route_standard.yaml.</summary>
+    public Task<RouteStandardDto> RouteStandardAsync(string lang, CancellationToken cancellationToken)
+    {
+        var kk = lang == Locale.Kk;
+        const string source = "Стандарт стационарной помощи, приказ МЗ РК № ҚР-ДСМ-27 (ред. 15.09.2025)";
+        return Task.FromResult(new RouteStandardDto(
+            new RouteStandardMetaDto(source, "https://adilet.zan.kz/rus/docs/V2200027218", "2025-09-15"),
+            true,
+            [
+                new("referral_issued", 1, kk ? "Жолдама берілді" : "Направление выдано", "1 рабочий день", null, null, null),
+                new("examination", 2, kk ? "Тексеру" : "Обследование", "приложение 5", null, null, null),
+                new("waitlisted", 3, kk ? "Күту парағына енгізілді" : "Внесено в лист ожидания", "регистрация в Портале", null, null, null),
+                new("date_assigned", 4, kk ? "Күні белгіленді" : "Дата назначена", "в течение 2 рабочих дней", 2, 2, null),
+                new("hospitalized", 5, kk ? "Емдеуге жатқызу" : "Госпитализация", "приёмное отделение", null, null, null),
+                new("refused", 5, kk ? "Бас тарту" : "Отказ", "неявка 2 дня", null, null, 2),
+            ],
+            [new("no_indications", "нет показаний"), new("contraindications", "противопоказания"), new("no_show_2_days", "неявка 2 дня"), new("non_core_profile", "непрофильная")],
+            [
+                new("cbc", kk ? "Жалпы қан талдауы" : "Общий анализ крови", 14, kk ? "14 күн" : "14 дней"),
+                new("ecg", "ЭКГ", 14, kk ? "14 күн" : "14 дней"),
+                new("hiv", kk ? "АИТВ" : "ВИЧ", 180, kk ? "6 ай" : "6 месяцев"),
+                new("fluorography", kk ? "Флюорография" : "Флюорография", 365, kk ? "12 ай" : "12 месяцев"),
+            ],
+            [
+                new("moh_avg_wait_days", 30, "days", kk ? "Орташа күту мерзімі" : "Средний срок ожидания", "МЗ РК, коллегия 19.02.2026", "2026-02-19"),
+                new("moh_target_wait_days", 20, "days", kk ? "Мақсатты күту мерзімі" : "Целевой срок ожидания", "МЗ РК, коллегия 19.02.2026", "2026-02-19"),
+            ]));
+    }
 }
 
 public sealed class InMemoryWorklist : IWorklistRepository

@@ -44,6 +44,22 @@ public sealed class QueueService(
         return new AlternativesResponseDto(items, response.Model.ToDto());
     }
 
+    /// <summary>Все очереди региона одним вызовом (для рабочего списка); очереди, которых модель не знает, в ответ не
+    /// попадают — вызывающий считает их по агрегатам витрины. Дедлайн пакетный: сотни очередей за один вызов.</summary>
+    public async Task<QueueForecastsDto> PredictQueuesAsync(
+        string regionKato, IEnumerable<(string MoCode, string ProfileCode)> queues, string registrationDate, CancellationToken cancellationToken)
+    {
+        var request = new PredictQueuesRequest { Region = new RegionRef { Kato = regionKato }, RegistrationDate = registrationDate };
+        request.Queues.AddRange(queues.Select(q => new QueueRef { MoCode = q.MoCode, ProfileCode = q.ProfileCode }));
+        var response = await client.PredictQueuesAsync(
+            request, deadline: DateTime.UtcNow.AddSeconds(options.Value.BatchTimeoutSeconds), cancellationToken: cancellationToken);
+        var items = response.Forecasts
+            .Where(f => string.IsNullOrEmpty(f.Error))
+            .Select(f => new QueueForecastDto(f.Queue.MoCode, f.Queue.ProfileCode, f.P50Days, f.P90Days, f.PWithin30Days, f.PRefusal, f.OrgInTraining))
+            .ToList();
+        return new QueueForecastsDto(items, response.Model.ToDto());
+    }
+
     internal static PredictWaitRequest ToProto(PredictRequestDto dto) => new()
     {
         Region = new RegionRef { Kato = dto.RegionKato ?? string.Empty },

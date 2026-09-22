@@ -8,5 +8,6 @@ public interface IDecisionRepository
     /// возвращает уже записанное (Created = false) и ничего не публикует.</summary>
     Task<(DecisionDto Decision, bool Created)> RecordAsync(NewDecision decision, Func<DecisionDto, object> outboxEvent, CancellationToken cancellationToken);
 
-    Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, int page, int size, CancellationToken cancellationToken);
+    /// <summary>subjectId — решения по одному предмету (например, реф пациента для маршрута); null — без фильтра.</summary>
+    Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, string? subjectId, int page, int size, CancellationToken cancellationToken);
 }

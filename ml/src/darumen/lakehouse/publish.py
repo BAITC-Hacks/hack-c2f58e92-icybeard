@@ -148,6 +148,50 @@ def vaccination_frame() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def route_standard_frames(seed_dir: Path | None = None) -> dict[str, pd.DataFrame]:
+    """Стандарт стационарной помощи (приказ МЗ РК ҚР-ДСМ-27) из refdata/route_standard.yaml: стадии маршрута,
+    причины отказа, чек-лист приложения 5 и ориентир МЗ РК по ожиданию — четыре витрины refdata.route_*.
+    Источник и дата редакции кладутся в каждую строку, чтобы интерфейс подписывал норматив без второго запроса;
+    у ориентиров свой источник (коллегия МЗ), он перекрывает общий. Пустой словарь, если файла нет."""
+    import yaml
+
+    from ..refdata.build import SEED_DIR
+
+    path = (seed_dir or SEED_DIR) / "route_standard.yaml"
+    if not path.exists():
+        return {}
+    doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    meta = doc.get("meta") or {}
+    stamp = {"source": str(meta.get("source", "")), "source_url": str(meta.get("source_url", "")),
+             "source_date": str(meta.get("source_date", ""))}
+
+    def rows(key: str, fields: dict[str, type]) -> pd.DataFrame:
+        out = []
+        for item in doc.get(key) or []:
+            row = dict(stamp)
+            for name, cast in fields.items():
+                value = item.get(name)
+                if value is None and name in stamp:
+                    continue  # у строки нет своего источника — остаётся общий из meta
+                row[name] = None if value is None else cast(value)
+            out.append(row)
+        frame = pd.DataFrame(out)
+        for name, cast in fields.items():
+            if cast is int and name in frame:
+                frame[name] = frame[name].astype("Int64")  # nullable, иначе DuckDB видит object-колонку
+        return frame
+
+    return {
+        "refdata.route_stages": rows("stages", {"code": str, "stage_order": int, "title_ru": str, "title_kk": str, "norm_ru": str,
+                                                "norm_kk": str, "norm_working_days": int, "reschedule_max_days": int, "no_show_days": int}),
+        "refdata.route_refusal_reasons": rows("refusal_reasons", {"code": str, "title_ru": str, "title_kk": str}),
+        "refdata.route_checklist": rows("checklist", {"code": str, "title_ru": str, "title_kk": str, "validity_days": int,
+                                                      "validity_label_ru": str, "validity_label_kk": str}),
+        "refdata.route_benchmarks": rows("benchmarks", {"code": str, "value": float, "unit": str, "title_ru": str, "title_kk": str,
+                                                        "source": str, "source_date": str}),
+    }
+
+
 def batches_frame(lake: Lakehouse) -> pd.DataFrame:
     """Партии загрузки из манифестов lakehouse — консоль стюарда работает и без Kafka."""
     rows = []
@@ -217,6 +261,11 @@ def publish_postgres(lake: Lakehouse, dsn: str = DEFAULT_PG_DSN, streams: dict[s
         if len(vaccination):
             con.register("vaccination_df", vaccination)
             counts["refdata.vaccination_wuenic"] = _replace_pg_table(con, "refdata.vaccination_wuenic", "SELECT * FROM vaccination_df", ["vaccine", "year"])
+        for name, frame in route_standard_frames().items():
+            if len(frame):
+                view = name.replace(".", "_") + "_df"
+                con.register(view, frame)
+                counts[name] = _replace_pg_table(con, name, f"SELECT * FROM {view}", ["code"])
         streams = load_streams() if streams is None else streams
         con.register("streams_df", streams_frame(streams))
         counts["gold.streams"] = _replace_pg_table(con, "gold.streams", "SELECT * FROM streams_df", ["stream_id"])

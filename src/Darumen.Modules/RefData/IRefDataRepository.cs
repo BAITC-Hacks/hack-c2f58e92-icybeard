@@ -17,4 +17,8 @@ public interface IRefDataRepository
     /// <summary>Коды планов вакцинации, встречающиеся в данных (для переключателя потока на странице региона);
     /// пусто, пока витрина не опубликована.</summary>
     Task<IReadOnlyList<string>> VaccinationPlansAsync(string? regionKato, CancellationToken cancellationToken);
+
+    /// <summary>Стандарт стационарной помощи для маршрута пациента (подписи по lang); RouteStandardDto.Empty, пока
+    /// витрины не опубликованы.</summary>
+    Task<RouteStandardDto> RouteStandardAsync(string lang, CancellationToken cancellationToken);
 }

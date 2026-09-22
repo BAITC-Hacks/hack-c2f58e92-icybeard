@@ -4,8 +4,9 @@ using Microsoft.AspNetCore.Http;
 
 namespace Darumen.Shared.Api;
 
-/// <summary>Кто делает запрос: из claims (JWT Keycloak или схема заголовков).</summary>
-public sealed record CurrentUser(string Actor, string Role, string? RegionKato)
+/// <summary>Кто делает запрос: из claims (JWT Keycloak или схема заголовков). Iin — ИИН гражданина из клейма `iin`
+/// (в демо-realm синтетический); нигде не логируется и не хранится, используется только как устойчивый сид маршрута.</summary>
+public sealed record CurrentUser(string Actor, string Role, string? RegionKato, string? Iin = null)
 {
     public const string Anonymous = "anonymous";
     public const string NoRole = "none";
@@ -22,6 +23,6 @@ public sealed record CurrentUser(string Actor, string Role, string? RegionKato)
         var actor = principal.FindFirst(DarumenClaims.Name)?.Value ?? principal.Identity.Name ?? Anonymous;
         var roles = principal.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
         var role = Roles.All.FirstOrDefault(roles.Contains) ?? roles.FirstOrDefault() ?? NoRole;
-        return new CurrentUser(actor, role, principal.FindFirst(DarumenClaims.Region)?.Value);
+        return new CurrentUser(actor, role, principal.FindFirst(DarumenClaims.Region)?.Value, principal.FindFirst(DarumenClaims.Iin)?.Value);
     }
 }

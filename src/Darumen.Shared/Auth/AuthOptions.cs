@@ -34,6 +34,8 @@ public static class Roles
 public static class Policies
 {
     public const string Authenticated = "authenticated";
+    /// <summary>Гражданин видит только свой маршрут (/route/me); публичные экраны ожидания и лекарств политики не требуют.</summary>
+    public const string Citizen = "citizen";
     public const string Doctor = "doctor";
     public const string Regulator = "regulator";
     public const string Steward = "steward";
@@ -45,5 +47,7 @@ public static class DarumenClaims
 {
     public const string Name = "preferred_username";
     public const string Region = "region_kato";
+    /// <summary>ИИН гражданина (маппер `iin` на клиентах darumen-web и darumen-mobile); в демо-realm значения синтетические.</summary>
+    public const string Iin = "iin";
     public const string RealmAccess = "realm_access";
 }

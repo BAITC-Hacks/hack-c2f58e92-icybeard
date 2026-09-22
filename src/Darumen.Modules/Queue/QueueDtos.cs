@@ -28,6 +28,11 @@ public sealed record AlternativeDto(OrganizationDto Mo, double P50Days, double P
 
 public sealed record AlternativesResponseDto(IReadOnlyList<AlternativeDto> Items, ModelInfoDto Model);
 
+/// <summary>Пакетный прогноз по очередям региона (PredictQueues): без объяснений, только числа для рабочего списка.</summary>
+public sealed record QueueForecastDto(string MoCode, string ProfileCode, double P50Days, double P90Days, double PWithin30Days, double PRefusal, bool OrgInTraining);
+
+public sealed record QueueForecastsDto(IReadOnlyList<QueueForecastDto> Items, ModelInfoDto Model);
+
 public sealed record QueueDayDto(string Day, int Registered, int Hospitalized, int Refused, int QueueLen, double? QueueAgeP50);
 
 public sealed record ThroughputDto(string Day, double ThroughputPerDay, double? RefusalRate4w, double? WaitP50Days, double? WaitP90Days);

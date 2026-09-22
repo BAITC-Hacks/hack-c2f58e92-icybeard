@@ -100,5 +100,63 @@ public sealed class RefDataRepository(IDbConnectionFactory db) : IRefDataReposit
         }
     }
 
+    public async Task<RouteStandardDto> RouteStandardAsync(string lang, CancellationToken cancellationToken)
+    {
+        await using var connection = await db.OpenAsync(cancellationToken);
+        var kk = lang == Locale.Kk;
+        try
+        {
+            var stages = (await connection.QueryAsync<StageRow>(new CommandDefinition(
+                """
+                SELECT code AS Code, stage_order::int AS StageOrder, title_ru AS TitleRu, title_kk AS TitleKk, norm_ru AS NormRu, norm_kk AS NormKk,
+                       norm_working_days::int AS NormWorkingDays, reschedule_max_days::int AS RescheduleMaxDays, no_show_days::int AS NoShowDays,
+                       source AS Source, source_url AS SourceUrl, source_date AS SourceDate
+                FROM refdata.route_stages ORDER BY stage_order, code
+                """, cancellationToken: cancellationToken))).ToList();
+            var reasons = (await connection.QueryAsync<TitledRow>(new CommandDefinition(
+                "SELECT code AS Code, title_ru AS TitleRu, title_kk AS TitleKk FROM refdata.route_refusal_reasons ORDER BY code",
+                cancellationToken: cancellationToken))).ToList();
+            var checklist = (await connection.QueryAsync<ChecklistRow>(new CommandDefinition(
+                """
+                SELECT code AS Code, title_ru AS TitleRu, title_kk AS TitleKk, validity_days::int AS ValidityDays,
+                       validity_label_ru AS ValidityLabelRu, validity_label_kk AS ValidityLabelKk
+                FROM refdata.route_checklist ORDER BY validity_days, code
+                """, cancellationToken: cancellationToken))).ToList();
+            var benchmarks = (await connection.QueryAsync<BenchmarkRow>(new CommandDefinition(
+                """
+                SELECT code AS Code, value::float8 AS Value, unit AS Unit, title_ru AS TitleRu, title_kk AS TitleKk, source AS Source, source_date AS SourceDate
+                FROM refdata.route_benchmarks ORDER BY code
+                """, cancellationToken: cancellationToken))).ToList();
+            if (stages.Count == 0)
+            {
+                return RouteStandardDto.Empty;
+            }
+
+            return new RouteStandardDto(
+                new RouteStandardMetaDto(stages[0].Source, stages[0].SourceUrl, stages[0].SourceDate),
+                true,
+                stages.Select(s => new RouteStageDefDto(s.Code, s.StageOrder, Pick(kk, s.TitleRu, s.TitleKk), Pick(kk, s.NormRu, s.NormKk), s.NormWorkingDays, s.RescheduleMaxDays, s.NoShowDays)).ToList(),
+                reasons.Select(r => new RouteRefusalReasonDto(r.Code, Pick(kk, r.TitleRu, r.TitleKk))).ToList(),
+                checklist.Select(c => new RouteChecklistDefDto(c.Code, Pick(kk, c.TitleRu, c.TitleKk), c.ValidityDays, Pick(kk, c.ValidityLabelRu, c.ValidityLabelKk))).ToList(),
+                benchmarks.Select(b => new RouteBenchmarkDto(b.Code, b.Value, b.Unit, Pick(kk, b.TitleRu, b.TitleKk), b.Source, b.SourceDate)).ToList());
+        }
+        catch (Npgsql.PostgresException e) when (e.SqlState == "42P01")
+        {
+            return RouteStandardDto.Empty; // витрины refdata.route_* появятся после make publish
+        }
+    }
+
+    private static string Pick(bool kk, string ru, string? kkText) => kk && !string.IsNullOrWhiteSpace(kkText) ? kkText : ru;
+
     private sealed record RegionRow(string RegionKato, string NameRu, string? NameKz, string Capital, double? Lat, double? Lon, int? PopulationThousands);
+
+    private sealed record StageRow(
+        string Code, int StageOrder, string TitleRu, string? TitleKk, string NormRu, string? NormKk, int? NormWorkingDays, int? RescheduleMaxDays,
+        int? NoShowDays, string Source, string SourceUrl, string SourceDate);
+
+    private sealed record TitledRow(string Code, string TitleRu, string? TitleKk);
+
+    private sealed record ChecklistRow(string Code, string TitleRu, string? TitleKk, int ValidityDays, string ValidityLabelRu, string? ValidityLabelKk);
+
+    private sealed record BenchmarkRow(string Code, double Value, string Unit, string TitleRu, string? TitleKk, string Source, string SourceDate);
 }

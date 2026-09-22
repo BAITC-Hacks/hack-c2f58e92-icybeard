@@ -57,10 +57,25 @@ public sealed class MedicinesRepository(IDbConnectionFactory db) : IMedicinesRep
     public async Task<IReadOnlyList<MnnDto>> MnnAsync(string nosologyId, int limit, CancellationToken cancellationToken)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
+        // gold.rx_mnn: одна строка на (drug_mnn_id, nosology_id, category_id) — внутри одной нозологии МНН встречается
+        // в нескольких категориях (например, МНН 286 при нозологии 110 — категории 63, 64, 68). Список для выбора
+        // должен содержать каждый МНН один раз: объём суммируем по категориям, категорию показываем самую массовую
+        // (DISTINCT ON), как в TopMnnAsync. Иначе выпадающий список клиента получает дубликаты значений и падает.
         var rows = await connection.QueryAsync<MnnDto>(new CommandDefinition(
             """
-            SELECT drug_mnn_id AS MnnId, nosology_id AS NosologyId, category_id AS CategoryId, issued_12m AS Issued12m, fulfilled_12m AS Fulfilled12m, fill_days_p50 AS FillDaysP50
-            FROM gold.rx_mnn WHERE nosology_id = @nosologyId AND drug_mnn_id <> 'unknown' ORDER BY issued_12m DESC LIMIT @limit
+            WITH totals AS (
+                SELECT drug_mnn_id, sum(issued_12m)::bigint AS issued_12m, sum(fulfilled_12m)::bigint AS fulfilled_12m,
+                       avg(fill_days_p50) AS fill_days_p50
+                FROM gold.rx_mnn WHERE nosology_id = @nosologyId AND drug_mnn_id <> 'unknown' GROUP BY drug_mnn_id
+            ),
+            top_category AS (
+                SELECT DISTINCT ON (drug_mnn_id) drug_mnn_id, category_id
+                FROM gold.rx_mnn WHERE nosology_id = @nosologyId AND drug_mnn_id <> 'unknown' ORDER BY drug_mnn_id, issued_12m DESC
+            )
+            SELECT t.drug_mnn_id AS MnnId, @nosologyId AS NosologyId, c.category_id AS CategoryId,
+                   t.issued_12m AS Issued12m, t.fulfilled_12m AS Fulfilled12m, t.fill_days_p50 AS FillDaysP50
+            FROM totals t JOIN top_category c USING (drug_mnn_id)
+            ORDER BY t.issued_12m DESC LIMIT @limit
             """,
             new { nosologyId, limit }, cancellationToken: cancellationToken));
         return rows.ToList();

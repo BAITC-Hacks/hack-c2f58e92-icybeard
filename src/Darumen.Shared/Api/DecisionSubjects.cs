@@ -8,4 +8,8 @@ public static class DecisionSubjects
 
     /// <summary>Сигнал аномалии: recommended/chosen вида {"status": "…"}, subject_id — id сигнала.</summary>
     public const string Anomaly = "anomaly";
+
+    /// <summary>Маршрут пациента: перенаправление врачом, recommended/chosen вида {"moCode": "…"}, subject_id — реф
+    /// синтетического пациента (SYN-регион-организация-профиль-NN); гражданин видит эти решения на своём маршруте.</summary>
+    public const string Route = "route";
 }

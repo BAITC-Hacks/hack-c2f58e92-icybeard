@@ -6,6 +6,14 @@ ENV_FILE ?= .env
 # если .env ещё не создан (до cp .env.example .env), флаг не добавляем, чтобы compose не падал на отсутствующем файле
 COMPOSE ?= docker compose $(if $(wildcard $(ENV_FILE)),--env-file $(ENV_FILE),) -f infra/docker-compose.yml
 LOAD_ENV = $(if $(wildcard $(ENV_FILE)),set -a; . ./$(ENV_FILE); set +a;,)
+# macOS arm64: grpc.tools везёт для macOS только x64-protoc, без Rosetta он не запускается («Bad CPU type in executable»).
+# Если стоят нативные protoc и grpc_csharp_plugin из Homebrew (brew install protobuf grpc), Grpc.Tools берёт их.
+ifeq ($(shell uname -sm 2>/dev/null),Darwin arm64)
+ifneq ($(wildcard /opt/homebrew/bin/protoc),)
+export PROTOBUF_PROTOC ?= /opt/homebrew/bin/protoc
+export GRPC_PROTOC_PLUGIN ?= /opt/homebrew/bin/grpc_csharp_plugin
+endif
+endif
 
 help: ## Список целей
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-14s %s\n", $$1, $$2}'

@@ -130,7 +130,7 @@ public sealed class InsightReportService(
     {
         var from = DateOnly.ParseExact(month + "-01", "yyyy-MM-dd");
         var to = from.AddMonths(1);
-        var page = await decisions.ListAsync(null, null, 1, 5000, ct);
+        var page = await decisions.ListAsync(null, null, null, 1, 5000, ct);
         return page.Items
             .Where(d => d.RecordedAt.UtcDateTime >= from.ToDateTime(TimeOnly.MinValue) && d.RecordedAt.UtcDateTime < to.ToDateTime(TimeOnly.MinValue))
             .ToList();

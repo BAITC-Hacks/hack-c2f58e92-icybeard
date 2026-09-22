@@ -11,6 +11,35 @@ service QueueIntelligence {
   rpc PredictWait(PredictWaitRequest) returns (PredictWaitResponse);
   rpc PredictRefusal(PredictWaitRequest) returns (PredictRefusalResponse);
   rpc Alternatives(AlternativesRequest) returns (AlternativesResponse);
+  // Пакетный прогноз для рабочего списка: одна строка на очередь (организация × профиль) региона, без объяснений —
+  // объяснение по одной очереди даёт PredictWait. Один вызов вместо двух на каждую из сотен очередей региона.
+  rpc PredictQueues(PredictQueuesRequest) returns (PredictQueuesResponse);
+}
+
+message QueueRef {
+  string mo_code = 1;
+  string profile_code = 2;
+}
+
+message PredictQueuesRequest {
+  RegionRef region = 1;
+  repeated QueueRef queues = 2;
+  string registration_date = 3; // YYYY-MM-DD, дата среза витрины: модель не видит календарь за пределами обучения
+}
+
+message QueueForecast {
+  QueueRef queue = 1;
+  double p50_days = 2;
+  double p90_days = 3;
+  double p_within_30_days = 4;
+  double p_refusal = 5;
+  bool org_in_training = 6;
+  string error = 7; // непустая строка — очередь не распознана моделью (профиль или организация), прогноза нет
+}
+
+message PredictQueuesResponse {
+  repeated QueueForecast forecasts = 1;
+  ModelInfo model = 2;
 }
 
 message PredictWaitRequest {

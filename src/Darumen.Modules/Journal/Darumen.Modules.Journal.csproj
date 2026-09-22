@@ -15,6 +15,7 @@
     <ProjectReference Include="..\..\Darumen.Contracts\Darumen.Contracts.csproj" />
     <ProjectReference Include="..\..\Darumen.Migrations\Darumen.Migrations.csproj" />
     <ProjectReference Include="..\Queue\Darumen.Modules.Queue.csproj" />
+    <ProjectReference Include="..\RefData\Darumen.Modules.RefData.csproj" />
   </ItemGroup>
 
 </Project>

@@ -11,8 +11,11 @@ namespace Darumen.Modules.Journal;
 /// по конкретному диагнозу пациента, только за оценку по организации и профилю.</summary>
 public sealed record QueuePrediction(double P50Days, double P90Days, double PRefusal, bool FromModel);
 
+/// <summary>Stage — подпись стадии по-русски для текущих клиентов; StageCode — машинный код той же стадии
+/// (<see cref="WorklistBuilder.StageRegistered"/>, <see cref="WorklistBuilder.StageWaiting"/>, <see cref="WorklistBuilder.StageCalled"/>),
+/// который клиенты локализуют сами (RU/KK). PatientRef — см. <see cref="RoutePatientRef"/>.</summary>
 public sealed record WorklistItemDto(
-    string PatientRef, bool Synthetic, string Stage, string? ExpectedDate, IReadOnlyList<string> RiskFlags, int Priority,
+    string PatientRef, bool Synthetic, string Stage, string StageCode, string? ExpectedDate, IReadOnlyList<string> RiskFlags, int Priority,
     string NextAction, string Explanation, string MoCode, string MoName, string ProfileCode, string RegionKato, int DaysWaiting);
 
 /// <summary>ModelBacked — прогноз модели получен хотя бы для одной очереди (иначе показывать в UI
@@ -59,6 +62,9 @@ public static class WorklistBuilder
     public const int MaxPerQueue = 6;
     public const double RefusalRiskThreshold = 0.2;
     public const double FasterByDays = 7;
+    public const string StageRegistered = "registered";
+    public const string StageWaiting = "waiting";
+    public const string StageCalled = "called";
 
     /// <summary>predictions — прогноз модели по одной очереди (mo_code, profile_code), см. <see cref="QueuePrediction"/>.
     /// Приоритет и флаг риска отказа считаются по нему, а не по формуле на сырых полях витрины (3.6): при
@@ -80,10 +86,10 @@ public static class WorklistBuilder
         foreach (var state in states)
         {
             var prediction = predictions.GetValueOrDefault((state.MoCode, state.ProfileCode)) ?? Fallback(state);
-            var count = (int)Math.Clamp(Math.Round(MaxItems * (double)state.QueueLen / total), 1, MaxPerQueue);
+            var count = CountFor(state, total);
             for (var i = 0; i < count; i++)
             {
-                items.Add(Item(state, i, prediction, fastest.GetValueOrDefault(state.ProfileCode, double.NaN)));
+                items.Add(BuildItem(state, i, prediction, fastest.GetValueOrDefault(state.ProfileCode, double.NaN)));
             }
         }
 
@@ -91,15 +97,29 @@ public static class WorklistBuilder
         return filtered.OrderByDescending(i => i.Priority).ThenByDescending(i => i.DaysWaiting).Take(MaxItems).ToList();
     }
 
+    /// <summary>Сколько синтетических пациентов приходится на очередь: пропорционально её доле в регионе, от 1 до
+    /// MaxPerQueue. Публично, чтобы маршрут (/route/{patientRef}) проверял, существует ли номер пациента в очереди.</summary>
+    public static int CountFor(QueueStateRow state, long total) =>
+        total <= 0 ? 0 : (int)Math.Clamp(Math.Round(MaxItems * (double)state.QueueLen / total), 1, MaxPerQueue);
+
+    /// <summary>Минимальное медианное ожидание по профилю среди организаций региона (флаг «есть быстрее»); NaN без данных.</summary>
+    public static double FastestP50(IReadOnlyList<QueueStateRow> states, string profileCode)
+    {
+        var known = states.Where(s => s.ProfileCode == profileCode && s.WaitP50 is not null).Select(s => s.WaitP50!.Value).ToList();
+        return known.Count == 0 ? double.NaN : known.Min();
+    }
+
     /// <summary>Прогноз недоступен (сервис моделей упал или организация вне обучения) — тот же расчёт,
     /// что был единственным до 3.6, на агрегатах витрины вместо модели; FromModel = false.</summary>
-    private static QueuePrediction Fallback(QueueStateRow state)
+    public static QueuePrediction Fallback(QueueStateRow state)
     {
         var p50 = state.QueueAgeP50 ?? 10;
         return new QueuePrediction(state.WaitP50 ?? p50, state.WaitP90 ?? p50 * 2, state.RefusalRate4w ?? 0, false);
     }
 
-    private static WorklistItemDto Item(QueueStateRow state, int index, QueuePrediction prediction, double fastestP50)
+    /// <summary>Одна строка рабочего списка: index — номер пациента в очереди (0..CountFor−1), реф получает index+1.
+    /// Публично, чтобы маршрут регенерировал ту же строку по рефу без пересборки всего списка.</summary>
+    public static WorklistItemDto BuildItem(QueueStateRow state, int index, QueuePrediction prediction, double fastestP50)
     {
         var seed = Seed($"{state.MoCode}|{state.ProfileCode}|{index}");
         var p50 = state.QueueAgeP50 ?? 10;
@@ -126,7 +146,13 @@ public static class WorklistBuilder
         }
 
         var remaining = Math.Max(0, expectedWait - daysWaiting);
-        var stage = daysWaiting == 0 ? "зарегистрирован" : remaining <= 3 ? "вызов на госпитализацию" : "ожидает";
+        var stageCode = daysWaiting == 0 ? StageRegistered : remaining <= 3 ? StageCalled : StageWaiting;
+        var stage = stageCode switch
+        {
+            StageRegistered => "зарегистрирован",
+            StageCalled => "вызов на госпитализацию",
+            _ => "ожидает",
+        };
         // 3.6: приоритет = насколько пациент уже пережидает прогноз модели (не абсолютные дни) + предсказанный
         // моделью риск отказа — оба слагаемых из прогноза, а не только число флагов, как было до 3.6
         var overdue = expectedWait > 0 ? daysWaiting / expectedWait : (daysWaiting > 0 ? 2.0 : 0.0);
@@ -141,12 +167,13 @@ public static class WorklistBuilder
         var explanation = $"очередь {state.QueueLen} направлений, {(prediction.FromModel ? "прогноз ожидания" : "медианное ожидание")} {expectedWait:0} дн., " +
                           $"{(prediction.FromModel ? "прогноз риска отказа" : "отказы за 4 недели")} {prediction.PRefusal:P0}";
         return new WorklistItemDto(
-            $"SYN-{state.RegionKato}-{state.MoCode}-{index + 1:00}", true, stage,
+            new RoutePatientRef(state.RegionKato, state.MoCode, state.ProfileCode, index + 1).Format(), true, stage, stageCode,
             state.AsOf.AddDays((int)Math.Round(remaining)).ToString("yyyy-MM-dd"), flags, priority, nextAction, explanation,
             state.MoCode, state.MoName, state.ProfileCode, state.RegionKato, daysWaiting);
     }
 
-    private static uint Seed(string key)
+    /// <summary>FNV-1a: детерминированный сид по строковому ключу (та же функция нужна маршруту для дат и истории).</summary>
+    public static uint Seed(string key)
     {
         uint hash = 2166136261;
         foreach (var c in key)

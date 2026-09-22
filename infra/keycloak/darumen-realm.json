@@ -49,7 +49,8 @@
         "http://localhost:4173/*",
         "http://localhost:8000/*",
         "http://localhost:3000/*",
-        "http://web/*"
+        "http://web/*",
+        "https://dc.jurek.kz/*"
       ],
       "webOrigins": [
         "+"
@@ -67,6 +68,20 @@
           "config": {
             "user.attribute": "region_kato",
             "claim.name": "region_kato",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "iin",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "iin",
+            "claim.name": "iin",
             "jsonType.label": "String",
             "id.token.claim": "true",
             "access.token.claim": "true",
@@ -123,6 +138,20 @@
           }
         },
         {
+          "name": "iin",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "iin",
+            "claim.name": "iin",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
           "name": "audience darumen-api",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
@@ -160,7 +189,15 @@
       ],
       "realmRoles": [
         "citizen"
-      ]
+      ],
+      "attributes": {
+        "region_kato": [
+          "75"
+        ],
+        "iin": [
+          "000000000001"
+        ]
+      }
     },
     {
       "username": "doctor1",
