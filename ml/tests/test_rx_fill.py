@@ -2,7 +2,6 @@
 плюс gold/rx_fill_by_mnn.parquet для сервиса лекарств (5.7 A)."""
 import numpy as np
 import pandas as pd
-import pytest
 
 from darumen.intake.pipeline import Lakehouse
 from darumen.models.rx_fill import train_rx_fill

@@ -82,8 +82,8 @@ def train_rx_fill(lake: Lakehouse, out_dir: Path) -> dict:
     y = test["fill_days"].to_numpy()
     report = {
         "name": "rx_fill_p50", "version": VERSION,
-        "train_rows": int(len(train)), "test_rows": int(len(test)),
-        "train_window": f"{TRAIN_FROM}..{TEST_FROM}", "test_window": f"{TEST_FROM}..{str(df['day'].max())}",
+        "train_rows": len(train), "test_rows": len(test),
+        "train_window": f"{TRAIN_FROM}..{TEST_FROM}", "test_window": f"{TEST_FROM}..{df['day'].max()!s}",
         "pinball_p50": round(pinball50(y, pred), 4), "pinball_p50_baseline": round(pinball50(y, base), 4),
         "mae": round(float(np.mean(np.abs(y - pred))), 3), "mae_baseline": round(float(np.mean(np.abs(y - base))), 3),
         "median_fill_days": global_median,
@@ -116,7 +116,7 @@ def train_rx_fill(lake: Lakehouse, out_dir: Path) -> dict:
     gold = lake.root / "gold"
     gold.mkdir(parents=True, exist_ok=True)
     cells.to_parquet(gold / "rx_fill_by_mnn.parquet", index=False)
-    report["cells"] = int(len(cells))
+    report["cells"] = len(cells)
     write_json(out_dir / "report.json", report)
     return report
 

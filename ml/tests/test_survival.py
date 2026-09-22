@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
 
-from darumen.intake.pipeline import Lakehouse
-from darumen.models.survival import train_survival
-
 # Тот же синтетический features_wait.parquet, что и в test_models.synthetic_features (2.1):
 # split уже размечен на train/valid/test_time/test_mo, ровно то, что читает survival._dataset.
-from test_models import synthetic_features  # noqa: E402
+from test_models import synthetic_features
+
+from darumen.intake.pipeline import Lakehouse
+from darumen.models.survival import train_survival
 
 
 def _lake_with_features_wait(tmp_path, df: pd.DataFrame) -> Lakehouse:

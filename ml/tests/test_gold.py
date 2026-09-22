@@ -3,7 +3,7 @@ from pathlib import Path
 import duckdb
 
 from darumen.intake.contracts import load_contracts
-from darumen.intake.pipeline import Lakehouse, run_batch
+from darumen.intake.pipeline import run_batch
 from darumen.lakehouse.gold import build_gold
 from darumen.refdata.build import build_refdata
 

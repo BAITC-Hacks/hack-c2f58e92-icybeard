@@ -14,7 +14,7 @@ def test_route_standard_frames_cover_stages_checklist_reasons_and_benchmarks_wit
 
     stages = frames["refdata.route_stages"]
     assert list(stages["code"]) == ["referral_issued", "examination", "waitlisted", "date_assigned", "hospitalized", "refused"]
-    assert sorted(set(int(v) for v in stages["stage_order"])) == [1, 2, 3, 4, 5]
+    assert sorted({int(v) for v in stages["stage_order"]}) == [1, 2, 3, 4, 5]
     by_code = stages.set_index("code")
     assert int(by_code.loc["date_assigned", "norm_working_days"]) == 2
     assert int(by_code.loc["refused", "no_show_days"]) == 2
@@ -25,7 +25,7 @@ def test_route_standard_frames_cover_stages_checklist_reasons_and_benchmarks_wit
     checklist = frames["refdata.route_checklist"]
     assert len(checklist) == 10
     assert (checklist["validity_days"] > 0).all()
-    assert set(int(v) for v in checklist["validity_days"]) == {14, 30, 180, 365}
+    assert {int(v) for v in checklist["validity_days"]} == {14, 30, 180, 365}
 
     benchmarks = frames["refdata.route_benchmarks"].set_index("code")
     assert benchmarks.loc["moh_avg_wait_days", "value"] == 30
