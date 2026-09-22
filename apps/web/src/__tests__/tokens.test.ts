@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import tokens from '../../../../design/tokens.json'
 
 // vitest отдаёт импорт .css пустой строкой даже с ?raw — читаем файл напрямую (cwd vitest — apps/web)
 const css = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8')
+// design/tokens.json лежит в корне репозитория, вне apps/web: статический импорт ломает vue-tsc в Docker-сборке
+// (в образ копируется только apps/web), поэтому читаем файл так же, как tokens.css
+const tokens = JSON.parse(readFileSync(resolve(process.cwd(), '../../design/tokens.json'), 'utf8')) as Record<string, Record<string, string>>
 
 /** Роль из design/tokens.json → переменная в tokens.css. */
 const VARS: Record<string, string> = {
@@ -25,7 +27,7 @@ describe('design tokens', () => {
     ['dark', 'html.darumen-dark'],
   ])('%s theme in tokens.css matches design/tokens.json', (theme, selector) => {
     const vars = block(selector)
-    const expected = (tokens as Record<string, Record<string, string>>)[theme]!
+    const expected = tokens[theme]!
     for (const [role, variable] of Object.entries(VARS)) {
       expect(vars[variable], `${variable} for ${role}`).toBe(expected[role]!.toUpperCase())
     }

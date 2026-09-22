@@ -171,6 +171,8 @@ export interface WorklistItem {
   patientRef: string; synthetic: boolean; stage: string; stageCode: string; expectedDate: string | null; riskFlags: string[]
   priority: number; nextAction: string; nextActionCode: string; explanation: string; moCode: string; moName: string; profileCode: string; regionKato: string; daysWaiting: number
 }
+/** Конверт /journal/worklist: modelBacked=false — прогнозы посчитаны по агрегатам витрины, а не моделью. */
+export interface WorklistResponse { items: WorklistItem[]; synthetic: boolean; asOf: string; regionKato: string; modelBacked: boolean }
 
 /** Маршрут пациента (docs/api.md, раздел Route): один контракт для гражданина (/route/me) и врача (/route/{ref}). */
 export interface RouteOrganization { moCode: string; moName: string; profileCode: string; profileName: string }

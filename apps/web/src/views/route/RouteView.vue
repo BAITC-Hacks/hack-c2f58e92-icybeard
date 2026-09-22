@@ -19,7 +19,7 @@ import Section from '@/components/ui/Section.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { days, pct, refusalWords } from '@/lib/format'
-import { checklistTone, dateShort, nextActionKey, outcomeTone, stageTone } from '@/lib/route'
+import { checklistTone, dateShort, nextActionKey, outcomeTone, stageTone, type Tone } from '@/lib/route'
 
 /** Один экран для двух ролей: без patientRef — «Мой путь» гражданина (/route/me), с ним — маршрут пациента для врача
  * (/route/{ref}) с панелью врача и перенаправлением. Числа — только из API, каждое с меткой происхождения. */
@@ -38,8 +38,9 @@ let redirectKey = ''
 const isDoctor = computed(() => data.value?.doctor !== null && data.value?.doctor !== undefined)
 const target = computed(() => data.value?.benchmarks.find((b) => b.code === 'moh_target_wait_days') ?? null)
 const expired = computed(() => data.value?.checklist.filter((c) => c.status === 'expired').length ?? 0)
-const tone = (severity: string): 'neutral' | 'ok' | 'warn' | 'danger' | 'accent' =>
-  ({ success: 'ok', warn: 'warn', danger: 'danger', info: 'accent', secondary: 'neutral' })[severity] ?? 'neutral'
+// тон PrimeVue-подобных помощников lib/route → тон StatusTag
+const STATUS_TONES = { success: 'ok', warn: 'warn', danger: 'danger', info: 'accent', secondary: 'neutral' } as const satisfies Record<Tone, string>
+const tone = (severity: Tone): (typeof STATUS_TONES)[Tone] => STATUS_TONES[severity]
 
 async function load() {
   busy.value = true

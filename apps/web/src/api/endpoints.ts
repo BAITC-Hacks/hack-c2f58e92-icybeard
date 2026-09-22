@@ -3,7 +3,7 @@ import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, EquipmentOrganization, EquipmentResponse, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
   LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, RouteStandard, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
-  SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistItem,
+  SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistResponse,
 } from './types'
 
 export const queue = {
@@ -50,7 +50,7 @@ export const journal = {
   decisions: (filter: { actor?: string; subject?: string; page?: number; size?: number }) =>
     api<Paged<Decision>>('/api/v1/journal/decisions', { query: filter }),
   worklist: (filter: { regionKato?: string; flag?: string } = {}) =>
-    api<{ items: WorklistItem[]; synthetic: boolean; modelBacked: boolean }>('/api/v1/journal/worklist', { query: filter }),
+    api<WorklistResponse>('/api/v1/journal/worklist', { query: filter }),
   audit: (filter: { actor?: string; page?: number; size?: number } = {}) =>
     api<Paged<AuditEntry>>('/api/v1/journal/audit', { query: filter }),
 }
