@@ -2,25 +2,27 @@
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import Select from 'primevue/select'
-import Tag from 'primevue/tag'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
 import { journal } from '@/api/endpoints'
 import type { WorklistItem } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
-import OriginTag from '@/components/OriginTag.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import PageShell from '@/components/ui/PageShell.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
 const { t } = useI18n()
 const refdata = useRefdataStore()
 const auth = useAuthStore()
-const router = useRouter()
 const items = ref<WorklistItem[]>([])
 const modelBacked = ref(false)
+const asOf = ref('')
 const flag = ref<string | null>(null)
 const error = ref<unknown>(null)
+const busy = ref(true)
 const flags = computed(() => [
   { label: t('doctor.worklist.flagAll'), value: null },
   { label: t('doctor.worklist.flagStuck'), value: 'stuck_over_30' },
@@ -28,18 +30,25 @@ const flags = computed(() => [
   { label: t('doctor.worklist.flagFaster'), value: 'faster_alternative' },
 ])
 
+const flagLabels = computed<Record<string, string>>(() => ({
+  stuck_over_30: t('doctor.worklist.flagStuckShort'), refusal_risk: t('doctor.worklist.flagRiskShort'), faster_alternative: t('doctor.worklist.flagFasterShort'),
+}))
+const flagTones: Record<string, 'warn' | 'danger' | 'accent'> = { stuck_over_30: 'warn', refusal_risk: 'danger', faster_alternative: 'accent' }
+
 async function load() {
   error.value = null
+  busy.value = true
   try {
     const response = await journal.worklist({ regionKato: auth.region ?? undefined, flag: flag.value ?? undefined })
     items.value = response.items
     modelBacked.value = response.modelBacked
+    asOf.value = response.asOf
   } catch (e) {
     error.value = e
+  } finally {
+    busy.value = false
   }
 }
-
-const flagLabels = computed<Record<string, string>>(() => ({ stuck_over_30: t('doctor.worklist.flagStuckShort'), refusal_risk: t('doctor.worklist.flagRiskShort'), faster_alternative: t('doctor.worklist.flagFasterShort') }))
 
 onMounted(async () => {
   await refdata.load()
@@ -49,23 +58,34 @@ watch(flag, load)
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('doctor.worklist.title') }} <OriginTag :kind="modelBacked ? 'ml' : 'formula'" :note="modelBacked ? t('doctor.worklist.note') : t('doctor.worklist.noteFallback')" /></h1>
-    <p class="lead synthetic">{{ t('doctor.worklist.lead') }}</p>
-    <div class="actions" style="margin: 0 0 12px"><Select v-model="flag" :options="flags" option-label="label" option-value="value" size="small" /></div>
+  <PageShell
+    :title="t('doctor.worklist.title')"
+    :origin="modelBacked ? 'ml' : 'formula'"
+    :origin-note="modelBacked ? t('doctor.worklist.note') : t('doctor.worklist.noteFallback')"
+    :synthetic="asOf ? `${t('doctor.worklist.lead')} · ${t('doctor.worklist.asOf', { date: asOf })}` : t('doctor.worklist.lead')"
+  >
+    <template #actions><Select v-model="flag" :options="flags" option-label="label" option-value="value" size="small" /></template>
     <ErrorBox :error="error" />
-    <DataTable :value="items" size="small" sort-field="priority" :sort-order="-1" paginator :rows="20">
+    <Skeleton v-if="busy && items.length === 0" kind="table" :lines="8" />
+    <EmptyState v-else-if="items.length === 0" :title="t('doctor.worklist.empty')" />
+    <DataTable v-else :value="items" size="small" sort-field="priority" :sort-order="-1" paginator :rows="20">
       <Column :header="t('doctor.worklist.patient')">
-        <template #body="{ data }"><RouterLink :to="{ name: 'patient-route', params: { patientRef: data.patientRef } }" data-testid="worklist-patient">{{ data.patientRef }}</RouterLink></template>
+        <template #body="{ data }"><RouterLink :to="{ name: 'patient-route', params: { patientRef: data.patientRef } }" class="mono" data-testid="worklist-patient">{{ data.patientRef }}</RouterLink></template>
       </Column>
       <Column :header="t('common.profile')"><template #body="{ data }">{{ refdata.profileName(data.profileCode) }}</template></Column>
       <Column field="stage" :header="t('doctor.worklist.stage')" />
       <Column field="daysWaiting" :header="t('doctor.worklist.daysWaiting')" sortable />
       <Column field="expectedDate" :header="t('doctor.worklist.expectedDate')" />
-      <Column :header="t('doctor.worklist.flags')"><template #body="{ data }"><Tag v-for="f in data.riskFlags" :key="f" :value="flagLabels[f] ?? f" severity="warn" style="margin-right: 4px" /></template></Column>
+      <Column :header="t('doctor.worklist.flags')">
+        <template #body="{ data }"><StatusTag v-for="f in data.riskFlags" :key="f" :value="flagLabels[f] ?? f" :tone="flagTones[f] ?? 'neutral'" style="margin-right: 4px" /></template>
+      </Column>
       <Column field="priority" :header="t('doctor.worklist.priority')" sortable />
       <Column :header="t('doctor.worklist.nextStep')"><template #body="{ data }"><span>{{ data.nextAction }}</span><br /><span class="muted">{{ data.explanation }}</span></template></Column>
-      <Column header=""><template #body="{ data }"><a href="#" @click.prevent="router.push({ name: 'referral', query: { moCode: data.moCode, profileCode: data.profileCode } })">{{ t('doctor.worklist.openReferral') }}</a></template></Column>
+      <Column header=""><template #body="{ data }"><RouterLink :to="{ name: 'referral', query: { moCode: data.moCode, profileCode: data.profileCode } }">{{ t('doctor.worklist.openReferral') }}</RouterLink></template></Column>
     </DataTable>
-  </main>
+  </PageShell>
 </template>
+
+<style scoped>
+.mono { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+</style>

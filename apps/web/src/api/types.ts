@@ -192,6 +192,13 @@ export interface RouteDoctorPanel {
   priority: number; riskFlags: string[]; nextAction: string; explanation: string; pRefusal: number; refusalOrgInTraining: boolean; shap: Explanation | null
 }
 export interface RouteStandardRef { source: string; sourceUrl: string; sourceDate: string; available: boolean }
+/** Справочник Стандарта стационарной помощи (GET /refdata/route-standard): стадии, причины отказа, обследования, ориентиры МЗ РК. */
+export interface RouteStageDef { code: string; order: number; title: string; norm: string; normWorkingDays: number | null; rescheduleMaxDays: number | null; noShowDays: number | null }
+export interface RouteChecklistDef { code: string; title: string; validityDays: number; validityLabel: string }
+export interface RouteStandard {
+  meta: { source: string; sourceUrl: string; sourceDate: string }; available: boolean; stages: RouteStageDef[]
+  refusalReasons: { code: string; title: string }[]; checklist: RouteChecklistDef[]; benchmarks: RouteBenchmark[]
+}
 export interface PatientRoute {
   patientRef: string; synthetic: boolean; audience: 'citizen' | 'doctor'; asOf: string; regionKato: string; organization: RouteOrganization
   stage: string; stageTitle: string; timeline: RouteStage[]; dates: RouteDates; daysWaiting: number; forecast: RouteForecast

@@ -3,14 +3,17 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
-import Tag from 'primevue/tag'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { journal } from '@/api/endpoints'
 import type { AuditEntry } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import { useLocaleFormat } from '@/composables/useLocaleFormat'
+import PageShell from '@/components/ui/PageShell.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { dateTime } = useLocaleFormat()
 
 const items = ref<AuditEntry[]>([])
 const total = ref(0)
@@ -52,9 +55,7 @@ onMounted(load)
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('gov.audit.title') }}</h1>
-    <p class="lead">{{ t('gov.audit.lead') }}</p>
+  <PageShell :title="t('gov.audit.title')" :lead="t('gov.audit.lead')">
 
     <div class="actions" style="margin: 0 0 12px; align-items: center">
       <div class="field" style="margin: 0">
@@ -80,7 +81,7 @@ onMounted(load)
       @page="onPage"
     >
       <Column field="at" :header="t('gov.audit.colWhen')">
-        <template #body="{ data }">{{ new Date(data.at).toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }}</template>
+        <template #body="{ data }">{{ dateTime(data.at) }}</template>
       </Column>
       <Column field="actor" :header="t('gov.audit.colActor')" />
       <Column field="role" :header="t('gov.audit.colRole')" />
@@ -88,11 +89,11 @@ onMounted(load)
       <Column field="path" :header="t('gov.audit.colPath')" />
       <Column field="query" :header="t('gov.audit.colQuery')" />
       <Column field="status" :header="t('gov.audit.colStatus')">
-        <template #body="{ data }"><Tag :value="data.status" :severity="data.status < 400 ? 'success' : 'danger'" /></template>
+        <template #body="{ data }"><StatusTag :value="String(data.status)" :tone="data.status < 400 ? 'ok' : 'danger'" /></template>
       </Column>
       <Column field="durationMs" :header="t('gov.audit.colDuration')" />
       <Column field="traceId" :header="t('gov.audit.colTrace')" />
       <template #empty>{{ t('gov.audit.empty') }}</template>
     </DataTable>
-  </main>
+  </PageShell>
 </template>

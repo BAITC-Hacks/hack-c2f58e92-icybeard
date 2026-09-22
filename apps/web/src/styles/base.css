@@ -1,0 +1,70 @@
+/* Базовые стили и общие классы страниц. Цвета — только через токены из tokens.css (обе темы). */
+:root {
+  font-family: var(--dm-font-sans);
+  font-size: var(--dm-text-base);
+  line-height: 1.45;
+  color: var(--dm-ink);
+  background: var(--dm-bg);
+  -webkit-font-smoothing: antialiased;
+  /* прежние имена переменных — их ещё используют существующие экраны */
+  --darumen-bg: var(--dm-bg);
+  --darumen-ink: var(--dm-ink);
+  --darumen-muted: var(--dm-muted);
+  --darumen-accent: var(--dm-accent);
+  --darumen-card: var(--dm-surface);
+  --darumen-border: var(--dm-hairline);
+}
+
+body { margin: 0; background: var(--dm-bg); color: var(--dm-ink); }
+a { color: var(--dm-accent); }
+h1, h2, h3 { font-weight: 600; letter-spacing: -0.01em; }
+.tabular, .kpi .value, .contribution, td.num, .num { font-variant-numeric: tabular-nums; }
+
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+.page { width: min(1320px, 100% - 32px); margin: 0 auto; padding-block: var(--dm-space-5); flex: 1; }
+.page h1 { font-size: 1.5rem; margin: 0 0 4px; }
+.page .lead { color: var(--dm-muted); margin: 0 0 var(--dm-space-4); }
+.grid { display: grid; gap: var(--dm-space-4); }
+.grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); }
+.grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.card { background: var(--dm-surface); border: 1px solid var(--dm-hairline); border-radius: var(--dm-radius-md); padding: var(--dm-space-4); }
+.card h2 { font-size: 1.05rem; margin: 0 0 var(--dm-space-3); }
+.kpi { display: flex; flex-wrap: wrap; gap: var(--dm-space-3); }
+.kpi .item { flex: 1 1 140px; background: var(--dm-surface-2); border-radius: var(--dm-radius-sm); padding: var(--dm-space-3); }
+.kpi .item .value { font-size: 1.6rem; font-weight: 600; }
+.kpi .item .label { color: var(--dm-muted); font-size: 0.85rem; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--dm-space-3); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 0.85rem; color: var(--dm-muted); }
+.field .error { color: var(--dm-danger); font-size: 0.8rem; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--dm-space-2); margin-top: var(--dm-space-3); }
+.muted { color: var(--dm-muted); }
+.synthetic { border-left: 4px solid var(--dm-warn); padding-left: var(--dm-space-2); }
+.select-wide { min-width: 280px; }
+.map { height: 520px; border-radius: var(--dm-radius-md); overflow: hidden; }
+.chart { height: 320px; }
+.topbar { background: var(--dm-surface); border-bottom: 1px solid var(--dm-hairline); }
+.topbar .inner { width: min(1320px, 100% - 32px); margin: 0 auto; display: flex; align-items: center; gap: var(--dm-space-4); padding-block: var(--dm-space-2); flex-wrap: wrap; }
+.topbar .brand { font-weight: 700; color: var(--dm-accent); text-decoration: none; font-size: 1.1rem; }
+.topbar nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.topbar nav a { padding: 6px 10px; border-radius: var(--dm-radius-sm); text-decoration: none; color: var(--dm-ink); }
+.topbar nav a.router-link-active { background: var(--dm-accent-soft); color: var(--dm-accent); }
+.topbar .spacer { flex: 1; }
+.factor { display: flex; justify-content: space-between; gap: var(--dm-space-2); padding: 6px 0; border-bottom: 1px dashed var(--dm-hairline); }
+.factor .contribution { white-space: nowrap; }
+.contribution.plus { color: var(--dm-danger); }
+.contribution.minus { color: var(--dm-ok); }
+.footer { text-align: center; color: var(--dm-muted); font-size: 0.8rem; padding: var(--dm-space-4); }
+.segment { padding: 4px 6px; border-radius: 6px; margin: 0 0 2px; transition: background-color 0.1s ease; }
+.segment-highlight { background: var(--dm-accent-soft); }
+mark.drug-hint { background: var(--dm-warn-soft); color: inherit; padding: 0 2px; border-radius: 3px; }
+.qr-block img { border: 1px solid var(--dm-hairline); border-radius: var(--dm-radius-sm); background: #fff; padding: 8px; }
+
+/* PrimeVue поверх токенов: приглушённые заголовки таблиц, табличные цифры в ячейках */
+.p-datatable .p-datatable-thead > tr > th { font-size: 0.85rem; font-weight: 600; color: var(--dm-muted); }
+.p-datatable .p-datatable-tbody > tr > td { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+@media (max-width: 640px) { .map { height: 360px; } .chart { height: 260px; } }

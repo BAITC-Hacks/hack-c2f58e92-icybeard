@@ -14,6 +14,7 @@ import QueueChart from '@/components/QueueChart.vue'
 import { days, pct } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
+import PageShell from '@/components/ui/PageShell.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -23,7 +24,7 @@ const toast = useToast()
 
 const moCode = computed(() => String(route.params.moCode))
 const kato = computed(() => String(route.query.kato ?? auth.region ?? ''))
-const profile = ref<string>(String(route.query.profile ?? '381'))
+const profile = ref<string>(String(route.query.profile ?? ''))
 const organizations = ref<OrganizationItem[]>([])
 const series = ref<OrganizationSeries | null>(null)
 const regionPrediction = ref<PredictResponse | null>(null)
@@ -78,14 +79,14 @@ async function dismiss(id: string, comment: string) {
 
 onMounted(async () => {
   await refdata.load()
+  if (!profile.value) profile.value = refdata.topProfileCode() // профиль с наибольшим числом направлений, не зашитый код
   await load()
 })
 watch([moCode, profile], load)
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ orgName }}</h1>
+  <PageShell :title="orgName">
     <p class="lead">
       {{ t('gov.org.lead') }}
       <RouterLink :to="`/gov/regions/${kato}`">← {{ t('common.region') }} {{ refdata.regionName(kato) }}</RouterLink>
@@ -137,5 +138,5 @@ watch([moCode, profile], load)
       </div>
       <p v-else class="muted">{{ t('gov.org.equipmentUnavailable') }}</p>
     </div>
-  </main>
+  </PageShell>
 </template>

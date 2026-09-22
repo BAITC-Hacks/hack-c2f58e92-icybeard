@@ -26,6 +26,8 @@ export const ru = {
     history: 'История', outcome: { hospitalized: 'госпитализация', refused: 'отказ' }, waited: 'ждал {days} дн.',
   },
   app: { footer: 'Darumen Health · GovTech Camp 2026 · данные МЗ РК, I квартал 2025 и история ЭРСБ с 2012' },
+  theme: { light: 'Светлая тема', dark: 'Тёмная тема', system: 'Тема как в системе' },
+  format: { refusal: { above: 'выше среднего', below: 'ниже среднего', average: 'около среднего' } },
   auth: {
     login: 'Войти', logout: 'Выйти', guest: 'Гость',
     loginTitle: 'Вход', loginLead: 'Гражданину — маршрут госпитализации, врачу — рабочий список и ассистент направления.',
@@ -129,6 +131,7 @@ export const ru = {
       includeNeighbors: 'Показать и соседние регионы', neighborRegion: 'сосед: {region}',
       monthsIn: ',январе,феврале,марте,апреле,мае,июне,июле,августе,сентябре,октябре,ноябре,декабре',
       inMonth: 'в',
+      pickTitle: 'Выберите регион и профиль койки', pickText: 'Прогноз ожидания считается по региону и профилю; личных данных не нужно.',
     },
   },
   doctor: {
@@ -148,6 +151,7 @@ export const ru = {
       qrAlt: 'QR-код со ссылкой на памятку пациента',
       drugHintNote: 'Подсветка — подсказка врачу по ключевым словам, а не точное извлечение препаратов из текста',
       checkPrescription: 'Проверить рецепт',
+      pasteSample: 'Вставить пример', sectionPrescriptions: 'Назначения',
     },
     referral: {
       title: 'Ассистент направления',
@@ -167,6 +171,7 @@ export const ru = {
       referHere: 'Направить сюда', reasonLabel: 'Причина выбора (попадает в журнал)',
       keepSelected: 'Оставить в выбранной организации', recorded: 'записано',
       decisionRecorded: 'Решение записано в журнал',
+      fillForm: 'Выберите регион, организацию и профиль койки — прогноз считается по ним', icdOptional: 'необязательно',
     },
     worklist: {
       title: 'Рабочий список', note: 'Приоритеты рассчитаны моделью ожидания и риска отказа',
@@ -176,6 +181,7 @@ export const ru = {
       flagStuckShort: '> 30 дней', flagRiskShort: 'риск отказа', flagFasterShort: 'есть быстрее',
       patient: 'Пациент', stage: 'Этап', daysWaiting: 'Ждёт, дн.', expectedDate: 'Ожидаемая дата', flags: 'Флаги',
       priority: 'Приоритет', nextStep: 'Следующий шаг', openReferral: 'открыть направление',
+      asOf: 'данные на {date}', empty: 'В списке нет пациентов',
     },
     decisions: {
       title: 'Журнал решений',
@@ -299,6 +305,7 @@ export const ru = {
       scenario: 'Сценарий', capacity: 'Мощность', redirect: 'Перенаправить из группы', horizon: 'Горизонт',
       maxShare: 'Максимум переноса от одной организации', beds: '+N коек',
       resultFor: 'Результат для', waitNow: 'ожидание сейчас, дн.', waitScenario: 'ожидание в сценарии, дн.',
+      pickTitle: 'Выберите регион и профиль койки, затем «Рассчитать»',
       delta: 'изменение, дн.', sensitivity: 'чувствительность к потоку ±20 %',
       admissionsPerDay: 'пропускная способность в сценарии, госпитализаций/день',
       admissionsPerDayShort: 'госпитализации в день',

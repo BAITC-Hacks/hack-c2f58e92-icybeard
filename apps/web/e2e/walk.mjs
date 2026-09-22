@@ -9,18 +9,20 @@ const password = process.env.WALK_PASSWORD ?? 'darumen'
 const users = { citizen: 'citizen1', doctor: 'doctor1', chief: 'chief1', regulator: 'regulator1', steward: 'steward1' }
 const pages = [
   { role: null, path: '/', wait: 'Войти через eGov mobile', variants: true },
-  { role: null, path: '/wait', wait: 'В среднем по региону', variants: true },
+  { role: null, path: '/wait', wait: 'Выберите регион' },   // до ссылки с параметрами: выбор запоминается в localStorage
+  { role: null, path: '/wait?region=75&profile=381', wait: 'В среднем по региону', variants: true },
   { role: null, path: '/medicines', wait: 'Покрытие' },
   { role: 'citizen', path: '/me/route', wait: 'Мой путь', variants: true },
   { role: 'doctor', path: '/doctor/patients/SYN-75-028B-381-01', wait: 'Маршрут пациента' },
   { role: 'regulator', path: '/gov', wait: 'Индекс за', variants: true },
   { role: 'regulator', path: '/gov/regions/75', wait: 'Сигналы региона' },
-  { role: 'regulator', path: '/gov/simulator', wait: 'Результат для' },
+  { role: 'regulator', path: '/gov/simulator?region=75&profile=381', wait: 'Результат для' },
   { role: 'regulator', path: '/gov/insight', wait: 'Вопрос' },
   { role: 'regulator', path: '/gov/organizations/028B?kato=75&profile=381', wait: 'Сигналы организации' },
   { role: 'regulator', path: '/quality', wait: 'Качество' },
   { role: 'regulator', path: '/doctor/decisions', wait: 'Журнал решений' },
-  { role: 'doctor', path: '/doctor/referral', wait: 'Альтернативы в регионе', variants: true },
+  { role: 'doctor', path: '/doctor/referral?moCode=028B&profileCode=381', wait: 'Альтернативы в регионе', variants: true },
+  { role: 'doctor', path: '/doctor/referral', wait: 'Выберите регион' },
   { role: 'doctor', path: '/doctor/worklist', wait: 'Приоритет' },
   { role: 'doctor', path: '/doctor/decisions', wait: 'Журнал решений' },
   { role: 'doctor', path: '/doctor/scribe', wait: 'AI-скрайб приёма' },

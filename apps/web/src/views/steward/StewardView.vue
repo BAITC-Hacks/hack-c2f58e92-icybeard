@@ -3,15 +3,17 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
-import Tag from 'primevue/tag'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { intake } from '@/api/endpoints'
 import type { Batch, IntakeDraftSummary, IntakeUploadResult } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
-import { num } from '@/lib/format'
+import { useLocaleFormat } from '@/composables/useLocaleFormat'
+import PageShell from '@/components/ui/PageShell.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { num, dateTime } = useLocaleFormat()
 const items = ref<Batch[]>([])
 const error = ref<unknown>(null)
 
@@ -107,9 +109,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('steward.title') }}</h1>
-    <p class="lead">{{ t('steward.lead') }}</p>
+  <PageShell :title="t('steward.title')" :lead="t('steward.lead')">
     <ErrorBox :error="error" />
 
     <div class="card">
@@ -139,9 +139,9 @@ onMounted(async () => {
     <div class="card" style="margin-top: 16px">
       <h2>{{ t('steward.batches') }}</h2>
       <DataTable :value="items" size="small" paginator :rows="20">
-        <Column field="receivedAt" :header="t('steward.received')"><template #body="{ data }">{{ new Date(data.receivedAt).toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }}</template></Column>
+        <Column field="receivedAt" :header="t('steward.received')"><template #body="{ data }">{{ dateTime(data.receivedAt) }}</template></Column>
         <Column field="dataset" :header="t('steward.dataset')" />
-        <Column field="status" :header="t('steward.status')"><template #body="{ data }"><Tag :value="data.status" :severity="data.status === 'loaded' ? 'success' : 'warn'" /></template></Column>
+        <Column field="status" :header="t('steward.status')"><template #body="{ data }"><StatusTag :value="data.status" :tone="data.status === 'loaded' ? 'ok' : 'warn'" /></template></Column>
         <Column :header="t('steward.loaded')"><template #body="{ data }">{{ num(data.rowsLoaded) }}</template></Column>
         <Column :header="t('steward.quarantined')"><template #body="{ data }">{{ num(data.rowsQuarantined) }}</template></Column>
         <Column :header="t('steward.partitions')"><template #body="{ data }">{{ data.partitions.length }}</template></Column>
@@ -183,5 +183,5 @@ onMounted(async () => {
         </template>
       </div>
     </div>
-  </main>
+  </PageShell>
 </template>

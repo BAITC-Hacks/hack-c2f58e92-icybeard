@@ -26,6 +26,8 @@ export const kk = {
     history: 'Тарих', outcome: { hospitalized: 'емдеуге жатқызу', refused: 'бас тарту' }, waited: '{days} күн күтті',
   },
   app: { footer: 'Darumen Health · GovTech Camp 2026 · ҚР ДСМ деректері, 2025 жылғы I тоқсан және 2012 жылдан бергі ЭРСБ тарихы' },
+  theme: { light: 'Ашық тақырып', dark: 'Қараңғы тақырып', system: 'Жүйедегідей тақырып' },
+  format: { refusal: { above: 'орташадан жоғары', below: 'орташадан төмен', average: 'орташа шамада' } },
   auth: {
     login: 'Кіру', logout: 'Шығу', guest: 'Қонақ',
     loginTitle: 'Кіру', loginLead: 'Азаматқа — емдеуге жатқызу жолы, дәрігерге — жұмыс тізімі және жолдама көмекшісі.',
@@ -129,6 +131,7 @@ export const kk = {
       includeNeighbors: 'Көрші өңірлерді де көрсету', neighborRegion: 'көрші: {region}',
       monthsIn: ',қаңтарда,ақпанда,наурызда,сәуірде,мамырда,маусымда,шілдеде,тамызда,қыркүйекте,қазанда,қарашада,желтоқсанда',
       inMonth: '',
+      pickTitle: 'Өңір мен төсек бейінін таңдаңыз', pickText: 'Күту болжамы өңір мен бейін бойынша есептеледі; жеке деректер қажет емес.',
     },
   },
   doctor: {
@@ -148,6 +151,7 @@ export const kk = {
       qrAlt: 'Науқас естелігіне сілтемесі бар QR-код',
       drugHintNote: 'Түстеу — түйінді сөздер бойынша дәрігерге кеңес, мәтіннен препараттарды дәл анықтау емес',
       checkPrescription: 'Рецептті тексеру',
+      pasteSample: 'Мысал қою', sectionPrescriptions: 'Тағайындаулар',
     },
     referral: {
       title: 'Жолдама көмекшісі',
@@ -167,6 +171,7 @@ export const kk = {
       referHere: 'Осында жіберу', reasonLabel: 'Таңдау себебі (журналға түседі)',
       keepSelected: 'Таңдалған ұйымда қалдыру', recorded: 'жазылды',
       decisionRecorded: 'Шешім журналға жазылды',
+      fillForm: 'Өңірді, ұйымды және төсек бейінін таңдаңыз — болжам солар бойынша есептеледі', icdOptional: 'міндетті емес',
     },
     worklist: {
       title: 'Жұмыс тізімі', note: 'Басымдықтар күту және бас тарту тәуекелі моделімен есептелген',
@@ -176,6 +181,7 @@ export const kk = {
       flagStuckShort: '> 30 күн', flagRiskShort: 'бас тарту тәуекелі', flagFasterShort: 'жылдамырақ бар',
       patient: 'Науқас', stage: 'Кезең', daysWaiting: 'Күтуде, күн', expectedDate: 'Күтілетін күн', flags: 'Жалаушалар',
       priority: 'Басымдық', nextStep: 'Келесі қадам', openReferral: 'жолдаманы ашу',
+      asOf: 'деректер {date} жағдайы бойынша', empty: 'Тізімде науқастар жоқ',
     },
     decisions: {
       title: 'Шешімдер журналы',
@@ -299,6 +305,7 @@ export const kk = {
       scenario: 'Сценарий', capacity: 'Қуат', redirect: 'Топтан қайта бағыттау', horizon: 'Көкжиек',
       maxShare: 'Бір ұйымнан ауысудың ең көбі', beds: '+N төсек',
       resultFor: 'Нәтиже', waitNow: 'қазіргі күту, күн', waitScenario: 'сценарийдегі күту, күн',
+      pickTitle: 'Өңір мен төсек бейінін таңдап, «Есептеу» басыңыз',
       delta: 'өзгеріс, күн', sensitivity: 'ағынға сезімталдық ±20 %',
       admissionsPerDay: 'сценарийдегі өткізу қабілеті, госпитализация/күн',
       admissionsPerDayShort: 'госпитализация күніне',

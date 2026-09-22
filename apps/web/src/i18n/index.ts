@@ -19,8 +19,15 @@ export const i18n = createI18n({
   messages: { ru, kk },
 })
 
+function applyLang(locale: 'ru' | 'kk') {
+  if (typeof document !== 'undefined') document.documentElement.lang = locale
+}
+
+applyLang(i18n.global.locale.value as 'ru' | 'kk')
+
 export function setLocale(locale: 'ru' | 'kk') {
   i18n.global.locale.value = locale
+  applyLang(locale)
   try {
     localStorage.setItem(STORAGE_KEY, locale)
   } catch {

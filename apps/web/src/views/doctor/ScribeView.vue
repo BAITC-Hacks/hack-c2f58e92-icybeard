@@ -7,12 +7,15 @@ import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { kk } from '@/i18n/kk'
+import { ru } from '@/i18n/ru'
 import { useRouter } from 'vue-router'
 import { scribe } from '@/api/endpoints'
 import type { ScribeDraft, ScribeHealth, ScribeSegment } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
 import { pickRecordingFormat } from '@/lib/audio'
+import PageShell from '@/components/ui/PageShell.vue'
 
 // Простая эвристика для подсветки вероятных упоминаний препаратов в разделе «Назначения»:
 // слово с заглавной буквы рядом с дозировкой (мг/мл/мкг/ЕД) или после характерных глаголов назначения.
@@ -42,7 +45,10 @@ const sessionId = ref<string | null>(null)
 const health = ref<ScribeHealth | null>(null)
 const transcript = ref('')
 const segments = ref<ScribeSegment[]>([])
-const typed = ref(t('doctor.scribe.sampleTranscript'))
+// поле пустое: врач печатает или вставляет текст приёма; пример — по кнопке, а не предзаполнением
+const typed = ref('')
+// раздел «Назначения» узнаём по подписи из словарей обоих языков — черновик приходит на языке сессии
+const prescriptionSections = [ru.doctor.scribe.sectionPrescriptions, kk.doctor.scribe.sectionPrescriptions]
 const draft = ref<ScribeDraft | null>(null)
 const leaflet = ref('')
 const leafletUrl = ref<string | null>(null)
@@ -193,9 +199,7 @@ onBeforeUnmount(() => recorder?.state === 'recording' && recorder.stop())
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('doctor.scribe.title') }}</h1>
-    <p class="lead">{{ t('doctor.scribe.lead') }}</p>
+  <PageShell :title="t('doctor.scribe.title')" :lead="t('doctor.scribe.lead')">
     <p v-if="health" class="muted">{{ t('doctor.scribe.transcriber') }}: {{ health.transcriber }} · {{ t('doctor.scribe.drafter') }}: {{ health.drafter }}</p>
     <p v-else class="muted">{{ t('doctor.scribe.serviceDown') }}</p>
     <div class="card">
@@ -216,7 +220,10 @@ onBeforeUnmount(() => recorder?.state === 'recording' && recorder.stop())
           <label v-if="!approved" class="p-button p-button-secondary p-button-sm" style="cursor: pointer">{{ t('doctor.scribe.uploadFile') }}<input type="file" accept="audio/*" hidden @change="onFile" /></label>
         </div>
         <div class="field" style="margin-top: 12px"><label>{{ t('doctor.scribe.orType') }}</label><Textarea v-model="typed" rows="4" auto-resize /></div>
-        <div class="actions"><Button :label="t('doctor.scribe.useText')" size="small" severity="secondary" :disabled="approved" @click="useTyped" /></div>
+        <div class="actions">
+          <Button :label="t('doctor.scribe.useText')" size="small" severity="secondary" :disabled="approved" @click="useTyped" />
+          <Button :label="t('doctor.scribe.pasteSample')" size="small" text :disabled="approved" data-testid="scribe-sample" @click="typed = t('doctor.scribe.sampleTranscript')" />
+        </div>
         <div v-if="segments.length" class="transcript-segments" style="margin-top: 12px">
           <p
             v-for="(segment, i) in segments"
@@ -243,7 +250,7 @@ onBeforeUnmount(() => recorder?.state === 'recording' && recorder.stop())
         >
           <label>{{ section.name }}</label>
           <Textarea v-model="section.text" rows="2" auto-resize />
-          <template v-if="section.name === 'Назначения' && section.text">
+          <template v-if="prescriptionSections.includes(section.name) && section.text">
             <!-- эвристическая подсветка: подсказка врачу, не структурированные данные и не гарантия точности -->
             <p class="muted drug-hints" v-html="highlightDrugMentions(section.text)"></p>
             <p class="muted" style="font-size: 0.8rem">{{ t('doctor.scribe.drugHintNote') }}</p>
@@ -263,5 +270,5 @@ onBeforeUnmount(() => recorder?.state === 'recording' && recorder.stop())
         </div>
       </div>
     </div>
-  </main>
+  </PageShell>
 </template>

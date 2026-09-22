@@ -22,6 +22,7 @@ import SeriesChart from '@/components/SeriesChart.vue'
 import { num } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
+import PageShell from '@/components/ui/PageShell.vue'
 
 const { t } = useI18n()
 const refdata = useRefdataStore()
@@ -197,9 +198,7 @@ watch([month, profile], load)
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('gov.map.title') }}</h1>
-    <p class="lead">{{ t('gov.map.lead') }}</p>
+  <PageShell :title="t('gov.map.title')" :lead="t('gov.map.lead')">
     <div class="actions" style="margin: 0 0 12px">
       <Select v-model="month" :options="index?.months ?? []" :placeholder="t('common.month')" size="small" />
       <Select
@@ -328,5 +327,5 @@ watch([month, profile], load)
       </DataTable>
       <p v-else class="muted">{{ equipmentHint }}</p>
     </div>
-  </main>
+  </PageShell>
 </template>

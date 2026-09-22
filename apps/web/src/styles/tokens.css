@@ -1,0 +1,111 @@
+/* Clinical Minimal — токены веба. Цвета совпадают с design/tokens.json и apps/mobile/lib/theme/tokens.dart
+ * (паритет проверяет src/__tests__/tokens.test.ts). Тёмная тема — класс darumen-dark на <html>: его ставит
+ * composables/useTheme.ts и bootstrap-скрипт в index.html до загрузки стилей (без вспышки). PrimeVue читает
+ * переменные через styles/preset.ts, графики и карта — через composables/useChartTheme.ts (canvas не понимает var()). */
+:root {
+  color-scheme: light;
+  --dm-bg: #FDFDFB;
+  --dm-surface: #FFFFFF;
+  --dm-surface-2: #F4F5F3;
+  --dm-ink: #101418;
+  --dm-muted: #6E7680;
+  --dm-faint: #B9BFC4;
+  --dm-hairline: #E6E8E6;
+  --dm-accent: #0F766E;
+  --dm-accent-hover: #0B5F59;
+  --dm-accent-soft: #E4EFED;
+  --dm-ok: #2F7D4F;
+  --dm-ok-soft: #E6F1EA;
+  --dm-warn: #92600A;
+  --dm-warn-soft: #F6ECDF;
+  --dm-danger: #8A3B2E;
+  --dm-danger-soft: #F3E6E3;
+  --dm-ai: #92600A;
+  --dm-ai-soft: #F6ECDF;
+  --dm-neutral-soft: #ECEFF3;
+
+  /* шкала поверхностей для PrimeVue (surface.0…950) */
+  --dm-surface-0: #FFFFFF;
+  --dm-surface-50: #F7F8F6;
+  --dm-surface-100: #EEF0EE;
+  --dm-surface-200: #E6E8E6;
+  --dm-surface-300: #D3D7D5;
+  --dm-surface-400: #9AA3AA;
+  --dm-surface-500: #6E7680;
+  --dm-surface-600: #4E565E;
+  --dm-surface-700: #2E353B;
+  --dm-surface-800: #1C2226;
+  --dm-surface-900: #101418;
+  --dm-surface-950: #0A0D0F;
+
+  --dm-space-1: 4px;
+  --dm-space-2: 8px;
+  --dm-space-3: 12px;
+  --dm-space-4: 16px;
+  --dm-space-5: 24px;
+  --dm-space-6: 32px;
+  --dm-space-7: 48px;
+  --dm-space-8: 64px;
+  --dm-radius-sm: 8px;
+  --dm-radius-md: 12px;
+  --dm-radius-lg: 16px;
+  --dm-radius-pill: 999px;
+
+  --dm-text-xs: 12px;
+  --dm-text-sm: 14px;
+  --dm-text-base: 16px;
+  --dm-text-lg: 18px;
+  --dm-text-xl: 24px;
+  --dm-text-kpi: 32px;
+  --dm-font-sans: 'Onest Variable', 'Onest', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --dm-chart-1: #0F766E;
+  --dm-chart-2: #92600A;
+  --dm-chart-3: #4E566E;
+  --dm-chart-4: #8A3B2E;
+  --dm-chart-band: rgba(15, 118, 110, 0.15);
+  --dm-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+html.darumen-dark {
+  color-scheme: dark;
+  --dm-bg: #0E1213;
+  --dm-surface: #161B1D;
+  --dm-surface-2: #1C2224;
+  --dm-ink: #ECEEEA;
+  --dm-muted: #9AA3AA;
+  --dm-faint: #5C656C;
+  --dm-hairline: #242B2E;
+  --dm-accent: #3FA89E;
+  --dm-accent-hover: #5CBDB4;
+  --dm-accent-soft: #173B38;
+  --dm-ok: #7FC39A;
+  --dm-ok-soft: #1C3326;
+  --dm-warn: #D9A85B;
+  --dm-warn-soft: #3A2E18;
+  --dm-danger: #D08B7E;
+  --dm-danger-soft: #3A231F;
+  --dm-ai: #D9A85B;
+  --dm-ai-soft: #3A2E18;
+  --dm-neutral-soft: #22282B;
+
+  --dm-surface-0: #161B1D;
+  --dm-surface-50: #1C2224;
+  --dm-surface-100: #22282B;
+  --dm-surface-200: #242B2E;
+  --dm-surface-300: #2E353B;
+  --dm-surface-400: #4E565E;
+  --dm-surface-500: #6E7680;
+  --dm-surface-600: #9AA3AA;
+  --dm-surface-700: #C5CBCF;
+  --dm-surface-800: #DEE1DF;
+  --dm-surface-900: #ECEEEA;
+  --dm-surface-950: #F7F8F6;
+
+  --dm-chart-1: #3FA89E;
+  --dm-chart-2: #D9A85B;
+  --dm-chart-3: #9AA3C8;
+  --dm-chart-4: #D08B7E;
+  --dm-chart-band: rgba(63, 168, 158, 0.2);
+  --dm-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}

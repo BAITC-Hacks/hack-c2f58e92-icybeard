@@ -10,8 +10,9 @@ describe('format', () => {
     expect(signed(0)).toBe('0.0')
   })
 
-  it('maps the index to a hue from red to green', () => {
-    expect(indexColor(0)).toBe('hsl(0 70% 42%)')
-    expect(indexColor(100)).toBe('hsl(120 70% 42%)')
+  it('maps the index to a hue from red to green, lighter on the dark theme', () => {
+    expect(indexColor(0)).toBe('hsl(0 55% 42%)')
+    expect(indexColor(100)).toBe('hsl(120 55% 42%)')
+    expect(indexColor(50, true)).toBe('hsl(60 55% 58%)')
   })
 })

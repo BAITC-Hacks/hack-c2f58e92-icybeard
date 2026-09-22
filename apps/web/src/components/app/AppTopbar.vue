@@ -4,6 +4,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import LocaleSwitch from './LocaleSwitch.vue'
+import ThemeToggle from './ThemeToggle.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
@@ -29,6 +30,7 @@ const links = computed(() =>
       </nav>
       <span class="spacer" />
       <LocaleSwitch />
+      <ThemeToggle />
       <template v-if="auth.isAuthenticated">
         <span class="muted" data-testid="user-chip">
           {{ auth.actor }}<template v-if="auth.role"> · {{ t('decision.role.' + auth.role) }}</template>

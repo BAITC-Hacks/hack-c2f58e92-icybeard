@@ -2,7 +2,7 @@ import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, EquipmentOrganization, EquipmentResponse, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
-  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
+  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, RouteStandard, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistItem,
 } from './types'
 
@@ -71,6 +71,7 @@ export const refdata = {
     api<{ items: OrganizationItem[] }>('/api/v1/refdata/organizations', { query: { regionKato, q, profileCode, limit } }),
   profiles: () => api<{ items: Profile[] }>('/api/v1/refdata/profiles'),
   vaccinationPlans: (regionKato?: string) => api<{ items: string[] }>('/api/v1/refdata/vaccination-plans', { query: { regionKato } }),
+  routeStandard: () => api<RouteStandard>('/api/v1/refdata/route-standard'),
 }
 
 export const medicines = {

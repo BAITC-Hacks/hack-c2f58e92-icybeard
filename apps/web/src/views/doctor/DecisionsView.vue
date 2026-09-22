@@ -10,8 +10,11 @@ import ErrorBox from '@/components/ErrorBox.vue'
 import { describeChoice, describeSubject, organizationOf, roleLabel, subjectLabel, type DecisionNames } from '@/lib/decision'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
+import { useLocaleFormat } from '@/composables/useLocaleFormat'
+import PageShell from '@/components/ui/PageShell.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { dateTime } = useLocaleFormat()
 const auth = useAuthStore()
 const refdata = useRefdataStore()
 const items = ref<Decision[]>([])
@@ -48,15 +51,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('doctor.decisions.title') }}</h1>
-    <p class="lead">{{ auth.hasRole('regulator') ? t('doctor.decisions.leadRegulator') : t('doctor.decisions.leadSelf') }} {{ t('doctor.decisions.total') }} {{ total }}.</p>
+  <PageShell :title="t('doctor.decisions.title')" :lead="`${auth.hasRole('regulator') ? t('doctor.decisions.leadRegulator') : t('doctor.decisions.leadSelf')} ${t('doctor.decisions.total')} ${total}.`">
     <div class="actions" style="margin: 0 0 12px">
       <Button :label="t('doctor.decisions.refresh')" icon="pi pi-refresh" size="small" severity="secondary" :loading="loading" @click="load" />
     </div>
     <ErrorBox :error="error" />
     <DataTable :value="items" size="small" paginator :rows="25">
-      <Column field="recordedAt" :header="t('doctor.decisions.when')"><template #body="{ data }">{{ new Date(data.recordedAt).toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }}</template></Column>
+      <Column field="recordedAt" :header="t('doctor.decisions.when')"><template #body="{ data }">{{ dateTime(data.recordedAt) }}</template></Column>
       <Column field="actor" :header="t('doctor.decisions.who')" />
       <Column :header="t('doctor.decisions.role')"><template #body="{ data }">{{ roleLabel(data.role) }}</template></Column>
       <Column :header="t('doctor.decisions.subject')"><template #body="{ data }">{{ subjectLabel(data.subject) }}</template></Column>
@@ -65,5 +66,5 @@ onMounted(async () => {
       <Column :header="t('doctor.decisions.chosen')"><template #body="{ data }">{{ describeChoice(data.chosen, names) }}</template></Column>
       <Column field="reason" :header="t('doctor.decisions.reason')" />
     </DataTable>
-  </main>
+  </PageShell>
 </template>

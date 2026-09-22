@@ -32,3 +32,4 @@ node e2e/login-check.mjs          # вход regulator1 → карта реги�
 - `src/views/` — страницы по ролям: `citizen/`, `route/` (Мой путь и маршрут пациента), `doctor/`, `gov/`, `steward/`.
 - `src/components/` — `OriginTag` (метка «ML-модель / формула / AI-черновик» у каждого числа), графики, карта; `app/` — шапка, вход.
 - `src/i18n/` — словари RU/KK (паритет ключей проверяет тест), `src/lib/` — форматирование и помощники маршрута.
+- `src/styles/` — `tokens.css` (цвета из `design/tokens.json`, общие с мобилкой; тёмная тема — класс `darumen-dark` на `<html>`), `base.css`, `preset.ts` (PrimeVue на токенах); `src/components/ui/` — `PageShell`, `AppCard`, `KpiTile`, `StatusTag`, `EmptyState`, `Skeleton`.

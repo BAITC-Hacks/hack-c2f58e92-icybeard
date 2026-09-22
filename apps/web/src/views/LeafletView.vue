@@ -4,8 +4,10 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { scribe } from '@/api/endpoints'
 import ErrorBox from '@/components/ErrorBox.vue'
+import { useLocaleFormat } from '@/composables/useLocaleFormat'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { dateTime } = useLocaleFormat()
 const route = useRoute()
 const text = ref('')
 const approvedAt = ref('')
@@ -28,7 +30,7 @@ onMounted(async () => {
     <ErrorBox :error="error" />
     <div v-if="text" class="card">
       <p style="white-space: pre-wrap">{{ text }}</p>
-      <p class="muted">{{ t('leaflet.approvedBy') }} {{ new Date(approvedAt).toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }}. Darumen Care.</p>
+      <p class="muted">{{ t('leaflet.approvedBy') }} {{ dateTime(approvedAt) }}. Darumen Care.</p>
     </div>
   </main>
 </template>

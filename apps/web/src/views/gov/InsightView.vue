@@ -13,6 +13,8 @@ import { insight } from '@/api/endpoints'
 import type { AskResponse, InsightStatus } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
+import { useChartTheme } from '@/composables/useChartTheme'
+import PageShell from '@/components/ui/PageShell.vue'
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
@@ -23,17 +25,18 @@ const error = ref<unknown>(null)
 const busy = ref(false)
 const status = ref<InsightStatus | null>(null)
 const examples = computed(() => t('gov.insight.examples').split('|'))
-if (!question.value) question.value = t('gov.insight.defaultQuestion')
 
+const { base: chartBase, axis: chartAxis } = useChartTheme()
 const chartOption = computed(() => {
   const chart = result.value?.chart
   if (!chart) return null
   return {
+    ...chartBase.value,
     tooltip: { trigger: 'axis' },
-    legend: { data: chart.series.map((s) => s.name) },
+    legend: { ...chartBase.value.legend, data: chart.series.map((s) => s.name) },
     grid: { left: 48, right: 16, top: 36, bottom: chart.type === 'bar' ? 90 : 40 },
-    xAxis: { type: 'category', data: chart.x, axisLabel: { rotate: chart.type === 'bar' ? 45 : 0, fontSize: 10 } },
-    yAxis: { type: 'value' },
+    xAxis: { type: 'category', data: chart.x, ...chartAxis.value, axisLabel: { ...chartAxis.value.axisLabel, rotate: chart.type === 'bar' ? 45 : 0, fontSize: 10 } },
+    yAxis: { type: 'value', ...chartAxis.value },
     series: chart.series.map((s) => ({ name: s.name, type: chart.type, data: s.data, showSymbol: false, lineStyle: ['прогноз', 'болжам'].includes(s.name) ? { type: 'dashed' } : undefined })),
   }
 })
@@ -60,14 +63,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('gov.insight.title') }}</h1>
-    <p class="lead">{{ t('gov.insight.lead') }}</p>
+  <PageShell :title="t('gov.insight.title')" :lead="t('gov.insight.lead')">
     <Message v-if="status && !status.available" severity="warn" :closable="false">
       {{ t('gov.insight.unavailable', { provider: status.provider, model: status.model }) }}
     </Message>
     <div class="card">
-      <div class="field"><label>{{ t('gov.insight.question') }}</label><Textarea v-model="question" rows="2" auto-resize /></div>
+      <div class="field"><label>{{ t('gov.insight.question') }}</label><Textarea v-model="question" rows="2" auto-resize :placeholder="t('gov.insight.defaultQuestion')" /></div>
       <div class="actions">
         <Button :label="t('gov.insight.ask')" icon="pi pi-comment" :loading="busy" @click="ask" />
         <Button v-for="e in examples" :key="e" :label="e" size="small" severity="secondary" text @click="question = e" />
@@ -85,5 +86,5 @@ onMounted(async () => {
         <VChart class="chart" :option="chartOption" autoresize />
       </div>
     </div>
-  </main>
+  </PageShell>
 </template>

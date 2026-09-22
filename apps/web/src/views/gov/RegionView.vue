@@ -16,6 +16,8 @@ import SeriesChart from '@/components/SeriesChart.vue'
 import { days, pct } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
+import { useLocaleFormat } from '@/composables/useLocaleFormat'
+import PageShell from '@/components/ui/PageShell.vue'
 
 /** Переключатель потока для прогноза справа (3.1): у каждого потока свой второй ключ сущности и единица измерения —
  * госпитализации по профилю, приёмный покой по конкретной организации региона (нужен entity.mo_key, не mo_code —
@@ -27,7 +29,8 @@ const STREAM_DEFS = [
 ] as const
 type StreamKind = (typeof STREAM_DEFS)[number]['value']
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { num } = useLocaleFormat()
 const route = useRoute()
 const router = useRouter()
 const refdata = useRefdataStore()
@@ -37,7 +40,7 @@ const toast = useToast()
 const kato = computed(() => String(route.params.kato))
 const organizations = ref<OrganizationItem[]>([])
 const moCode = ref<string | null>(null)
-const profile = ref<string>('381')
+const profile = ref<string>('')
 const streamKind = ref<StreamKind>('admissions')
 const vaccinationPlans = ref<string[]>([])
 const vaccinationPlan = ref<string | null>(null)
@@ -199,6 +202,7 @@ async function dismiss(id: string, comment: string) {
 
 onMounted(async () => {
   await refdata.load()
+  if (!profile.value) profile.value = refdata.topProfileCode() // профиль с наибольшим числом направлений, не зашитый код
   await loadVaccinationPlans()
   await loadRegion()
   await loadSeries()
@@ -225,9 +229,7 @@ watch(vaccinationPlan, () => {
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ refdata.regionName(kato) }}</h1>
-    <p class="lead">{{ t('gov.region.lead') }}</p>
+  <PageShell :title="refdata.regionName(kato)" :lead="t('gov.region.lead')">
     <div class="actions" style="margin: 0 0 12px">
       <Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter size="small" style="min-width: 280px" />
       <Select v-model="moCode" :options="organizations" option-label="name" option-value="moCode" filter size="small" :placeholder="t('common.organization')" style="min-width: 360px; max-width: 100%" />
@@ -276,7 +278,7 @@ watch(vaccinationPlan, () => {
           <p v-if="flatSeasonHint" class="muted">{{ t('gov.region.seasonHint') }}: {{ flatSeasonHint }} {{ t('gov.region.seasonHintSuffix') }}</p>
           <!-- коэффициент и источник: refdata/external_benchmarks.yaml (diagnostics.dm01_tests_per_admission) -->
           <p v-if="forecast && forecast.points.length" class="muted">
-            {{ t('gov.region.diagnosticsLoad') }}: ≈ {{ Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5).toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }}
+            {{ t('gov.region.diagnosticsLoad') }}: ≈ {{ num(Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5)) }}
             {{ t('gov.region.diagnosticsLoadSuffix') }}
           </p>
           <p v-else-if="!forecast && !forecastHint" class="muted">{{ t('gov.region.forecastNotBuiltProfile') }}</p>
@@ -301,5 +303,5 @@ watch(vaccinationPlan, () => {
         <p class="muted">{{ t('gov.region.bedDemand.formula') }}</p>
       </div>
     </div>
-  </main>
+  </PageShell>
 </template>

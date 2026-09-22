@@ -51,12 +51,17 @@ export const useRefdataStore = defineStore('refdata', () => {
     return profiles.value.find((p) => p.profileCode === code)?.name ?? code ?? '—'
   }
 
+  /** Профиль с наибольшим числом направлений — дефолт страниц региона и организации вместо зашитого кода. */
+  function topProfileCode(): string {
+    return [...profiles.value].sort((a, b) => b.referrals - a.referrals)[0]?.profileCode ?? ''
+  }
+
   function organizationName(moCode: string | null | undefined): string {
     if (!moCode) return '—'
     return organizationNames.value[moCode] ?? moCode
   }
 
   return {
-    regions, profiles, loaded, load, organizationsOf, resolveOrganizations, regionName, profileName, organizationName,
+    regions, profiles, loaded, load, organizationsOf, resolveOrganizations, regionName, profileName, organizationName, topProfileCode,
   }
 })

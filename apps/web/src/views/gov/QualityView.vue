@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import Tag from 'primevue/tag'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { analytics, refdata as refdataApi } from '@/api/endpoints'
@@ -7,8 +6,12 @@ import type { QualityBreakdownRow, QualityReport, VaccinationBenchmark } from '@
 import ErrorBox from '@/components/ErrorBox.vue'
 import { pct } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
+import { useLocaleFormat } from '@/composables/useLocaleFormat'
+import PageShell from '@/components/ui/PageShell.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { num } = useLocaleFormat()
 const refdata = useRefdataStore()
 const report = ref<QualityReport | null>(null)
 const vaccination = ref<VaccinationBenchmark[]>([])
@@ -69,15 +72,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('gov.quality.title') }}</h1>
-    <p class="lead">{{ t('gov.quality.lead') }}</p>
+  <PageShell :title="t('gov.quality.title')" :lead="t('gov.quality.lead')">
     <ErrorBox :error="error" />
 
     <template v-if="report?.wait">
       <div class="card">
         <h2>{{ t('gov.quality.waitTitle') }}</h2>
-        <p class="muted">{{ t('gov.quality.waitTrained', { through: report.wait.trainedThrough, rows: report.wait.trainRows?.toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }) }}</p>
+        <p class="muted">{{ t('gov.quality.waitTrained', { through: report.wait.trainedThrough, rows: num(report.wait.trainRows) }) }}</p>
         <div v-if="report.wait.test_time" class="kpi" style="margin-top: 10px">
           <div class="item">
             <div class="value">{{ report.wait.test_time.pinball_p50.toFixed(2) }} <span class="muted">/ {{ report.wait.test_time.pinball_p50_baseline.toFixed(2) }}</span></div>
@@ -103,7 +104,7 @@ onMounted(async () => {
           <h2>{{ t('gov.quality.errorByRegion') }}</h2>
           <p class="muted">{{ t('gov.quality.errorByRegionHint') }}</p>
           <div v-for="row in report.wait.by_region ?? []" :key="row.region_kato" class="factor">
-            <span>{{ rowName(row) }} <span class="muted">· {{ row.n.toLocaleString('ru-RU') }}</span></span>
+            <span>{{ rowName(row) }} <span class="muted">· {{ num(row.n) }}</span></span>
             <span class="contribution" :class="worse(row) ? 'minus' : 'plus'">{{ row.pinball_p50.toFixed(2) }} / {{ row.pinball_p50_baseline.toFixed(2) }}</span>
           </div>
         </div>
@@ -111,7 +112,7 @@ onMounted(async () => {
           <h2>{{ t('gov.quality.errorByProfile') }}</h2>
           <p class="muted">{{ t('gov.quality.errorByProfileHint') }}</p>
           <div v-for="row in report.wait.by_profile ?? []" :key="row.profile_code" class="factor">
-            <span>{{ rowName(row) }} <span class="muted">· {{ row.n.toLocaleString('ru-RU') }}</span></span>
+            <span>{{ rowName(row) }} <span class="muted">· {{ num(row.n) }}</span></span>
             <span class="contribution" :class="worse(row) ? 'minus' : 'plus'">{{ row.pinball_p50.toFixed(2) }} / {{ row.pinball_p50_baseline.toFixed(2) }}</span>
           </div>
         </div>
@@ -133,7 +134,7 @@ onMounted(async () => {
             <td>
               <template v-if="f.models && f.chosen && f.baseline">
                 {{ f.models[f.chosen]?.mase.toFixed(2) }} / {{ f.models[f.baseline]?.mase.toFixed(2) }}
-                <Tag v-if="(f.models[f.chosen]?.mase ?? 1) <= (f.models[f.baseline]?.mase ?? 1)" :value="t('gov.quality.betterThanNaive')" severity="success" style="margin-left: 6px" />
+                <StatusTag v-if="(f.models[f.chosen]?.mase ?? 1) <= (f.models[f.baseline]?.mase ?? 1)" :value="t('gov.quality.betterThanNaive')" tone="ok" style="margin-left: 6px" />
               </template>
               <span v-else class="muted">{{ f.skipped ?? '—' }}</span>
             </td>
@@ -216,12 +217,12 @@ onMounted(async () => {
             <div class="label">{{ t('gov.quality.maeDays') }}</div>
           </div>
           <div class="item">
-            <div class="value">{{ report.los.cells?.toLocaleString('ru-RU') }}</div>
+            <div class="value">{{ num(report.los.cells) }}</div>
             <div class="label">{{ t('gov.quality.losCells') }}</div>
           </div>
         </div>
-        <p class="muted" style="margin-top: 8px">{{ t('gov.quality.losTrained', { train: report.los.train_rows?.toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU'), test: report.los.test_rows?.toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }) }}</p>
+        <p class="muted" style="margin-top: 8px">{{ t('gov.quality.losTrained', { train: num(report.los.train_rows), test: num(report.los.test_rows) }) }}</p>
       </div>
     </div>
-  </main>
+  </PageShell>
 </template>

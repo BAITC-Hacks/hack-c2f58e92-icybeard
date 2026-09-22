@@ -11,15 +11,22 @@ import { analytics, simulation } from '@/api/endpoints'
 import type { LosItem, RedistributeResponse, SimulateResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
-import { days, num, signed } from '@/lib/format'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import { days, signed } from '@/lib/format'
+import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
+import { useLocaleFormat } from '@/composables/useLocaleFormat'
+import PageShell from '@/components/ui/PageShell.vue'
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
+const { num } = useLocaleFormat()
 const refdata = useRefdataStore()
+const auth = useAuthStore()
 const route = useRoute()
 // 3.2: список перегруженных организаций (RegionView, GovMapView) ведёт сюда с конкретным регионом/профилем
-const region = ref(typeof route.query.region === 'string' ? route.query.region : '75')
-const profile = ref(typeof route.query.profile === 'string' ? route.query.profile : '381')
+// регион — из ссылки или учётной записи, профиль — только из ссылки; без обоих расчёт не запускается
+const region = ref<string | null>(typeof route.query.region === 'string' ? route.query.region : (auth.region ?? null))
+const profile = ref<string | null>(typeof route.query.profile === 'string' ? route.query.profile : null)
 const capacity = ref(15)
 const redirect = ref(0)
 const horizon = ref(90)
@@ -33,15 +40,18 @@ const error = ref<unknown>(null)
 const busy = ref(false)
 
 async function run() {
+  const regionKato = region.value
+  const profileCode = profile.value
+  if (!regionKato || !profileCode) return
   busy.value = true
   error.value = null
   try {
     ;[result.value, moves.value] = await Promise.all([
-      simulation.simulate(region.value, profile.value, { capacityDeltaPct: capacity.value, redistributeSharePct: redirect.value, horizonDays: horizon.value, bedsDelta: beds.value }),
-      simulation.redistribute(region.value, profile.value, { maxShareMovedPct: maxShare.value, horizonDays: horizon.value }),
+      simulation.simulate(regionKato, profileCode, { capacityDeltaPct: capacity.value, redistributeSharePct: redirect.value, horizonDays: horizon.value, bedsDelta: beds.value }),
+      simulation.redistribute(regionKato, profileCode, { maxShareMovedPct: maxShare.value, horizonDays: horizon.value }),
     ])
     // длительность лечения — отдельная витрина; её отсутствие не должно ломать расчёт
-    los.value = (await analytics.los(region.value, profile.value)).items[0] ?? null
+    los.value = (await analytics.los(regionKato, profileCode)).items[0] ?? null
   } catch (e) {
     if (result.value === null) error.value = e
   } finally {
@@ -51,30 +61,30 @@ async function run() {
 
 onMounted(async () => {
   await refdata.load()
-  await run()
+  // автозапуск только по ссылке с региона/организации (регион и профиль в query); иначе регулятор выбирает сам
+  if (typeof route.query.region === 'string' && typeof route.query.profile === 'string') await run()
 })
 </script>
 
 <template>
-  <main class="page">
-    <h1>{{ t('gov.simulator.title') }}</h1>
-    <p class="lead">{{ t('gov.simulator.lead') }}</p>
+  <PageShell :title="t('gov.simulator.title')" :lead="t('gov.simulator.lead')">
     <div class="grid cols-2">
       <div class="card">
         <h2>{{ t('gov.simulator.scenario') }}</h2>
         <div class="form-grid">
-          <div class="field"><label>{{ t('common.region') }}</label><Select v-model="region" :options="refdata.regions" option-label="name" option-value="regionKato" filter /></div>
-          <div class="field"><label>{{ t('common.profile') }}</label><Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter /></div>
+          <div class="field"><label>{{ t('common.region') }}</label><Select v-model="region" :options="refdata.regions" option-label="name" option-value="regionKato" filter :placeholder="t('common.region')" /></div>
+          <div class="field"><label>{{ t('common.profile') }}</label><Select v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" filter :placeholder="t('common.profile')" /></div>
         </div>
         <div class="field" style="margin-top: 12px"><label>{{ t('gov.simulator.capacity') }}: {{ signed(capacity, 0) }} %</label><Slider v-model="capacity" :min="-30" :max="60" /></div>
         <div class="field" style="margin-top: 12px"><label>{{ t('gov.simulator.redirect') }}: {{ redirect }} %</label><Slider v-model="redirect" :min="0" :max="50" /></div>
         <div class="field" style="margin-top: 12px"><label>{{ t('gov.simulator.horizon') }}: {{ horizon }} {{ t('common.days') }}</label><Slider v-model="horizon" :min="30" :max="180" :step="30" /></div>
         <div class="field" style="margin-top: 12px"><label>{{ t('gov.simulator.maxShare') }}: {{ maxShare }} %</label><Slider v-model="maxShare" :min="5" :max="50" :step="5" /></div>
         <div class="field" style="margin-top: 12px"><label>{{ t('gov.simulator.beds') }}: {{ beds }}</label><Slider v-model="beds" :min="0" :max="100" :step="5" /></div>
-        <div class="actions"><Button :label="t('common.apply')" icon="pi pi-play" :loading="busy" @click="run" /></div>
+        <div class="actions"><Button :label="t('common.apply')" icon="pi pi-play" :loading="busy" :disabled="!region || !profile" @click="run" /></div>
         <ErrorBox :error="error" />
       </div>
-      <div class="card" v-if="result">
+      <div v-if="!result" class="card"><EmptyState :title="t('gov.simulator.pickTitle')" icon="pi pi-sliders-h" /></div>
+      <div class="card" v-else>
         <h2>{{ t('gov.simulator.resultFor') }} {{ result.organisations }} <OriginTag kind="formula" /></h2>
         <div class="kpi">
           <div class="item"><div class="value">{{ days(result.baseline.meanWaitDays, 1) }}</div><div class="label">{{ t('gov.simulator.waitNow') }}</div></div>
@@ -85,7 +95,7 @@ onMounted(async () => {
         <ul class="muted"><li v-for="a in result.assumptions" :key="a">{{ a }}</li></ul>
         <p class="muted" v-if="los && los.losMedianFact > 0">
           {{ t('gov.simulator.losIntro') }}: {{ los.losMedianFact.toFixed(1) }} {{ t('common.days') }} ({{ t('gov.simulator.losMedianCaveat') }},
-          {{ los.n.toLocaleString(locale === 'kk' ? 'kk-KZ' : 'ru-RU') }} {{ t('gov.simulator.cases') }}<template v-if="los.losP50Model !== null">; p50 LOS: {{ los.losP50Model.toFixed(1) }} {{ t('common.days') }}</template>) —
+          {{ num(los.n) }} {{ t('gov.simulator.cases') }}<template v-if="los.losP50Model !== null">; p50 LOS: {{ los.losP50Model.toFixed(1) }} {{ t('common.days') }}</template>) —
           {{ t('gov.simulator.oneBed') }} ≈ {{ (1 / los.losMedianFact).toFixed(2) }} {{ t('gov.simulator.admissionsPerDayShort') }}<template v-if="beds > 0">, {{ t('gov.simulator.soBedsDelta') }} +{{ beds }} {{ t('gov.simulator.bedsUnit') }} ≈ +{{ (beds / los.losMedianFact).toFixed(2) }} {{ t('gov.simulator.admissionsPerDayShort') }}</template>.
         </p>
         <p class="muted" v-else-if="beds > 0">
@@ -107,5 +117,5 @@ onMounted(async () => {
       </DataTable>
       <p v-if="moves.moves.length === 0" class="muted">{{ t('gov.simulator.noMoves') }}</p>
     </div>
-  </main>
+  </PageShell>
 </template>

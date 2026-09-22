@@ -35,7 +35,7 @@ const linkable = computed(() => auth.hasRole('chief', 'regulator'))
   cursor: help;
 }
 a.origin { cursor: pointer; }
-.origin.ml { background: #e3f2ef; color: #0f766e; }
-.origin.formula { background: #eceff3; color: #4a5568; }
-.origin.ai { background: #f6ecdf; color: #92600a; }
+.origin.ml { background: var(--dm-accent-soft); color: var(--dm-accent); }
+.origin.formula { background: var(--dm-neutral-soft); color: var(--dm-muted); }
+.origin.ai { background: var(--dm-ai-soft); color: var(--dm-ai); }
 </style>
