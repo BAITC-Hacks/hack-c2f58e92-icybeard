@@ -80,7 +80,14 @@ echo "→ проверка"
 ssh "$HOST" "$COMPOSE ps"
 for i in $(seq 1 30); do
   if curl -fsS --max-time 5 "$URL/health" >/dev/null 2>&1; then
-    echo "✓ $URL/health отвечает"; curl -fsS --max-time 10 "$URL/api/v1/" ; echo; exit 0
+    echo "✓ $URL/health отвечает"; curl -fsS --max-time 10 "$URL/api/v1/" ; echo
+    # Keycloak стартует дольше API (~40 с): без него вход в веб и мобильное приложение не работает
+    for j in $(seq 1 30); do
+      if curl -fsS --max-time 5 "$URL/auth/realms/darumen" >/dev/null 2>&1; then echo "✓ $URL/auth/realms/darumen отвечает"; exit 0; fi
+      sleep 2
+    done
+    echo "✗ $URL/auth/realms/darumen не ответил за 60 с — смотрите: ssh $HOST '$COMPOSE logs --tail=100 keycloak'" >&2
+    exit 1
   fi
   sleep 2
 done

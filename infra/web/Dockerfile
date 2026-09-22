@@ -1,13 +1,17 @@
-# Веб-клиент Darumen: сборка Vite → статический nginx, который проксирует /api к сервису api.
-# VITE_* задаются на этапе сборки: режим авторизации headers, API того же origin.
+# Веб-клиент Darumen: сборка Vite → статический nginx, который проксирует /api к сервису api и /auth к Keycloak.
+# VITE_* задаются на этапе сборки: Keycloak стенда за тем же origin (/auth), API того же origin.
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci
 COPY apps/web/ ./
-ARG VITE_AUTH_MODE=headers
+ARG VITE_KEYCLOAK_URL=https://dc.jurek.kz/auth
+ARG VITE_KEYCLOAK_REALM=darumen
+ARG VITE_KEYCLOAK_CLIENT=darumen-web
+ARG VITE_EGOV_ENABLED=false
 ARG VITE_API_BASE=
-ENV VITE_AUTH_MODE=$VITE_AUTH_MODE VITE_API_BASE=$VITE_API_BASE
+ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM VITE_KEYCLOAK_CLIENT=$VITE_KEYCLOAK_CLIENT \
+    VITE_EGOV_ENABLED=$VITE_EGOV_ENABLED VITE_API_BASE=$VITE_API_BASE
 RUN npm run build
 
 FROM nginx:1.27-alpine

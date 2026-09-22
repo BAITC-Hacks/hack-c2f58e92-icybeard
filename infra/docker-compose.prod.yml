@@ -2,11 +2,12 @@
 # над docker-compose.yml (compose мерджит списки ports, оверлеем порт не убрать).
 #
 # Что отличается от dev-стека:
-#   - только то, без чего API не работает: postgres, models (gRPC), scribe, api, web;
-#     ClickHouse/Cube/Kafka/Keycloak/MinIO/MLflow/Valkey не поднимаем — Auth в режиме
-#     headers, Messaging в режиме local (outbox в Postgres, без Kafka), ClickHouse в C# не используется;
+#   - только то, без чего продукт не работает: postgres, models (gRPC), scribe, intake, keycloak, api, web;
+#     ClickHouse/Cube/Kafka/MinIO/MLflow/Valkey не поднимаем — Messaging в режиме local (outbox в Postgres,
+#     без Kafka), ClickHouse в C# не используется;
 #   - наружу смотрит только web на 127.0.0.1:5173 — TLS терминирует хостовый Caddy
 #     (блок dc.jurek.kz → reverse_proxy 127.0.0.1:5173, см. pos-server/deploy/caddy/Caddyfile.host);
+#     Keycloak доступен через nginx веба под /auth (тот же origin: вход веба по PKCE, токены мобильного приложения);
 #   - lakehouse монтируется с хоста (/srv/darumen/lakehouse: gold, models, refdata — ~60 МБ);
 #   - секреты — из /srv/darumen/.env (образец: infra/deploy/.env.prod.example).
 #
@@ -81,6 +82,26 @@ services:
       postgres: { condition: service_healthy }
       models: { condition: service_started }
 
+  # Вход веба и мобильного приложения. Realm darumen (роли, демо-пользователи, мапперы region_kato/iin) импортируется
+  # из infra/keycloak при каждом старте; БД dev-file внутри контейнера — сессии живут до пересоздания контейнера.
+  # issuer в токенах — публичный адрес за Caddy и nginx (KC_HOSTNAME), служебные адреса для api (JWKS) отдаются
+  # по хосту запроса (keycloak:8080, KC_HOSTNAME_BACKCHANNEL_DYNAMIC), как в dev-стеке.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HOSTNAME: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}/auth
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      JAVA_OPTS_KC_HEAP: "-Xms64m -Xmx512m"   # 8 ГБ VM делится с POS: не даём JVM взять 70 % памяти по умолчанию
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    restart: unless-stopped
+
   api:
     build:
       context: ..
@@ -90,7 +111,8 @@ services:
       ASPNETCORE_URLS: http://0.0.0.0:8000
       ConnectionStrings__Postgres: Host=postgres;Database=darumen;Username=darumen;Password=${POSTGRES_PASSWORD}
       ModelServices__Address: http://models:50051
-      Auth__Mode: headers
+      Auth__Mode: keycloak
+      Auth__Authority: http://keycloak:8080/auth/realms/darumen
       Messaging__Mode: local   # outbox в Postgres, без Kafka
       Cors__Origins__0: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}
       ReverseProxy__Clusters__scribe__Destinations__local__Address: http://scribe:8010/
@@ -109,16 +131,20 @@ services:
       models: { condition: service_started }
       scribe: { condition: service_started }
       intake: { condition: service_started }
+      keycloak: { condition: service_started }
 
   web:
     build:
       context: ..
       dockerfile: infra/web/Dockerfile
+      args:
+        VITE_KEYCLOAK_URL: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}/auth
     ports:
       - "127.0.0.1:5173:80"
     restart: unless-stopped
     depends_on:
       - api
+      - keycloak
 
   # Одноразовая публикация gold и refdata из lakehouse в Postgres (после первого up и после каждого обновления данных):
   #   docker compose -f infra/docker-compose.prod.yml --env-file .env --profile tools run --rm publish
