@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from darumen.intake import gold_refresh
 from darumen.intake.app import create_app
 from darumen.intake.pipeline import Lakehouse
 
@@ -58,6 +59,23 @@ def test_upload_of_a_known_schema_loads_straight_to_silver_and_publishes(tmp_pat
     assert body["batch"]["rowsSilver"] == 3
     assert (lake.silver("bg_referrals")).exists()
     assert len(publisher.calls) == 1 and publisher.calls[0][0] == "bg_referrals"
+
+
+def test_upload_does_not_publish_marts_without_an_explicit_postgres_dsn(tmp_path, monkeypatch):
+    """Без POSTGRES_DSN intake пересобирает gold, но не публикует: DSN по умолчанию — localhost dev-стека, и тестовый
+    lakehouse из трёх строк перезаписал бы там настоящие витрины (так и случилось 22.09.2026 при обычном pytest)."""
+    monkeypatch.delenv("POSTGRES_DSN", raising=False)
+
+    def forbidden_publish(*_args, **_kwargs):
+        raise AssertionError("publish must not be called without POSTGRES_DSN")
+
+    monkeypatch.setattr(gold_refresh, "publish", forbidden_publish)
+    client, _lake, _publisher = _client(tmp_path)
+    with (FIXTURES / "referrals_slice.csv").open("rb") as fh:
+        response = client.post("/intake/files", files={"file": ("referrals_slice.csv", fh, "text/csv")})
+    assert response.status_code == 201
+    gold = response.json()["batch"]["gold"]
+    assert gold["rebuilt"] and gold["published"] is False and "POSTGRES_DSN" in gold["warning"]
 
 
 def test_upload_of_an_unknown_schema_produces_a_reviewable_draft(tmp_path):

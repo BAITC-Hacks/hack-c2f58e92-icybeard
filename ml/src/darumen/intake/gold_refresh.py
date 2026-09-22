@@ -6,6 +6,8 @@ failure here is reported as a warning, never raised — the load itself already 
 """
 from __future__ import annotations
 
+import os
+
 from ..lakehouse.gold import build_gold
 from ..lakehouse.publish import publish
 from .pipeline import Lakehouse
@@ -35,8 +37,14 @@ def rebuild_after_batch(lake: Lakehouse, dataset: str) -> dict[str, object]:
     except Exception as exc:  # noqa: BLE001 - партия уже загружена, витрины можно пересобрать и вручную (make gold)
         result["warning"] = f"gold не пересобран: {type(exc).__name__}: {exc}"
         return result
+    dsn = os.environ.get("POSTGRES_DSN")
+    if not dsn:
+        # Без явного адреса витрины не публикуются: DSN по умолчанию — localhost dev-стека, и одиночный intake
+        # (или тест на временном lakehouse) молча перезаписал бы там настоящие gold-таблицы.
+        result["warning"] = "витрины пересобраны, но не опубликованы: POSTGRES_DSN не задан"
+        return result
     try:
-        publish(lake)
+        publish(lake, pg_dsn=dsn)
         result["published"] = True
     except Exception as exc:  # noqa: BLE001 - Postgres/ClickHouse не обязаны быть подняты рядом с одиночным intake
         result["warning"] = f"витрины пересобраны, но не опубликованы (Postgres/ClickHouse недоступны?): {type(exc).__name__}: {exc}"
