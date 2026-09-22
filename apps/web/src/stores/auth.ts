@@ -50,11 +50,11 @@ export const useAuthStore = defineStore('auth', () => {
   async function init() {
     keycloak = new Keycloak({ url, realm, clientId: import.meta.env.VITE_KEYCLOAK_CLIENT ?? 'darumen-web' })
     try {
-      // тихая проверка сессии через iframe со статической страницей, иначе keycloak-js делает полный редирект
-      // и оставляет в адресе #error=login_required, который потом ломает разбор кода авторизации
+      // проверка сессии полным редиректом (prompt=none) без iframe: тихая проверка через iframe и проверка
+      // 3p-cookies не переживают X-Frame-Options: DENY / CSP frame-ancestors на прокси стенда, а гостю
+      // редирект обходится в один переход туда-обратно; #error=login_required keycloak-js убирает из адреса сам
       const authenticated = await keycloak.init({
         onLoad: 'check-sso',
-        silentCheckSsoRedirectUri: `${window.location.origin}/silent-check-sso.html`,
         pkceMethod: 'S256',
         checkLoginIframe: false,
       })

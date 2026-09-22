@@ -9,7 +9,6 @@ import './styles/tokens.css'
 import './styles/base.css'
 import App from './App.vue'
 import { i18n } from './i18n'
-import { router } from './router'
 import { useAuthStore } from './stores/auth'
 import { DarumenPreset } from './styles/preset'
 
@@ -22,8 +21,12 @@ app.use(i18n)
 
 // Маршрутизатор подключается только после проверки сессии: его первая навигация сразу запускает защиту
 // маршрутов и переход по роли, и при переходе по прямой ссылке (например /gov/regions/19) роли уже должны быть известны.
+// Сам модуль роутера импортируется тоже только теперь: createWebHistory() запоминает адрес в момент создания,
+// а keycloak-js убирает #state/#code/#error после редиректа проверки сессии уже внутри init() — иначе первая
+// навигация роутера возвращала бы в адрес устаревший фрагмент.
 const auth = useAuthStore()
-auth.init().finally(() => {
+auth.init().finally(async () => {
+  const { router } = await import('./router')
   app.use(router)
   app.mount('#app')
 })
