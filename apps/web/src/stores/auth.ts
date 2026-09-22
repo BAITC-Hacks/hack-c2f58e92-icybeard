@@ -34,12 +34,21 @@ export const useAuthStore = defineStore('auth', () => {
     region.value = parsed.region_kato ?? null
   }
 
+  const url: string = import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8080'
+  const realm: string = import.meta.env.VITE_KEYCLOAK_REALM ?? 'darumen'
+
+  /** Отвечает ли realm: публичное описание realm с коротким таймаутом (без cookies и iframe). */
+  async function realmReachable(): Promise<boolean> {
+    try {
+      const signal = typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(5000) : undefined
+      return (await fetch(`${url}/realms/${realm}`, { signal })).ok
+    } catch {
+      return false
+    }
+  }
+
   async function init() {
-    keycloak = new Keycloak({
-      url: import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8080',
-      realm: import.meta.env.VITE_KEYCLOAK_REALM ?? 'darumen',
-      clientId: import.meta.env.VITE_KEYCLOAK_CLIENT ?? 'darumen-web',
-    })
+    keycloak = new Keycloak({ url, realm, clientId: import.meta.env.VITE_KEYCLOAK_CLIENT ?? 'darumen-web' })
     try {
       // тихая проверка сессии через iframe со статической страницей, иначе keycloak-js делает полный редирект
       // и оставляет в адресе #error=login_required, который потом ломает разбор кода авторизации
@@ -54,8 +63,14 @@ export const useAuthStore = defineStore('auth', () => {
         window.history.replaceState(null, '', window.location.pathname + window.location.search)
       }
     } catch (error) {
-      keycloakUnavailable.value = true
-      console.warn('Keycloak недоступен, вход отключён', error)
+      // init падает и когда сервер входа не отвечает, и когда тихую проверку сессии в iframe заблокировал прокси
+      // (X-Frame-Options/CSP на хостовом Caddy): во втором случае вход по кнопке — полный редирект — работает,
+      // поэтому кнопку гасим только если сам realm не отвечает
+      keycloakUnavailable.value = !(await realmReachable())
+      console.warn(
+        keycloakUnavailable.value ? 'Keycloak недоступен, вход отключён' : 'Тихая проверка сессии Keycloak не прошла (iframe заблокирован?), вход по кнопке доступен',
+        error,
+      )
     }
   }
 

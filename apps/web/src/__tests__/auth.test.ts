@@ -75,8 +75,9 @@ describe('auth store (Keycloak)', () => {
     expect(auth.roleHome()).toBe('/gov')
   })
 
-  it('marks Keycloak unavailable when init fails and stays usable as a guest', async () => {
+  it('marks Keycloak unavailable when init fails and the realm does not answer, staying usable as a guest', async () => {
     kc.fail = true
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED') }))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const auth = useAuthStore()
     await auth.init()
@@ -84,6 +85,21 @@ describe('auth store (Keycloak)', () => {
     expect(auth.keycloakUnavailable).toBe(true)
     expect(await auth.authHeaders()).toEqual({})
     warn.mockRestore()
+    vi.unstubAllGlobals()
+  })
+
+  it('keeps the login button when the realm answers but the silent SSO check fails (iframe blocked by a proxy header)', async () => {
+    kc.fail = true
+    const fetchMock = vi.fn(async () => ({ ok: true }))
+    vi.stubGlobal('fetch', fetchMock)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const auth = useAuthStore()
+    await auth.init()
+    expect(auth.isAuthenticated).toBe(false)
+    expect(auth.keycloakUnavailable).toBe(false)
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringMatching(/\/realms\/darumen$/), expect.anything())
+    warn.mockRestore()
+    vi.unstubAllGlobals()
   })
 
   it('login returns to the denied page, never to a protocol-relative url, and passes the idp hint', async () => {
