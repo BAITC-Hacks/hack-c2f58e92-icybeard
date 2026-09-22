@@ -11,14 +11,15 @@
 | postgres | postgis 17 | журнал, intake, витрины gold/refdata из lakehouse |
 | models | `infra/models.Dockerfile` | gRPC Queue Intelligence / Load Forecasting, читает `/lakehouse` (gold, models, refdata) |
 | scribe | тот же образ, `SCRIBE_EXTRAS=1` | FastAPI-скрайб: faster-whisper (веса скачиваются при первом запросе) + черновики через DeepSeek |
-| api | `infra/api.Dockerfile` | .NET API: `Auth__Mode=headers`, `Messaging__Mode=stub`, Insight через DeepSeek |
-| web | `infra/web/Dockerfile` | Vite-сборка за nginx, `/api`, `/openapi`, `/scalar`, `/health` проксируются в api |
+| keycloak | `quay.io/keycloak/keycloak:26.0` | вход веба (PKCE) и мобильного приложения (password grant); realm `darumen` импортируется из `infra/keycloak` при старте; снаружи — только через nginx веба под `/auth` |
+| api | `infra/api.Dockerfile` | .NET API: `Auth__Mode=keycloak` (issuer `https://dc.jurek.kz/auth/realms/darumen`, JWKS по внутреннему адресу `keycloak:8080`), `Messaging__Mode=local`, Insight через DeepSeek |
+| web | `infra/web/Dockerfile` | Vite-сборка за nginx, `/api`, `/openapi`, `/scalar`, `/health` проксируются в api, `/auth` — в keycloak |
 
-ClickHouse, Cube, Kafka, Schema Registry, Keycloak, MinIO, MLflow и Valkey в проде не нужны: в C# ClickHouse не используется, шина хранит outbox в Postgres, а Kafka заглушена, авторизация — заголовками `X-Actor`/`X-Role`/`X-Region` (демо-режим, роль выбирается в интерфейсе — как и на старом стенде, стенд не для персональных данных).
+ClickHouse, Cube, Kafka, Schema Registry, MinIO, MLflow и Valkey в проде не нужны: в C# ClickHouse не используется, шина хранит outbox в Postgres, а Kafka заглушена. Вход — Keycloak с демо-пользователями realm (`regulator1`, `chief1`, `doctor1`, `steward1`, `citizen1`, `admin1`, пароль `darumen`); персональных данных стенд не хранит, ИИН у `citizen1` синтетический.
 
 ## Как задеплоить
 
-1. Один раз: `cp infra/deploy/.env.prod.example infra/deploy/.env.prod`, заполнить `POSTGRES_PASSWORD` и `DEEPSEEK_API_KEY` (файл в `.gitignore`).
+1. Один раз: `cp infra/deploy/.env.prod.example infra/deploy/.env.prod`, заполнить `POSTGRES_PASSWORD`, `KEYCLOAK_ADMIN_PASSWORD` и `DEEPSEEK_API_KEY` (файл в `.gitignore`).
 2. Локально должны быть собраны витрины: `make data && make train` (нужны `lakehouse/gold`, `lakehouse/models`, `lakehouse/refdata`).
 3. Первый раз, с остановкой старого стека GovTech Camp в `/srv/govtech-camp`:
    ```bash
@@ -26,7 +27,7 @@ ClickHouse, Cube, Kafka, Schema Registry, Keycloak, MinIO, MLflow и Valkey в �
    ```
    Дальше просто `make deploy` (или `make deploy ARGS=--no-publish`, если менялся только код).
 
-Скрипт `scripts/deploy.sh` делает rsync кода (без данных, `node_modules`, `bin/obj`) и ~60 МБ витрин в `/srv/darumen`, кладёт `.env`, собирает образы на VM, поднимает стек, публикует gold и refdata в Postgres (`--profile tools run --rm publish`) и ждёт `https://dc.jurek.kz/health`.
+Скрипт `scripts/deploy.sh` делает rsync кода (без данных, `node_modules`, `bin/obj`) и ~60 МБ витрин в `/srv/darumen`, кладёт `.env`, собирает образы на VM, поднимает стек, публикует gold и refdata в Postgres (`--profile tools run --rm publish`) и ждёт `https://dc.jurek.kz/health` и `https://dc.jurek.kz/auth/realms/darumen`.
 
 Старый стек останавливается через `docker compose down` без `-v`: его тома (`govtech-camp_pgdata`, `govtech-camp_uploads`) остаются, при необходимости удалить руками `docker volume rm`.
 
@@ -34,9 +35,10 @@ ClickHouse, Cube, Kafka, Schema Registry, Keycloak, MinIO, MLflow и Valkey в �
 
 ```bash
 ssh deploy@195.201.7.56 'cd /srv/darumen && docker compose -f infra/docker-compose.prod.yml --env-file .env ps'
-ssh deploy@195.201.7.56 'cd /srv/darumen && docker compose -f infra/docker-compose.prod.yml --env-file .env logs --tail=100 api models scribe'
+ssh deploy@195.201.7.56 'cd /srv/darumen && docker compose -f infra/docker-compose.prod.yml --env-file .env logs --tail=100 api models scribe keycloak'
 curl -s https://dc.jurek.kz/api/v1/            # {"name":"Darumen Health","version":...}
 curl -s https://dc.jurek.kz/api/v1/insight/status
+curl -s https://dc.jurek.kz/auth/realms/darumen | jq .realm   # "darumen" — Keycloak за nginx отвечает
 ```
 
 Обновление данных: перегенерировать витрины локально (`make data`, `make train`) и снова `make deploy` — publish пересоздаст таблицы gold/refdata, journal и intake не трогаются.

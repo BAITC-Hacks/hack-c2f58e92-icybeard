@@ -96,7 +96,7 @@
   "model": { "name": "rx_fill", "version": "1.0.0", "trainedThrough": "2025-03-24" }
 }
 ```
-`covered` по активным спецификациям нозологии (справочник спецификаций), сроки по фактическим обеспеченным рецептам (МНН за последние недели, иначе нозология за месяцы), дефицит по падению доли обеспеченных к выписанным. Названий МНН и аптек в открытых данных нет (запросы 12, 13): `pharmacies` пустой, названия вида «МНН 817». `GET /api/v1/medicines/nosologies`, `GET /api/v1/medicines/mnn?nosologyId=` дают списки для выбора.
+`covered` по активным спецификациям нозологии (справочник спецификаций), сроки по фактическим обеспеченным рецептам (МНН за последние недели, иначе нозология за месяцы), дефицит по падению доли обеспеченных к выписанным. Названий МНН и аптек в открытых данных нет (запросы 12, 13): `pharmacies` пустой, названия вида «МНН 817». `GET /api/v1/medicines/nosologies`, `GET /api/v1/medicines/mnn?nosologyId=` дают списки для выбора; в `/mnn` каждый МНН ровно один раз (объём суммируется по категориям нозологии, категория — самая массовая), иначе выпадающий список клиента получал дубликаты.
 
 ## Journal: решения человека
 
@@ -104,13 +104,41 @@
 ```json
 { "subject": "referral", "subjectId": "…", "recommended": { "moCode": "…" }, "chosen": { "moCode": "…" }, "reason": "…" }
 ```
-Ответ 201 `{ "decisionId", "recordedAt" }`. Публикует `decision.recorded`.
+Ответ 201 `{ "decisionId", "recordedAt" }`. Публикует `decision.recorded`. `subject`: `referral` (направление), `anomaly` (сигнал, пишется через `/anomalies/{id}/ack`), `route` (маршрут пациента, `subjectId` — реф `SYN-…`, пишется через `/route/{patientRef}/redirect`).
 
-### `GET /api/v1/journal/decisions?actor=me&subject=&page=&size=` (doctor: свои; regulator: регион)
-Ответ `{ items: [ { decisionId, actor, role, subject, subjectId, recommended, chosen, reason, recordedAt } ], page, size, total }`. До подключения Keycloak актор берётся из заголовков `X-Actor` и `X-Role`.
+### `GET /api/v1/journal/decisions?actor=me&subject=&subjectId=&page=&size=` (doctor: свои; regulator: регион)
+Ответ `{ items: [ { decisionId, actor, role, subject, subjectId, recommended, chosen, reason, recordedAt } ], page, size, total }`. `subjectId` — решения по одному предмету (например, по рефу пациента). До подключения Keycloak актор берётся из заголовков `X-Actor` и `X-Role`.
 
-### `GET /api/v1/journal/worklist` (doctor)
-Рабочий список пациентов на маршруте (на кэмпе синтетический): `{ "items": [ { "patientRef", "synthetic": true, "stage", "expectedDate", "riskFlags": ["stuck_over_30"], "priority", "nextAction", "explanation" } ] }`.
+### `GET /api/v1/journal/worklist?regionKato=&flag=` (doctor)
+Рабочий список пациентов на маршруте (на кэмпе синтетический): `{ "items": [ { "patientRef": "SYN-75-028B-381-01", "synthetic": true, "stage", "stageCode": "registered | waiting | called", "expectedDate", "riskFlags": ["stuck_over_30"], "priority", "nextAction", "explanation", "moCode", "moName", "profileCode", "regionKato", "daysWaiting" } ], "synthetic": true, "asOf", "regionKato", "modelBacked" }`. Реф включает профиль (у организации бывают очереди по нескольким профилям) и открывает маршрут пациента — `GET /api/v1/route/{patientRef}`; `stage` — русская подпись для старых клиентов, `stageCode` — машинный код для локализации. Прогнозы по очередям региона (в Алматы их 373) модель отдаёт одним пакетным вызовом `PredictQueues`, API кэширует их на срез витрины (1 ч): состав и порядок списка стабильны между запросами, повторный запрос к модели не обращается; `modelBacked: false` — сервис моделей был недоступен, приоритеты и флаги посчитаны по агрегатам витрины.
+
+## Route: маршрут пациента
+
+Один контракт для гражданина и врача — только логистика плановой госпитализации: стадии Стандарта стационарной помощи (приказ МЗ РК ҚР-ДСМ-27), даты, прогноз ожидания той же модели, чек-лист обследований со сроками давности, альтернативы, решения врача и история прошлых направлений. Пациент синтетический (`synthetic: true`): выдуман, но сроки, очередь и исходы взяты из реального состояния очередей региона на `asOf`; это написано в `basis`. Ответы не кэшируются. Сервис моделей недоступен — маршрут строится по агрегатам витрины (`forecast.fromModel = false`, `pWithin30Days = null`), а не отдаёт 503.
+
+### `GET /api/v1/route/me?regionKato=` (citizen)
+Регион — клейм `region_kato`, иначе параметр, иначе `75`. Гражданин — один из первых пяти «застрявших» (дольше 30 дней или с организацией быстрее) пациентов рабочего списка региона (те же кэшированные прогнозы, что у врача); профили, привязанные к полу и беременности (231, 241, 251), и детские (по названию в справочнике: «… для детей», «Педиатрические», «Патология новорожденных») синтетическому взрослому гражданину не назначаются; номер — детерминированно по ИИН из клейма (иначе по учётной записи), поэтому врач видит того же пациента на первом экране своего списка. Ответ:
+```json
+{ "patientRef": "SYN-75-028B-381-01", "synthetic": true, "audience": "citizen", "asOf": "2025-03-31", "regionKato": "75",
+  "organization": { "moCode", "moName", "profileCode", "profileName" },
+  "stage": "waitlisted", "stageTitle": "Внесено в лист ожидания",
+  "timeline": [ { "code": "referral_issued | examination | waitlisted | date_assigned | hospitalized", "order", "title", "date", "status": "done | current | upcoming", "norm" } ],
+  "dates": { "issuedAt", "registeredAt", "plannedAt", "expectedAt" }, "daysWaiting": 47,
+  "forecast": { "p50Days", "p90Days", "pWithin30Days", "fromModel": true, "model": { "name", "version", "trainedThrough" } },
+  "benchmarks": [ { "code": "moh_target_wait_days", "value": 20, "unit": "days", "title", "source", "sourceDate": "2026-02-19" } ],
+  "checklist": [ { "code": "cbc", "title", "validityDays": 14, "validityLabel": "14 дней", "doneAt", "validUntil", "status": "valid | expiring | expired" } ],
+  "alternatives": [ { "mo": { "moCode", "name", "regionKato" }, "p50Days", "p90Days", "pRefusal", "distanceKm", "isNeighborRegion" } ], "alternativesModel",
+  "decisions": [ { "decisionId", "role", "recordedAt", "fromMoCode", "toMoCode", "toMoName", "reason", "kind": "redirect | keep" } ],
+  "history": [ { "moCode", "moName", "profileCode", "profileName", "registeredAt", "outcome": "hospitalized | refused", "outcomeAt", "waitDays" } ],
+  "doctor": null, "basis": "Синтетический маршрут: …", "standard": { "source", "sourceUrl", "sourceDate", "available" } }
+```
+Гражданину `doctor` всегда `null`: риск отказа, приоритет и флаги — служебная информация врача. Стадии и статусы чек-листа считаются только по датам (`issuedAt` — за 1–10 дней до регистрации, обследования сданы между ними, срок действия — по приложению 5); причины отказов пациенту не приписываются, в открытых данных их нет. 404, если в регионе нет очередей; 422 — неверный КАТО.
+
+### `GET /api/v1/route/{patientRef}` (doctor)
+Тот же ответ с `audience: "doctor"` и панелью `doctor: { priority, riskFlags, nextAction, explanation, pRefusal, refusalOrgInTraining, shap }`. 403 — пациент другого региона (клейм `region_kato` врача сильнее рефа), 404 — реф не разбирается или в очереди нет пациента с таким номером на дату среза.
+
+### `POST /api/v1/route/{patientRef}/redirect` (doctor)
+Тело `{ "toMoCode": "22GN", "reason": "…" }`, заголовок `Idempotency-Key`. Записывает решение `subject: route` (рекомендация системы — самая быстрая альтернатива по модели, выбор — `toMoCode`) и публикует `decision.recorded`; ответ 201 `{ "decisionId", "recordedAt" }`, при повторе ключа 200 с той же записью. 422 без `toMoCode` или `reason` и если организация совпадает с текущей. Гражданин видит решение в `decisions` своего маршрута («врач предложил другую организацию»).
 
 ## Insight
 
@@ -141,7 +169,8 @@
 
 ## Refdata
 
-- `GET /api/v1/refdata/regions`, `/organizations?regionKato=&q=`, `/profiles`, `/icd10?q=`, `/mnn?q=`. Публичные, кэш 1 час.
+- `GET /api/v1/refdata/regions`, `/organizations?regionKato=&q=&profileCode=`, `/profiles`, `/seasonality`, `/vaccination`, `/vaccination-plans?regionKato=`, `/route-standard`. Публичные, кэш 1 час, `Vary: Accept-Language`. Справочников МКБ-10 и МНН по имени нет (запрос 12).
+- `GET /api/v1/refdata/route-standard` — Стандарт стационарной помощи (приказ МЗ РК ҚР-ДСМ-27, ред. 15.09.2025): `{ "meta": { "source", "sourceUrl", "sourceDate" }, "available", "stages": [ { "code", "order", "title", "norm", "normWorkingDays", "rescheduleMaxDays", "noShowDays" } ], "refusalReasons": [ { "code", "title" } ], "checklist": [ { "code", "title", "validityDays", "validityLabel" } ], "benchmarks": [ { "code", "value", "unit", "title", "source", "sourceDate" } ] }`. Подписи по `Accept-Language`; источник — `refdata/route_standard.yaml` → `make publish` → `refdata.route_*`; `available: false`, пока витрины не опубликованы. Только логистика: сроки давности обследований — норматив приложения 5, а не медицинская рекомендация; ориентир МЗ РК (20 дней) — из коллегии 19.02.2026.
 
 ## Scribe (демо)
 
