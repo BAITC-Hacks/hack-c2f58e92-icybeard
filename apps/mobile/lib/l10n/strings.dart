@@ -293,6 +293,11 @@ class S {
   String get scribeAudioDeletedNote =>
       _t('Сессия завершена, исходные данные удалены сервером.', 'Сеанс аяқталды, бастапқы деректер сервер тарапынан жойылды.');
   String get scribeNewSessionButton => _t('Новая сессия', 'Жаңа сеанс');
+  String get scribeRecordMic => _t('Записать с микрофона', 'Микрофоннан жазу');
+  String get scribeStopRecording => _t('Остановить и распознать', 'Тоқтату және тану');
+  String get scribeTranscribing => _t('Распознаём запись…', 'Жазба танылуда…');
+  String get scribeMicDenied => _t('Нет доступа к микрофону — введите текст вручную.', 'Микрофонға қолжетімділік жоқ — мәтінді қолмен енгізіңіз.');
+  String get scribeQrHint => _t('QR-код ссылки на памятку — покажите пациенту', 'Естелік сілтемесінің QR-коды — науқасқа көрсетіңіз');
   String scribeSectionLabel(String name) {
     if (_locale != 'kk') return name;
     const map = {

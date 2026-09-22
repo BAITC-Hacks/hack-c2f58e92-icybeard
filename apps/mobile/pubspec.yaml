@@ -45,6 +45,9 @@ dependencies:
   # токены Keycloak — в защищённом хранилище платформы, а не в SharedPreferences открытым текстом
   flutter_secure_storage: ^10.3.1
   package_info_plus: ^8.3.1
+  qr_flutter: ^4.1.0
+  record: ^6.2.1
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

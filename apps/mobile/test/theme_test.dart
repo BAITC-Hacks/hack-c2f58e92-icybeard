@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:darumen/theme/app_theme.dart';
 import 'package:darumen/theme/tokens.dart';
 import 'package:darumen/theme/tones.dart';
@@ -20,6 +23,23 @@ void main() {
     expect(light.extension<AppTones>(), isNotNull);
     expect(dark.extension<AppPalette>()?.colors.surface, AppColors.dark.surface);
     expect(light.cardTheme.elevation, 0, reason: 'карточки без тени, только hairline');
+  });
+
+  test('tokens match design/tokens.json shared with the web client', () {
+    final json = jsonDecode(File('../../design/tokens.json').readAsStringSync()) as Map<String, dynamic>;
+    Color hex(String value) => Color(int.parse('FF${value.substring(1)}', radix: 16));
+    for (final (name, colors) in [('light', AppColors.light), ('dark', AppColors.dark)]) {
+      final expected = json[name] as Map<String, dynamic>;
+      final actual = {
+        'surface': colors.surface, 'card': colors.card, 'ink': colors.ink, 'muted': colors.muted, 'faint': colors.faint,
+        'hairline': colors.hairline, 'accent': colors.accent, 'accentSoft': colors.accentSoft, 'ok': colors.ok, 'okSoft': colors.okSoft,
+        'warn': colors.warn, 'warnSoft': colors.warnSoft, 'danger': colors.danger, 'dangerSoft': colors.dangerSoft, 'neutralSoft': colors.neutralSoft,
+      };
+      for (final entry in actual.entries) {
+        expect(entry.value, hex(expected[entry.key] as String), reason: '$name.${entry.key}');
+      }
+    }
+    expect(AppSpacing.lg, (json['space'] as Map<String, dynamic>)['lg']);
   });
 
   test('tones map origin kinds to accent, neutral and warn pairs', () {

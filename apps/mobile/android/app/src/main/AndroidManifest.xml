@@ -2,6 +2,7 @@
     <!-- API и Keycloak — по сети; в release только https (res/xml/network_security_config.xml),
          в debug тот же файл из src/debug разрешает http до эмулятора (10.0.2.2) и адресов в локальной сети -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="Darumen"
         android:name="${applicationName}"

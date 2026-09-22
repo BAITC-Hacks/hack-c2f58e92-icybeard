@@ -1,4 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:record/record.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
@@ -7,6 +12,7 @@ import '../api/models.dart';
 import '../l10n/strings.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
+import '../theme/tones.dart';
 import '../widgets/error_box.dart';
 import '../widgets/origin_tag.dart';
 import '../widgets/section.dart';
@@ -34,9 +40,14 @@ class _ScribeScreenState extends State<ScribeScreen> {
   ApproveResult? result;
   Object? error;
   bool busy = false;
+  // запись с микрофона: файл во временной папке, после распознавания удаляется; аудио на сервере — до утверждения
+  final AudioRecorder _recorder = AudioRecorder();
+  bool recording = false;
+  bool transcribing = false;
 
   @override
   void dispose() {
+    _recorder.dispose();
     transcript.dispose();
     leaflet.dispose();
     for (final c in sectionControllers.values) {
@@ -78,6 +89,51 @@ class _ScribeScreenState extends State<ScribeScreen> {
       setState(() => error = e);
     } finally {
       setState(() => busy = false);
+    }
+  }
+
+  Future<void> _record() async {
+    final s = S.at(context);
+    if (!await _recorder.hasPermission()) {
+      if (mounted) {
+        setState(() => error = s.scribeMicDenied);
+      }
+      return;
+    }
+    final dir = await getTemporaryDirectory();
+    await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: '${dir.path}/consult.m4a');
+    if (mounted) {
+      setState(() => recording = true);
+    }
+  }
+
+  Future<void> _stopRecording() async {
+    final path = await _recorder.stop();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      recording = false;
+      transcribing = path != null;
+    });
+    if (path == null || sessionId == null) {
+      return;
+    }
+    try {
+      final file = File(path);
+      final text = await context.read<Session>().api.uploadScribeAudio(sessionId!, await file.readAsBytes(), 'consult.m4a');
+      await file.delete();
+      if (mounted) {
+        setState(() => transcript.text = text);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => error = e);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => transcribing = false);
+      }
     }
   }
 
@@ -194,6 +250,16 @@ class _ScribeScreenState extends State<ScribeScreen> {
           FilledButton.icon(onPressed: consent && !busy ? _start : null, icon: const Icon(Icons.play_arrow), label: Text(s.scribeStartButton)),
         ],
         if (step == _Step.transcript) ...[
+          Row(
+            children: [
+              if (!recording)
+                FilledButton.tonalIcon(onPressed: busy || transcribing ? null : _record, icon: const Icon(Icons.mic_none), label: Text(s.scribeRecordMic))
+              else
+                FilledButton.icon(onPressed: _stopRecording, icon: const Icon(Icons.stop_circle_outlined), label: Text(s.scribeStopRecording)),
+              if (transcribing) ...[const SizedBox(width: AppSpacing.md), const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)), const SizedBox(width: AppSpacing.sm), Text(s.scribeTranscribing, style: theme.textTheme.bodySmall)],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
           Text(s.scribeNoAudioCaption, style: theme.textTheme.bodySmall),
           const SizedBox(height: AppSpacing.sm),
           TextField(
@@ -260,6 +326,16 @@ class _ScribeScreenState extends State<ScribeScreen> {
               trailing: IconButton(icon: const Icon(Icons.copy_outlined), tooltip: s.copy, onPressed: () => _copy(result!.leafletUrl)),
             ),
           ),
+          const SizedBox(height: AppSpacing.md),
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppPalette.of(context).hairline)),
+              child: QrImageView(data: result!.leafletUrl, size: 200),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Center(child: Text(s.scribeQrHint, style: theme.textTheme.bodySmall, textAlign: TextAlign.center)),
           const SizedBox(height: AppSpacing.md),
           Text(s.scribeAudioDeletedNote, style: theme.textTheme.bodySmall),
           const SizedBox(height: AppSpacing.lg),

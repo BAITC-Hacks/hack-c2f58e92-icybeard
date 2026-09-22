@@ -150,5 +150,16 @@ class ApiClient {
 
   Future<void> discardScribe(String sessionId) async => await delete('/api/v1/scribe/sessions/$sessionId');
 
+  /// Аудио консультации → стенограмма: multipart с полем `file`, как в вебе; ответ `{ text, transcript[] }`.
+  Future<String> uploadScribeAudio(String sessionId, List<int> bytes, String filename) async {
+    final headers = {..._headers(await _bearer())}..remove('Content-Type');
+    final request = http.MultipartRequest('POST', _uri('/api/v1/scribe/sessions/$sessionId/audio'))
+      ..headers.addAll(headers)
+      ..files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    final body = _decode(await http.Response.fromStream(await _http.send(request))) as Map<String, dynamic>;
+    final segments = (body['transcript'] as List<dynamic>?) ?? const [];
+    return body['text'] as String? ?? segments.map((e) => (e as Map<String, dynamic>)['text'] as String? ?? '').join(' ');
+  }
+
   void close() => _http.close();
 }
