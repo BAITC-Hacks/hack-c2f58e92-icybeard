@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../api/client.dart';
 import '../api/models.dart';
 import '../l10n/strings.dart';
 import '../state/session.dart';
-import '../widgets/common.dart';
+import '../theme/tokens.dart';
+import '../widgets/error_box.dart';
+import '../widgets/origin_tag.dart';
+import '../widgets/section.dart';
+import '../widgets/status_chip.dart';
 
 enum _Step { consent, transcript, draft, approved }
 
-/// AI-скрайб: типизированная стенограмма (без записи с микрофона — см. docs/finish-plan.md 5.12),
-/// черновик по разделам, утверждение и памятка пациенту через тот же REST API, что и веб.
+/// AI-скрайб: типизированная стенограмма, черновик по разделам (каждый помечен «AI‑черновик»), утверждение
+/// врачом и памятка пациенту через тот же REST API, что и веб.
 class ScribeScreen extends StatefulWidget {
   const ScribeScreen({super.key});
 
@@ -79,7 +84,9 @@ class _ScribeScreenState extends State<ScribeScreen> {
   Future<void> _makeDraft() async {
     final api = context.read<Session>().api;
     final id = sessionId;
-    if (id == null) return;
+    if (id == null) {
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -109,7 +116,9 @@ class _ScribeScreenState extends State<ScribeScreen> {
   Future<void> _approve() async {
     final api = context.read<Session>().api;
     final id = sessionId;
-    if (id == null) return;
+    if (id == null) {
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -142,91 +151,128 @@ class _ScribeScreenState extends State<ScribeScreen> {
     _resetAll();
   }
 
+  Future<void> _copy(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(S.at(context).copied)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final s = S.of(context.watch<Session>().locale);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(s.scribeTitle),
-        actions: [
-          if (step == _Step.transcript || step == _Step.draft)
-            IconButton(icon: const Icon(Icons.close), tooltip: s.scribeDiscardButton, onPressed: busy ? null : _discard),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          ErrorBox(error: error),
-          if (step == _Step.consent) ...[
-            SwitchListTile(
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    return PageScaffold(
+      title: s.scribeTitle,
+      actions: [
+        if (step == _Step.transcript || step == _Step.draft)
+          IconButton(icon: const Icon(Icons.close), tooltip: s.scribeDiscardButton, onPressed: busy ? null : _discard),
+      ],
+      children: [
+        Wrap(
+          spacing: AppSpacing.xs,
+          runSpacing: AppSpacing.xs,
+          children: [
+            for (final (index, item) in _Step.values.indexed)
+              StatusChip(
+                '${index + 1} · ${_stepLabel(s, item)}',
+                tone: item == step ? StatusTone.accent : item.index < step.index ? StatusTone.ok : StatusTone.neutral,
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        if (error != null) ...[ErrorBox(error: error), const SizedBox(height: AppSpacing.md)],
+        if (step == _Step.consent) ...[
+          Card(
+            child: SwitchListTile(
               value: consent,
               onChanged: (v) => setState(() => consent = v),
               title: Text(s.scribeConsentLabel),
-              contentPadding: EdgeInsets.zero,
             ),
-            const SizedBox(height: 8),
-            FilledButton.icon(
-              onPressed: consent && !busy ? _start : null,
-              icon: const Icon(Icons.play_arrow),
-              label: Text(s.scribeStartButton),
-            ),
-          ],
-          if (step == _Step.transcript) ...[
-            Text(s.scribeNoAudioCaption, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 8),
-            TextField(
-              controller: transcript,
-              minLines: 6,
-              maxLines: 12,
-              decoration: InputDecoration(labelText: s.scribeTranscriptFieldLabel, alignLabelWithHint: true),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: busy ? null : _makeDraft,
-              icon: const Icon(Icons.description),
-              label: Text(s.scribeMakeDraftButton),
-            ),
-          ],
-          if (step == _Step.draft) ...[
-            Text(s.scribeDraftReviewCaption, style: Theme.of(context).textTheme.bodySmall),
-            for (final section in sections)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(s.scribeSectionLabel(section.name), style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 4),
-                        TextField(controller: sectionControllers[section.name], minLines: 2, maxLines: 8),
-                      ],
-                    ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton.icon(onPressed: consent && !busy ? _start : null, icon: const Icon(Icons.play_arrow), label: Text(s.scribeStartButton)),
+        ],
+        if (step == _Step.transcript) ...[
+          Text(s.scribeNoAudioCaption, style: theme.textTheme.bodySmall),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            controller: transcript,
+            minLines: 6,
+            maxLines: 12,
+            decoration: InputDecoration(labelText: s.scribeTranscriptFieldLabel, alignLabelWithHint: true),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton.icon(onPressed: busy ? null : _makeDraft, icon: const Icon(Icons.description_outlined), label: Text(s.scribeMakeDraftButton)),
+        ],
+        if (step == _Step.draft) ...[
+          Text(s.scribeDraftReviewCaption, style: theme.textTheme.bodySmall),
+          for (final section in sections)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.md),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: Text(s.scribeSectionLabel(section.name), style: theme.textTheme.titleMedium)),
+                          const OriginTag(Origin.ai),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      TextField(controller: sectionControllers[section.name], minLines: 2, maxLines: 8),
+                    ],
                   ),
                 ),
               ),
-            const SizedBox(height: 12),
-            TextField(controller: leaflet, minLines: 3, maxLines: 8, decoration: InputDecoration(labelText: s.scribeLeafletLabel)),
-            const SizedBox(height: 12),
-            FilledButton.icon(onPressed: busy ? null : _approve, icon: const Icon(Icons.check_circle), label: Text(s.scribeApproveButton)),
-          ],
-          if (step == _Step.approved && result != null) ...[
-            Text(s.scribeApprovedTitle, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            SectionTitle(s.scribeLeafletTokenLabel),
-            SelectableText(result!.leafletToken),
-            SectionTitle(s.scribeLeafletUrlLabel),
-            SelectableText(result!.leafletUrl),
-            const SizedBox(height: 12),
-            Text(s.scribeAudioDeletedNote, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text(s.scribeNoQrNote, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(onPressed: _resetAll, icon: const Icon(Icons.refresh), label: Text(s.scribeNewSessionButton)),
-          ],
+            ),
+          const SizedBox(height: AppSpacing.md),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(child: Text(s.scribeLeafletLabel, style: theme.textTheme.titleMedium)),
+                      const OriginTag(Origin.ai),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(controller: leaflet, minLines: 3, maxLines: 8),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          FilledButton.icon(onPressed: busy ? null : _approve, icon: const Icon(Icons.check_circle_outline), label: Text(s.scribeApproveButton)),
         ],
-      ),
+        if (step == _Step.approved && result != null) ...[
+          Text(s.scribeApprovedTitle, style: theme.textTheme.titleMedium),
+          SectionTitle(s.scribeLeafletUrlLabel),
+          Card(
+            child: ListTile(
+              title: SelectableText(result!.leafletUrl, style: theme.textTheme.bodySmall),
+              trailing: IconButton(icon: const Icon(Icons.copy_outlined), tooltip: s.copy, onPressed: () => _copy(result!.leafletUrl)),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(s.scribeAudioDeletedNote, style: theme.textTheme.bodySmall),
+          const SizedBox(height: AppSpacing.lg),
+          OutlinedButton.icon(onPressed: _resetAll, icon: const Icon(Icons.refresh), label: Text(s.scribeNewSessionButton)),
+        ],
+      ],
     );
   }
+
+  static String _stepLabel(S s, _Step step) => switch (step) {
+        _Step.consent => s.scribeConsentShort,
+        _Step.transcript => s.scribeTranscriptFieldLabel,
+        _Step.draft => s.scribeDraftShort,
+        _Step.approved => s.scribeApprovedShort,
+      };
 }

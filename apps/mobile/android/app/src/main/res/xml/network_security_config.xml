@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- release: только https (стенд dc.jurek.kz); debug-вариант в src/debug/res/xml разрешает cleartext для эмулятора -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

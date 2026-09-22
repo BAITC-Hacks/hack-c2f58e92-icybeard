@@ -1,197 +1,199 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/client.dart';
+import '../config/env.dart';
+import 'token_store.dart';
 
-/// Кто пользуется приложением и куда ходить за данными.
-/// Два режима входа: демо-заголовки X-Actor/X-Role (по умолчанию) и Keycloak
-/// (клиент darumen-mobile, password-grant с обновлением токена).
+enum AuthRole { guest, citizen, doctor }
+
+/// Кто пользуется приложением. Единственный вход — Keycloak (клиент darumen-mobile, password grant с обновлением
+/// токена); без входа — гость с публичными экранами. Роль, регион и ИИН всегда выводятся из клеймов токена и не
+/// хранятся отдельно. Один ApiClient на всю сессию; уведомляет слушателей только при смене роли или языка, чтобы
+/// guard роутера не перезапускался на каждом тихом обновлении токена.
 class Session extends ChangeNotifier {
-  Session({String? baseUrl}) : _baseUrl = baseUrl ?? defaultBaseUrl();
+  Session({TokenStore? tokens, http.Client? httpClient})
+      : _tokens = tokens ?? TokenStore(),
+        _http = httpClient ?? http.Client() {
+    api = ApiClient(baseUrl: Env.apiBase, client: _http, tokenProvider: freshToken, locale: () => _locale);
+  }
 
-  static const roles = ['citizen', 'doctor'];
-  static const demoActors = {'citizen': 'citizen1', 'doctor': 'doctor1'};
-  static const _kcClientId = 'darumen-mobile';
+  static const _refreshAhead = Duration(seconds: 30);
 
-  String _baseUrl;
-  String _role = 'citizen';
-  String _region = '75';
+  final TokenStore _tokens;
+  final http.Client _http;
+  late final ApiClient api;
+
+  AuthRole _role = AuthRole.guest;
+  String? _username;
+  String? _regionClaim;
+  String? _iin;
   String _locale = 'ru';
+  String _preferredRegion = Env.defaultRegion;
+  String? _lastProfile;
+  String? _lastNosology;
+  String? _access;
+  String? _refresh;
+  DateTime? _expiresAt;
 
-  // Keycloak
-  String _authMode = 'demo'; // demo | keycloak
-  String _keycloakUrl = defaultKeycloakUrl();
-  String? _kcToken;
-  String? _kcRefresh;
-  DateTime? _kcExpiresAt;
-  String? _kcActor;
-
-  String get baseUrl => _baseUrl;
-  String get role => _role;
-  String get region => _region;
+  AuthRole get role => _role;
+  bool get isAuthenticated => _role != AuthRole.guest;
+  bool get isDoctor => _role == AuthRole.doctor;
+  bool get isCitizen => _role == AuthRole.citizen;
+  String? get username => _username;
+  String? get iin => _iin;
   String get locale => _locale;
-  bool get isDoctor => _role == 'doctor';
-  String get authMode => _authMode;
-  String get keycloakUrl => _keycloakUrl;
-  bool get isKeycloak => _authMode == 'keycloak' && _kcToken != null;
-  String? get actor => isKeycloak ? _kcActor : demoActors[_role];
 
-  ApiClient get api => isKeycloak
-      ? ApiClient(baseUrl: _baseUrl, locale: _locale, tokenProvider: _freshToken)
-      : ApiClient(baseUrl: _baseUrl, actor: demoActors[_role], role: _role, region: _region, locale: _locale);
+  /// Регион из клейма учётной записи, иначе выбранный гостем, иначе г. Алматы.
+  String get region => _regionClaim ?? _preferredRegion;
+  bool get regionFromAccount => _regionClaim != null;
+  String? get lastProfile => _lastProfile;
+  String? get lastNosology => _lastNosology;
 
-  static String defaultBaseUrl() {
-    if (kIsWeb) return 'http://localhost:8000';
-    try {
-      return Platform.isAndroid ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
-    } catch (_) {
-      return 'http://localhost:8000';
-    }
-  }
-
-  static String defaultKeycloakUrl() {
-    if (kIsWeb) return 'http://localhost:8080';
-    try {
-      return Platform.isAndroid ? 'http://10.0.2.2:8080' : 'http://localhost:8080';
-    } catch (_) {
-      return 'http://localhost:8080';
-    }
-  }
+  /// Стартовый маршрут по роли: врач — рабочий список, остальные — главная.
+  String get home => _role == AuthRole.doctor ? '/doctor/patients' : '/home';
 
   Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _baseUrl = prefs.getString('baseUrl') ?? _baseUrl;
-      _role = prefs.getString('role') ?? _role;
-      _region = prefs.getString('region') ?? _region;
       _locale = prefs.getString('locale') ?? _locale;
-      _authMode = prefs.getString('authMode') ?? _authMode;
-      _keycloakUrl = prefs.getString('keycloakUrl') ?? _keycloakUrl;
-      _kcToken = prefs.getString('kcToken');
-      _kcRefresh = prefs.getString('kcRefresh');
-      final expires = prefs.getInt('kcExpiresAt');
-      _kcExpiresAt = expires == null ? null : DateTime.fromMillisecondsSinceEpoch(expires);
-      _kcActor = prefs.getString('kcActor');
-      notifyListeners();
+      _preferredRegion = prefs.getString('region') ?? _preferredRegion;
+      _lastProfile = prefs.getString('lastProfile');
+      _lastNosology = prefs.getString('lastNosology');
     } catch (_) {
-      // без хранилища работаем с настройками по умолчанию
+      // без хранилища — настройки по умолчанию
     }
-  }
-
-  Future<void> update({String? baseUrl, String? role, String? region, String? locale, String? keycloakUrl}) async {
-    _baseUrl = baseUrl ?? _baseUrl;
-    _role = role ?? _role;
-    _region = region ?? _region;
-    _locale = locale ?? _locale;
-    _keycloakUrl = keycloakUrl ?? _keycloakUrl;
+    final stored = await _tokens.read();
+    if (stored != null) {
+      _access = stored.access;
+      _refresh = stored.refresh;
+      _expiresAt = stored.expiresAt;
+      _applyClaims(stored.access);
+    }
     notifyListeners();
-    await _persist();
   }
 
-  /// Вход паролем демо-пользователя реалма darumen (grant_type=password, клиент darumen-mobile).
-  /// Роль и регион берутся из клеймов токена — как в вебе.
+  /// Вход паролем (демо-пользователи realm darumen: citizen1, doctor1). Роль, регион и ИИН — из клеймов токена.
   Future<void> login(String username, String password) async {
-    final data = await _tokenRequest({'grant_type': 'password', 'username': username, 'password': password});
-    _applyTokens(data);
-    _authMode = 'keycloak';
+    _applyTokens(await _tokenRequest({'grant_type': 'password', 'username': username, 'password': password}));
+    await _tokens.write(StoredTokens(access: _access!, refresh: _refresh, expiresAt: _expiresAt));
     notifyListeners();
-    await _persist();
   }
 
   Future<void> logout() async {
-    _authMode = 'demo';
-    _kcToken = null;
-    _kcRefresh = null;
-    _kcExpiresAt = null;
-    _kcActor = null;
+    _access = null;
+    _refresh = null;
+    _expiresAt = null;
+    _username = null;
+    _regionClaim = null;
+    _iin = null;
+    _role = AuthRole.guest;
+    await _tokens.clear();
     notifyListeners();
-    await _persist();
   }
 
-  /// Токен для запроса: обновляется за 30 секунд до истечения; при неудаче — выход в демо-режим.
-  Future<String?> _freshToken() async {
-    if (_kcToken == null) return null;
-    final expiring = _kcExpiresAt == null || DateTime.now().isAfter(_kcExpiresAt!.subtract(const Duration(seconds: 30)));
-    if (expiring && _kcRefresh != null) {
+  Future<void> setLocale(String locale) async {
+    if (locale == _locale) {
+      return;
+    }
+    _locale = locale;
+    notifyListeners();
+    await _persist('locale', locale);
+  }
+
+  /// Регион гостя и учётной записи без клейма region_kato; при клейме выбор не переопределяет учётную запись.
+  Future<void> setRegion(String regionKato) async {
+    _preferredRegion = regionKato;
+    await _persist('region', regionKato);
+  }
+
+  Future<void> rememberProfile(String profileCode) async {
+    _lastProfile = profileCode;
+    await _persist('lastProfile', profileCode);
+  }
+
+  Future<void> rememberNosology(String nosologyId) async {
+    _lastNosology = nosologyId;
+    await _persist('lastNosology', nosologyId);
+  }
+
+  /// Токен для запроса: обновляется за 30 секунд до истечения; если обновить нельзя — выход в гости.
+  /// На тихом успешном обновлении слушатели не уведомляются.
+  Future<String?> freshToken() async {
+    if (_access == null) {
+      return null;
+    }
+    final expiring = _expiresAt == null || DateTime.now().isAfter(_expiresAt!.subtract(_refreshAhead));
+    if (expiring && _refresh != null) {
       try {
-        _applyTokens(await _tokenRequest({'grant_type': 'refresh_token', 'refresh_token': _kcRefresh!}));
-        await _persist();
+        _applyTokens(await _tokenRequest({'grant_type': 'refresh_token', 'refresh_token': _refresh!}));
+        await _tokens.write(StoredTokens(access: _access!, refresh: _refresh, expiresAt: _expiresAt));
       } catch (_) {
         await logout();
         return null;
       }
     }
-    return _kcToken;
+    return _access;
   }
 
   Future<Map<String, dynamic>> _tokenRequest(Map<String, String> body) async {
-    final response = await http.post(
-      Uri.parse('$_keycloakUrl/realms/darumen/protocol/openid-connect/token'),
+    final response = await _http.post(
+      Uri.parse('${Env.keycloakUrl}/realms/${Env.keycloakRealm}/protocol/openid-connect/token'),
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: {'client_id': _kcClientId, ...body},
+      body: {'client_id': Env.keycloakClientId, ...body},
     );
     final json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     if (response.statusCode >= 400) {
-      throw ApiException(response.statusCode, json['error'] as String? ?? 'HTTP ${response.statusCode}',
-          detail: json['error_description'] as String?);
+      throw ApiException(response.statusCode, json['error'] as String? ?? 'HTTP ${response.statusCode}', detail: json['error_description'] as String?);
     }
     return json;
   }
 
   void _applyTokens(Map<String, dynamic> data) {
-    _kcToken = data['access_token'] as String;
-    _kcRefresh = data['refresh_token'] as String? ?? _kcRefresh;
-    _kcExpiresAt = DateTime.now().add(Duration(seconds: (data['expires_in'] as num?)?.toInt() ?? 300));
-    final claims = _jwtClaims(_kcToken!);
-    _kcActor = claims['preferred_username'] as String? ?? _kcActor;
-    final tokenRoles = ((claims['realm_access'] as Map<String, dynamic>?)?['roles'] as List<dynamic>? ?? []).cast<String>();
-    // роль приложения: врач при роли doctor, иначе гражданин; admin считается врачом для демо
-    _role = tokenRoles.contains('doctor') || tokenRoles.contains('admin') ? 'doctor' : 'citizen';
-    _region = claims['region_kato'] as String? ?? _region;
+    _access = data['access_token'] as String;
+    _refresh = data['refresh_token'] as String? ?? _refresh;
+    _expiresAt = DateTime.now().add(Duration(seconds: (data['expires_in'] as num?)?.toInt() ?? 300));
+    _applyClaims(_access!);
   }
 
-  static Map<String, dynamic> _jwtClaims(String token) {
+  void _applyClaims(String token) {
+    final claims = jwtClaims(token);
+    _username = claims['preferred_username'] as String? ?? _username;
+    final roles = ((claims['realm_access'] as Map<String, dynamic>?)?['roles'] as List<dynamic>? ?? const []).cast<String>();
+    // admin считается врачом: политика Doctor в API включает роль admin (AuthSetup.cs)
+    _role = roles.contains('doctor') || roles.contains('admin') ? AuthRole.doctor : AuthRole.citizen;
+    _regionClaim = claims['region_kato'] as String?;
+    _iin = claims['iin'] as String?;
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> jwtClaims(String token) {
     final parts = token.split('.');
-    if (parts.length != 3) return {};
-    final payload = base64Url.normalize(parts[1]);
-    return jsonDecode(utf8.decode(base64Url.decode(payload))) as Map<String, dynamic>;
+    if (parts.length != 3) {
+      return {};
+    }
+    try {
+      return jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1])))) as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
   }
 
-  Future<void> _persist() async {
+  Future<void> _persist(String key, String value) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('baseUrl', _baseUrl);
-      await prefs.setString('role', _role);
-      await prefs.setString('region', _region);
-      await prefs.setString('locale', _locale);
-      await prefs.setString('authMode', _authMode);
-      await prefs.setString('keycloakUrl', _keycloakUrl);
-      if (_kcToken != null) {
-        await prefs.setString('kcToken', _kcToken!);
-      } else {
-        await prefs.remove('kcToken');
-      }
-      if (_kcRefresh != null) {
-        await prefs.setString('kcRefresh', _kcRefresh!);
-      } else {
-        await prefs.remove('kcRefresh');
-      }
-      if (_kcExpiresAt != null) {
-        await prefs.setInt('kcExpiresAt', _kcExpiresAt!.millisecondsSinceEpoch);
-      } else {
-        await prefs.remove('kcExpiresAt');
-      }
-      if (_kcActor != null) {
-        await prefs.setString('kcActor', _kcActor!);
-      } else {
-        await prefs.remove('kcActor');
-      }
+      await prefs.setString(key, value);
     } catch (_) {
-      // хранилище недоступно: настройки живут до перезапуска
+      // хранилище недоступно: настройка живёт до перезапуска
     }
+  }
+
+  @override
+  void dispose() {
+    api.close();
+    super.dispose();
   }
 }

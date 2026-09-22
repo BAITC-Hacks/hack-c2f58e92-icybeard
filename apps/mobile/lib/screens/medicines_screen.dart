@@ -3,9 +3,19 @@ import 'package:provider/provider.dart';
 
 import '../api/models.dart';
 import '../l10n/strings.dart';
+import '../state/load_state.dart';
 import '../state/session.dart';
-import '../widgets/common.dart';
+import '../theme/tokens.dart';
+import '../widgets/error_box.dart';
+import '../widgets/format.dart';
+import '../widgets/kpi_tile.dart';
+import '../widgets/origin_tag.dart';
+import '../widgets/section.dart';
+import '../widgets/skeleton.dart';
+import '../widgets/status_chip.dart';
 
+/// Проверка рецепта: покрыт ли МНН программой, сроки обеспечения (правила по витринам — «формула», p50 модели —
+/// «ML‑модель»), признаки дефицита. Публичный экран; нозология запоминается между запусками.
 class MedicinesScreen extends StatefulWidget {
   const MedicinesScreen({super.key});
 
@@ -14,13 +24,12 @@ class MedicinesScreen extends StatefulWidget {
 }
 
 class _MedicinesScreenState extends State<MedicinesScreen> {
-  List<Nosology> nosologies = [];
-  List<Mnn> mnns = [];
-  String? nosologyId;
-  String? mnnId;
-  CheckResponse? result;
-  Object? error;
-  bool busy = false;
+  List<Nosology> _nosologies = const [];
+  List<Mnn> _mnns = const [];
+  String? _nosologyId;
+  String? _mnnId;
+  LoadState<CheckResponse>? _state;
+  Object? _refdataError;
 
   @override
   void initState() {
@@ -29,92 +38,141 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
   }
 
   Future<void> _load() async {
-    final api = context.read<Session>().api;
+    final session = context.read<Session>();
     try {
-      nosologies = await api.nosologies();
-      nosologyId = nosologies.firstOrNull?.id;
+      final nosologies = await session.api.nosologies();
+      if (!mounted) {
+        return;
+      }
+      final remembered = session.lastNosology;
+      setState(() {
+        _nosologies = nosologies;
+        _nosologyId = nosologies.any((n) => n.id == remembered) ? remembered : nosologies.firstOrNull?.id;
+        _refdataError = null;
+      });
       await _loadMnn();
       await _check();
     } catch (e) {
-      setState(() => error = e);
+      if (mounted) {
+        setState(() => _refdataError = e);
+      }
     }
   }
 
   Future<void> _loadMnn() async {
-    if (nosologyId == null) return;
-    mnns = await context.read<Session>().api.mnn(nosologyId!);
-    setState(() => mnnId = mnns.firstOrNull?.id);
+    final nosologyId = _nosologyId;
+    if (nosologyId == null) {
+      return;
+    }
+    final mnns = await context.read<Session>().api.mnn(nosologyId);
+    if (mounted) {
+      // сервер отдаёт каждый МНН один раз; на случай старого API дедуплицируем — DropdownButton падает на повторах
+      final unique = <String, Mnn>{for (final m in mnns) m.id: m};
+      setState(() {
+        _mnns = unique.values.toList();
+        _mnnId = _mnns.firstOrNull?.id;
+      });
+    }
   }
 
   Future<void> _check() async {
     final session = context.read<Session>();
-    setState(() {
-      busy = true;
-      error = null;
-    });
+    setState(() => _state = const Loading());
     try {
-      final r = await session.api.checkMedicine(mnnId: mnnId, nosologyId: nosologyId, regionKato: session.region);
-      setState(() => result = r);
+      final result = await session.api.checkMedicine(mnnId: _mnnId, nosologyId: _nosologyId, regionKato: session.region);
+      if (_nosologyId != null) {
+        await session.rememberNosology(_nosologyId!);
+      }
+      if (mounted) {
+        setState(() => _state = Loaded(result));
+      }
     } catch (e) {
-      setState(() => error = e);
-    } finally {
-      setState(() => busy = false);
+      if (mounted) {
+        setState(() => _state = Failed(e));
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final s = S.of(context.watch<Session>().locale);
-    return Scaffold(
-      appBar: AppBar(title: Text(s.medicinesTitle)),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          DropdownButtonFormField<String>(
-            initialValue: nosologyId,
-            decoration: InputDecoration(labelText: s.nosologyLabel),
-            items: [for (final n in nosologies) DropdownMenuItem(value: n.id, child: Text(s.nosologyItem(n.id, n.issued12m)))],
-            onChanged: (v) async {
-              setState(() => nosologyId = v);
-              await _loadMnn();
-            },
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: mnns.any((m) => m.id == mnnId) ? mnnId : null,
-            decoration: InputDecoration(labelText: s.mnnLabel),
-            items: [for (final m in mnns) DropdownMenuItem(value: m.id, child: Text(s.mnnItem(m.id, m.issued12m)))],
-            onChanged: (v) => setState(() => mnnId = v),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(onPressed: busy ? null : _check, icon: const Icon(Icons.check_circle), label: Text(s.checkButton)),
-          ErrorBox(error: error),
-          if (result != null) ...[
-            SectionTitle(s.coverageSection),
-            Chip(
-              label: Text(result!.covered ? s.coveredBy(result!.program) : s.notCovered),
-              backgroundColor: result!.covered ? Colors.green.shade100 : Colors.orange.shade100,
-            ),
-            SectionTitle(s.fillTimeSection),
-            Row(children: [
-              Expanded(child: KpiTile(value: days(result!.fillDaysP50), label: s.kpiMedianDays)),
-              const SizedBox(width: 8),
-              Expanded(child: KpiTile(value: days(result!.fillDaysP90), label: s.kpiP90Days)),
-              const SizedBox(width: 8),
-              Expanded(child: KpiTile(value: pct(result!.pFilled14d), label: s.kpiWithin14)),
-            ]),
-            Text(result!.basis, style: Theme.of(context).textTheme.bodySmall),
-            SectionTitle(s.shortageSection),
-            Chip(
-              label: Text(result!.shortage.flag ? s.shortageFlag(result!.shortage.score) : s.noShortage),
-              backgroundColor: result!.shortage.flag ? Colors.red.shade100 : Colors.green.shade100,
-            ),
-            Text(result!.shortage.basis, style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 8),
-            Text(s.pharmacyHint, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ],
-      ),
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    final state = _state;
+    return PageScaffold(
+      title: s.medicinesTitle,
+      children: [
+        DropdownButtonFormField<String>(
+          initialValue: _nosologies.any((n) => n.id == _nosologyId) ? _nosologyId : null,
+          decoration: InputDecoration(labelText: s.nosologyLabel),
+          isExpanded: true,
+          items: [for (final n in _nosologies) DropdownMenuItem(value: n.id, child: Text(s.nosologyItem(n.id, n.issued12m), overflow: TextOverflow.ellipsis))],
+          onChanged: (v) async {
+            setState(() => _nosologyId = v);
+            await _loadMnn();
+          },
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        DropdownButtonFormField<String>(
+          initialValue: _mnns.any((m) => m.id == _mnnId) ? _mnnId : null,
+          decoration: InputDecoration(labelText: s.mnnLabel),
+          isExpanded: true,
+          items: [for (final m in _mnns) DropdownMenuItem(value: m.id, child: Text(s.mnnItem(m.id, m.issued12m), overflow: TextOverflow.ellipsis))],
+          onChanged: (v) => setState(() => _mnnId = v),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        FilledButton.icon(onPressed: state is Loading ? null : _check, icon: const Icon(Icons.check_circle_outline), label: Text(s.checkButton)),
+        if (_refdataError != null) ...[const SizedBox(height: AppSpacing.md), ErrorBox(error: _refdataError, onRetry: _load)],
+        if (state != null)
+          switch (state) {
+            Loading<CheckResponse>() => const Padding(padding: EdgeInsets.only(top: AppSpacing.lg), child: KpiRowSkeleton()),
+            Failed<CheckResponse>(:final error) => Padding(padding: const EdgeInsets.only(top: AppSpacing.md), child: ErrorBox(error: error, onRetry: _check)),
+            Loaded<CheckResponse>(:final data) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionTitle(s.coverageSection, origin: Origin.formula),
+                  StatusChip(
+                    data.covered ? s.coveredBy(data.program) : s.notCovered,
+                    tone: data.covered ? StatusTone.ok : StatusTone.warn,
+                    icon: data.covered ? Icons.check : Icons.info_outline,
+                  ),
+                  SectionTitle(s.fillTimeSection, origin: Origin.formula),
+                  KpiRow(
+                    children: [
+                      KpiTile(value: days(data.fillDaysP50), label: s.kpiMedianDays),
+                      KpiTile(value: days(data.fillDaysP90), label: s.kpiP90Days),
+                      KpiTile(value: pct(data.pFilled14d), label: s.kpiWithin14),
+                    ],
+                  ),
+                  if (data.fillDaysP50Model != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        Expanded(child: KpiTile(value: days(data.fillDaysP50Model), label: s.kpiMedianDays, origin: Origin.ml)),
+                        const SizedBox(width: AppSpacing.sm),
+                        const Expanded(flex: 2, child: SizedBox.shrink()),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(data.basis, style: theme.textTheme.bodySmall),
+                  SectionTitle(s.shortageSection, origin: Origin.formula),
+                  StatusChip(
+                    data.shortage.flag ? s.shortageFlag(data.shortage.score) : s.noShortage,
+                    tone: data.shortage.flag ? StatusTone.danger : StatusTone.ok,
+                    icon: data.shortage.flag ? Icons.warning_amber_outlined : Icons.check,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(data.shortage.basis, style: theme.textTheme.bodySmall),
+                  if (data.model != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(s.modelTrained(data.model!.name, data.model!.version, data.model!.trainedThrough), style: theme.textTheme.labelSmall),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                  Text(s.pharmacyHint, style: theme.textTheme.labelSmall),
+                ],
+              ),
+          },
+      ],
     );
   }
 }

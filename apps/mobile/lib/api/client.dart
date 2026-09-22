@@ -18,33 +18,30 @@ class ApiException implements Exception {
   String toString() => detail == null ? title : '$title: $detail';
 }
 
-/// Клиент REST API. Вход через заголовки X-Actor/X-Role/X-Region (демо) или Bearer-токен Keycloak.
+/// Клиент REST API. Bearer-токен Keycloak на каждый запрос, если пользователь вошёл; без токена — только публичные
+/// эндпоинты (ожидание, лекарства, справочники). Один экземпляр на сессию, закрывается вместе с ней.
 class ApiClient {
-  ApiClient({required this.baseUrl, http.Client? http_, this.actor, this.role, this.region, this.locale = 'ru', this.token, this.tokenProvider})
-      : _http = http_ ?? http.Client();
+  ApiClient({required this.baseUrl, http.Client? client, this.tokenProvider, String Function()? locale})
+      : _http = client ?? http.Client(),
+        _locale = locale ?? (() => 'ru');
 
   final String baseUrl;
   final http.Client _http;
-  final String? actor;
-  final String? role;
-  final String? region;
-  final String locale;
-  final String? token;
+  final String Function() _locale;
 
-  /// Свежий Bearer-токен на каждый запрос (Keycloak с обновлением); null — режим заголовков.
+  /// Свежий Bearer-токен на каждый запрос (Keycloak с обновлением); null — гость.
   final Future<String?> Function()? tokenProvider;
+
+  String get locale => _locale();
 
   Map<String, String> _headers(String? bearer) => {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
         'Accept-Language': locale,
         if (bearer != null) 'Authorization': 'Bearer $bearer',
-        if (bearer == null && actor != null) 'X-Actor': actor!,
-        if (bearer == null && role != null) 'X-Role': role!,
-        if (bearer == null && region != null) 'X-Region': region!,
       };
 
-  Future<String?> _bearer() async => token ?? await tokenProvider?.call();
+  Future<String?> _bearer() async => await tokenProvider?.call();
 
   Uri _uri(String path, [Map<String, String?>? query]) {
     final clean = <String, String>{for (final e in (query ?? {}).entries) if (e.value != null && e.value!.isNotEmpty) e.key: e.value!};
@@ -96,8 +93,24 @@ class ApiClient {
   Future<List<IndexItem>> index({String? profileCode}) async =>
       ((await get('/api/v1/index', {'profileCode': profileCode}))['items'] as List<dynamic>).map((i) => IndexItem.fromJson(i as Map<String, dynamic>)).toList();
 
-  Future<List<WorklistItem>> worklist({String? flag}) async =>
-      ((await get('/api/v1/journal/worklist', {'flag': flag}))['items'] as List<dynamic>).map((w) => WorklistItem.fromJson(w as Map<String, dynamic>)).toList();
+  Future<WorklistResponse> worklistPage({String? flag}) async =>
+      WorklistResponse.fromJson(await get('/api/v1/journal/worklist', {'flag': flag}) as Map<String, dynamic>);
+
+  Future<List<WorklistItem>> worklist({String? flag}) async => (await worklistPage(flag: flag)).items;
+
+  // ---------- маршрут пациента ----------
+  Future<PatientRoute> myRoute({String? regionKato}) async =>
+      PatientRoute.fromJson(await get('/api/v1/route/me', {'regionKato': regionKato}) as Map<String, dynamic>);
+
+  Future<PatientRoute> patientRoute(String patientRef) async =>
+      PatientRoute.fromJson(await get('/api/v1/route/${Uri.encodeComponent(patientRef)}') as Map<String, dynamic>);
+
+  /// Перенаправление пациента врачом: один Idempotency-Key на нажатие, повтор возвращает ту же запись.
+  Future<String> redirectRoute(String patientRef, {required String toMoCode, required String reason, required String idempotencyKey}) async =>
+      ((await post('/api/v1/route/${Uri.encodeComponent(patientRef)}/redirect', {'toMoCode': toMoCode, 'reason': reason},
+              headers: {'Idempotency-Key': idempotencyKey})) as Map<String, dynamic>)['decisionId'] as String;
+
+  Future<RouteStandard> routeStandard() async => RouteStandard.fromJson(await get('/api/v1/refdata/route-standard') as Map<String, dynamic>);
 
   Future<String> recordDecision(Map<String, dynamic> decision, String idempotencyKey) async =>
       ((await post('/api/v1/journal/decisions', decision, headers: {'Idempotency-Key': idempotencyKey})) as Map<String, dynamic>)['decisionId'] as String;
@@ -136,4 +149,6 @@ class ApiClient {
   ) as Map<String, dynamic>);
 
   Future<void> discardScribe(String sessionId) async => await delete('/api/v1/scribe/sessions/$sessionId');
+
+  void close() => _http.close();
 }

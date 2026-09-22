@@ -1,39 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-import 'screens/decisions_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/medicines_screen.dart';
-import 'screens/referral_screen.dart';
-import 'screens/scribe_screen.dart';
-import 'screens/settings_screen.dart';
-import 'screens/vaccination_screen.dart';
-import 'screens/wait_screen.dart';
-import 'screens/worklist_screen.dart';
+import 'router/app_router.dart';
+import 'state/session.dart';
+import 'theme/app_theme.dart';
 
-final router = GoRouter(
-  routes: [
-    GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
-    GoRoute(path: '/wait', builder: (_, _) => const WaitScreen()),
-    GoRoute(path: '/medicines', builder: (_, _) => const MedicinesScreen()),
-    GoRoute(path: '/vaccination', builder: (_, _) => const VaccinationScreen()),
-    GoRoute(path: '/worklist', builder: (_, _) => const WorklistScreen()),
-    GoRoute(path: '/referral', builder: (_, state) => ReferralScreen(moCode: state.uri.queryParameters['moCode'], profileCode: state.uri.queryParameters['profileCode'])),
-    GoRoute(path: '/decisions', builder: (_, _) => const DecisionsScreen()),
-    GoRoute(path: '/scribe', builder: (_, _) => const ScribeScreen()),
-    GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
-  ],
-);
-
-class DarumenApp extends StatelessWidget {
+/// Корень приложения: роутер создаётся один раз от сессии, тема светлая/тёмная по системе, локаль — из сессии
+/// (меняется без пересоздания роутера, системные виджеты локализуются делегатами).
+class DarumenApp extends StatefulWidget {
   const DarumenApp({super.key});
 
   @override
+  State<DarumenApp> createState() => _DarumenAppState();
+}
+
+class _DarumenAppState extends State<DarumenApp> {
+  late final GoRouter _router = buildRouter(context.read<Session>());
+
+  @override
   Widget build(BuildContext context) {
+    final locale = context.select<Session, String>((s) => s.locale);
     return MaterialApp.router(
-      title: 'Darumen Care',
-      theme: ThemeData(colorSchemeSeed: const Color(0xFF0B7285), useMaterial3: true),
-      routerConfig: router,
+      title: 'Darumen',
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
+      locale: Locale(locale),
+      supportedLocales: const [Locale('ru'), Locale('kk')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      routerConfig: _router,
       debugShowCheckedModeBanner: false,
     );
   }
