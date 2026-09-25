@@ -155,6 +155,7 @@ class WorklistItem {
     required this.daysWaiting,
     this.nextActionCode = '',
     this.synthetic = true,
+    this.patientSignal,
   });
   final String patientRef;
 
@@ -177,6 +178,9 @@ class WorklistItem {
   final String regionKato;
   final int daysWaiting;
   final bool synthetic;
+
+  /// Открытый сигнал гражданина (в riskFlags при этом есть RouteCodes.patientSignalFlag).
+  final PatientSignal? patientSignal;
   factory WorklistItem.fromJson(Map<String, dynamic> json) => WorklistItem(
         patientRef: json['patientRef'] as String,
         stage: json['stage'] as String,
@@ -193,6 +197,24 @@ class WorklistItem {
         regionKato: json['regionKato'] as String? ?? '',
         daysWaiting: (json['daysWaiting'] as num).toInt(),
         synthetic: json['synthetic'] as bool? ?? true,
+        patientSignal: json['patientSignal'] == null ? null : PatientSignal.fromJson(json['patientSignal'] as Map<String, dynamic>),
+      );
+}
+
+/// Открытый сигнал гражданина в строке рабочего списка: вид, организация из просьбы «быстрее», комментарий, время.
+class PatientSignal {
+  const PatientSignal({required this.kind, this.toMoCode, this.toMoName, this.comment, required this.recordedAt});
+  final String kind;
+  final String? toMoCode;
+  final String? toMoName;
+  final String? comment;
+  final String recordedAt;
+  factory PatientSignal.fromJson(Map<String, dynamic> json) => PatientSignal(
+        kind: json['kind'] as String,
+        toMoCode: json['toMoCode'] as String?,
+        toMoName: json['toMoName'] as String?,
+        comment: json['comment'] as String?,
+        recordedAt: json['recordedAt'] as String? ?? '',
       );
 }
 
@@ -376,6 +398,35 @@ abstract final class RouteCodes {
 
   static const redirect = 'redirect';
   static const keep = 'keep';
+
+  // сигналы гражданина по маршруту (RouteSignals в API) и флаг открытого сигнала в рабочем списке
+  static const stillWaiting = 'still_waiting';
+  static const treatedElsewhere = 'treated_elsewhere';
+  static const withdraw = 'withdraw';
+  static const requestRedirect = 'request_redirect';
+  static const patientSignalFlag = 'patient_signal';
+}
+
+/// Сигнал гражданина по своему маршруту: подтверждение ожидания, «уже лечился в другом месте», «больше не нужно»
+/// или просьба рассмотреть организацию быстрее (toMoCode). open — врач ещё не ответил решением.
+class RouteSignal {
+  const RouteSignal({required this.decisionId, required this.recordedAt, required this.kind, this.toMoCode, this.toMoName, this.comment, required this.open});
+  final String decisionId;
+  final String recordedAt;
+  final String kind;
+  final String? toMoCode;
+  final String? toMoName;
+  final String? comment;
+  final bool open;
+  factory RouteSignal.fromJson(Map<String, dynamic> json) => RouteSignal(
+        decisionId: json['decisionId'] as String,
+        recordedAt: json['recordedAt'] as String? ?? '',
+        kind: json['kind'] as String,
+        toMoCode: json['toMoCode'] as String?,
+        toMoName: json['toMoName'] as String?,
+        comment: json['comment'] as String?,
+        open: json['open'] as bool? ?? false,
+      );
 }
 
 class RouteOrganization {
@@ -626,6 +677,8 @@ class PatientRoute {
     this.doctor,
     required this.basis,
     required this.standard,
+    this.signals = const [],
+    this.validationDue = false,
   });
   final String patientRef;
   final bool synthetic;
@@ -649,6 +702,12 @@ class PatientRoute {
   final String basis;
   final RouteStandardRef standard;
 
+  /// Сигналы гражданина, свежие первыми; validationDue — нет подтверждения ожидания за 30 дней, показать «Вы ещё ждёте?».
+  final List<RouteSignal> signals;
+  final bool validationDue;
+
+  RouteSignal? get openSignal => signals.where((s) => s.open).firstOrNull;
+  RouteSignal? get openRequest => signals.where((s) => s.open && s.kind == RouteCodes.requestRedirect).firstOrNull;
   RouteBenchmark? get targetBenchmark => benchmarks.where((b) => b.code == 'moh_target_wait_days').firstOrNull;
   int get expiredChecklistCount => checklist.where((c) => c.status == RouteCodes.expired).length;
   RouteDecision? get latestRedirect => decisions.where((d) => d.kind == RouteCodes.redirect).firstOrNull;
@@ -675,6 +734,8 @@ class PatientRoute {
         doctor: json['doctor'] == null ? null : RouteDoctorPanel.fromJson(json['doctor'] as Map<String, dynamic>),
         basis: json['basis'] as String? ?? '',
         standard: RouteStandardRef.fromJson(json['standard'] as Map<String, dynamic>? ?? const {}),
+        signals: (json['signals'] as List<dynamic>? ?? []).map((x) => RouteSignal.fromJson(x as Map<String, dynamic>)).toList(),
+        validationDue: json['validationDue'] as bool? ?? false,
       );
 }
 

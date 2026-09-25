@@ -18,11 +18,20 @@ import 'status_chip.dart';
 /// прогноз с ориентиром МЗ РК, этапы Стандарта, анализы со сроками, где быстрее, решения врача, история.
 /// В режиме врача добавляется служебная панель (приоритет, флаги, риск отказа, факторы) и кнопки «Направить сюда».
 class RouteView extends StatelessWidget {
-  const RouteView({super.key, required this.route, this.doctorMode = false, this.onRedirect});
+  const RouteView({super.key, required this.route, this.doctorMode = false, this.onRedirect, this.onSignal, this.onRequest, this.onKeep});
 
   final PatientRoute route;
   final bool doctorMode;
   final void Function(Alternative alternative)? onRedirect;
+
+  /// Гражданин: ответ на «Вы ещё ждёте?» (still_waiting | treated_elsewhere | withdraw).
+  final void Function(String kind)? onSignal;
+
+  /// Гражданин: попросить врача рассмотреть организацию из списка «где быстрее».
+  final void Function(Alternative alternative)? onRequest;
+
+  /// Врач: оставить в текущей организации с причиной — ответ на сигнал пациента.
+  final VoidCallback? onKeep;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +41,7 @@ class RouteView extends StatelessWidget {
     final forecastOrigin = route.forecast.fromModel ? Origin.ml : Origin.formula;
     final target = route.targetBenchmark;
     final doctor = route.doctor;
+    final entries = _entries(s);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -78,6 +88,32 @@ class RouteView extends StatelessWidget {
             ),
           ),
         ),
+        if (doctorMode && route.openSignal != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          _SignalBanner(route: route, onRedirect: onRedirect, onKeep: onKeep),
+        ],
+        if (!doctorMode && route.validationDue && onSignal != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.validationTitle, style: theme.textTheme.titleMedium),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(s.validationBody, style: theme.textTheme.bodySmall),
+                  const SizedBox(height: AppSpacing.md),
+                  FilledButton(onPressed: () => onSignal!(RouteCodes.stillWaiting), child: Text(s.validationStill)),
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton(onPressed: () => onSignal!(RouteCodes.treatedElsewhere), child: Text(s.validationTreated)),
+                  const SizedBox(height: AppSpacing.xs),
+                  TextButton(onPressed: () => onSignal!(RouteCodes.withdraw), child: Text(s.validationWithdraw)),
+                ],
+              ),
+            ),
+          ),
+        ],
         SectionTitle(s.forecastSection, origin: forecastOrigin),
         KpiRow(
           children: [
@@ -132,27 +168,23 @@ class RouteView extends StatelessWidget {
                       '${alternative.isNeighborRegion ? ' · ${s.externalBenchmark}' : ''}',
                       style: theme.textTheme.bodySmall?.merge(AppType.numeric),
                     ),
-                    trailing: doctorMode && onRedirect != null
-                        ? TextButton(onPressed: () => onRedirect!(alternative), child: Text(s.redirectHere))
-                        : null,
+                    trailing: _alternativeAction(s, alternative),
                   ),
               ],
             ),
           ),
           if (!doctorMode) ...[const SizedBox(height: AppSpacing.xs), Text(s.redirectOnlyDoctor, style: theme.textTheme.labelSmall)],
         ],
-        if (route.decisions.isNotEmpty) ...[
-          SectionTitle(s.decisionsSection),
+        if (entries.isNotEmpty) ...[
+          SectionTitle(s.signalsSection),
           Card(
             child: Column(
               children: [
-                for (final decision in route.decisions)
+                for (final entry in entries)
                   ListTile(
-                    leading: Icon(decision.kind == RouteCodes.redirect ? Icons.alt_route : Icons.check_circle_outline, color: colors.accent),
-                    title: Text(decision.kind == RouteCodes.redirect ? s.doctorProposed(decision.toMoName) : s.doctorKept),
-                    subtitle: Text(
-                      [dateTimeShort(decision.recordedAt), if (decision.reason != null && decision.reason!.isNotEmpty) decision.reason!].join(' · '),
-                    ),
+                    leading: Icon(entry.icon, color: colors.accent),
+                    title: Text(entry.title),
+                    subtitle: Text(entry.subtitle),
                   ),
               ],
             ),
@@ -189,10 +221,48 @@ class RouteView extends StatelessWidget {
     );
   }
 
+  /// Кнопка у альтернативы: врач — «Направить сюда»; гражданин — «Попросить», а если запрос по этой организации уже
+  /// открыт — чип «запрос отправлен».
+  Widget? _alternativeAction(S s, Alternative alternative) {
+    if (doctorMode) {
+      return onRedirect == null ? null : TextButton(onPressed: () => onRedirect!(alternative), child: Text(s.redirectHere));
+    }
+    if (onRequest == null) {
+      return null;
+    }
+    if (route.openRequest?.toMoCode == alternative.moCode) {
+      return StatusChip(s.requestPending, tone: StatusTone.accent);
+    }
+    return TextButton(onPressed: () => onRequest!(alternative), child: Text(s.requestConsider));
+  }
+
+  /// Решения врача и сигналы гражданина одной лентой, свежие первыми (ISO-даты сравниваются как строки).
+  List<_Entry> _entries(S s) {
+    final rows = <_Entry>[
+      for (final d in route.decisions)
+        _Entry(
+          d.recordedAt,
+          d.kind == RouteCodes.redirect ? s.doctorProposed(d.toMoName) : s.doctorKept,
+          [dateTimeShort(d.recordedAt), if (d.reason != null && d.reason!.isNotEmpty) d.reason!].join(' · '),
+          d.kind == RouteCodes.redirect ? Icons.alt_route : Icons.check_circle_outline,
+        ),
+      for (final x in route.signals)
+        _Entry(
+          x.recordedAt,
+          doctorMode ? s.patientSignalText(x.kind, x.toMoName) : s.signalText(x.kind, x.toMoName),
+          [dateTimeShort(x.recordedAt), if (x.comment != null && x.comment!.isNotEmpty) x.comment!, if (x.open) s.awaitingDoctor].join(' · '),
+          Icons.record_voice_over_outlined,
+        ),
+    ];
+    rows.sort((a, b) => b.at.compareTo(a.at));
+    return rows;
+  }
+
   static String _flagLabel(S s, String flag) => switch (flag) {
         'stuck_over_30' => s.flagOver30,
         'refusal_risk' => s.flagRefusalRisk,
         'faster_alternative' => s.flagFasterAlt,
+        'patient_signal' => s.flagPatientSignal,
         _ => flag,
       };
 
@@ -201,4 +271,65 @@ class RouteView extends StatelessWidget {
         'stuck_over_30' => StatusTone.warn,
         _ => StatusTone.accent,
       };
+}
+
+class _Entry {
+  const _Entry(this.at, this.title, this.subtitle, this.icon);
+
+  final String at;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+}
+
+/// Баннер врача: открытый сигнал пациента с двумя действиями — «Направить сюда» (если просимая организация есть
+/// среди альтернатив) и «Оставить» с причиной. Оба пишут решение в журнал и закрывают сигнал.
+class _SignalBanner extends StatelessWidget {
+  const _SignalBanner({required this.route, this.onRedirect, this.onKeep});
+
+  final PatientRoute route;
+  final void Function(Alternative alternative)? onRedirect;
+  final VoidCallback? onKeep;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
+    final signal = route.openSignal!;
+    final requested = route.alternatives.where((a) => a.moCode == signal.toMoCode).firstOrNull;
+    return Card(
+      color: colors.accentSoft,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.record_voice_over_outlined, color: colors.accent),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(child: Text(s.patientSignalText(signal.kind, signal.toMoName), style: theme.textTheme.titleSmall)),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              [dateTimeShort(signal.recordedAt), if (signal.comment != null && signal.comment!.isNotEmpty) '«${signal.comment}»'].join(' · '),
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                if (requested != null && onRedirect != null) ...[
+                  Expanded(child: FilledButton(onPressed: () => onRedirect!(requested), child: Text(s.redirectHere))),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+                if (onKeep != null) Expanded(child: OutlinedButton(onPressed: onKeep, child: Text(s.keepHere))),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

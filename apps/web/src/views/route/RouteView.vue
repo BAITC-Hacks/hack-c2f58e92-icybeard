@@ -7,7 +7,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@/api/client'
 import { route as routeApi } from '@/api/endpoints'
-import type { PatientRoute } from '@/api/types'
+import type { PatientRoute, SignalKind } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -19,7 +19,7 @@ import Section from '@/components/ui/Section.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { days, pct, refusalWords } from '@/lib/format'
-import { checklistTone, dateShort, nextActionKey, outcomeTone, stageTone, type Tone } from '@/lib/route'
+import { checklistTone, dateShort, nextActionKey, openRequest, openSignal, outcomeTone, routeEntries, stageTone, type Tone } from '@/lib/route'
 
 /** Один экран для двух ролей: без patientRef — «Мой путь» гражданина (/route/me), с ним — маршрут пациента для врача
  * (/route/{ref}) с панелью врача и перенаправлением. Числа — только из API, каждое с меткой происхождения. */
@@ -38,6 +38,46 @@ let redirectKey = ''
 const isDoctor = computed(() => data.value?.doctor !== null && data.value?.doctor !== undefined)
 const target = computed(() => data.value?.benchmarks.find((b) => b.code === 'moh_target_wait_days') ?? null)
 const expired = computed(() => data.value?.checklist.filter((c) => c.status === 'expired').length ?? 0)
+// двусторонний маршрут: сигналы гражданина (валидация листа ожидания, просьба «быстрее») и ответы врача
+const requestComment = ref('')
+const signalling = ref<string | null>(null)
+const openSig = computed(() => (data.value ? openSignal(data.value) : null))
+const pendingRequest = computed(() => (data.value ? openRequest(data.value) : null))
+const entries = computed(() => (data.value ? routeEntries(data.value) : []))
+const requestedAlternative = computed(() => data.value?.alternatives.find((a) => a.mo.moCode === openSig.value?.toMoCode) ?? null)
+
+async function signal(kind: SignalKind, toMoCode?: string) {
+  signalling.value = toMoCode ?? kind
+  try {
+    await routeApi.signal({ kind, toMoCode, comment: requestComment.value.trim() || undefined }, crypto.randomUUID())
+    toast.add({ severity: 'success', summary: t(toMoCode ? 'route.requestSent' : 'route.signalSent'), life: 4000 })
+    requestComment.value = ''
+    await load()
+  } catch (e) {
+    error.value = e
+  } finally {
+    signalling.value = null
+  }
+}
+
+async function keep() {
+  if (!props.patientRef) return
+  if (!reason.value.trim()) {
+    toast.add({ severity: 'warn', summary: t('route.reasonRequired'), life: 3000 })
+    return
+  }
+  redirecting.value = 'keep'
+  try {
+    await routeApi.keep(props.patientRef, { reason: reason.value.trim() }, redirectKey)
+    toast.add({ severity: 'success', summary: t('route.keepDone'), life: 4000 })
+    reason.value = ''
+    await load()
+  } catch (e) {
+    error.value = e
+  } finally {
+    redirecting.value = null
+  }
+}
 // тон PrimeVue-подобных помощников lib/route → тон StatusTag
 const STATUS_TONES = { success: 'ok', warn: 'warn', danger: 'danger', info: 'accent', secondary: 'neutral' } as const satisfies Record<Tone, string>
 const tone = (severity: Tone): (typeof STATUS_TONES)[Tone] => STATUS_TONES[severity]
@@ -102,6 +142,24 @@ watch(() => props.patientRef, load)
         <p v-if="expired" class="muted">{{ t('route.expiredCount', { count: expired }) }}</p>
       </AppCard>
 
+      <AppCard v-if="!isDoctor && data.validationDue" :title="t('route.validationTitle')" data-testid="validation-card">
+        <p class="muted">{{ t('route.validationBody') }}</p>
+        <div class="actions">
+          <Button :label="t('route.validationStill')" :loading="signalling === 'still_waiting'" :disabled="signalling !== null" data-testid="still-waiting" @click="signal('still_waiting')" />
+          <Button :label="t('route.validationTreated')" severity="secondary" :loading="signalling === 'treated_elsewhere'" :disabled="signalling !== null" @click="signal('treated_elsewhere')" />
+          <Button :label="t('route.validationWithdraw')" severity="secondary" text :loading="signalling === 'withdraw'" :disabled="signalling !== null" @click="signal('withdraw')" />
+        </div>
+      </AppCard>
+
+      <AppCard v-if="isDoctor && openSig" :title="t('route.patientSignal.' + openSig.kind, { name: openSig.toMoName ?? '' })" data-testid="signal-banner">
+        <p class="muted">{{ dateShort(openSig.recordedAt) }}<template v-if="openSig.comment"> · «{{ openSig.comment }}»</template></p>
+        <div class="actions">
+          <Button v-if="requestedAlternative" :label="t('route.referHere')" :loading="redirecting === requestedAlternative.mo.moCode" :disabled="redirecting !== null" @click="redirect(requestedAlternative.mo.moCode)" />
+          <Button :label="t('route.keepHere')" severity="secondary" :loading="redirecting === 'keep'" :disabled="redirecting !== null" data-testid="keep" @click="keep()" />
+        </div>
+        <p class="muted" style="margin-top: 8px">{{ t('route.reasonBelow') }}</p>
+      </AppCard>
+
       <Section v-if="data.doctor" :cols="1">
         <AppCard :title="t('route.doctorPanel')" origin="ml" data-testid="doctor-panel">
           <p>
@@ -160,7 +218,7 @@ watch(() => props.patientRef, load)
             <thead>
               <tr class="muted">
                 <th>{{ t('common.organization') }}</th><th>p50, {{ t('common.days') }}</th><th>p90, {{ t('common.days') }}</th>
-                <th v-if="isDoctor">{{ t('doctor.referral.refusalShort') }}</th><th v-if="isDoctor"></th>
+                <th v-if="isDoctor">{{ t('doctor.referral.refusalShort') }}</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -172,6 +230,10 @@ watch(() => props.patientRef, load)
                 <td v-if="isDoctor">
                   <Button :label="t('route.referHere')" size="small" severity="secondary" :loading="redirecting === a.mo.moCode" :disabled="redirecting !== null" data-testid="redirect" @click="redirect(a.mo.moCode)" />
                 </td>
+                <td v-else>
+                  <StatusTag v-if="pendingRequest?.toMoCode === a.mo.moCode" :value="t('route.requestPending')" tone="accent" />
+                  <Button v-else :label="t('route.requestConsider')" size="small" severity="secondary" :loading="signalling === a.mo.moCode" :disabled="signalling !== null" data-testid="request" @click="signal('request_redirect', a.mo.moCode)" />
+                </td>
               </tr>
             </tbody>
           </table>
@@ -179,16 +241,26 @@ watch(() => props.patientRef, load)
             <label>{{ t('route.reason') }}</label>
             <Textarea v-model="reason" rows="2" auto-resize data-testid="redirect-reason" />
           </div>
-          <p v-else class="muted" style="margin-top: 8px">{{ t('route.doctorOnly') }}</p>
+          <div v-else class="field" style="margin-top: 12px">
+            <label>{{ t('route.requestComment') }}</label>
+            <Textarea v-model="requestComment" rows="2" auto-resize data-testid="request-comment" />
+          </div>
+          <p v-if="!isDoctor" class="muted" style="margin-top: 8px">{{ t('route.doctorOnly') }}</p>
         </AppCard>
       </Section>
 
       <Section :cols="2">
-        <AppCard :title="t('route.decisions')" data-testid="route-decisions">
-          <p v-if="data.decisions.length === 0" class="muted">{{ t('route.noDecisions') }}</p>
-          <div v-for="d in data.decisions" :key="d.decisionId" class="decision">
-            <div>{{ d.kind === 'redirect' ? t('route.redirect', { name: d.toMoName }) : t('route.keep') }}</div>
-            <div class="muted">{{ dateShort(d.recordedAt) }} · {{ t('decision.role.' + d.role) }}<template v-if="d.reason"> · {{ d.reason }}</template></div>
+        <AppCard :title="t('route.signalsTitle')" data-testid="route-decisions">
+          <p v-if="entries.length === 0" class="muted">{{ t('route.noDecisions') }}</p>
+          <div v-for="e in entries" :key="e.kind === 'decision' ? e.decision.decisionId : e.signal.decisionId" class="decision">
+            <template v-if="e.kind === 'decision'">
+              <div>{{ e.decision.kind === 'redirect' ? t('route.redirect', { name: e.decision.toMoName }) : t('route.keep') }}</div>
+              <div class="muted">{{ dateShort(e.decision.recordedAt) }} · {{ t('decision.role.' + e.decision.role) }}<template v-if="e.decision.reason"> · {{ e.decision.reason }}</template></div>
+            </template>
+            <template v-else>
+              <div>{{ t((isDoctor ? 'route.patientSignal.' : 'route.signal.') + e.signal.kind, { name: e.signal.toMoName ?? '' }) }}</div>
+              <div class="muted">{{ dateShort(e.signal.recordedAt) }}<template v-if="e.signal.comment"> · {{ e.signal.comment }}</template><template v-if="e.signal.open"> · {{ t('route.awaitingDoctor') }}</template></div>
+            </template>
           </div>
         </AppCard>
         <AppCard :title="t('route.history')">
@@ -215,6 +287,7 @@ watch(() => props.patientRef, load)
 .stage.current { font-weight: 600; }
 .stage.upcoming { color: var(--dm-muted); }
 .decision { padding: 6px 0; border-bottom: 1px dashed var(--dm-hairline); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .route-timeline :deep(.p-timeline-event-opposite) { display: none; }
 table.plain { width: 100%; border-collapse: collapse; }
 table.plain th { text-align: left; font-weight: 500; }

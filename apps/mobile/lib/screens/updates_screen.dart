@@ -11,11 +11,13 @@ import '../theme/tones.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/format.dart';
 import '../widgets/load_state_view.dart';
+import '../widgets/route_events.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 
 /// Уведомления — только события маршрута (как Messages в NHS App: ничего нерелевантного, никаких новостей).
-/// Лента выводится на клиенте из пройденных стадий и решений врача; push через eGov mobile — после интеграции.
+/// Лента выводится на клиенте (routeEvents): стадии, решения врача, сигналы гражданина, сроки анализов;
+/// push через eGov mobile — после интеграции.
 class UpdatesScreen extends StatefulWidget {
   const UpdatesScreen({super.key});
 
@@ -50,22 +52,6 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     }
   }
 
-  List<_Event> _events(PatientRoute route, S s) {
-    final events = <_Event>[
-      for (final stage in route.timeline)
-        if (stage.date != null && stage.status != RouteCodes.upcoming) _Event(stage.date!, stage.title, Icons.flag_outlined),
-      for (final decision in route.decisions)
-        _Event(
-          decision.recordedAt,
-          decision.kind == RouteCodes.redirect ? s.doctorProposed(decision.toMoName) : s.doctorKept,
-          Icons.alt_route,
-          detail: decision.reason,
-        ),
-    ];
-    events.sort((a, b) => b.at.compareTo(a.at));
-    return events;
-  }
-
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
@@ -94,7 +80,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
           onRetry: _load,
           skeleton: const ListSkeleton(),
           builder: (_, route) {
-            final events = _events(route, s);
+            final events = routeEvents(route, s);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -128,11 +114,3 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   }
 }
 
-class _Event {
-  const _Event(this.at, this.title, this.icon, {this.detail});
-
-  final String at;
-  final String title;
-  final IconData icon;
-  final String? detail;
-}

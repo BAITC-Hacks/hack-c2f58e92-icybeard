@@ -1,3 +1,26 @@
+import type { PatientRoute, RouteDecision, RouteSignal } from '@/api/types'
+
+/** Открытый сигнал гражданина (врач ещё не ответил); null — сигналов нет. */
+export function openSignal(route: Pick<PatientRoute, 'signals'>): RouteSignal | null {
+  return route.signals.find((s) => s.open) ?? null
+}
+
+/** Открытая просьба «рассмотреть организацию быстрее» — у альтернативы вместо кнопки показывается «запрос отправлен». */
+export function openRequest(route: Pick<PatientRoute, 'signals'>): RouteSignal | null {
+  return route.signals.find((s) => s.open && s.kind === 'request_redirect') ?? null
+}
+
+export type RouteEntry = { at: string; kind: 'decision'; decision: RouteDecision } | { at: string; kind: 'signal'; signal: RouteSignal }
+
+/** Решения врача и сигналы гражданина одной лентой, свежие первыми (ISO-время сравнивается как строки). */
+export function routeEntries(route: Pick<PatientRoute, 'decisions' | 'signals'>): RouteEntry[] {
+  const rows: RouteEntry[] = [
+    ...route.decisions.map((d) => ({ at: d.recordedAt, kind: 'decision' as const, decision: d })),
+    ...route.signals.map((s) => ({ at: s.recordedAt, kind: 'signal' as const, signal: s })),
+  ]
+  return rows.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+}
+
 /** Коды стадий маршрута из Стандарта ҚР-ДСМ-27 в порядке прохождения (docs/api.md, раздел Route). */
 export const STAGE_CODES = ['referral_issued', 'examination', 'waitlisted', 'date_assigned', 'hospitalized', 'refused'] as const
 export type StageCode = (typeof STAGE_CODES)[number]

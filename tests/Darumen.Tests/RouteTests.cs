@@ -190,6 +190,83 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
         Assert.Equal(HttpStatusCode.UnprocessableEntity, noReason.StatusCode);
     }
 
+    /// <summary>Двусторонний маршрут: просьба гражданина «рассмотреть организацию быстрее» поднимает его в рабочем
+    /// списке врача с флагом и остаётся открытой, пока врач не ответит решением; «оставить» с причиной закрывает её,
+    /// гражданин видит и сигнал, и ответ. Повтор с тем же Idempotency-Key не создаёт второй записи.</summary>
+    [Fact]
+    public async Task Citizen_signal_reaches_the_doctors_worklist_and_a_keep_decision_closes_it()
+    {
+        var citizen = app.CreateClient("citizen", "c-signal");
+        var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        var alternative = route!.Organization.MoCode == "22GN" ? "028B" : "22GN";
+        citizen.DefaultRequestHeaders.Add(DecisionRecording.IdempotencyHeader, "sig-1");
+        var body = new RouteSignalRequestDto(RouteSignals.RequestRedirect, alternative, "живу рядом");
+
+        var first = await citizen.PostAsJsonAsync("/api/v1/route/me/signals", body);
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        var created = await first.Content.ReadFromJsonAsync<DecisionCreatedDto>();
+        var second = await citizen.PostAsJsonAsync("/api/v1/route/me/signals", body);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(created!.DecisionId, (await second.Content.ReadFromJsonAsync<DecisionCreatedDto>())!.DecisionId);
+
+        var after = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        var signal = Assert.Single(after!.Signals, s => s.DecisionId == created.DecisionId);
+        Assert.True(signal.Open);
+        Assert.Equal(alternative, signal.ToMoCode);
+        Assert.Equal("живу рядом", signal.Comment);
+        Assert.DoesNotContain(after.Decisions, d => d.DecisionId == created.DecisionId);
+        Assert.True(after.ValidationDue);
+
+        var doctor = app.CreateClient("doctor", "doctor-sig", "75");
+        var worklist = await doctor.GetFromJsonAsync<WorklistResponseDto>($"/api/v1/journal/worklist?flag={WorklistBuilder.PatientSignal}");
+        var row = Assert.Single(worklist!.Items, i => i.PatientRef == route.PatientRef);
+        Assert.Contains(WorklistBuilder.PatientSignal, row.RiskFlags);
+        Assert.Equal(RouteSignals.RequestRedirect, row.PatientSignal!.Kind);
+        Assert.Equal(alternative, row.PatientSignal.ToMoCode);
+        var doctorRoute = await doctor.GetFromJsonAsync<RouteDto>($"/api/v1/route/{route.PatientRef}");
+        Assert.Contains(WorklistBuilder.PatientSignal, doctorRoute!.Doctor!.RiskFlags);
+
+        doctor.DefaultRequestHeaders.Add(DecisionRecording.IdempotencyHeader, "keep-1");
+        var keep = await doctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/keep", new RouteKeepRequestDto("профиль требует именно этой клиники"));
+        Assert.Equal(HttpStatusCode.Created, keep.StatusCode);
+        var keepId = (await keep.Content.ReadFromJsonAsync<DecisionCreatedDto>())!.DecisionId;
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await doctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/keep", new RouteKeepRequestDto(null))).StatusCode);
+
+        var closed = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        Assert.False(Assert.Single(closed!.Signals, s => s.DecisionId == created.DecisionId).Open);
+        var answer = Assert.Single(closed.Decisions, d => d.DecisionId == keepId);
+        Assert.Equal(RouteDecisionKinds.Keep, answer.Kind);
+        Assert.Equal("профиль требует именно этой клиники", answer.Reason);
+        var listAfter = await doctor.GetFromJsonAsync<WorklistResponseDto>($"/api/v1/journal/worklist?flag={WorklistBuilder.PatientSignal}");
+        Assert.DoesNotContain(listAfter!.Items, i => i.PatientRef == route.PatientRef);
+    }
+
+    /// <summary>Валидация листа ожидания: новый маршрут просит подтвердить ожидание, «ещё жду» снимает вопрос на 30 дней;
+    /// незнакомый вид сигнала и просьба «быстрее» в свою же организацию — 422; сигналы шлёт только гражданин.</summary>
+    [Fact]
+    public async Task Still_waiting_confirmation_clears_validation_due_and_bad_signals_are_rejected()
+    {
+        var citizen = app.CreateClient("citizen", "c-valid");
+        var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        Assert.True(route!.ValidationDue);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity,
+            (await citizen.PostAsJsonAsync("/api/v1/route/me/signals", new RouteSignalRequestDto("nap", null, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity,
+            (await citizen.PostAsJsonAsync("/api/v1/route/me/signals", new RouteSignalRequestDto(RouteSignals.RequestRedirect, route.Organization.MoCode, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity,
+            (await citizen.PostAsJsonAsync("/api/v1/route/me/signals", new RouteSignalRequestDto(RouteSignals.RequestRedirect, null, null))).StatusCode);
+
+        Assert.Equal(HttpStatusCode.Created,
+            (await citizen.PostAsJsonAsync("/api/v1/route/me/signals", new RouteSignalRequestDto(RouteSignals.StillWaiting, null, null))).StatusCode);
+        var after = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        Assert.False(after!.ValidationDue);
+        Assert.Equal(RouteSignals.StillWaiting, after.Signals[0].Kind);
+        Assert.Null(after.Signals[0].ToMoCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await app.CreateClient("doctor", "doctor1", "75").PostAsJsonAsync("/api/v1/route/me/signals", new RouteSignalRequestDto(RouteSignals.StillWaiting, null, null))).StatusCode);
+    }
+
     [Fact]
     public async Task Route_me_is_for_citizens_only()
     {

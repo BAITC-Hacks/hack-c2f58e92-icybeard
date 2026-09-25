@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:darumen/api/models.dart';
+import 'package:darumen/l10n/strings.dart';
 import 'package:darumen/screens/scribe_screen.dart';
 import 'package:darumen/state/session.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -13,7 +14,9 @@ import 'package:darumen/widgets/checklist_tile.dart';
 import 'package:darumen/widgets/kpi_tile.dart';
 import 'package:darumen/widgets/origin_tag.dart';
 import 'package:darumen/widgets/redirect_reason_dialog.dart';
+import 'package:darumen/widgets/route_events.dart';
 import 'package:darumen/widgets/route_timeline.dart';
+import 'package:darumen/widgets/route_view.dart';
 import 'package:darumen/widgets/status_chip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -123,6 +126,80 @@ void main() {
     expect(find.text('Записать с микрофона'), findsOneWidget);
     expect(find.text('Составить черновик'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('citizen route asks "are you still waiting" and lets the patient request a faster organisation', (tester) async {
+    final route = PatientRoute.fromJson({
+      'patientRef': 'SYN-75-028B-381-01',
+      'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
+      'forecast': {'p50Days': 47, 'p90Days': 106, 'fromModel': true},
+      'alternatives': [
+        {'mo': {'moCode': '22GN', 'name': 'Больница №2'}, 'p50Days': 9, 'p90Days': 20, 'pRefusal': 0.1, 'distanceKm': 12},
+      ],
+      'validationDue': true,
+    });
+    final signals = <String>[];
+    Alternative? requested;
+    await tester.pumpWidget(host(RouteView(route: route, onSignal: signals.add, onRequest: (a) => requested = a)));
+    expect(find.text('Вы ещё ждёте госпитализацию?'), findsOneWidget);
+    await tester.tap(find.text('Да, жду'));
+    expect(signals, ['still_waiting']);
+    // альтернативы ниже прогноза и этапов — на экране 360×800 они за пределами вьюпорта
+    await tester.ensureVisible(find.text('Попросить'));
+    await tester.tap(find.text('Попросить'));
+    expect(requested?.moCode, '22GN');
+    expect(find.text('Направить сюда'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('doctor route shows the open patient signal with keep and redirect actions', (tester) async {
+    final route = PatientRoute.fromJson({
+      'patientRef': 'SYN-75-028B-381-01',
+      'audience': 'doctor',
+      'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
+      'forecast': {'p50Days': 47, 'p90Days': 106, 'fromModel': true},
+      'alternatives': [
+        {'mo': {'moCode': '22GN', 'name': 'Больница №2'}, 'p50Days': 9, 'p90Days': 20, 'pRefusal': 0.1, 'distanceKm': 12},
+      ],
+      'doctor': {'priority': 12, 'riskFlags': ['patient_signal'], 'nextAction': 'ждать вызова', 'nextActionCode': 'wait_for_call', 'explanation': '', 'pRefusal': 0.2, 'refusalOrgInTraining': true},
+      'signals': [
+        {'decisionId': 'a', 'recordedAt': '2026-09-25T10:00:00+00:00', 'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': 'Больница №2', 'comment': 'живу рядом', 'open': true},
+      ],
+    });
+    var kept = false;
+    Alternative? redirected;
+    await tester.pumpWidget(host(RouteView(route: route, doctorMode: true, onRedirect: (a) => redirected = a, onKeep: () => kept = true)));
+    expect(find.text('Пациент просит рассмотреть: Больница №2'), findsWidgets);
+    expect(find.text('Вы ещё ждёте госпитализацию?'), findsNothing);
+    await tester.ensureVisible(find.text('Оставить'));
+    await tester.tap(find.text('Оставить'));
+    expect(kept, isTrue);
+    await tester.ensureVisible(find.text('Направить сюда').first);
+    await tester.tap(find.text('Направить сюда').first);
+    expect(redirected?.moCode, '22GN');
+    expect(tester.takeException(), isNull);
+  });
+
+  test('route events include signals and expiring tests, newest first', () {
+    final route = PatientRoute.fromJson({
+      'patientRef': 'SYN-75-028B-381-01',
+      'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
+      'forecast': {'p50Days': 47, 'p90Days': 106},
+      'timeline': [
+        {'code': 'waitlisted', 'order': 3, 'title': 'Внесено в лист ожидания', 'date': '2025-02-17', 'status': 'current'},
+        {'code': 'date_assigned', 'order': 4, 'title': 'Дата назначена', 'status': 'upcoming'},
+      ],
+      'checklist': [
+        {'code': 'cbc', 'title': 'ОАК', 'validityDays': 14, 'validityLabel': '14 дней', 'doneAt': '2025-02-14', 'validUntil': '2025-02-28', 'status': 'expiring'},
+        {'code': 'hiv', 'title': 'ВИЧ', 'validityDays': 180, 'validityLabel': '6 месяцев', 'doneAt': '2025-02-14', 'validUntil': '2025-08-13', 'status': 'valid'},
+      ],
+      'signals': [
+        {'decisionId': 'a', 'recordedAt': '2026-09-25T10:00:00+00:00', 'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': 'Больница №2', 'open': true},
+      ],
+    });
+    final events = routeEvents(route, S.of('ru'));
+    expect(events.map((e) => e.title).toList(), ['Вы попросили рассмотреть: Больница №2', 'ОАК действует до 28.02.2025', 'Внесено в лист ожидания']);
+    expect(events.first.detail, 'ждёт ответа врача');
   });
 
   testWidgets('checklist tile maps statuses to labels', (tester) async {

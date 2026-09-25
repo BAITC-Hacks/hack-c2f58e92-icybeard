@@ -110,7 +110,7 @@
 Ответ `{ items: [ { decisionId, actor, role, subject, subjectId, recommended, chosen, reason, recordedAt } ], page, size, total }`. `subjectId` — решения по одному предмету (например, по рефу пациента). До подключения Keycloak актор берётся из заголовков `X-Actor` и `X-Role`.
 
 ### `GET /api/v1/journal/worklist?regionKato=&flag=` (doctor)
-Рабочий список пациентов на маршруте (на кэмпе синтетический): `{ "items": [ { "patientRef": "SYN-75-028B-381-01", "synthetic": true, "stage", "stageCode": "registered | waiting | called", "expectedDate", "riskFlags": ["stuck_over_30"], "priority", "nextAction", "nextActionCode": "redirect_faster | review_before_call | clarify_date | wait_for_call", "explanation", "moCode", "moName", "profileCode", "regionKato", "daysWaiting" } ], "synthetic": true, "asOf", "regionKato", "modelBacked" }`. Реф включает профиль (у организации бывают очереди по нескольким профилям) и открывает маршрут пациента — `GET /api/v1/route/{patientRef}`; `stage` и `nextAction` — русские подписи для старых клиентов, `stageCode` и `nextActionCode` — машинные коды, которые клиенты локализуют сами (RU/KK). Прогнозы по очередям региона (в Алматы их 373) модель отдаёт одним пакетным вызовом `PredictQueues`, API кэширует их на срез витрины (1 ч): состав и порядок списка стабильны между запросами, повторный запрос к модели не обращается; `modelBacked: false` — сервис моделей был недоступен, приоритеты и флаги посчитаны по агрегатам витрины.
+Рабочий список пациентов на маршруте (на кэмпе синтетический): `{ "items": [ { "patientRef": "SYN-75-028B-381-01", "synthetic": true, "stage", "stageCode": "registered | waiting | called", "expectedDate", "riskFlags": ["stuck_over_30"], "priority", "nextAction", "nextActionCode": "redirect_faster | review_before_call | clarify_date | wait_for_call", "explanation", "moCode", "moName", "profileCode", "regionKato", "daysWaiting" } ], "synthetic": true, "asOf", "regionKato", "modelBacked" }`. Реф включает профиль (у организации бывают очереди по нескольким профилям) и открывает маршрут пациента — `GET /api/v1/route/{patientRef}`; `stage` и `nextAction` — русские подписи для старых клиентов, `stageCode` и `nextActionCode` — машинные коды, которые клиенты локализуют сами (RU/KK). Строка с открытым сигналом гражданина (см. `POST /route/me/signals`) несёт `"patientSignal": { "kind", "toMoCode", "toMoName", "comment", "recordedAt" }`, флаг `patient_signal` в `riskFlags` и приоритет на 3 выше; фильтр `flag=patient_signal`. Сигнал закрывается решением врача (`/route/{ref}/redirect` или `/route/{ref}/keep`). Прогнозы по очередям региона (в Алматы их 373) модель отдаёт одним пакетным вызовом `PredictQueues`, API кэширует их на срез витрины (1 ч): состав и порядок списка стабильны между запросами, повторный запрос к модели не обращается; `modelBacked: false` — сервис моделей был недоступен, приоритеты и флаги посчитаны по агрегатам витрины.
 
 ## Route: маршрут пациента
 
@@ -139,6 +139,16 @@
 
 ### `POST /api/v1/route/{patientRef}/redirect` (doctor)
 Тело `{ "toMoCode": "22GN", "reason": "…" }`, заголовок `Idempotency-Key`. Записывает решение `subject: route` (рекомендация системы — самая быстрая альтернатива по модели, выбор — `toMoCode`) и публикует `decision.recorded`; ответ 201 `{ "decisionId", "recordedAt" }`, при повторе ключа 200 с той же записью. 422 без `toMoCode` или `reason` и если организация совпадает с текущей. Гражданин видит решение в `decisions` своего маршрута («врач предложил другую организацию»).
+
+### `POST /api/v1/route/{patientRef}/keep` (doctor)
+
+Тело `{ "reason" }`, `Idempotency-Key` как у `/redirect`. Решение «оставить в текущей организации» с причиной: в журнале `chosen` = текущая организация, на маршруте `Kind = keep`; закрывает открытый сигнал гражданина. 422 без причины.
+
+### `POST /api/v1/route/me/signals` (citizen)
+
+Двусторонний маршрут: тело `{ "kind": "still_waiting | treated_elsewhere | withdraw | request_redirect", "toMoCode"?, "comment"? }`, `Idempotency-Key`. Первые три — цифровая валидация листа ожидания («Вы ещё ждёте?», как DrDoctor/NECU в NHS), четвёртый — просьба рассмотреть организацию быстрее (`toMoCode` обязателен и не равен текущей → иначе 422). Запись идёт в те же `journal.decisions` (subject `route`, роль `citizen`, `chosen = {"signal", "moCode"?}`, `reason` = комментарий); в аудит не попадает. Ответ 201 `{ "decisionId", "recordedAt" }`.
+
+В `GET /route/me` и `GET /route/{ref}` добавлены `"signals": [ { "decisionId", "recordedAt", "kind", "toMoCode", "toMoName", "comment", "open" } ]` (свежие первыми, `open` — врач ещё не ответил решением после сигнала) и `"validationDue"` (нет подтверждения ожидания за 30 дней). Сигналы не входят в `decisions`.
 
 ## Insight
 

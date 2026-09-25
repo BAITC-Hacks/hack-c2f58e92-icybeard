@@ -1,5 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { NEXT_ACTION_CODES, STAGE_CODES, checklistTone, dateShort, nextActionKey, outcomeTone, stageIndex, stageTone } from '@/lib/route'
+import type { RouteDecision, RouteSignal } from '@/api/types'
+import { NEXT_ACTION_CODES, STAGE_CODES, checklistTone, dateShort, nextActionKey, openRequest, openSignal, outcomeTone, routeEntries, stageIndex, stageTone } from '@/lib/route'
+
+const signal = (over: Partial<RouteSignal>): RouteSignal => ({
+  decisionId: 'a', recordedAt: '2026-09-25T10:00:00+00:00', kind: 'still_waiting', toMoCode: null, toMoName: null, comment: null, open: false, ...over,
+})
+const decision = (over: Partial<RouteDecision>): RouteDecision => ({
+  decisionId: 'd', role: 'doctor', recordedAt: '2026-09-24T10:00:00+00:00', fromMoCode: null, toMoCode: '22GN', toMoName: 'Больница №2', reason: null, kind: 'redirect', ...over,
+})
+
+describe('route signals', () => {
+  it('finds the open signal and the open request, ignoring answered ones', () => {
+    const answered = signal({ decisionId: 'x', kind: 'request_redirect', toMoCode: '22GN', open: false })
+    const open = signal({ decisionId: 'y', kind: 'request_redirect', toMoCode: '028B', open: true, recordedAt: '2026-09-26T10:00:00+00:00' })
+    expect(openSignal({ signals: [open, answered] })?.decisionId).toBe('y')
+    expect(openRequest({ signals: [open, answered] })?.toMoCode).toBe('028B')
+    expect(openSignal({ signals: [answered] })).toBeNull()
+    expect(openRequest({ signals: [signal({ kind: 'still_waiting', open: true })] })).toBeNull()
+  })
+
+  it('merges decisions and signals newest first', () => {
+    const entries = routeEntries({
+      decisions: [decision({ decisionId: 'd1', recordedAt: '2026-09-24T10:00:00+00:00' })],
+      signals: [signal({ decisionId: 's1', recordedAt: '2026-09-25T10:00:00+00:00' }), signal({ decisionId: 's0', recordedAt: '2026-09-20T10:00:00+00:00' })],
+    })
+    expect(entries.map((e) => (e.kind === 'decision' ? e.decision.decisionId : e.signal.decisionId))).toEqual(['s1', 'd1', 's0'])
+  })
+})
 
 describe('route helpers', () => {
   it('maps next-action codes to dictionary keys and leaves unknown codes to the raw API text', () => {

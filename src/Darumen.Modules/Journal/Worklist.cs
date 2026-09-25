@@ -17,7 +17,12 @@ public sealed record QueuePrediction(double P50Days, double P90Days, double PRef
 /// (<see cref="WorklistBuilder.ActionRedirectFaster"/> и другие Action*). PatientRef — см. <see cref="RoutePatientRef"/>.</summary>
 public sealed record WorklistItemDto(
     string PatientRef, bool Synthetic, string Stage, string StageCode, string? ExpectedDate, IReadOnlyList<string> RiskFlags, int Priority,
-    string NextAction, string NextActionCode, string Explanation, string MoCode, string MoName, string ProfileCode, string RegionKato, int DaysWaiting);
+    string NextAction, string NextActionCode, string Explanation, string MoCode, string MoName, string ProfileCode, string RegionKato, int DaysWaiting,
+    PatientSignalDto? PatientSignal = null);
+
+/// <summary>Открытый сигнал гражданина по строке списка (<see cref="RouteSignals"/>): вид, организация из просьбы «быстрее»,
+/// комментарий и время; в RiskFlags при этом есть <see cref="WorklistBuilder.PatientSignal"/>.</summary>
+public sealed record PatientSignalDto(string Kind, string? ToMoCode, string? ToMoName, string? Comment, DateTimeOffset RecordedAt);
 
 /// <summary>ModelBacked — прогноз модели получен хотя бы для одной очереди (иначе показывать в UI
 /// как формулу/агрегаты, а не как «ML-модель», см. WorklistView.vue).</summary>
@@ -60,6 +65,11 @@ public static class WorklistBuilder
     public const string RefusalRisk = "refusal_risk";
     public const string FasterAlternative = "faster_alternative";
 
+    /// <summary>Открытый сигнал гражданина (запрос «быстрее», подтверждение или отказ от ожидания): человек в списке
+    /// ждёт ответа врача, поэтому строка получает флаг и +<see cref="SignalPriorityBonus"/> к приоритету.</summary>
+    public const string PatientSignal = "patient_signal";
+    public const int SignalPriorityBonus = 3;
+
     /// <summary>Коды следующего шага (NextActionCode) по флагам, от сильного к слабому; подписи RU/KK — на клиентах.</summary>
     public const string ActionRedirectFaster = "redirect_faster";
     public const string ActionReviewBeforeCall = "review_before_call";
@@ -79,7 +89,8 @@ public static class WorklistBuilder
     /// витрины вместо прогноза, помеченный FromModel = false — так метка «ML-модель» на экране остаётся честной
     /// (см. WorklistResponseDto.ModelBacked).</summary>
     public static IReadOnlyList<WorklistItemDto> Build(
-        IReadOnlyList<QueueStateRow> states, IReadOnlyDictionary<(string MoCode, string ProfileCode), QueuePrediction> predictions, string? flag = null)
+        IReadOnlyList<QueueStateRow> states, IReadOnlyDictionary<(string MoCode, string ProfileCode), QueuePrediction> predictions, string? flag = null,
+        IReadOnlyDictionary<string, PatientSignalDto>? signals = null)
     {
         var total = states.Sum(s => s.QueueLen);
         if (total == 0)
@@ -96,13 +107,22 @@ public static class WorklistBuilder
             var count = CountFor(state, total);
             for (var i = 0; i < count; i++)
             {
-                items.Add(BuildItem(state, i, prediction, fastest.GetValueOrDefault(state.ProfileCode, double.NaN)));
+                var item = BuildItem(state, i, prediction, fastest.GetValueOrDefault(state.ProfileCode, double.NaN));
+                items.Add(signals is not null && signals.TryGetValue(item.PatientRef, out var signal) ? WithSignal(item, signal) : item);
             }
         }
 
         var filtered = flag is null ? items : items.Where(i => i.RiskFlags.Contains(flag));
         return filtered.OrderByDescending(i => i.Priority).ThenByDescending(i => i.DaysWaiting).Take(MaxItems).ToList();
     }
+
+    /// <summary>Строка с открытым сигналом гражданина: флаг, сам сигнал и приоритет выше — человек ждёт ответа врача.</summary>
+    public static WorklistItemDto WithSignal(WorklistItemDto item, PatientSignalDto signal) => item with
+    {
+        RiskFlags = item.RiskFlags.Contains(PatientSignal) ? item.RiskFlags : [.. item.RiskFlags, PatientSignal],
+        Priority = item.Priority + SignalPriorityBonus,
+        PatientSignal = signal,
+    };
 
     /// <summary>Сколько синтетических пациентов приходится на очередь: пропорционально её доле в регионе, от 1 до
     /// MaxPerQueue. Публично, чтобы маршрут (/route/{patientRef}) проверял, существует ли номер пациента в очереди.</summary>

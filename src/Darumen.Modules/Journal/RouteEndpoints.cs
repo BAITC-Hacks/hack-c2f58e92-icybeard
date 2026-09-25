@@ -24,34 +24,60 @@ public static class RouteEndpoints
         group.MapGet("/me", async (string? regionKato, HttpContext http, IWorklistRepository worklist, IRefDataRepository refData,
                 IDecisionRepository decisions, QueueService queueService, QueuePredictions predictions, CancellationToken ct) =>
             {
-                var user = CurrentUser.From(http);
-                var region = user.RegionKato ?? regionKato ?? DefaultRegion;
-                var errors = new ValidationErrors().Kato("regionKato", region);
-                if (errors.Any)
+                var (parsed, states, problem) = await ResolveCitizenAsync(regionKato, http, worklist, refData, predictions, ct);
+                if (problem is not null)
                 {
-                    return errors.Problem();
+                    return problem;
                 }
 
-                var states = await worklist.QueueStatesAsync(region, ct);
-                // та же популяция и те же кэшированные прогнозы, что в рабочем списке врача (QueuePredictions): гражданин —
-                // один из пациентов списка. Сервис моделей недоступен — популяция, как и список, строится по агрегатам витрины
-                var (byQueue, _) = await predictions.ForQueuesAsync(states, ct);
-                var population = WorklistBuilder.Build(states, byQueue);
-                if (population.Count == 0)
-                {
-                    return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Нет очередей в регионе",
-                        detail: $"в регионе {region} нет активных очередей на дату среза витрины");
-                }
-
-                // сид — ИИН из клейма (не сохраняется, только хешируется), иначе учётная запись: реф не меняется при смене логина того же человека
-                var excludedProfiles = RouteBuilder.ExcludedProfiles(await refData.ProfilesAsync(ct));
-                RoutePatientRef.TryParse(RouteBuilder.PickPatientRef(population, user.Iin ?? user.Actor, excludedProfiles), out var parsed);
-                return await BuildAsync(parsed!, states, RouteAudience.Citizen, Locale.From(http.Request), refData, decisions, queueService, ct);
+                return await BuildAsync(parsed!, states!, RouteAudience.Citizen, Locale.From(http.Request), refData, decisions, queueService, ct);
             })
             .RequireAuthorization(Policies.Citizen)
             .WithName("MyRoute")
             .WithSummary("Мой маршрут: синтетический пациент на реальных очередях региона — стадии Стандарта, прогноз ожидания, чек-лист обследований, где быстрее, решения врача, история")
             .Produces<RouteDto>().ProducesProblem(StatusCodes.Status404NotFound).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost("/me/signals", async (RouteSignalRequestDto body, string? regionKato, HttpContext http, IWorklistRepository worklist,
+                IRefDataRepository refData, IDecisionRepository decisions, QueuePredictions predictions, CancellationToken ct) =>
+            {
+                var (parsed, _, problem) = await ResolveCitizenAsync(regionKato, http, worklist, refData, predictions, ct);
+                if (problem is not null)
+                {
+                    return problem;
+                }
+
+                var errors = new ValidationErrors().Require("kind", body.Kind);
+                if (!errors.Any && !RouteSignals.Kinds.Contains(body.Kind!))
+                {
+                    errors.Add("kind", $"ожидается один из: {string.Join(", ", RouteSignals.Kinds)}");
+                }
+
+                var request = !errors.Any && body.Kind == RouteSignals.RequestRedirect;
+                if (request)
+                {
+                    errors.Require("toMoCode", body.ToMoCode);
+                    if (!errors.Any && body.ToMoCode == parsed!.MoCode)
+                    {
+                        errors.Add("toMoCode", "организация совпадает с текущей");
+                    }
+                }
+
+                if (errors.Any)
+                {
+                    return errors.Problem();
+                }
+
+                // сигнал — та же запись журнала, что решение врача: recommended = текущая организация, chosen = {"signal", "moCode"?};
+                // комментарий гражданина — в reason, без обработки текста
+                var comment = string.IsNullOrWhiteSpace(body.Comment) ? null : body.Comment.Trim();
+                return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, parsed!.Format(),
+                    MoJson(parsed.MoCode), RouteSignals.Json(body.Kind!, request ? body.ToMoCode : null), comment, _ => "/api/v1/route/me", ct);
+            })
+            .RequireAuthorization(Policies.Citizen)
+            .WithName("MyRouteSignal")
+            .WithSummary("Сигнал гражданина по своему маршруту: «ещё жду», «уже лечился в другом месте», «больше не нужно» или просьба рассмотреть организацию быстрее (toMoCode); врач видит его в рабочем списке и отвечает решением")
+            .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
         group.MapGet("/{patientRef}", async (string patientRef, HttpContext http, IWorklistRepository worklist, IRefDataRepository refData,
                 IDecisionRepository decisions, QueueService queueService, CancellationToken ct) =>
@@ -89,13 +115,9 @@ public static class RouteEndpoints
                     return errors.Problem();
                 }
 
-                // рекомендация системы — самая быстрая альтернатива по модели; без модели рекомендацией остаётся текущая организация
-                var state = states!.First(s => s.MoCode == parsed!.MoCode && s.ProfileCode == parsed.ProfileCode);
-                var alternatives = await TryAsync(() => queueService.AlternativesAsync(AlternativesRequest(state, 1), ct));
-                var recommended = alternatives is { Items.Count: > 0 } ? alternatives.Items[0].Mo.MoCode : parsed!.MoCode;
                 var reference = parsed!.Format();
                 return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, reference,
-                    MoJson(recommended), MoJson(body.ToMoCode!), body.Reason, _ => $"/api/v1/route/{reference}", ct);
+                    MoJson(await RecommendedAsync(parsed, states!, queueService, ct)), MoJson(body.ToMoCode!), body.Reason, _ => $"/api/v1/route/{reference}", ct);
             })
             .RequireAuthorization(Policies.Doctor)
             .WithName("RedirectRoute")
@@ -103,6 +125,70 @@ public static class RouteEndpoints
             .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost("/{patientRef}/keep", async (string patientRef, RouteKeepRequestDto body, HttpContext http, IWorklistRepository worklist,
+                IDecisionRepository decisions, QueueService queueService, CancellationToken ct) =>
+            {
+                var (parsed, states, problem) = await ResolveAsync(patientRef, http, worklist, ct);
+                if (problem is not null)
+                {
+                    return problem;
+                }
+
+                var errors = new ValidationErrors().Require("reason", body.Reason);
+                if (errors.Any)
+                {
+                    return errors.Problem();
+                }
+
+                // «оставить» — тоже решение с причиной: закрывает сигнал гражданина и попадает в журнал как Kind = keep
+                var reference = parsed!.Format();
+                return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, reference,
+                    MoJson(await RecommendedAsync(parsed, states!, queueService, ct)), MoJson(parsed.MoCode), body.Reason, _ => $"/api/v1/route/{reference}", ct);
+            })
+            .RequireAuthorization(Policies.Doctor)
+            .WithName("KeepRoute")
+            .WithSummary("Оставить пациента в текущей организации с причиной — ответ на сигнал гражданина; решение уходит в журнал (Kind = keep)")
+            .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
+            .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    /// <summary>Рекомендация системы для журнала — самая быстрая альтернатива по модели; без модели рекомендацией
+    /// остаётся текущая организация.</summary>
+    private static async Task<string> RecommendedAsync(RoutePatientRef parsed, IReadOnlyList<QueueStateRow> states, QueueService queueService, CancellationToken ct)
+    {
+        var state = states.First(s => s.MoCode == parsed.MoCode && s.ProfileCode == parsed.ProfileCode);
+        var alternatives = await TryAsync(() => queueService.AlternativesAsync(AlternativesRequest(state, 1), ct));
+        return alternatives is { Items.Count: > 0 } ? alternatives.Items[0].Mo.MoCode : parsed.MoCode;
+    }
+
+    /// <summary>Персона гражданина: та же популяция и те же кэшированные прогнозы, что в рабочем списке врача
+    /// (QueuePredictions) — гражданин один из пациентов списка. Сид — ИИН из клейма (не сохраняется, только хешируется),
+    /// иначе учётная запись: реф не меняется при смене логина того же человека.</summary>
+    private static async Task<(RoutePatientRef? Parsed, IReadOnlyList<QueueStateRow>? States, IResult? Problem)> ResolveCitizenAsync(
+        string? regionKato, HttpContext http, IWorklistRepository worklist, IRefDataRepository refData, QueuePredictions predictions, CancellationToken ct)
+    {
+        var user = CurrentUser.From(http);
+        var region = user.RegionKato ?? regionKato ?? DefaultRegion;
+        var errors = new ValidationErrors().Kato("regionKato", region);
+        if (errors.Any)
+        {
+            return (null, null, errors.Problem());
+        }
+
+        var states = await worklist.QueueStatesAsync(region, ct);
+        var (byQueue, _) = await predictions.ForQueuesAsync(states, ct);
+        var population = WorklistBuilder.Build(states, byQueue);
+        if (population.Count == 0)
+        {
+            return (null, null, Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Нет очередей в регионе",
+                detail: $"в регионе {region} нет активных очередей на дату среза витрины"));
+        }
+
+        var excludedProfiles = RouteBuilder.ExcludedProfiles(await refData.ProfilesAsync(ct));
+        RoutePatientRef.TryParse(RouteBuilder.PickPatientRef(population, user.Iin ?? user.Actor, excludedProfiles), out var parsed);
+        return (parsed, states, null);
     }
 
     /// <summary>Разбор рефа, проверка региона врача (клейм region_kato сильнее рефа) и существования пациента в очереди.</summary>
@@ -152,7 +238,8 @@ public static class RouteEndpoints
         var item = WorklistBuilder.BuildItem(state, parsed.Index - 1, queuePrediction, WorklistBuilder.FastestP50(states, state.ProfileCode));
         var profileNames = profilesTask.Result.GroupBy(p => p.ProfileCode).ToDictionary(g => g.Key, g => g.First().Name);
         var route = RouteBuilder.Build(new RouteBuilder.Inputs(
-            item, state, states, standardTask.Result, prediction, alternativesTask.Result, decisionsTask.Result.Items, profileNames, audience, lang));
+            item, state, states, standardTask.Result, prediction, alternativesTask.Result, decisionsTask.Result.Items, profileNames, audience, lang,
+            DateTimeOffset.UtcNow));
         return Results.Ok(route);
     }
 

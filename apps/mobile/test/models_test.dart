@@ -32,6 +32,39 @@ void main() {
     }).nextActionCode, '');
     expect(S.of('kk').nextActionText('wait_for_call', 'ждать вызова'), 'шақыруды күту');
     expect(S.of('kk').nextActionText('', 'ждать вызова'), 'ждать вызова');
+    // открытый сигнал пациента в строке списка
+    final signalled = WorklistItem.fromJson({
+      'patientRef': 'SYN-75-028B-381-03', 'stage': 'ожидает', 'riskFlags': ['patient_signal'], 'priority': 15,
+      'nextAction': 'ждать вызова', 'explanation': '', 'moCode': '028B', 'profileCode': '381', 'daysWaiting': 40,
+      'patientSignal': {'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': 'Больница №2', 'comment': 'живу рядом', 'recordedAt': '2026-09-25T10:00:00+00:00'},
+    });
+    expect(signalled.patientSignal?.toMoName, 'Больница №2');
+    expect(signalled.riskFlags, contains(RouteCodes.patientSignalFlag));
+  });
+
+  test('route parses citizen signals and the validation prompt', () {
+    final route = PatientRoute.fromJson({
+      'patientRef': 'SYN-75-028B-381-01',
+      'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
+      'forecast': {'p50Days': 47, 'p90Days': 106, 'fromModel': true},
+      'signals': [
+        {'decisionId': 'a', 'recordedAt': '2026-09-25T10:00:00+00:00', 'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': 'Больница №2', 'open': true},
+        {'decisionId': 'b', 'recordedAt': '2026-09-20T10:00:00+00:00', 'kind': 'still_waiting', 'open': false},
+      ],
+      'validationDue': true,
+    });
+    expect(route.validationDue, isTrue);
+    expect(route.openRequest?.toMoCode, '22GN');
+    expect(route.signals, hasLength(2));
+    // старый ответ без сигналов
+    final plain = PatientRoute.fromJson({
+      'patientRef': 'SYN-75-028B-381-01',
+      'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
+      'forecast': {'p50Days': 47, 'p90Days': 106},
+    });
+    expect(plain.signals, isEmpty);
+    expect(plain.validationDue, isFalse);
+    expect(plain.openSignal, isNull);
     final c = CheckResponse.fromJson({'covered': true, 'program': 'Программа 90', 'fillDaysP50': 3, 'shortage': {'flag': false, 'score': 0.1, 'basis': 'ok'}});
     expect(c.covered, isTrue);
     expect(c.fillDaysP90, isNull);

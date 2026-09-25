@@ -1,9 +1,8 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../api/client.dart';
 import '../api/models.dart';
 import '../l10n/strings.dart';
 import '../state/load_state.dart';
@@ -57,13 +56,26 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
     if (reason == null || reason.isEmpty || !mounted) {
       return;
     }
+    await _record(() => context.read<Session>().api.redirectRoute(widget.patientRef, toMoCode: alternative.moCode, reason: reason, idempotencyKey: newIdempotencyKey()), s.redirectDone);
+  }
+
+  /// «Оставить» с причиной — ответ на сигнал пациента, в журнале Kind = keep.
+  Future<void> _keep() async {
+    final s = S.at(context);
+    final reason = await RedirectReasonDialog.show(context, organization: s.keepHere, label: s.keepReasonLabel, confirmLabel: s.keepHere);
+    if (reason == null || reason.isEmpty || !mounted) {
+      return;
+    }
+    await _record(() => context.read<Session>().api.keepRoute(widget.patientRef, reason: reason, idempotencyKey: newIdempotencyKey()), s.keepDone);
+  }
+
+  Future<void> _record(Future<String> Function() call, String done) async {
+    final s = S.at(context);
     setState(() => _redirecting = true);
     try {
-      final random = Random.secure();
-      final key = List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
-      await context.read<Session>().api.redirectRoute(widget.patientRef, toMoCode: alternative.moCode, reason: reason, idempotencyKey: key);
+      await call();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.redirectDone)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(done)));
         await _load();
       }
     } catch (e) {
@@ -115,7 +127,7 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
               const ListSkeleton(),
             ],
           ),
-          builder: (_, route) => RouteView(route: route, doctorMode: true, onRedirect: _redirecting ? null : _redirect),
+          builder: (_, route) => RouteView(route: route, doctorMode: true, onRedirect: _redirecting ? null : _redirect, onKeep: _redirecting ? null : _keep),
         ),
       ],
     );

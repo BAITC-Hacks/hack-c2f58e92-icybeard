@@ -170,7 +170,11 @@ export interface AuditEntry {
 export interface WorklistItem {
   patientRef: string; synthetic: boolean; stage: string; stageCode: string; expectedDate: string | null; riskFlags: string[]
   priority: number; nextAction: string; nextActionCode: string; explanation: string; moCode: string; moName: string; profileCode: string; regionKato: string; daysWaiting: number
+  /** Открытый сигнал гражданина (в riskFlags при этом есть patient_signal); null — сигнала нет. */
+  patientSignal: PatientSignal | null
 }
+export interface PatientSignal { kind: SignalKind; toMoCode: string | null; toMoName: string | null; comment: string | null; recordedAt: string }
+export type SignalKind = 'still_waiting' | 'treated_elsewhere' | 'withdraw' | 'request_redirect'
 /** Конверт /journal/worklist: modelBacked=false — прогнозы посчитаны по агрегатам витрины, а не моделью. */
 export interface WorklistResponse { items: WorklistItem[]; synthetic: boolean; asOf: string; regionKato: string; modelBacked: boolean }
 
@@ -189,6 +193,10 @@ export interface RouteDecision {
 export interface RouteHistoryItem {
   moCode: string; moName: string; profileCode: string; profileName: string; registeredAt: string; outcome: 'hospitalized' | 'refused'; outcomeAt: string; waitDays: number
 }
+/** Сигнал гражданина по своему маршруту (POST /route/me/signals): валидация листа ожидания или просьба рассмотреть организацию; open — врач ещё не ответил. */
+export interface RouteSignal {
+  decisionId: string; recordedAt: string; kind: SignalKind; toMoCode: string | null; toMoName: string | null; comment: string | null; open: boolean
+}
 /** Только для врача: гражданину API отдаёт doctor = null (риск отказа и приоритет — служебная информация). */
 export interface RouteDoctorPanel {
   priority: number; riskFlags: string[]; nextAction: string; nextActionCode: string; explanation: string; pRefusal: number; refusalOrgInTraining: boolean; shap: Explanation | null
@@ -206,6 +214,8 @@ export interface PatientRoute {
   stage: string; stageTitle: string; timeline: RouteStage[]; dates: RouteDates; daysWaiting: number; forecast: RouteForecast
   benchmarks: RouteBenchmark[]; checklist: RouteChecklistItem[]; alternatives: Alternative[]; alternativesModel: ModelInfo | null
   decisions: RouteDecision[]; history: RouteHistoryItem[]; doctor: RouteDoctorPanel | null; basis: string; standard: RouteStandardRef
+  /** Сигналы гражданина, свежие первыми; validationDue — нет подтверждения ожидания за 30 дней, показать «Вы ещё ждёте?». */
+  signals: RouteSignal[]; validationDue: boolean
 }
 
 export interface Region { regionKato: string; name: string; capital: string; lat: number | null; lon: number | null; populationThousands: number | null }

@@ -26,6 +26,7 @@ const error = ref<unknown>(null)
 const busy = ref(true)
 const flags = computed(() => [
   { label: t('doctor.worklist.flagAll'), value: null },
+  { label: t('doctor.worklist.flagSignal'), value: 'patient_signal' },
   { label: t('doctor.worklist.flagStuck'), value: 'stuck_over_30' },
   { label: t('doctor.worklist.flagRisk'), value: 'refusal_risk' },
   { label: t('doctor.worklist.flagFaster'), value: 'faster_alternative' },
@@ -33,8 +34,9 @@ const flags = computed(() => [
 
 const flagLabels = computed<Record<string, string>>(() => ({
   stuck_over_30: t('doctor.worklist.flagStuckShort'), refusal_risk: t('doctor.worklist.flagRiskShort'), faster_alternative: t('doctor.worklist.flagFasterShort'),
+  patient_signal: t('doctor.worklist.flagSignalShort'),
 }))
-const flagTones: Record<string, 'warn' | 'danger' | 'accent'> = { stuck_over_30: 'warn', refusal_risk: 'danger', faster_alternative: 'accent' }
+const flagTones: Record<string, 'warn' | 'danger' | 'accent'> = { stuck_over_30: 'warn', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'accent' }
 
 /** Стадия по коду (registered | waiting | called) на языке интерфейса; незнакомый код — русская подпись API как есть. */
 function stageLabel(item: WorklistItem): string {
@@ -93,7 +95,15 @@ watch(flag, load)
         <template #body="{ data }"><StatusTag v-for="f in data.riskFlags" :key="f" :value="flagLabels[f] ?? f" :tone="flagTones[f] ?? 'neutral'" style="margin-right: 4px" /></template>
       </Column>
       <Column field="priority" :header="t('doctor.worklist.priority')" sortable />
-      <Column :header="t('doctor.worklist.nextStep')"><template #body="{ data }"><span>{{ nextAction(data) }}</span><br /><span class="muted">{{ data.explanation }}</span></template></Column>
+      <Column :header="t('doctor.worklist.nextStep')">
+        <template #body="{ data }">
+          <div v-if="data.patientSignal" class="signal" data-testid="worklist-signal">
+            {{ t('route.patientSignal.' + data.patientSignal.kind, { name: data.patientSignal.toMoName ?? '' }) }}
+            <span v-if="data.patientSignal.comment" class="muted"> · «{{ data.patientSignal.comment }}»</span>
+          </div>
+          <span>{{ nextAction(data) }}</span><br /><span class="muted">{{ data.explanation }}</span>
+        </template>
+      </Column>
       <Column header=""><template #body="{ data }"><RouterLink :to="{ name: 'referral', query: { moCode: data.moCode, profileCode: data.profileCode } }">{{ t('doctor.worklist.openReferral') }}</RouterLink></template></Column>
     </DataTable>
   </PageShell>
@@ -101,4 +111,5 @@ watch(flag, load)
 
 <style scoped>
 .mono { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
+.signal { font-weight: 600; margin-bottom: 4px; }
 </style>

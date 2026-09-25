@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 
@@ -110,6 +111,19 @@ class ApiClient {
       ((await post('/api/v1/route/${Uri.encodeComponent(patientRef)}/redirect', {'toMoCode': toMoCode, 'reason': reason},
               headers: {'Idempotency-Key': idempotencyKey})) as Map<String, dynamic>)['decisionId'] as String;
 
+  /// Ответ врача «оставить в текущей организации» с причиной: закрывает сигнал гражданина, в журнале — Kind = keep.
+  Future<String> keepRoute(String patientRef, {required String reason, required String idempotencyKey}) async =>
+      ((await post('/api/v1/route/${Uri.encodeComponent(patientRef)}/keep', {'reason': reason}, headers: {'Idempotency-Key': idempotencyKey}))
+          as Map<String, dynamic>)['decisionId'] as String;
+
+  /// Сигнал гражданина по своему маршруту: still_waiting | treated_elsewhere | withdraw | request_redirect (с toMoCode).
+  Future<String> sendRouteSignal(String kind, {String? toMoCode, String? comment, required String idempotencyKey, String? regionKato}) async =>
+      ((await post(
+        '/api/v1/route/me/signals${regionKato == null ? '' : '?regionKato=${Uri.encodeQueryComponent(regionKato)}'}',
+        {'kind': kind, 'toMoCode': ?toMoCode, if (comment != null && comment.isNotEmpty) 'comment': comment},
+        headers: {'Idempotency-Key': idempotencyKey},
+      )) as Map<String, dynamic>)['decisionId'] as String;
+
   Future<RouteStandard> routeStandard() async => RouteStandard.fromJson(await get('/api/v1/refdata/route-standard') as Map<String, dynamic>);
 
   Future<String> recordDecision(Map<String, dynamic> decision, String idempotencyKey) async =>
@@ -162,4 +176,10 @@ class ApiClient {
   }
 
   void close() => _http.close();
+}
+
+/// Idempotency-Key на одно нажатие: повтор запроса с тем же ключом возвращает ту же запись журнала.
+String newIdempotencyKey() {
+  final random = Random.secure();
+  return List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
 }

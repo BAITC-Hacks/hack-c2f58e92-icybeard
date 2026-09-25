@@ -120,6 +120,42 @@ class S {
   String doctorProposed(String name) => _t('Врач предложил другую организацию: $name', 'Дәрігер басқа ұйымды ұсынды: $name');
   String get doctorKept => _t('Врач оставил текущую организацию', 'Дәрігер ағымдағы ұйымды қалдырды');
   String get redirectOnlyDoctor => _t('Перенаправляет только врач', 'Тек дәрігер бағыттайды');
+
+  // двусторонний маршрут: валидация листа ожидания и запрос «быстрее» (гражданин), ответ врача
+  String get validationTitle => _t('Вы ещё ждёте госпитализацию?', 'Емдеуге жатқызуды әлі күтіп отырсыз ба?');
+  String get validationBody =>
+      _t('Ответ увидит ваш врач. Так лист ожидания остаётся честным.', 'Жауапты дәрігеріңіз көреді. Осылай күту парағы дұрыс болып қалады.');
+  String get validationStill => _t('Да, жду', 'Иә, күтемін');
+  String get validationTreated => _t('Уже лечился в другом месте', 'Басқа жерде емделдім');
+  String get validationWithdraw => _t('Больше не нужно', 'Енді қажет емес');
+  String get signalSent => _t('Ответ записан, врач его увидит', 'Жауап жазылды, дәрігер оны көреді');
+  String get requestConsider => _t('Попросить', 'Сұрау');
+  String requestTitle(String name) => _t('Попросить врача рассмотреть: $name', 'Дәрігерден қарауды сұрау: $name');
+  String get requestCommentLabel => _t('Комментарий (необязательно)', 'Түсініктеме (міндетті емес)');
+  String get requestSend => _t('Отправить', 'Жіберу');
+  String get requestSent => _t('Запрос отправлен врачу', 'Сұрау дәрігерге жіберілді');
+  String get requestPending => _t('запрос отправлен', 'сұрау жіберілді');
+  String get signalsSection => _t('Решения и запросы', 'Шешімдер мен сұраулар');
+  String get awaitingDoctor => _t('ждёт ответа врача', 'дәрігер жауабын күтуде');
+  String signalText(String kind, String? name) => switch (kind) {
+        'request_redirect' => _t('Вы попросили рассмотреть: ${name ?? ''}', 'Сіз қарауды сұрадыңыз: ${name ?? ''}'),
+        'still_waiting' => _t('Вы подтвердили, что ждёте', 'Күтіп отырғаныңызды растадыңыз'),
+        'treated_elsewhere' => _t('Вы сообщили, что уже лечились в другом месте', 'Басқа жерде емделгеніңізді хабарладыңыз'),
+        'withdraw' => _t('Вы отказались от ожидания', 'Күтуден бас тарттыңыз'),
+        _ => kind,
+      };
+  String patientSignalText(String kind, String? name) => switch (kind) {
+        'request_redirect' => _t('Пациент просит рассмотреть: ${name ?? ''}', 'Науқас қарауды сұрайды: ${name ?? ''}'),
+        'still_waiting' => _t('Пациент подтвердил, что ждёт', 'Науқас күтіп отырғанын растады'),
+        'treated_elsewhere' => _t('Пациент уже лечился в другом месте', 'Науқас басқа жерде емделген'),
+        'withdraw' => _t('Пациент отказался от ожидания', 'Науқас күтуден бас тартты'),
+        _ => kind,
+      };
+  String get keepHere => _t('Оставить', 'Қалдыру');
+  String get keepReasonLabel => _t('Причина (попадает в журнал)', 'Себебі (журналға түседі)');
+  String get keepDone => _t('Решение записано в журнал', 'Шешім журналға жазылды');
+  String checklistExpiresEvent(String title, String date) => _t('$title действует до $date', '$title $date дейін жарамды');
+  String checklistExpiredEvent(String title, String date) => _t('$title истёк $date', '$title мерзімі $date өтті');
   String get noActiveReferral => _t('Активных направлений нет', 'Белсенді жолдамалар жоқ');
   String get referralLabel => _t('Направление', 'Жолдама');
   String get planLabel => _t('Дата госпитализации', 'Емдеуге жатқызу күні');
@@ -246,6 +282,8 @@ class S {
   String get flagOver30 => _t('> 30 дней', '> 30 күн');
   String get flagRefusalRisk => _t('риск отказа', 'бас тарту қаупі');
   String get flagFasterAlt => _t('есть быстрее', 'жылдамырағы бар');
+  String get flagPatientSignal => _t('запрос пациента', 'науқас сұрауы');
+  String get worklistEmpty => _t('В списке нет пациентов с таким флагом', 'Тізімде мұндай жалаушасы бар науқастар жоқ');
   String get worklistCaption =>
       _t('Синтетические пациенты на реальных очередях региона, без персональных данных.', 'Аймақтың нақты кезектеріндегі синтетикалық пациенттер, дербес деректерсіз.');
   String waitingHeadline(String patientRef, int days, int priority) =>

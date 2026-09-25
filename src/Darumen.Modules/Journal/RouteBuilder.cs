@@ -19,7 +19,7 @@ public static class RouteBuilder
     public sealed record Inputs(
         WorklistItemDto Item, QueueStateRow State, IReadOnlyList<QueueStateRow> States, RouteStandardDto Standard,
         PredictResponseDto? Prediction, AlternativesResponseDto? Alternatives, IReadOnlyList<DecisionDto> Decisions,
-        IReadOnlyDictionary<string, string> ProfileNames, string Audience, string Lang);
+        IReadOnlyDictionary<string, string> ProfileNames, string Audience, string Lang, DateTimeOffset? Now = null);
 
     private static readonly (string Code, int Order, string Ru, string Kk)[] DefaultStages =
     [
@@ -100,8 +100,14 @@ public static class RouteBuilder
             names.TryAdd(alternative.Mo.MoCode, alternative.Mo.Name);
         }
 
+        // сигналы гражданина — реальные события (время сервера), в отличие от дат маршрута, живущих в «сегодня» витрины
+        var signals = RouteSignals.FromDecisions(input.Decisions, names);
+        var validationDue = RouteSignals.ValidationDue(signals, input.Now ?? DateTimeOffset.UtcNow);
+        IReadOnlyList<string> riskFlags = signals.Any(s => s.Open) && !item.RiskFlags.Contains(WorklistBuilder.PatientSignal)
+            ? [.. item.RiskFlags, WorklistBuilder.PatientSignal]
+            : item.RiskFlags;
         var doctor = input.Audience == RouteAudience.Doctor
-            ? new RouteDoctorPanelDto(item.Priority, item.RiskFlags, item.NextAction, item.NextActionCode, item.Explanation,
+            ? new RouteDoctorPanelDto(item.Priority, riskFlags, item.NextAction, item.NextActionCode, item.Explanation,
                 input.Prediction?.PRefusal ?? fallback.PRefusal, input.Prediction?.RefusalOrgInTraining ?? false, input.Prediction?.Explanation)
             : null;
 
@@ -114,7 +120,8 @@ public static class RouteBuilder
             input.Alternatives?.Items ?? [], input.Alternatives?.Model,
             Decisions(input.Decisions, state.MoCode, names), History(input.States, reference, today, input.ProfileNames), doctor,
             Basis(kk, today),
-            new RouteStandardRefDto(input.Standard.Meta.Source, input.Standard.Meta.SourceUrl, input.Standard.Meta.SourceDate, input.Standard.Available));
+            new RouteStandardRefDto(input.Standard.Meta.Source, input.Standard.Meta.SourceUrl, input.Standard.Meta.SourceDate, input.Standard.Available),
+            signals, validationDue);
     }
 
     /// <summary>Стадии Стандарта до госпитализации; отказ на таймлайне активного маршрута не показывается.
@@ -195,8 +202,9 @@ public static class RouteBuilder
         var rows = new List<RouteDecisionDto>();
         foreach (var decision in decisions)
         {
+            // сигналы гражданина ({"signal": …}) — не решения врача: они идут в RouteDto.Signals
             var to = MoCode(decision.Chosen);
-            if (to is null)
+            if (to is null || RouteSignals.Kind(decision.Chosen) is not null)
             {
                 continue;
             }

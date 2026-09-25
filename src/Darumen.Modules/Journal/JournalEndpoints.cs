@@ -5,6 +5,10 @@ namespace Darumen.Modules.Journal;
 
 public static class JournalEndpoints
 {
+    /// <summary>Сколько решений по маршрутам читать для флагов сигналов в рабочем списке: журнал маршрутов на кэмпе
+    /// исчисляется десятками записей, одной страницы хватает.</summary>
+    private const int RouteDecisionsPage = 500;
+
     public static void Map(IEndpointRouteBuilder api)
     {
         var group = api.MapGroup("/journal").WithTags("Journal").RequireAuthorization(Policies.DoctorOrRegulator);
@@ -33,14 +37,20 @@ public static class JournalEndpoints
             })
             .WithName("Decisions").WithSummary("Журнал решений (subjectId — решения по одному предмету, например по рефу пациента)").Produces<Paged<DecisionDto>>();
 
-        group.MapGet("/worklist", async (string? regionKato, string? flag, HttpContext http, IWorklistRepository repository, QueuePredictions predictions, CancellationToken ct) =>
+        group.MapGet("/worklist", async (string? regionKato, string? flag, HttpContext http, IWorklistRepository repository, QueuePredictions predictions,
+                IDecisionRepository decisions, CancellationToken ct) =>
             {
                 var user = CurrentUser.From(http);
                 var region = regionKato ?? user.RegionKato ?? "75";
                 var states = await repository.QueueStatesAsync(region, ct);
                 var asOf = states.Count > 0 ? states[0].AsOf.ToString("yyyy-MM-dd") : string.Empty;
                 var (byQueue, modelBacked) = await predictions.ForQueuesAsync(states, ct);
-                return Results.Ok(new WorklistResponseDto(WorklistBuilder.Build(states, byQueue, flag), true, asOf, region, modelBacked));
+                // открытые сигналы граждан: решения по маршрутам немногочисленны (только по рефам региона), одна страница
+                var routeDecisions = await decisions.ListAsync(null, DecisionSubjects.Route, null, 1, RouteDecisionsPage, ct);
+                var names = states.GroupBy(s => s.MoCode).ToDictionary(g => g.Key, g => g.First().MoName);
+                var regional = routeDecisions.Items.Where(d => d.SubjectId.StartsWith($"SYN-{region}-", StringComparison.Ordinal)).ToList();
+                var signals = RouteSignals.Open(regional, names);
+                return Results.Ok(new WorklistResponseDto(WorklistBuilder.Build(states, byQueue, flag, signals), true, asOf, region, modelBacked));
             })
             .RequireAuthorization(Policies.Doctor)
             .WithName("Worklist").WithSummary("Рабочий список врача: синтетические пациенты на реальных очередях региона").Produces<WorklistResponseDto>();

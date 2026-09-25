@@ -15,7 +15,17 @@ public sealed record RouteDto(
     string Stage, string StageTitle, IReadOnlyList<RouteStageDto> Timeline, RouteDatesDto Dates, int DaysWaiting,
     RouteForecastDto Forecast, IReadOnlyList<RouteBenchmarkDto> Benchmarks, IReadOnlyList<RouteChecklistItemDto> Checklist,
     IReadOnlyList<AlternativeDto> Alternatives, ModelInfoDto? AlternativesModel, IReadOnlyList<RouteDecisionDto> Decisions,
-    IReadOnlyList<RouteHistoryDto> History, RouteDoctorPanelDto? Doctor, string Basis, RouteStandardRefDto Standard);
+    IReadOnlyList<RouteHistoryDto> History, RouteDoctorPanelDto? Doctor, string Basis, RouteStandardRefDto Standard,
+    IReadOnlyList<RouteSignalDto> Signals, bool ValidationDue);
+
+/// <summary>Сигнал гражданина по своему маршруту (<see cref="RouteSignals"/>): подтверждение ожидания, «уже лечился
+/// в другом месте», «больше не нужно» или просьба рассмотреть организацию быстрее (ToMoCode). Open — врач ещё не
+/// ответил решением после сигнала.</summary>
+public sealed record RouteSignalDto(Guid DecisionId, DateTimeOffset RecordedAt, string Kind, string? ToMoCode, string? ToMoName, string? Comment, bool Open);
+
+public sealed record RouteSignalRequestDto(string? Kind, string? ToMoCode, string? Comment);
+
+public sealed record RouteKeepRequestDto(string? Reason);
 
 public sealed record RouteOrganizationDto(string MoCode, string MoName, string ProfileCode, string ProfileName);
 

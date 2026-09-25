@@ -3,7 +3,7 @@ import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, EquipmentOrganization, EquipmentResponse, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
   LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, RouteStandard, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
-  SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistResponse,
+  SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistResponse, SignalKind,
 } from './types'
 
 export const queue = {
@@ -61,6 +61,12 @@ export const route = {
   patient: (patientRef: string) => api<PatientRoute>(`/api/v1/route/${encodeURIComponent(patientRef)}`),
   redirect: (patientRef: string, body: { toMoCode: string; reason: string }, idempotencyKey: string) =>
     api<DecisionCreated>(`/api/v1/route/${encodeURIComponent(patientRef)}/redirect`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** «Оставить в текущей организации» с причиной — ответ врача на сигнал гражданина (Kind = keep). */
+  keep: (patientRef: string, body: { reason: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/route/${encodeURIComponent(patientRef)}/keep`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Сигнал гражданина: still_waiting | treated_elsewhere | withdraw | request_redirect (с toMoCode). */
+  signal: (body: { kind: SignalKind; toMoCode?: string; comment?: string }, idempotencyKey: string) =>
+    api<DecisionCreated>('/api/v1/route/me/signals', { body, headers: { 'Idempotency-Key': idempotencyKey } }),
 }
 
 export const refdata = {
