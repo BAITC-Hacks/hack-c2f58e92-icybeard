@@ -32,7 +32,16 @@ auth.init().finally(async () => {
   // Заставка из index.html: после сборки знака (~4 с) фон и слово растворяются, а знак перелетает в знак шапки
   // (data-brand-mark) — плавный переход в интерфейс. Без якоря на странице знак просто растворяется.
   const boot = document.getElementById('boot')
-  if (boot) {
+  let skipBoot = false
+  try {
+    // возврат из Keycloak (вход, выход, проверка сессии) — вторая загрузка той же страницы: заставку не повторяем
+    skipBoot = sessionStorage.getItem('darumen.boot.skip') === '1'
+    sessionStorage.removeItem('darumen.boot.skip')
+  } catch {
+    skipBoot = false
+  }
+  if (boot && skipBoot) boot.remove()
+  else if (boot) {
     const started = Number(boot.dataset.started ?? performance.timeOrigin)
     const wait = Math.max(0, 4000 - (Date.now() - started))
     window.setTimeout(() => {

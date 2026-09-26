@@ -47,18 +47,48 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** Признак, что в этом браузере уже входили: только тогда стоит проверять сессию редиректом. Гость без него
+   * открывает страницу без перехода в Keycloak (и без второй загрузки, которая обрывала заставку). */
+  const SESSION_HINT = 'darumen.session'
+  /** Ставится перед любым редиректом в Keycloak: после возврата заставка index.html не запускается второй раз. */
+  const BOOT_SKIP = 'darumen.boot.skip'
+
+  function markRedirect() {
+    try {
+      sessionStorage.setItem(BOOT_SKIP, '1')
+    } catch {
+      // приватный режим без storage — заставка просто сыграет ещё раз
+    }
+  }
+
   async function init() {
     keycloak = new Keycloak({ url, realm, clientId: import.meta.env.VITE_KEYCLOAK_CLIENT ?? 'darumen-web' })
+    const returning = window.location.hash.includes('state=') || window.location.hash.includes('error=')
+    let hadSession = false
+    try {
+      hadSession = localStorage.getItem(SESSION_HINT) === '1'
+    } catch {
+      hadSession = false
+    }
     try {
       // проверка сессии полным редиректом (prompt=none) без iframe: тихая проверка через iframe и проверка
-      // 3p-cookies не переживают X-Frame-Options: DENY / CSP frame-ancestors на прокси стенда, а гостю
-      // редирект обходится в один переход туда-обратно; #error=login_required keycloak-js убирает из адреса сам
+      // 3p-cookies не переживают X-Frame-Options: DENY / CSP frame-ancestors на прокси стенда. Редирект
+      // делаем только тем, кто уже входил в этом браузере, или при возврате из Keycloak; гость остаётся гостем
+      // без перехода. #error=login_required keycloak-js убирает из адреса сам
+      const checkSession = returning || hadSession
+      if (checkSession && !returning) markRedirect()
       const authenticated = await keycloak.init({
-        onLoad: 'check-sso',
+        ...(checkSession ? { onLoad: 'check-sso' as const } : {}),
         pkceMethod: 'S256',
         checkLoginIframe: false,
       })
       if (authenticated) readToken()
+      try {
+        if (authenticated) localStorage.setItem(SESSION_HINT, '1')
+        else if (returning) localStorage.removeItem(SESSION_HINT)
+      } catch {
+        // без storage признак просто не сохраняется
+      }
       if (window.location.hash.includes('error=') || window.location.hash.includes('state=')) {
         window.history.replaceState(null, '', window.location.pathname + window.location.search)
       }
@@ -86,10 +116,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** Вход через Keycloak (PKCE). idpHint — брокер realm (например eGov), когда он настроен: docs/egov-auth.md. */
   async function login(options: { idpHint?: string } = {}) {
+    markRedirect()
     await keycloak?.login({ redirectUri: window.location.origin + returnPath(), ...options })
   }
 
   async function logout() {
+    markRedirect()
+    try {
+      localStorage.removeItem(SESSION_HINT)
+    } catch {
+      // без storage признак и так не хранился
+    }
     await keycloak?.logout({ redirectUri: window.location.origin })
   }
 

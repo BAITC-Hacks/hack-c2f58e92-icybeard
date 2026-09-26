@@ -11,6 +11,7 @@ const kc = vi.hoisted(() => ({
   login: vi.fn(async () => {}),
   logout: vi.fn(async () => {}),
   updateToken: vi.fn(async () => false),
+  initOptions: undefined as Record<string, unknown> | undefined,
 }))
 
 vi.mock('keycloak-js', () => ({
@@ -20,7 +21,8 @@ vi.mock('keycloak-js', () => ({
     login = kc.login
     logout = kc.logout
     updateToken = kc.updateToken
-    async init() {
+    async init(options: Record<string, unknown>) {
+      kc.initOptions = options
       if (kc.fail) throw new Error('Keycloak down')
       this.token = kc.token
       this.tokenParsed = kc.tokenParsed
@@ -38,9 +40,30 @@ function signedIn(roles: string[], claims: Record<string, unknown> = {}) {
 describe('auth store (Keycloak)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    Object.assign(kc, { authenticated: false, fail: false, token: undefined, tokenParsed: undefined })
+    Object.assign(kc, { authenticated: false, fail: false, token: undefined, tokenParsed: undefined, initOptions: undefined })
     vi.clearAllMocks()
+    localStorage.clear()
+    sessionStorage.clear()
     window.history.replaceState(null, '', '/')
+  })
+
+  it('checks the session by redirect only after a previous login in this browser', async () => {
+    await useAuthStore().init()
+    expect(kc.initOptions).not.toHaveProperty('onLoad') // гость первый раз: без перехода в Keycloak и второй загрузки
+    expect(sessionStorage.getItem('darumen.boot.skip')).toBeNull()
+
+    setActivePinia(createPinia())
+    signedIn(['citizen'])
+    await useAuthStore().init()
+    expect(localStorage.getItem('darumen.session')).toBe('1')
+
+    setActivePinia(createPinia())
+    await useAuthStore().init()
+    expect(kc.initOptions).toMatchObject({ onLoad: 'check-sso' })
+    expect(sessionStorage.getItem('darumen.boot.skip')).toBe('1') // заставка после возврата не повторится
+
+    await useAuthStore().logout()
+    expect(localStorage.getItem('darumen.session')).toBeNull()
   })
 
   it('stays a guest without a session and sends no auth headers', async () => {
