@@ -1,28 +1,34 @@
 <script setup lang="ts">
-import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
 import Button from 'primevue/button'
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { ApiError } from '@/api/client'
 import { analytics, insight, queue } from '@/api/endpoints'
-import type {
-  Anomaly, EquipmentRegion, ForecastResponse, IndexResponse, OncoLateItem, OverloadedOrganization, StaffingRegion, VacRefusalContraindication, VacRefusalReason,
-} from '@/api/types'
+import type { Anomaly, IndexResponse, OverloadedOrganization } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
+import CountryExtras from '@/components/gov/CountryExtras.vue'
 import IndexTable from '@/components/IndexTable.vue'
-import OriginTag from '@/components/OriginTag.vue'
 import OverloadedTable from '@/components/OverloadedTable.vue'
 import RegionMap from '@/components/RegionMap.vue'
-import SeriesChart from '@/components/SeriesChart.vue'
-import { num } from '@/lib/format'
+import AppCard from '@/components/ui/AppCard.vue'
+import CollapsibleSection from '@/components/ui/CollapsibleSection.vue'
+import PageShell from '@/components/ui/PageShell.vue'
+import SearchSelect from '@/components/ui/SearchSelect.vue'
+import Skeleton from '@/components/ui/Skeleton.vue'
+import Sparkline from '@/components/ui/Sparkline.vue'
+import { days, pct } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
-import PageShell from '@/components/ui/PageShell.vue'
+
+/** Карта регионов: KPI со спарклайнами по месяцам индекса, карта и таблица в одной карточке с общей подсветкой,
+ * лента сигналов с фильтром по статусу; остальные витрины по стране — свёрнутыми секциями. */
+/** «Регионов ниже порога» — индекс ниже середины шкалы 0…100. */
+const INDEX_THRESHOLD = 50
+const HISTORY_MONTHS = 6
+const SIGNAL_STATUSES = ['open', 'acknowledged', 'dismissed'] as const
 
 const { t } = useI18n()
 const refdata = useRefdataStore()
@@ -33,28 +39,45 @@ const toast = useToast()
 const month = ref<string | null>(null)
 const profile = ref<string>('all')
 const index = ref<IndexResponse | null>(null)
+const history = ref<{ month: string; avgP90: number; shareOver30: number; below: number }[]>([])
+const openAnomalies = ref<Anomaly[]>([])
+const openTotal = ref(0)
 const anomalies = ref<Anomaly[]>([])
+const signalStatus = ref<(typeof SIGNAL_STATUSES)[number]>('open')
 const overloaded = ref<OverloadedOrganization[]>([])
+const hovered = ref<string | null>(null)
 const error = ref<unknown>(null)
 const loading = ref(false)
-/** 3.1: отдельная карточка по онкологии — поток onco_monthly не имеет региона в сущности (только локализация ЗН),
- * 'ALL' — зарезервированное значение локализации в build_onco_monthly (сумма по всем локализациям), не наша выдумка. */
-const onco = ref<ForecastResponse | null>(null)
-const oncoHint = ref<string | null>(null)
+const downloading = ref(false)
+
+const profileCode = computed(() => (profile.value === 'all' ? undefined : profile.value))
+const profileOptions = computed(() => [{ profileCode: 'all', name: t('common.all') }, ...refdata.profiles])
+const mean = (values: number[]) => (values.length ? values.reduce((s, v) => s + v, 0) / values.length : NaN)
+const kpis = computed(() => {
+  const items = index.value?.items ?? []
+  return {
+    avgP90: mean(items.map((i) => i.p90Days)),
+    shareOver30: mean(items.map((i) => i.shareOver30)),
+    below: items.filter((i) => i.indexValue < INDEX_THRESHOLD).length,
+  }
+})
+/** Открытые сигналы по периодам — спарклайн из самой ленты (отдельной истории у сигналов нет). */
+const signalSpark = computed(() => {
+  const counts = new Map<string, number>()
+  for (const a of openAnomalies.value) counts.set(a.period, (counts.get(a.period) ?? 0) + 1)
+  return [...counts.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, n]) => n)
+})
 
 async function load() {
   loading.value = true
   error.value = null
   try {
-    const [idx, an, ov] = await Promise.all([
-      analytics.index(month.value ?? undefined, profile.value === 'all' ? undefined : profile.value),
-      analytics.anomalies({ status: 'open', size: 12 }),
-      queue.overloaded(undefined, profile.value === 'all' ? undefined : profile.value),
-    ])
+    const [idx, ov] = await Promise.all([analytics.index(month.value ?? undefined, profileCode.value), queue.overloaded(undefined, profileCode.value)])
     index.value = idx
+    if (month.value !== idx.month) settingMonth = true
     month.value = idx.month
-    anomalies.value = an.items
     overloaded.value = ov.items
+    await loadHistory(idx.months)
   } catch (e) {
     error.value = e
   } finally {
@@ -62,102 +85,32 @@ async function load() {
   }
 }
 
-function goToOrganization(code: string) {
-  router.push({ name: 'organization', params: { moCode: code } })
+/** История KPI по последним месяцам индекса — для спарклайнов. */
+async function loadHistory(months: string[]) {
+  const recent = months.slice(-HISTORY_MONTHS)
+  const responses = await Promise.all(recent.map((m) => analytics.index(m, profileCode.value).catch(() => null)))
+  history.value = responses.flatMap((r, i) =>
+    r ? [{ month: recent[i]!, avgP90: mean(r.items.map((x) => x.p90Days)), shareOver30: mean(r.items.map((x) => x.shareOver30)), below: r.items.filter((x) => x.indexValue < INDEX_THRESHOLD).length }] : [],
+  )
 }
 
-function goToSimulator(item: OverloadedOrganization) {
-  router.push({ name: 'simulator', query: { region: item.regionKato, profile: item.profileCode } })
-}
-
-async function loadOnco() {
-  onco.value = null
-  oncoHint.value = null
+async function loadSignals() {
   try {
-    onco.value = await analytics.forecast('onco_monthly', { localization: 'ALL' }, 3)
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 404) {
-      oncoHint.value = t('gov.map.oncoNoForecast')
-      return
+    const page = await analytics.anomalies({ status: signalStatus.value, size: 50 })
+    anomalies.value = page.items
+    if (signalStatus.value === 'open') {
+      openAnomalies.value = page.items
+      openTotal.value = page.total
     }
-    oncoHint.value = t('gov.map.oncoNotPublished')
+  } catch (e) {
+    error.value = e
   }
 }
 
-/** 5.2: сравнение регионов по кадрам — своя загрузка, витрина может быть ещё не опубликована. */
-const staffing = ref<StaffingRegion[]>([])
-const staffingHint = ref<string | null>(null)
-
-async function loadStaffing() {
-  staffing.value = []
-  staffingHint.value = null
-  try {
-    const res = await analytics.staffing()
-    staffing.value = res.items
-    if (res.items.length === 0) staffingHint.value = t('gov.map.staffingNotPublished')
-  } catch {
-    staffingHint.value = t('gov.map.staffingNotPublished')
-  }
-}
-
-/** 5.8: отказы от вакцинации — только общенационально, в vac_refusals нет региона. */
-const vacByReason = ref<VacRefusalReason[]>([])
-const vacByContraindication = ref<VacRefusalContraindication[]>([])
-const vacHint = ref<string | null>(null)
-
-async function loadVaccinationRefusals() {
-  vacByReason.value = []
-  vacByContraindication.value = []
-  vacHint.value = null
-  try {
-    const res = await analytics.vaccinationRefusals()
-    vacByReason.value = res.byReason
-    vacByContraindication.value = res.byContraindication
-    if (res.byReason.length === 0) vacHint.value = t('gov.map.vacRefusalsNotPublished')
-  } catch {
-    vacHint.value = t('gov.map.vacRefusalsNotPublished')
-  }
-}
-
-/** 5.8: доля запущенных случаев — только общенационально по локализации, onco_late уже агрегат по стране. */
-const oncoLate = ref<OncoLateItem[]>([])
-const oncoLateHint = ref<string | null>(null)
-
-async function loadOncoLate() {
-  oncoLate.value = []
-  oncoLateHint.value = null
-  try {
-    const res = await analytics.oncologyLateStage()
-    oncoLate.value = res.items
-    if (res.items.length === 0) oncoLateHint.value = t('gov.map.oncoLateNotPublished')
-  } catch {
-    oncoLateHint.value = t('gov.map.oncoLateNotPublished')
-  }
-}
-
-/** 5.10: медтехника по регионам — сравнение "у кого сколько единиц оборудования", по убыванию. */
-const equipment = ref<EquipmentRegion[]>([])
-const equipmentHint = ref<string | null>(null)
-
-async function loadEquipment() {
-  equipment.value = []
-  equipmentHint.value = null
-  try {
-    const res = await analytics.equipment()
-    equipment.value = res.items
-    if (res.items.length === 0) equipmentHint.value = t('gov.map.equipmentNotPublished')
-  } catch {
-    equipmentHint.value = t('gov.map.equipmentNotPublished')
-  }
-}
-
-const downloading = ref(false)
-
-/** Отчёт по индексу за выбранный месяц и профиль — PDF или Excel. */
 async function report(format: 'pdf' | 'xlsx') {
   downloading.value = true
   try {
-    await insight.report(format, month.value ?? undefined, profile.value === 'all' ? undefined : profile.value)
+    await insight.report(format, month.value ?? undefined, profileCode.value)
   } catch (e) {
     error.value = e
   } finally {
@@ -165,167 +118,100 @@ async function report(format: 'pdf' | 'xlsx') {
   }
 }
 
-async function ack(id: string, comment: string) {
+async function resolve(id: string, comment: string, status: 'acknowledged' | 'dismissed') {
   try {
-    await analytics.ack(id, comment)
+    await analytics.ack(id, comment, status)
     anomalies.value = anomalies.value.filter((a) => a.id !== id)
-    toast.add({ severity: 'success', summary: t('gov.map.ackToast'), life: 2500 })
+    openAnomalies.value = openAnomalies.value.filter((a) => a.id !== id)
+    openTotal.value = Math.max(0, openTotal.value - 1)
+    toast.add({ severity: status === 'acknowledged' ? 'success' : 'info', summary: t(status === 'acknowledged' ? 'gov.map.ackToast' : 'gov.map.dismissToast'), life: 2500 })
   } catch (e) {
     error.value = e
   }
 }
 
-async function dismiss(id: string, comment: string) {
-  try {
-    await analytics.ack(id, comment, 'dismissed')
-    anomalies.value = anomalies.value.filter((a) => a.id !== id)
-    toast.add({ severity: 'info', summary: t('gov.map.dismissToast'), life: 2500 })
-  } catch (e) {
-    error.value = e
-  }
-}
+const toRegion = (kato: string) => router.push({ name: 'region', params: { kato } })
 
 onMounted(async () => {
   await refdata.load()
-  await load()
-  await loadOnco()
-  await loadStaffing()
-  await loadVaccinationRefusals()
-  await loadOncoLate()
-  await loadEquipment()
+  await Promise.all([load(), loadSignals()])
 })
-watch([month, profile], load)
+let settingMonth = false // месяц, подставленный из ответа, не должен запускать повторную загрузку
+watch([month, profile], () => {
+  if (settingMonth) {
+    settingMonth = false
+    return
+  }
+  load()
+})
+watch(signalStatus, loadSignals)
 </script>
 
 <template>
-  <PageShell :title="t('gov.map.title')" :lead="t('gov.map.lead')">
-    <div class="actions" style="margin: 0 0 12px">
+  <PageShell :title="t('gov.map.title')" :lead="t('gov.map.lead')" :as-of="index?.month">
+    <template #actions>
       <Select v-model="month" :options="index?.months ?? []" :placeholder="t('common.month')" size="small" />
-      <Select
-        v-model="profile"
-        :options="[{ profileCode: 'all', name: t('common.all') }, ...refdata.profiles]"
-        option-label="name"
-        option-value="profileCode"
-        filter
-        size="small"
-        style="min-width: 280px"
-      />
-      <Button :label="t('gov.map.reportPdf')" icon="pi pi-file-pdf" size="small" severity="secondary" :loading="downloading" @click="report('pdf')" />
-      <Button label="Excel" icon="pi pi-file-excel" size="small" severity="secondary" :loading="downloading" @click="report('xlsx')" />
-      <span v-if="loading" class="muted">{{ t('common.loading') }}</span>
-    </div>
+      <SearchSelect v-model="profile" :options="profileOptions" option-label="name" option-value="profileCode" size="small" class="profile-select" />
+      <Button :label="t('gov.map.reportPdf')" icon="pi pi-file-pdf" size="small" severity="secondary" outlined :loading="downloading" @click="report('pdf')" />
+      <Button label="Excel" icon="pi pi-file-excel" size="small" severity="secondary" outlined :loading="downloading" @click="report('xlsx')" />
+    </template>
     <ErrorBox :error="error" />
-    <div class="grid cols-2">
-      <div>
-        <RegionMap :regions="refdata.regions" :index="index?.items ?? []" @select="router.push({ name: 'region', params: { kato: $event } })" />
-        <p class="muted" style="margin-top: 8px">{{ index?.method }}</p>
-        <!-- значения и правило применения: refdata/external_benchmarks.yaml -->
-        <p class="muted" style="margin-top: 4px">{{ t('gov.map.benchmark') }}</p>
+
+    <div class="kpi" data-testid="gov-kpis">
+      <div class="item">
+        <div class="kpi-top"><span class="value">{{ days(kpis.avgP90) }}</span><Sparkline :values="history.map((h) => h.avgP90)" /></div>
+        <div class="label">{{ t('gov.map.kpiAvgP90') }}</div>
       </div>
-      <div class="card">
-        <h2>{{ t('gov.map.indexFor') }} {{ index?.month ?? '…' }} <OriginTag kind="formula" /></h2>
-        <IndexTable :items="index?.items ?? []" @select="router.push({ name: 'region', params: { kato: $event } })" />
+      <div class="item">
+        <div class="kpi-top"><span class="value">{{ pct(kpis.shareOver30) }}</span><Sparkline :values="history.map((h) => h.shareOver30)" /></div>
+        <div class="label">{{ t('gov.map.kpiShareOver30') }}</div>
       </div>
-    </div>
-    <div class="grid cols-2" style="margin-top: 16px">
-      <div class="card">
-        <h2>{{ t('gov.map.openSignals') }} <OriginTag kind="formula" /></h2>
-        <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="ack" @dismiss="dismiss" />
+      <div class="item">
+        <div class="kpi-top"><span class="value">{{ openTotal }}</span><Sparkline :values="signalSpark" /></div>
+        <div class="label">{{ t('gov.map.openSignals') }}</div>
       </div>
-      <div class="card">
-        <h2>{{ t('gov.map.oncoTitle') }} <OriginTag kind="ml" /></h2>
-        <SeriesChart v-if="onco" :history="onco.history" :points="onco.points" :title="t('gov.map.oncoSeriesTitle')" :unit="t('gov.map.oncoUnit')" />
-        <p v-else class="muted">{{ oncoHint }}</p>
-        <p v-if="onco" class="muted">
-          {{ t('gov.map.backtest') }}: sMAPE {{ (onco.backtest.smape * 100).toFixed(1) }} % {{ t('gov.map.vsNaive') }} {{ (onco.backtest.baselineSmape * 100).toFixed(1) }} %.
-          {{ onco.model.name }} {{ onco.model.version }}. {{ t('gov.map.oncoCaveat') }}
-        </p>
+      <div class="item">
+        <div class="kpi-top"><span class="value">{{ index ? kpis.below : '—' }}</span><Sparkline :values="history.map((h) => h.below)" /></div>
+        <div class="label">{{ t('gov.map.kpiBelow', { threshold: INDEX_THRESHOLD }) }}</div>
       </div>
     </div>
-    <div class="card" style="margin-top: 16px">
-      <h2>{{ t('gov.map.overloaded') }} <OriginTag kind="formula" /></h2>
-      <OverloadedTable :items="overloaded" @organization="goToOrganization" @simulate="goToSimulator" />
-    </div>
-    <div class="card" style="margin-top: 16px">
-      <h2>{{ t('gov.map.staffingTitle') }} <OriginTag kind="formula" /></h2>
-      <DataTable
-        v-if="staffing.length"
-        :value="staffing"
-        size="small"
-        scrollable
-        scroll-height="420px"
-        selection-mode="single"
-        data-key="regionKato"
-        @row-click="router.push({ name: 'region', params: { kato: $event.data.regionKato } })"
-      >
-        <Column field="regionName" :header="t('common.region')" />
-        <Column :header="t('gov.map.staffingPer10k')" style="width: 10rem">
-          <template #body="{ data }">{{ num(data.ratePer10kPopulation, 1) }}</template>
-        </Column>
-        <Column :header="t('gov.map.staffingPer1000')" style="width: 10rem">
-          <template #body="{ data }">
-            <span v-if="data.ratePer1000Admissions !== null">{{ num(data.ratePer1000Admissions, 1) }}</span>
-            <span v-else class="muted">{{ t('gov.map.staffingNoAdmissions') }}</span>
-          </template>
-        </Column>
-      </DataTable>
-      <p v-else class="muted">{{ staffingHint }}</p>
-      <p v-if="staffing.length" class="muted" style="margin-top: 8px">
-        {{ t('gov.map.staffingSnapshot') }} {{ staffing[0].snapshotDate }}
-      </p>
-    </div>
-    <div class="grid cols-2" style="margin-top: 16px">
-      <div class="card">
-        <h2>{{ t('gov.map.vacRefusalsTitle') }} <OriginTag kind="formula" /></h2>
-        <p class="muted" style="margin-top: -4px">{{ t('gov.map.vacRefusalsNationwide') }}</p>
-        <DataTable v-if="vacByReason.length" :value="vacByReason" size="small" scrollable scroll-height="260px">
-          <Column field="reason" :header="t('gov.map.vacReason')" />
-          <Column field="n" :header="t('common.count')" style="width: 8rem" />
-        </DataTable>
-        <p v-else class="muted">{{ vacHint }}</p>
-        <template v-if="vacByContraindication.length">
-          <h3 style="margin-top: 12px">{{ t('gov.map.vacContraindication') }}</h3>
-          <DataTable :value="vacByContraindication" size="small" scrollable scroll-height="200px">
-            <Column field="contraindication" :header="t('gov.map.vacContraindication')" />
-            <Column field="n" :header="t('common.count')" style="width: 8rem" />
-          </DataTable>
-        </template>
+
+    <AppCard :title="`${t('gov.map.indexFor')} ${index?.month ?? '…'}`" origin="formula" style="margin-top: 16px">
+      <template #header><span class="muted small">{{ loading ? t('common.loading') : t('gov.map.hoverHint') }}</span></template>
+      <div class="map-grid">
+        <RegionMap :regions="refdata.regions" :index="index?.items ?? []" :highlight="hovered" @select="toRegion" @hover="hovered = $event" />
+        <Skeleton v-if="loading && !index" kind="table" :lines="8" />
+        <IndexTable v-else :items="index?.items ?? []" :highlight="hovered" @select="toRegion" @hover="hovered = $event" />
       </div>
-      <div class="card">
-        <h2>{{ t('gov.map.oncoLateTitle') }} <OriginTag kind="formula" /></h2>
-        <p class="muted" style="margin-top: -4px">{{ t('gov.map.oncoLateNationwide') }}</p>
-        <DataTable v-if="oncoLate.length" :value="oncoLate" size="small" scrollable scroll-height="420px">
-          <Column field="localizationName" :header="t('gov.map.oncoLateLocalization')" />
-          <Column :header="t('gov.map.oncoLateShare')" style="width: 10rem">
-            <template #body="{ data }">
-              <span v-if="data.advancedShare !== null">{{ num(data.advancedShare * 100, 1) }} %</span>
-              <span v-else class="muted">—</span>
-            </template>
-          </Column>
-          <Column field="advancedTotalCount" :header="t('gov.map.oncoLateCount')" style="width: 8rem" />
-        </DataTable>
-        <p v-else class="muted">{{ oncoLateHint }}</p>
-        <p v-if="oncoLate.length" class="muted" style="margin-top: 8px">
-          {{ t('gov.map.staffingSnapshot') }} {{ oncoLate[0].snapshotDate }}
-        </p>
-      </div>
-    </div>
-    <div class="card" style="margin-top: 16px">
-      <h2>{{ t('gov.map.equipmentTitle') }} <OriginTag kind="formula" /></h2>
-      <DataTable
-        v-if="equipment.length"
-        :value="equipment"
-        size="small"
-        scrollable
-        scroll-height="420px"
-        selection-mode="single"
-        data-key="regionKato"
-        @row-click="router.push({ name: 'region', params: { kato: $event.data.regionKato } })"
-      >
-        <Column field="regionName" :header="t('common.region')" />
-        <Column field="units" :header="t('gov.map.equipmentUnits')" style="width: 10rem" />
-      </DataTable>
-      <p v-else class="muted">{{ equipmentHint }}</p>
+      <p class="muted small" style="margin: 12px 0 0">{{ index?.method }}</p>
+      <!-- значения и правило применения: refdata/external_benchmarks.yaml -->
+      <p class="muted small" style="margin: 4px 0 0">{{ t('gov.map.benchmark') }}</p>
+    </AppCard>
+
+    <AppCard :title="t('gov.map.signals')" origin="formula" style="margin-top: 16px" data-testid="signals">
+      <template #header>
+        <div class="chips">
+          <button v-for="s in SIGNAL_STATUSES" :key="s" type="button" class="chip-filter" :class="{ active: signalStatus === s }" @click="signalStatus = s">
+            {{ t('anomaly.status.' + s) }} <span v-if="s === 'open'" class="count">{{ openTotal }}</span>
+          </button>
+        </div>
+      </template>
+      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
+    </AppCard>
+
+    <div class="extras">
+      <CollapsibleSection :title="t('gov.map.overloaded')" origin="formula" :summary="String(overloaded.length)">
+        <OverloadedTable :items="overloaded" @organization="router.push({ name: 'organization', params: { moCode: $event } })" @simulate="router.push({ name: 'simulator', query: { region: $event.regionKato, profile: $event.profileCode } })" />
+      </CollapsibleSection>
+      <CountryExtras />
     </div>
   </PageShell>
 </template>
+
+<style scoped>
+.profile-select { min-width: 260px; }
+.kpi-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.map-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--dm-space-4); align-items: start; }
+.extras { display: flex; flex-direction: column; gap: var(--dm-space-3); margin-top: 16px; }
+@media (max-width: 1000px) { .map-grid { grid-template-columns: 1fr; } }
+</style>

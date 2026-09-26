@@ -7,12 +7,16 @@ import '../api/models.dart';
 import '../l10n/strings.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
+import '../theme/tones.dart';
 import '../widgets/format.dart';
+import '../widgets/origin_tag.dart';
+import '../widgets/picker_sheet.dart';
 import '../widgets/section.dart';
 import '../widgets/status_chip.dart';
 
-/// Профиль вместо экрана настроек: кто вошёл, ИИН маской, регион из учётной записи, язык, справочные ссылки, выход.
-/// Адреса API и Keycloak здесь не редактируются — они задаются сборкой (`--dart-define`, см. config/env.dart).
+/// Профиль: имя или логин с чипом роли и регионом, строки-значения (ИИН маской — никогда полностью, язык, регион),
+/// «Справочно» (как считаются прогнозы, вакцинация, журнал решений для врача), «Выйти» внизу, версия и подпись
+/// данных. Гость: «Войти» вместо «Выйти», ИИН не показывается. Адреса API — только сборкой (config/env.dart).
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -40,78 +44,133 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _pickLanguage() async {
+    final session = context.read<Session>();
+    final s = S.at(context);
+    final chosen = await PickerSheet.show<String>(
+      context,
+      title: s.languageLabel,
+      items: [PickerItem('ru', s.languageName('ru')), PickerItem('kk', s.languageName('kk'))],
+      selected: session.locale,
+      search: false,
+    );
+    if (chosen != null) {
+      await session.setLocale(chosen);
+    }
+  }
+
+  Future<void> _pickRegion() async {
+    final session = context.read<Session>();
+    final s = S.at(context);
+    final chosen = await PickerSheet.show<String>(
+      context,
+      title: s.regionLabel,
+      items: [for (final r in _regions) PickerItem(r.kato, r.name)],
+      selected: session.region,
+    );
+    if (chosen != null) {
+      await session.setRegion(chosen);
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  void _showOrigins() {
+    final s = S.at(context);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheet) => Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.originsTitle, style: Theme.of(sheet).textTheme.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            Text(s.originsBody, style: Theme.of(sheet).textTheme.bodySmall),
+            const SizedBox(height: AppSpacing.lg),
+            for (final (origin, note) in [(Origin.ml, s.originMlNote), (Origin.formula, s.originFormulaNote), (Origin.ai, s.originAiNote)])
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OriginTag(origin),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(child: Text(note, style: Theme.of(sheet).textTheme.bodySmall)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _logout() async {
+    final session = context.read<Session>();
+    await session.logout();
+    if (mounted) {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = context.watch<Session>();
     final s = S.at(context);
     final theme = Theme.of(context);
     final regionName = _regions.where((r) => r.kato == session.region).map((r) => r.name).firstOrNull ?? session.region;
+    final role = switch (session.role) { AuthRole.doctor => s.roleDoctor, AuthRole.citizen => s.roleCitizen, AuthRole.guest => s.guest };
     return PageScaffold(
       title: s.profileTitle,
       children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(session.username ?? s.guest, style: theme.textTheme.titleLarge)),
-                    StatusChip(
-                      switch (session.role) { AuthRole.doctor => s.roleDoctor, AuthRole.citizen => s.roleCitizen, AuthRole.guest => s.guest },
-                      tone: session.isAuthenticated ? StatusTone.accent : StatusTone.neutral,
-                    ),
-                  ],
-                ),
-                if (session.iin != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Text('${s.iinLabel} ${maskIin(session.iin)}', style: theme.textTheme.bodyMedium),
-                ],
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  '${s.regionLabel}: $regionName${session.regionFromAccount ? ' · ${s.regionFromAccount}' : ''}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
+        Row(
+          children: [
+            Expanded(child: Text(session.username ?? s.guest, style: theme.textTheme.headlineSmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
+            const SizedBox(width: AppSpacing.sm),
+            StatusChip(role, tone: session.isAuthenticated ? StatusTone.accent : StatusTone.neutral),
+          ],
         ),
-        SectionTitle(s.languageLabel),
-        SegmentedButton<String>(
-          segments: const [ButtonSegment(value: 'ru', label: Text('РУС')), ButtonSegment(value: 'kk', label: Text('ҚАЗ'))],
-          selected: {session.locale},
-          onSelectionChanged: (v) => session.setLocale(v.first),
+        const SizedBox(height: AppSpacing.xs),
+        Text(regionName, style: theme.textTheme.bodySmall),
+        const SizedBox(height: AppSpacing.lg),
+        Card(
+          child: Column(
+            children: [
+              if (session.iin != null) ...[
+                _ValueRow(label: s.iinLabel, value: '${maskIin(session.iin)} · ${s.regionFromAccount}'),
+                const Divider(),
+              ],
+              _ValueRow(label: s.languageLabel, value: s.languageName(session.locale), onTap: _pickLanguage),
+              const Divider(),
+              _ValueRow(
+                label: s.regionLabel,
+                value: session.regionFromAccount ? '$regionName · ${s.regionFromAccount}' : regionName,
+                onTap: session.regionFromAccount || _regions.isEmpty ? null : _pickRegion,
+              ),
+            ],
+          ),
         ),
         SectionTitle(s.referenceSection),
         Card(
           child: Column(
             children: [
-              ListTile(
-                title: Text(s.vaccinationTitle),
-                subtitle: Text(s.vaccinationSubtitle),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.go('/home/vaccination'),
-              ),
+              _ValueRow(label: s.originsTitle, onTap: _showOrigins),
+              const Divider(),
+              _ValueRow(label: s.vaccinationTitle, onTap: () => context.go('/home/vaccination')),
               if (session.isDoctor) ...[
                 const Divider(),
-                ListTile(
-                  title: Text(s.decisionsTitle),
-                  subtitle: Text(s.decisionsSubtitle),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.go('/doctor/referral/decisions'),
-                ),
+                _ValueRow(label: s.decisionsTitle, onTap: () => context.go('/doctor/referral/decisions')),
               ],
-              const Divider(),
-              ListTile(title: Text(s.modelQualityNote, style: theme.textTheme.bodySmall), leading: const Icon(Icons.verified_outlined)),
-              const Divider(),
-              ListTile(title: Text(s.trustedContactsRoadmap, style: theme.textTheme.bodySmall), leading: const Icon(Icons.schedule_outlined)),
             ],
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
         if (session.isAuthenticated)
-          OutlinedButton.icon(onPressed: () => _logout(context), icon: const Icon(Icons.logout), label: Text(s.logout))
+          OutlinedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout), label: Text(s.logout))
         else
           FilledButton(onPressed: () => context.go('/login'), child: Text(s.loginButton)),
         const SizedBox(height: AppSpacing.lg),
@@ -128,12 +187,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
+}
 
-  Future<void> _logout(BuildContext context) async {
-    final session = context.read<Session>();
-    await session.logout();
-    if (context.mounted) {
-      context.go('/home');
-    }
+/// Строка «Метка … Значение ›»: значение справа, шеврон — если есть действие.
+class _ValueRow extends StatelessWidget {
+  const _ValueRow({required this.label, this.value, this.onTap});
+
+  final String label;
+  final String? value;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
+    return ListTile(
+      title: Text(label, style: theme.textTheme.bodyMedium),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (value != null)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(value!, style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end),
+            ),
+          if (onTap != null) Icon(Icons.chevron_right, color: colors.muted),
+        ],
+      ),
+      onTap: onTap,
+    );
   }
 }

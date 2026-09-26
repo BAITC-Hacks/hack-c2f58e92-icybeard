@@ -11,8 +11,9 @@ import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../widgets/error_box.dart';
 
-/// Вход: основная кнопка — eGov mobile (до появления доступа от НИТ ведёт на экран «Скоро», ничего не имитирует),
-/// вторичная — логин и пароль Keycloak, ссылка — гость. Никаких предзаполненных учёток и подсказок с паролем.
+/// Вход: язык выбирают до входа (РУС / ҚАЗ справа сверху), знак и слоган, три строки ценности, единственная
+/// заливная кнопка — eGov mobile (до доступа от НИТ ведёт на лист «Скоро», ничего не имитирует), контурная —
+/// логин и пароль Keycloak с ошибкой под полем, гость текстом. Никаких предзаполненных учёток.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.from});
 
@@ -98,14 +99,34 @@ class _LoginScreenState extends State<LoginScreen> {
     final s = S.at(context);
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
+    final session = context.watch<Session>();
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xxl, AppSpacing.xl, AppSpacing.xxl),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.md, AppSpacing.xl, AppSpacing.xxl),
           children: [
-            Text('Darumen', style: theme.textTheme.displaySmall?.copyWith(color: colors.accent)),
-            const SizedBox(height: AppSpacing.xs),
+            Align(alignment: Alignment.centerRight, child: _LanguageToggle(locale: session.locale, onChanged: session.setLocale)),
+            const SizedBox(height: AppSpacing.xl),
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(color: colors.accent, borderRadius: BorderRadius.circular(AppRadius.md)),
+                  child: Icon(Icons.route_outlined, color: theme.colorScheme.onPrimary),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Text('Darumen', style: theme.textTheme.headlineSmall?.copyWith(color: colors.accent)),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
             Text(s.loginTagline, style: theme.textTheme.titleMedium?.copyWith(color: colors.muted)),
+            const SizedBox(height: AppSpacing.xl),
+            _ValueRow(icon: Icons.flag_outlined, label: s.loginValueStage),
+            const SizedBox(height: AppSpacing.sm),
+            _ValueRow(icon: Icons.science_outlined, label: s.loginValueChecklist),
+            const SizedBox(height: AppSpacing.sm),
+            _ValueRow(icon: Icons.schedule_outlined, label: s.loginValueForecast),
             const SizedBox(height: AppSpacing.xxl),
             FilledButton.icon(
               onPressed: Env.egovEnabled ? null : _egov,
@@ -121,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 autofocus: true,
                 autocorrect: false,
                 textInputAction: TextInputAction.next,
-                decoration: InputDecoration(labelText: s.usernameLabel, errorText: _invalid ? s.loginFailed : null),
+                decoration: InputDecoration(labelText: s.usernameLabel),
               ),
               const SizedBox(height: AppSpacing.md),
               TextField(
@@ -131,6 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onSubmitted: (_) => _busy ? null : _login(),
                 decoration: InputDecoration(
                   labelText: s.passwordLabel,
+                  errorText: _invalid ? s.loginFailed : null,
                   suffixIcon: IconButton(
                     icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
                     onPressed: () => setState(() => _showPassword = !_showPassword),
@@ -140,14 +162,54 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: AppSpacing.md),
               FilledButton(onPressed: _busy ? null : _login, child: Text(_busy ? s.loggingInButton : s.loginButton)),
             ],
-            if (_error != null) ...[const SizedBox(height: AppSpacing.md), ErrorBox(error: _error)],
+            if (_error != null) ...[const SizedBox(height: AppSpacing.md), ErrorBox(error: _error, onRetry: _busy ? null : _login)],
             const SizedBox(height: AppSpacing.lg),
             Center(child: TextButton(onPressed: () => context.go('/home'), child: Text(s.continueAsGuest))),
-            const SizedBox(height: AppSpacing.xxl),
-            Text(s.loginPrivacyNote, style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
+            const SizedBox(height: AppSpacing.xl),
+            Text(s.loginPrivacyNote, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LanguageToggle extends StatelessWidget {
+  const _LanguageToggle({required this.locale, required this.onChanged});
+
+  final String locale;
+  final void Function(String locale) onChanged;
+
+  @override
+  Widget build(BuildContext context) => SegmentedButton<String>(
+        segments: const [ButtonSegment(value: 'ru', label: Text('РУС')), ButtonSegment(value: 'kk', label: Text('ҚАЗ'))],
+        selected: {locale},
+        showSelectedIcon: false,
+        style: const ButtonStyle(visualDensity: VisualDensity.compact, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+        onSelectionChanged: (v) => onChanged(v.first),
+      );
+}
+
+class _ValueRow extends StatelessWidget {
+  const _ValueRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppPalette.of(context);
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(color: colors.accentSoft, borderRadius: BorderRadius.circular(AppRadius.sm)),
+          child: Icon(icon, size: 20, color: colors.accent),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyMedium)),
+      ],
     );
   }
 }

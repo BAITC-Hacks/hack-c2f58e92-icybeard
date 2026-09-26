@@ -7,17 +7,19 @@ import LocaleSwitch from './LocaleSwitch.vue'
 import ThemeToggle from './ThemeToggle.vue'
 import { useAuthStore } from '@/stores/auth'
 
+/** Верхняя полоса гражданина и гостя: три пункта (Мой путь или Главная · Сколько ждут · Проверка рецепта), язык, тема, вход/выход. */
 const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
 
-/** Меню — из маршрутов с meta.nav, доступных ролям пользователя; порядок задаёт meta.nav. */
 const links = computed(() =>
   router
     .getRoutes()
-    .filter((r) => r.meta.nav !== undefined && r.meta.title !== undefined && (!r.meta.roles || auth.hasRole(...r.meta.roles)))
+    .filter((r) => r.meta.group === 'citizen' && r.meta.nav !== undefined && r.meta.title !== undefined && (!r.meta.roles || auth.hasRole(...r.meta.roles)))
+    // гражданину вместо «Главная» — «Мой путь»: главная и так уводит на домашний экран роли
+    .filter((r) => !(r.name === 'home' && auth.isAuthenticated))
     .sort((a, b) => (a.meta.nav ?? 0) - (b.meta.nav ?? 0))
-    .map((r) => ({ to: r.path, label: t(r.meta.title ?? '') })),
+    .map((r) => ({ to: r.path, label: t(r.meta.navTitle ?? r.meta.title ?? '') })),
 )
 </script>
 
@@ -32,7 +34,7 @@ const links = computed(() =>
       <LocaleSwitch />
       <ThemeToggle />
       <template v-if="auth.isAuthenticated">
-        <span class="muted" data-testid="user-chip">
+        <span class="muted user" data-testid="user-chip">
           {{ auth.actor }}<template v-if="auth.role"> · {{ t('decision.role.' + auth.role) }}</template>
         </span>
         <Button :label="t('auth.logout')" size="small" severity="secondary" data-testid="logout" @click="auth.logout()" />
@@ -42,3 +44,9 @@ const links = computed(() =>
     </div>
   </header>
 </template>
+
+<style scoped>
+.topbar .inner { width: min(960px, 100% - 32px); }
+.user { font-size: 0.9rem; }
+@media (max-width: 640px) { .user { display: none; } }
+</style>

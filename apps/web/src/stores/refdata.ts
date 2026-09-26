@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { refdata } from '@/api/endpoints'
 import type { OrganizationItem, Profile, Region } from '@/api/types'
 
@@ -7,16 +7,20 @@ import type { OrganizationItem, Profile, Region } from '@/api/types'
 export const useRefdataStore = defineStore('refdata', () => {
   const regions = ref<Region[]>([])
   const profiles = ref<Profile[]>([])
+  /** Всего направлений по всем профилям справочника (включая дневные стационары) — факт о данных на главной. */
+  const referralsTotal = ref(0)
   const organizations = ref<Record<string, OrganizationItem[]>>({})
   /** Названия организаций по коду: наполняется из списков регионов и точечных запросов. */
   const organizationNames = ref<Record<string, string>>({})
   const loaded = ref(false)
+  const regionsCount = computed(() => regions.value.length)
 
   async function load() {
     if (loaded.value) return
     const [r, p] = await Promise.all([refdata.regions(), refdata.profiles()])
     regions.value = r.items
     profiles.value = p.items.filter((x) => !x.isDayHospital)
+    referralsTotal.value = p.items.reduce((sum, x) => sum + x.referrals, 0)
     loaded.value = true
   }
 
@@ -62,6 +66,6 @@ export const useRefdataStore = defineStore('refdata', () => {
   }
 
   return {
-    regions, profiles, loaded, load, organizationsOf, resolveOrganizations, regionName, profileName, organizationName, topProfileCode,
+    regions, profiles, referralsTotal, regionsCount, loaded, load, organizationsOf, resolveOrganizations, regionName, profileName, organizationName, topProfileCode,
   }
 })

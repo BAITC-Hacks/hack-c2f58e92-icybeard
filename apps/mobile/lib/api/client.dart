@@ -78,8 +78,10 @@ class ApiClient {
       .map(BedProfile.fromJson)
       .toList();
 
-  Future<List<Organization>> organizations(String regionKato, String profileCode) async =>
-      ((await get('/api/v1/refdata/organizations', {'regionKato': regionKato, 'profileCode': profileCode, 'limit': '100'}))['items'] as List<dynamic>)
+  /// Организации региона по профилю койки; без профиля — весь справочник региона (имена для журнала решений).
+  Future<List<Organization>> organizations(String regionKato, [String? profileCode]) async =>
+      ((await get('/api/v1/refdata/organizations', {'regionKato': regionKato, 'profileCode': profileCode, 'limit': profileCode == null ? '500' : '100'}))['items']
+              as List<dynamic>)
           .map((o) => Organization.fromJson(o as Map<String, dynamic>))
           .toList();
 

@@ -10,8 +10,8 @@ const users = { citizen: 'citizen1', doctor: 'doctor1', chief: 'chief1', regulat
 const pages = [
   { role: null, path: '/', wait: 'Войти через eGov mobile', variants: true },
   { role: null, path: '/wait', wait: 'Выберите регион' },   // до ссылки с параметрами: выбор запоминается в localStorage
-  { role: null, path: '/wait?region=75&profile=381', wait: 'В среднем по региону', variants: true },
-  { role: null, path: '/medicines', wait: 'Покрытие' },
+  { role: null, path: '/wait?region=75&profile=381', wait: 'Где быстрее', variants: true },
+  { role: null, path: '/medicines', wait: 'Сроки обеспечения' },
   { role: 'citizen', path: '/me/route', wait: 'Мой путь', variants: true },
   { role: 'doctor', path: '/doctor/patients/SYN-75-028B-381-01', wait: 'Маршрут пациента' },
   { role: 'regulator', path: '/gov', wait: 'Индекс за', variants: true },

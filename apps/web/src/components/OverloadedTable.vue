@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
 import { useI18n } from 'vue-i18n'
 import type { OverloadedOrganization } from '@/api/types'
-import { pct } from '@/lib/format'
+import { pct, shortOrgName } from '@/lib/format'
 
+/** Ранжированные по нагрузке организации: короткие имена (полное — в title), переход в кабинет и в симулятор. */
 defineProps<{ items: OverloadedOrganization[] }>()
 const emit = defineEmits<{ organization: [moCode: string]; simulate: [item: OverloadedOrganization] }>()
 const { t } = useI18n()
@@ -17,26 +16,23 @@ function loadLabel(load: number | null): string {
 </script>
 
 <template>
-  <DataTable :value="items" size="small" scrollable scroll-height="420px">
-    <Column field="name" :header="t('common.organization')">
-      <template #body="{ data }">
-        <a href="#" @click.prevent="emit('organization', data.moCode)">{{ data.name }}</a>
-        <span class="muted"> ({{ data.moCode }})</span>
-      </template>
-    </Column>
-    <Column :header="t('overloadedTable.load')" style="width: 8rem">
-      <template #body="{ data }"><span :class="{ minus: data.load === null || data.load > 1 }">{{ loadLabel(data.load) }}</span></template>
-    </Column>
-    <Column field="queueLen" :header="t('overloadedTable.queue')" style="width: 6rem" />
-    <Column :header="`p90, ${t('common.days')}`" style="width: 6rem">
-      <template #body="{ data }">{{ data.queueAgeP90?.toFixed(0) ?? '—' }}</template>
-    </Column>
-    <Column :header="t('overloadedTable.refusals')" style="width: 6rem">
-      <template #body="{ data }">{{ pct(data.refusalRate4w) }}</template>
-    </Column>
-    <Column header="" style="width: 8rem">
-      <template #body="{ data }"><a href="#" @click.prevent="emit('simulate', data)">{{ t('overloadedTable.toSimulator') }} →</a></template>
-    </Column>
-  </DataTable>
   <p v-if="!items.length" class="muted">{{ t('overloadedTable.none') }}</p>
+  <div v-else class="table-wrap">
+    <table class="dense-table">
+      <thead>
+        <tr><th>#</th><th>{{ t('common.organization') }}</th><th class="num">{{ t('overloadedTable.load') }}</th><th class="num">{{ t('overloadedTable.queue') }}</th><th class="num">p90</th><th class="num">{{ t('overloadedTable.refusals') }}</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr v-for="(item, i) in items" :key="item.moCode" class="clickable" @click="emit('organization', item.moCode)">
+          <td class="muted">{{ i + 1 }}</td>
+          <td :title="item.name">{{ shortOrgName(item.name) }} <span class="mono muted">{{ item.moCode }}</span></td>
+          <td class="num" :class="{ 'delta-up': item.load === null || item.load > 1 }">{{ loadLabel(item.load) }}</td>
+          <td class="num">{{ item.queueLen }}</td>
+          <td class="num">{{ item.queueAgeP90?.toFixed(0) ?? '—' }}</td>
+          <td class="num">{{ pct(item.refusalRate4w) }}</td>
+          <td><a href="#" class="small" @click.prevent.stop="emit('simulate', item)">{{ t('overloadedTable.toSimulator') }} →</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </template>

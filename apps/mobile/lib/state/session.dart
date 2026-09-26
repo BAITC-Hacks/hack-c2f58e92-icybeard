@@ -35,6 +35,7 @@ class Session extends ChangeNotifier {
   String _preferredRegion = Env.defaultRegion;
   String? _lastProfile;
   String? _lastNosology;
+  String? _seenDecisionId;
   String? _access;
   String? _refresh;
   DateTime? _expiresAt;
@@ -53,6 +54,9 @@ class Session extends ChangeNotifier {
   String? get lastProfile => _lastProfile;
   String? get lastNosology => _lastNosology;
 
+  /// Последнее решение врача, которое гражданин закрыл кнопкой «Понятно»: карточка «Ответ врача» не повторяется.
+  String? get seenDecisionId => _seenDecisionId;
+
   /// Стартовый маршрут по роли: врач — рабочий список, остальные — главная.
   String get home => _role == AuthRole.doctor ? '/doctor/patients' : '/home';
 
@@ -63,6 +67,7 @@ class Session extends ChangeNotifier {
       _preferredRegion = prefs.getString('region') ?? _preferredRegion;
       _lastProfile = prefs.getString('lastProfile');
       _lastNosology = prefs.getString('lastNosology');
+      _seenDecisionId = prefs.getString('seenDecision');
     } catch (_) {
       // без хранилища — настройки по умолчанию
     }
@@ -118,6 +123,12 @@ class Session extends ChangeNotifier {
   Future<void> rememberNosology(String nosologyId) async {
     _lastNosology = nosologyId;
     await _persist('lastNosology', nosologyId);
+  }
+
+  Future<void> markDecisionSeen(String decisionId) async {
+    _seenDecisionId = decisionId;
+    notifyListeners();
+    await _persist('seenDecision', decisionId);
   }
 
   /// Токен для запроса: обновляется за 30 секунд до истечения; если обновить нельзя — выход в гости.

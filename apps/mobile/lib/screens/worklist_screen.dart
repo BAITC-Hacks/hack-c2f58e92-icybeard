@@ -8,19 +8,23 @@ import '../l10n/strings.dart';
 import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
+import '../theme/tones.dart';
 import '../theme/typography.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/format.dart';
 import '../widgets/load_state_view.dart';
+import '../widgets/org_name.dart';
 import '../widgets/origin_tag.dart';
 import '../widgets/redirect_reason_dialog.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/status_chip.dart';
 
-/// Рабочий список врача: синтетические пациенты на реальных очередях региона, приоритет по модели ожидания и риска
-/// отказа («ML‑модель»; «формула», если сервис моделей был недоступен). Тап открывает маршрут пациента.
-/// Строка с открытым сигналом пациента получает вопрос с двумя действиями: «Направить сюда» и «Оставить».
+enum _Sort { priority, days }
+
+/// «Пациенты» врача: заголовок с регионом и датой данных [ML], ряд плиток-счётчиков как фильтр (считаются на
+/// клиенте по полному списку), сортировка приоритет / дни, плотные строки с коротким именем организации и
+/// коротким следующим шагом; строка с запросом пациента — акцентная полоса и «Направить сюда» / «Оставить».
 class WorklistScreen extends StatefulWidget {
   const WorklistScreen({super.key});
 
@@ -29,20 +33,25 @@ class WorklistScreen extends StatefulWidget {
 }
 
 class _WorklistScreenState extends State<WorklistScreen> {
+  static const _flags = [null, RouteCodes.patientSignalFlag, 'stuck_over_30', 'refusal_risk', 'faster_alternative'];
+
   LoadState<WorklistResponse> _state = const Loading();
+  List<Region> _regions = const [];
   String? _flag;
+  _Sort _sort = _Sort.priority;
   bool _busy = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _loadRegions();
   }
 
   Future<void> _load() async {
     setState(() => _state = const Loading());
     try {
-      final page = await context.read<Session>().api.worklistPage(flag: _flag);
+      final page = await context.read<Session>().api.worklistPage();
       if (mounted) {
         setState(() => _state = Loaded(page));
       }
@@ -53,9 +62,15 @@ class _WorklistScreenState extends State<WorklistScreen> {
     }
   }
 
-  void _setFlag(String? flag) {
-    setState(() => _flag = flag);
-    _load();
+  Future<void> _loadRegions() async {
+    try {
+      final regions = await context.read<Session>().api.regions();
+      if (mounted) {
+        setState(() => _regions = regions);
+      }
+    } catch (_) {
+      // регион покажем кодом
+    }
   }
 
   /// Ответ на сигнал прямо из списка: «Направить сюда» в просимую организацию или «Оставить», оба с причиной.
@@ -63,8 +78,8 @@ class _WorklistScreenState extends State<WorklistScreen> {
     final s = S.at(context);
     final signal = item.patientSignal!;
     final reason = await (redirect
-        ? RedirectReasonDialog.show(context, organization: signal.toMoName ?? signal.toMoCode ?? '')
-        : RedirectReasonDialog.show(context, organization: s.keepHere, label: s.keepReasonLabel, confirmLabel: s.keepHere));
+        ? RedirectReasonDialog.show(context, organization: signal.toMoName ?? signal.toMoCode ?? '', subtitle: item.patientRef)
+        : RedirectReasonDialog.show(context, organization: s.keepHere, subtitle: item.patientRef, label: s.keepReasonLabel, confirmLabel: s.keepHere));
     if (reason == null || reason.isEmpty || !mounted) {
       return;
     }
@@ -91,108 +106,212 @@ class _WorklistScreenState extends State<WorklistScreen> {
     }
   }
 
+  List<WorklistItem> _visible(List<WorklistItem> items) {
+    final filtered = _flag == null ? [...items] : [for (final i in items) if (i.riskFlags.contains(_flag)) i];
+    filtered.sort((a, b) => _sort == _Sort.priority ? b.priority.compareTo(a.priority) : b.daysWaiting.compareTo(a.daysWaiting));
+    return filtered;
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
     final theme = Theme.of(context);
-    final flags = {
-      'patient_signal': s.flagPatientSignal,
-      'stuck_over_30': s.flagOver30,
-      'refusal_risk': s.flagRefusalRisk,
-      'faster_alternative': s.flagFasterAlt,
-    };
+    final session = context.watch<Session>();
+    final regionName = _regions.where((r) => r.kato == session.region).map((r) => r.name).firstOrNull ?? session.region;
     return PageScaffold(
-      title: s.worklistTitle,
-      onRefresh: _load,
-      children: [
-        Wrap(
-          spacing: AppSpacing.sm,
-          children: [
-            FilterChip(label: Text(s.flagAll), selected: _flag == null, onSelected: (_) => _setFlag(null)),
-            for (final f in flags.entries) FilterChip(label: Text(f.value), selected: _flag == f.key, onSelected: (_) => _setFlag(f.key)),
+      title: s.patientsTitle(regionName),
+      actions: [
+        PopupMenuButton<_Sort>(
+          icon: const Icon(Icons.swap_vert),
+          tooltip: s.sortLabel,
+          onSelected: (v) => setState(() => _sort = v),
+          itemBuilder: (_) => [
+            CheckedPopupMenuItem(value: _Sort.priority, checked: _sort == _Sort.priority, child: Text(s.sortByPriority)),
+            CheckedPopupMenuItem(value: _Sort.days, checked: _sort == _Sort.days, child: Text(s.sortByDays)),
           ],
         ),
-        const SizedBox(height: AppSpacing.sm),
+      ],
+      onRefresh: _load,
+      children: [
         LoadStateView<WorklistResponse>(
           state: _state,
           onRetry: _load,
-          skeleton: const ListSkeleton(count: 5, itemHeight: 96),
-          isEmpty: (page) => page.items.isEmpty,
-          empty: EmptyState(icon: Icons.people_outline, title: s.worklistEmpty),
-          builder: (_, page) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text('${s.worklistCaption} ${s.asOfLabel(dateShort(page.asOf))}', style: theme.textTheme.labelSmall)),
-                  const SizedBox(width: AppSpacing.sm),
-                  OriginTag(page.modelBacked ? Origin.ml : Origin.formula),
-                ],
-              ),
-              if (!page.modelBacked) ...[const SizedBox(height: AppSpacing.xs), Text(s.modelUnavailableNote, style: theme.textTheme.labelSmall)],
-              const SizedBox(height: AppSpacing.sm),
-              for (final item in page.items)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: Card(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(AppRadius.md),
-                      onTap: () => context.go('/doctor/patients/${Uri.encodeComponent(item.patientRef)}', extra: item),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(child: Text(item.patientRef, style: theme.textTheme.titleSmall?.merge(AppType.numeric))),
-                                StatusChip(s.priorityShort(item.priority), tone: StatusTone.accent),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Text('${s.waitingFor(item.daysWaiting)} · ${s.stageLabel(item.stageCode)}', style: theme.textTheme.bodySmall?.merge(AppType.numeric)),
-                            Text(item.moName, style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            if (item.riskFlags.isNotEmpty) ...[
-                              const SizedBox(height: AppSpacing.sm),
-                              Wrap(
-                                spacing: AppSpacing.xs,
-                                runSpacing: AppSpacing.xs,
-                                children: [for (final f in item.riskFlags) StatusChip(flags[f] ?? f, tone: _tone(f))],
-                              ),
-                            ],
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(s.nextActionText(item.nextActionCode, item.nextAction), style: theme.textTheme.bodyMedium),
-                            if (item.patientSignal != null) ...[
-                              const SizedBox(height: AppSpacing.sm),
-                              Text(
-                                s.patientSignalText(item.patientSignal!.kind, item.patientSignal!.toMoName),
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              if (item.patientSignal!.comment != null && item.patientSignal!.comment!.isNotEmpty)
-                                Text('«${item.patientSignal!.comment}»', style: theme.textTheme.bodySmall),
-                              const SizedBox(height: AppSpacing.sm),
-                              Row(
-                                children: [
-                                  if (item.patientSignal!.toMoCode != null) ...[
-                                    Expanded(child: FilledButton(onPressed: _busy ? null : () => _answer(item, redirect: true), child: Text(s.redirectHere))),
-                                    const SizedBox(width: AppSpacing.sm),
-                                  ],
-                                  Expanded(child: OutlinedButton(onPressed: _busy ? null : () => _answer(item, redirect: false), child: Text(s.keepHere))),
-                                ],
-                              ),
-                            ],
-                          ],
+          skeleton: const Column(children: [Skeleton(height: 64, radius: AppRadius.md), SizedBox(height: AppSpacing.md), ListSkeleton(count: 5, itemHeight: 120)]),
+          builder: (_, page) {
+            final visible = _visible(page.items);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: Text(s.asOfLabel(dateShort(page.asOf)), style: theme.textTheme.labelSmall)),
+                    OriginTag(page.modelBacked ? Origin.ml : Origin.formula),
+                  ],
+                ),
+                if (!page.modelBacked) ...[const SizedBox(height: AppSpacing.xs), Text(s.modelUnavailableNote, style: theme.textTheme.labelSmall)],
+                const SizedBox(height: AppSpacing.md),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final flag in _flags) ...[
+                        _CounterTile(
+                          label: s.flagShort(flag),
+                          count: flag == null ? page.items.length : page.items.where((i) => i.riskFlags.contains(flag)).length,
+                          selected: _flag == flag,
+                          onTap: () => setState(() => _flag = flag),
                         ),
-                      ),
-                    ),
+                        const SizedBox(width: AppSpacing.sm),
+                      ],
+                    ],
                   ),
                 ),
-            ],
-          ),
+                const SizedBox(height: AppSpacing.md),
+                if (visible.isEmpty)
+                  EmptyState(
+                    icon: Icons.people_outline,
+                    title: s.worklistEmpty,
+                    action: OutlinedButton(onPressed: () => setState(() => _flag = null), child: Text(s.showAll)),
+                  )
+                else
+                  for (final item in visible)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: _PatientRow(
+                        item: item,
+                        busy: _busy,
+                        onOpen: () => context.go('/doctor/patients/${Uri.encodeComponent(item.patientRef)}', extra: item),
+                        onAnswer: (redirect) => _answer(item, redirect: redirect),
+                      ),
+                    ),
+              ],
+            );
+          },
         ),
       ],
     );
   }
+}
+
+/// Плитка-счётчик: число и подпись; выбранная — акцентная рамка. Это и есть фильтр.
+class _CounterTile extends StatelessWidget {
+  const _CounterTile({required this.label, required this.count, required this.selected, required this.onTap});
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '$label $count',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: selected ? colors.accentSoft : colors.card,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: selected ? colors.accent : colors.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('$count', style: theme.textTheme.titleMedium?.merge(AppType.numeric).copyWith(color: selected ? colors.accent : colors.ink)),
+              Text(label, style: theme.textTheme.labelSmall),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PatientRow extends StatelessWidget {
+  const _PatientRow({required this.item, required this.busy, required this.onOpen, required this.onAnswer});
+
+  final WorklistItem item;
+  final bool busy;
+  final VoidCallback onOpen;
+  final void Function(bool redirect) onAnswer;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
+    final signal = item.patientSignal;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Container(
+          decoration: signal == null ? null : BoxDecoration(border: Border(left: BorderSide(color: colors.accent, width: 3))),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(child: Text(item.patientRef, style: theme.textTheme.titleSmall?.merge(AppType.numeric).copyWith(letterSpacing: 0.4))),
+                  StatusChip(s.priorityShort(item.priority), tone: StatusTone.accent),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text('${s.waitingFor(item.daysWaiting)} · ${s.stageLabel(item.stageCode)}', style: theme.textTheme.bodySmall?.merge(AppType.numeric)),
+              OrgName(item.moName, maxLines: 1),
+              if (item.riskFlags.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(spacing: AppSpacing.xs, runSpacing: AppSpacing.xs, children: [for (final f in item.riskFlags) StatusChip(s.flagShort(f), tone: _tone(f))]),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Icon(_nextIcon(item.nextActionCode), size: 16, color: colors.accent),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(child: Text(s.nextActionShort(item.nextActionCode, item.nextAction), style: theme.textTheme.labelMedium, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                ],
+              ),
+              if (signal != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  [
+                    signal.kind == RouteCodes.requestRedirect ? s.patientAsks(shortOrgName(signal.toMoName ?? signal.toMoCode ?? '')) : s.patientSignalText(signal.kind, null),
+                    if (signal.comment != null && signal.comment!.isNotEmpty) '„${signal.comment}“',
+                  ].join(' — '),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    if (signal.toMoCode != null) ...[
+                      Expanded(child: FilledButton(onPressed: busy ? null : () => onAnswer(true), child: Text(s.redirectHere))),
+                      const SizedBox(width: AppSpacing.sm),
+                    ],
+                    Expanded(child: OutlinedButton(onPressed: busy ? null : () => onAnswer(false), child: Text(s.keepHere))),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static IconData _nextIcon(String code) => switch (code) {
+        'redirect_faster' => Icons.alt_route,
+        'review_before_call' => Icons.fact_check_outlined,
+        'clarify_date' => Icons.event_outlined,
+        'wait_for_call' => Icons.hourglass_empty,
+        _ => Icons.arrow_forward,
+      };
 
   static StatusTone _tone(String flag) => switch (flag) {
         'refusal_risk' => StatusTone.danger,

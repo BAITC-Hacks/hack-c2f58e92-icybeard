@@ -8,16 +8,16 @@ import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import '../widgets/day_groups.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/format.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/route_events.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 
-/// Уведомления — только события маршрута (как Messages в NHS App: ничего нерелевантного, никаких новостей).
-/// Лента выводится на клиенте (routeEvents): стадии, решения врача, сигналы гражданина, сроки анализов;
-/// push через eGov mobile — после интеграции.
+/// Уведомления — только события маршрута (как Messages в NHS App), группами по дням: Сегодня · Вчера · 22 сентября.
+/// Строка: иконка типа (этап / врач / вы), заголовок в одну строку с коротким именем, подстрока — причина в
+/// кавычках или этап; у предложения врача — «Открыть маршрут». Push через eGov mobile — после интеграции.
 class UpdatesScreen extends StatefulWidget {
   const UpdatesScreen({super.key});
 
@@ -57,7 +57,6 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     final s = S.at(context);
     final session = context.watch<Session>();
     final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
     if (!session.isAuthenticated) {
       return PageScaffold(
         title: s.updatesTitle,
@@ -68,6 +67,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
             body: s.updatesEmptyBody,
             action: FilledButton(onPressed: () => context.go('/login?from=%2Fupdates'), child: Text(s.loginButton)),
           ),
+          Text(s.updatesPushRoadmap, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
         ],
       );
     }
@@ -78,31 +78,31 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
         LoadStateView<PatientRoute>(
           state: _state,
           onRetry: _load,
-          skeleton: const ListSkeleton(),
+          skeleton: const ListSkeleton(count: 6),
           builder: (_, route) {
-            final events = routeEvents(route, s);
+            final groups = groupByDay(routeEvents(route, s), (e) => e.at, s);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (events.isEmpty)
+                if (groups.isEmpty)
                   EmptyState(icon: Icons.notifications_none, title: s.updatesEmptyTitle, body: s.updatesEmptyBody)
                 else
-                  Card(
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < events.length; i++) ...[
-                          if (i > 0) const Divider(),
-                          ListTile(
-                            leading: Icon(events[i].icon, color: colors.accent),
-                            title: Text(events[i].title),
-                            subtitle: Text(
-                              [dateShort(events[i].at), if (events[i].detail != null && events[i].detail!.isNotEmpty) events[i].detail!].join(' · '),
-                            ),
-                          ),
-                        ],
-                      ],
+                  for (final group in groups) ...[
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
+                      child: Text(group.label, style: theme.textTheme.labelSmall),
                     ),
-                  ),
+                    Card(
+                      child: Column(
+                        children: [
+                          for (final (i, event) in group.items.indexed) ...[
+                            if (i > 0) const Divider(),
+                            _EventRow(event: event),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 const SizedBox(height: AppSpacing.lg),
                 Text(s.updatesPushRoadmap, style: theme.textTheme.labelSmall),
               ],
@@ -114,3 +114,46 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   }
 }
 
+class _EventRow extends StatelessWidget {
+  const _EventRow({required this.event});
+
+  final RouteEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(event.icon, color: event.kind == RouteEventKind.checklist ? colors.muted : colors.accent),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(event.title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                if (event.detail != null && event.detail!.isNotEmpty)
+                  Text(event.detail!, style: theme.textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
+                if (event.opensRoute)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                      onPressed: () => context.go('/home/route'),
+                      child: Text(s.openRoute),
+                    ),
+                  )
+                else
+                  const SizedBox(height: AppSpacing.xs),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

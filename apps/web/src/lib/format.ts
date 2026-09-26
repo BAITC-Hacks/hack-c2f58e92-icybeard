@@ -64,3 +64,63 @@ export function severityTone(severity: string): 'danger' | 'warn' | 'info' {
   if (severity === 'warning') return 'warn'
   return 'info'
 }
+
+/** Организационно-правовые формы, которые убираются из начала названия (длинные раньше коротких, без учёта регистра). */
+const LEGAL_FORMS = [
+  'Коммунальное государственное предприятие на праве хозяйственного ведения',
+  'Государственное коммунальное предприятие на праве хозяйственного ведения',
+  'Республиканское государственное предприятие на праве хозяйственного ведения',
+  'Государственное коммунальное казённое предприятие', 'Государственное коммунальное казенное предприятие',
+  'Коммунальное государственное предприятие', 'Государственное коммунальное предприятие', 'Республиканское государственное предприятие',
+  'Товарищество с ограниченной ответственностью', 'Некоммерческое акционерное общество', 'Акционерное общество',
+  'Коммунальное государственное учреждение', 'Республиканское государственное учреждение', 'Государственное учреждение',
+  'Частное учреждение', 'Учреждение', 'Индивидуальный предприниматель',
+  'КГП на ПХВ', 'ГКП на ПХВ', 'РГП на ПХВ', 'КГППХВ', 'ГКППХВ', 'РГППХВ', 'ГККП', 'КГП', 'ГКП', 'РГП', 'КГУ', 'РГУ', 'ТОО', 'НАО', 'АО', 'ГУ', 'ЧУ', 'ИП',
+]
+const OPEN_QUOTES = '"«„“'
+const CLOSE_QUOTES = '"»“”'
+/** Хвост после закрывающей кавычки — принадлежность («Управления здравоохранения…», «на праве…»): по нему узнаётся конец имени. */
+const AFFILIATION_TAIL = /^(на праве|управлени|министерств|комитет|департамент|акимат|уоз|уз |мз |ру |гу )/iu
+// \b в JS не знает кириллицу — граница слова через lookbehind по букве
+const ORDER_FRAGMENT = /(?<!\p{L})ордена\s+["«„“][^"»“”]*["»“”]\s*/giu
+
+function stripLegalForm(name: string): string {
+  const lower = name.toLowerCase()
+  for (const form of LEGAL_FORMS) {
+    const f = form.toLowerCase()
+    if (lower.startsWith(f) && (name.length === f.length || /[\s"«„“]/u.test(name[f.length] ?? ''))) return name.slice(f.length).trim()
+  }
+  return name
+}
+
+/** Позиция закрывающей кавычки для имени, начатого кавычкой в позиции 0: первая кавычка, за которой идёт конец строки
+ * или принадлежность («Управления…»); иначе последняя кавычка. Так переживаются лишняя кавычка в конце
+ * («…больница №4" Управления … Алматы"») и вложенные («Реабилитационный центр "Алау" Управления…»). */
+function closingQuote(text: string): number {
+  const candidates: number[] = []
+  for (let i = 1; i < text.length; i += 1) if (CLOSE_QUOTES.includes(text[i]!)) candidates.push(i)
+  if (candidates.length === 0) return -1
+  for (const i of candidates) {
+    const tail = text.slice(i + 1).trim()
+    if (tail === '' || AFFILIATION_TAIL.test(tail)) return i
+  }
+  return candidates[candidates.length - 1]!
+}
+
+/** Короткое имя организации: без организационно-правовой формы и принадлежности («Достар Мед» вместо
+ * «Товарищество с ограниченной ответственностью "Достар Мед"»). Полное имя остаётся для title и подстрок. */
+export function shortOrgName(name: string | null | undefined): string {
+  if (!name) return ''
+  const rest = stripLegalForm(name.trim())
+  if (!rest) return name.trim()
+  let short = rest
+  if (OPEN_QUOTES.includes(rest[0]!)) {
+    const close = closingQuote(rest)
+    short = close > 0 ? rest.slice(1, close) : rest.slice(1)
+    // нечётное число кавычек внутри — внешняя закрывающая слилась с внутренней («…центр "Алау" Управления…»): оставляем её в имени
+    const innerQuotes = [...short].filter((ch) => CLOSE_QUOTES.includes(ch) || OPEN_QUOTES.includes(ch)).length
+    if (close > 0 && innerQuotes % 2 === 1) short = rest.slice(1, close + 1)
+  }
+  short = short.replace(ORDER_FRAGMENT, '').replace(/\s{2,}/g, ' ').trim()
+  return short || name.trim()
+}

@@ -15,9 +15,9 @@ import '../widgets/route_view.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 
-/// «Мой путь» гражданина: стадия по Стандарту, прогноз, анализы, где быстрее, решения врача, история.
-/// Двусторонний маршрут: карточка «Вы ещё ждёте?» и «Попросить» у альтернатив шлют сигнал врачу (один
-/// Idempotency-Key на нажатие). Гость видит приглашение войти, а не редирект.
+/// «Мой путь» гражданина: стадия и прогноз в шапке, степпер, «Что сейчас», свёрнутые секции. Двусторонний
+/// маршрут: варианты «Вы ещё ждёте?» и «Попросить» у альтернатив шлют сигнал врачу (один Idempotency-Key на
+/// нажатие); «Понятно» под ответом врача запоминается в сессии. Гость видит приглашение войти, а не редирект.
 class RouteScreen extends StatefulWidget {
   const RouteScreen({super.key});
 
@@ -78,7 +78,8 @@ class _RouteScreenState extends State<RouteScreen> {
     final s = S.at(context);
     final comment = await RedirectReasonDialog.show(
       context,
-      organization: s.requestTitle(alternative.name),
+      organization: alternative.name,
+      subtitle: s.requestTitle(''),
       label: s.requestCommentLabel,
       confirmLabel: s.requestSend,
       optional: true,
@@ -115,14 +116,24 @@ class _RouteScreenState extends State<RouteScreen> {
           onRetry: _load,
           skeleton: const Column(
             children: [
-              Skeleton(height: 96, radius: AppRadius.md),
+              Skeleton(height: 28, width: 200),
+              SizedBox(height: AppSpacing.sm),
+              Skeleton(height: 16),
               SizedBox(height: AppSpacing.lg),
-              KpiRowSkeleton(),
+              Skeleton(height: 56, radius: AppRadius.md),
               SizedBox(height: AppSpacing.lg),
+              Skeleton(height: 140, radius: AppRadius.md),
+              SizedBox(height: AppSpacing.md),
               ListSkeleton(),
             ],
           ),
-          builder: (_, route) => RouteView(route: route, onSignal: (kind) => _signal(kind), onRequest: _request),
+          builder: (_, route) => RouteView(
+            route: route,
+            onSignal: (kind) => _signal(kind),
+            onRequest: _request,
+            seenDecisionId: session.seenDecisionId,
+            onAcknowledge: route.latestDecision == null ? null : () => session.markDecisionSeen(route.latestDecision!.decisionId),
+          ),
         ),
       ],
     );

@@ -1,30 +1,45 @@
 <script setup lang="ts">
-import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
 import { useI18n } from 'vue-i18n'
 import type { IndexItem } from '@/api/types'
+import { useChartTheme } from '@/composables/useChartTheme'
 import { days, indexColor, pct } from '@/lib/format'
 
-defineProps<{ items: IndexItem[]; selected?: string | null }>()
-const emit = defineEmits<{ select: [kato: string] }>()
+/** Ранжированная таблица регионов по индексу; наведение и клик уходят наружу — подсветка общая с картой. */
+defineProps<{ items: IndexItem[]; highlight?: string | null }>()
+const emit = defineEmits<{ select: [kato: string]; hover: [kato: string | null] }>()
 const { t } = useI18n()
+const { isDark } = useChartTheme()
 </script>
 
 <template>
-  <DataTable :value="items" size="small" scrollable scroll-height="460px" selection-mode="single" data-key="regionKato" @row-click="emit('select', $event.data.regionKato)">
-    <Column field="rank" header="#" style="width: 3rem" />
-    <Column field="name" :header="t('common.region')" />
-    <Column :header="t('indexTable.index')" style="width: 6rem">
-      <template #body="{ data }">
-        <span :style="{ color: indexColor(data.indexValue), fontWeight: 600 }">{{ data.indexValue.toFixed(1) }}</span>
-      </template>
-    </Column>
-    <Column :header="`> 30 ${t('common.days')}`" style="width: 6rem">
-      <template #body="{ data }">{{ pct(data.shareOver30) }}</template>
-    </Column>
-    <Column :header="`p90, ${t('common.days')}`" style="width: 6rem">
-      <template #body="{ data }">{{ days(data.p90Days) }}</template>
-    </Column>
-    <Column field="n" header="n" style="width: 5rem" />
-  </DataTable>
+  <div class="table-wrap index-wrap">
+    <table class="dense-table" data-testid="index-table">
+      <thead>
+        <tr><th>#</th><th>{{ t('common.region') }}</th><th class="num">{{ t('indexTable.index') }}</th><th class="num">&gt; 30 {{ t('common.days') }}</th><th class="num">p90</th><th class="num">n</th></tr>
+      </thead>
+      <tbody>
+        <tr
+          v-for="item in items"
+          :key="item.regionKato"
+          class="clickable"
+          :class="{ selected: highlight === item.regionKato }"
+          @click="emit('select', item.regionKato)"
+          @mouseenter="emit('hover', item.regionKato)"
+          @mouseleave="emit('hover', null)"
+        >
+          <td class="muted">{{ item.rank }}</td>
+          <td>{{ item.name }}</td>
+          <td class="num"><span class="index" :style="{ color: indexColor(item.indexValue, isDark) }">{{ item.indexValue.toFixed(1) }}</span></td>
+          <td class="num">{{ pct(item.shareOver30) }}</td>
+          <td class="num">{{ days(item.p90Days) }}</td>
+          <td class="num muted">{{ item.n }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </template>
+
+<style scoped>
+.index-wrap { max-height: 520px; overflow-y: auto; }
+.index { font-weight: 600; }
+</style>

@@ -248,6 +248,7 @@ class CheckResponse {
   const CheckResponse({
     required this.covered,
     this.program,
+    this.category,
     this.fillDaysP50,
     this.fillDaysP90,
     this.fillDaysP50Model,
@@ -258,6 +259,9 @@ class CheckResponse {
   });
   final bool covered;
   final String? program;
+
+  /// Категория спецификации программы («Программа 90 · категория 63»).
+  final String? category;
   final double? fillDaysP50;
   final double? fillDaysP90;
 
@@ -270,6 +274,7 @@ class CheckResponse {
   factory CheckResponse.fromJson(Map<String, dynamic> json) => CheckResponse(
         covered: json['covered'] as bool,
         program: json['program'] as String?,
+        category: json['category'] as String?,
         fillDaysP50: (json['fillDaysP50'] as num?)?.toDouble(),
         fillDaysP90: (json['fillDaysP90'] as num?)?.toDouble(),
         fillDaysP50Model: (json['fillDaysP50Model'] as num?)?.toDouble(),
@@ -710,7 +715,18 @@ class PatientRoute {
   RouteSignal? get openRequest => signals.where((s) => s.open && s.kind == RouteCodes.requestRedirect).firstOrNull;
   RouteBenchmark? get targetBenchmark => benchmarks.where((b) => b.code == 'moh_target_wait_days').firstOrNull;
   int get expiredChecklistCount => checklist.where((c) => c.status == RouteCodes.expired).length;
+  int get validChecklistCount => checklist.length - expiredChecklistCount;
   RouteDecision? get latestRedirect => decisions.where((d) => d.kind == RouteCodes.redirect).firstOrNull;
+
+  /// Самое свежее решение врача (ISO-даты сравниваются как строки) — «ответ врача» на главной и в «Что сейчас».
+  RouteDecision? get latestDecision =>
+      decisions.isEmpty ? null : decisions.reduce((a, b) => a.recordedAt.compareTo(b.recordedAt) >= 0 ? a : b);
+
+  /// Ближайший непройденный этап Стандарта — «следующий этап» в карточке «Что сейчас».
+  RouteStage? get nextStage {
+    final ordered = [...timeline]..sort((a, b) => a.order.compareTo(b.order));
+    return ordered.where((t) => t.status == RouteCodes.upcoming).firstOrNull;
+  }
 
   factory PatientRoute.fromJson(Map<String, dynamic> json) => PatientRoute(
         patientRef: json['patientRef'] as String,
