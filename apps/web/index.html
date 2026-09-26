@@ -24,16 +24,18 @@
   <body>
     <!-- Заставка до монтирования приложения: знак Darumen собирается (блок → дуга → сектор), main.ts убирает её после mount -->
     <style>
-      #boot { position: fixed; inset: 0; display: grid; place-items: center; background: #0b2a4a; z-index: 9999; transition: opacity .35s ease; }
+      #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: #0b2a4a; z-index: 9999; transition: opacity .35s ease; }
       #boot.out { opacity: 0; pointer-events: none; }
-      #boot svg { width: 96px; height: 92px; }
-      #boot .l { transform-origin: 35.5px 50px; animation: boot-block .45s cubic-bezier(.2,.9,.3,1.2) both; }
-      #boot .a { stroke-dasharray: 40; stroke-dashoffset: 40; animation: boot-arc .5s ease-in-out .35s forwards; }
-      #boot .f { transform-origin: 48px 50px; transform: scaleX(0); animation: boot-fill .4s cubic-bezier(.2,.8,.2,1) .7s forwards; }
+      #boot svg { width: 120px; height: 114px; }
+      #boot .w { margin: 0; font: 600 34px/1 Onest, 'Segoe UI', system-ui, sans-serif; letter-spacing: -1.2px; color: #f1f8fb; opacity: 0; transform: translateY(10px); animation: boot-word .6s ease-out 3.1s forwards; }
+      #boot .l { transform-origin: 35.5px 50px; animation: boot-block 1.2s cubic-bezier(.2,.9,.3,1.2) both; }
+      #boot .a { stroke-dasharray: 40; stroke-dashoffset: 40; animation: boot-arc 1.4s ease-in-out 1s forwards; }
+      #boot .f { transform-origin: 48px 50px; transform: scaleX(0); animation: boot-fill 1s cubic-bezier(.2,.8,.2,1) 2.2s forwards; }
       @keyframes boot-block { from { transform: scale(.6); opacity: 0 } to { transform: scale(1); opacity: 1 } }
       @keyframes boot-arc { to { stroke-dashoffset: 0 } }
       @keyframes boot-fill { to { transform: scaleX(1) } }
-      @media (prefers-reduced-motion: reduce) { #boot .l, #boot .a, #boot .f { animation: none; stroke-dashoffset: 0; transform: none; opacity: 1 } }
+      @keyframes boot-word { to { opacity: 1; transform: none } }
+      @media (prefers-reduced-motion: reduce) { #boot .l, #boot .a, #boot .f, #boot .w { animation: none; stroke-dashoffset: 0; transform: none; opacity: 1 } }
     </style>
     <div id="boot" aria-hidden="true">
       <script>document.currentScript.parentElement.dataset.started = String(Date.now())</script>
@@ -43,6 +45,7 @@
         <path class="a" d="M53 25a25 25 0 0 1 25 25" fill="none" stroke="#29B6D8" stroke-width="6" stroke-linecap="round"/>
         <path d="M53 50h28a28 28 0 0 1-28 28z" fill="#29B6D8" clip-path="url(#boot-c)"/>
       </svg>
+      <p class="w">darumen</p>
     </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>

@@ -37,8 +37,8 @@ class _DarumenAppState extends State<DarumenApp> {
       ],
       routerConfig: _router,
       // Заставка со знаком поверх первого экрана: один раз при холодном старте, дальше роутер живёт как обычно.
-      // INTRO_MS — длительность заставки в мс (для отладки: --dart-define=INTRO_MS=6000).
-      builder: (_, child) => DarumenIntro(duration: const Duration(milliseconds: int.fromEnvironment('INTRO_MS', defaultValue: 1400)), child: child ?? const SizedBox.shrink()),
+      // INTRO_MS — длительность заставки в мс, штатно 4 с (переопределяется --dart-define=INTRO_MS).
+      builder: (_, child) => DarumenIntro(duration: const Duration(milliseconds: int.fromEnvironment('INTRO_MS', defaultValue: 4000)), child: child ?? const SizedBox.shrink()),
       debugShowCheckedModeBanner: false,
     );
   }

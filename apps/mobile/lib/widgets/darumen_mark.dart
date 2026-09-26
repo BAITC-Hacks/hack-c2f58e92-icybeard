@@ -122,12 +122,12 @@ class DarumenMark extends StatelessWidget {
 }
 
 /// Заставка при открытии: знак собирается на фоне Navy (блок → дуга → сектор → слово), затем растворяется
-/// в приложение. Общее время ~1.6 с; при отключённых анимациях в системе показывается один кадр и сразу уходит.
+/// в приложение. Общее время ~4 с; при отключённых анимациях в системе показывается один кадр и сразу уходит.
 class DarumenIntro extends StatefulWidget {
   const DarumenIntro({
     super.key,
     required this.child,
-    this.duration = const Duration(milliseconds: 1400),
+    this.duration = const Duration(milliseconds: 4000),
     this.onDone,
   });
 
@@ -196,44 +196,41 @@ class _DarumenIntroState extends State<DarumenIntro>
                   child: Material(
                     color: DarumenBrand.navy,
                     child: Center(
-                      // Пока слова нет, знак стоит по центру; со словом ряд уезжает влево на половину его ширины.
-                      child: Transform.translate(
-                        offset: Offset(96 * (1 - seg(0.65, 0.9)), 0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CustomPaint(
-                              size: const Size(84, 80),
-                              painter: DarumenMarkPainter(
-                                block: seg(0, 0.3),
-                                arc: seg(0.25, 0.6),
-                                fill: seg(0.55, 0.8),
-                                onDark: true,
+                      // Знак стоит по центру экрана, слово появляется под ним и не сдвигает знак.
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CustomPaint(
+                            size: const Size(126, 120),
+                            painter: DarumenMarkPainter(
+                              block: seg(0, 0.3),
+                              arc: seg(0.25, 0.6),
+                              fill: seg(0.55, 0.8),
+                              onDark: true,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          Opacity(
+                            opacity: seg(0.7, 0.9),
+                            child: Transform.translate(
+                              offset: Offset(0, 10 * (1 - seg(0.7, 0.9))),
+                              child: Text(
+                                'darumen',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(
+                                      color: DarumenBrand.mist,
+                                      fontSize: 40,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: -1.4,
+                                      height: 1,
+                                      decoration: TextDecoration.none,
+                                    ),
                               ),
                             ),
-                            const SizedBox(width: 18),
-                            Opacity(
-                              opacity: seg(0.7, 0.9),
-                              child: Transform.translate(
-                                offset: Offset(12 * (1 - seg(0.7, 0.9)), 0),
-                                child: Text(
-                                  'darumen',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineMedium
-                                      ?.copyWith(
-                                        color: DarumenBrand.mist,
-                                        fontSize: 40,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: -1.4,
-                                        height: 1,
-                                        decoration: TextDecoration.none,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
