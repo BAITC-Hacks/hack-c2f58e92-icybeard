@@ -55,7 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function markRedirect() {
     try {
-      sessionStorage.setItem(BOOT_SKIP, '1')
+      window.sessionStorage.setItem(BOOT_SKIP, '1')
     } catch {
       // приватный режим без storage — заставка просто сыграет ещё раз
     }
@@ -66,7 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
     const returning = window.location.hash.includes('state=') || window.location.hash.includes('error=')
     let hadSession = false
     try {
-      hadSession = localStorage.getItem(SESSION_HINT) === '1'
+      hadSession = window.localStorage.getItem(SESSION_HINT) === '1'
     } catch {
       hadSession = false
     }
@@ -84,8 +84,8 @@ export const useAuthStore = defineStore('auth', () => {
       })
       if (authenticated) readToken()
       try {
-        if (authenticated) localStorage.setItem(SESSION_HINT, '1')
-        else if (returning) localStorage.removeItem(SESSION_HINT)
+        if (authenticated) window.localStorage.setItem(SESSION_HINT, '1')
+        else if (returning) window.localStorage.removeItem(SESSION_HINT)
       } catch {
         // без storage признак просто не сохраняется
       }
@@ -123,7 +123,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     markRedirect()
     try {
-      localStorage.removeItem(SESSION_HINT)
+      window.localStorage.removeItem(SESSION_HINT)
     } catch {
       // без storage признак и так не хранился
     }

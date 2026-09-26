@@ -31,6 +31,19 @@ vi.mock('keycloak-js', () => ({
   },
 }))
 
+/** В jsdom под Node 25 глобальные localStorage/sessionStorage — нодовские заглушки без clear(): подставляем свои. */
+function memoryStorage(): Storage {
+  const map = new Map<string, string>()
+  return {
+    get length() { return map.size },
+    clear: () => map.clear(),
+    getItem: (k: string) => map.get(k) ?? null,
+    key: (i: number) => [...map.keys()][i] ?? null,
+    removeItem: (k: string) => { map.delete(k) },
+    setItem: (k: string, v: string) => { map.set(k, String(v)) },
+  } as Storage
+}
+
 function signedIn(roles: string[], claims: Record<string, unknown> = {}) {
   kc.authenticated = true
   kc.token = 'jwt'
@@ -42,28 +55,28 @@ describe('auth store (Keycloak)', () => {
     setActivePinia(createPinia())
     Object.assign(kc, { authenticated: false, fail: false, token: undefined, tokenParsed: undefined, initOptions: undefined })
     vi.clearAllMocks()
-    localStorage.clear()
-    sessionStorage.clear()
+    Object.defineProperty(window, 'localStorage', { value: memoryStorage(), configurable: true })
+    Object.defineProperty(window, 'sessionStorage', { value: memoryStorage(), configurable: true })
     window.history.replaceState(null, '', '/')
   })
 
   it('checks the session by redirect only after a previous login in this browser', async () => {
     await useAuthStore().init()
     expect(kc.initOptions).not.toHaveProperty('onLoad') // гость первый раз: без перехода в Keycloak и второй загрузки
-    expect(sessionStorage.getItem('darumen.boot.skip')).toBeNull()
+    expect(window.sessionStorage.getItem('darumen.boot.skip')).toBeNull()
 
     setActivePinia(createPinia())
     signedIn(['citizen'])
     await useAuthStore().init()
-    expect(localStorage.getItem('darumen.session')).toBe('1')
+    expect(window.localStorage.getItem('darumen.session')).toBe('1')
 
     setActivePinia(createPinia())
     await useAuthStore().init()
     expect(kc.initOptions).toMatchObject({ onLoad: 'check-sso' })
-    expect(sessionStorage.getItem('darumen.boot.skip')).toBe('1') // заставка после возврата не повторится
+    expect(window.sessionStorage.getItem('darumen.boot.skip')).toBe('1') // заставка после возврата не повторится
 
     await useAuthStore().logout()
-    expect(localStorage.getItem('darumen.session')).toBeNull()
+    expect(window.localStorage.getItem('darumen.session')).toBeNull()
   })
 
   it('stays a guest without a session and sends no auth headers', async () => {

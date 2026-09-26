@@ -35,8 +35,8 @@ auth.init().finally(async () => {
   let skipBoot = false
   try {
     // возврат из Keycloak (вход, выход, проверка сессии) — вторая загрузка той же страницы: заставку не повторяем
-    skipBoot = sessionStorage.getItem('darumen.boot.skip') === '1'
-    sessionStorage.removeItem('darumen.boot.skip')
+    skipBoot = window.sessionStorage.getItem('darumen.boot.skip') === '1'
+    window.sessionStorage.removeItem('darumen.boot.skip')
   } catch {
     skipBoot = false
   }
