@@ -9,6 +9,7 @@ import '../router/guards.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import '../widgets/darumen_mark.dart';
 import '../widgets/error_box.dart';
 
 /// Вход: язык выбирают до входа (РУС / ҚАЗ справа сверху), знак и слоган, три строки ценности, единственная
@@ -109,14 +110,9 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: AppSpacing.xl),
             Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(color: colors.accent, borderRadius: BorderRadius.circular(AppRadius.md)),
-                  child: Icon(Icons.route_outlined, color: theme.colorScheme.onPrimary),
-                ),
+                const DarumenMark(size: 46),
                 const SizedBox(width: AppSpacing.md),
-                Text('Darumen', style: theme.textTheme.headlineSmall?.copyWith(color: colors.accent)),
+                Text('darumen', style: theme.textTheme.headlineSmall?.copyWith(color: DarumenBrand.navy, letterSpacing: -0.8)),
               ],
             ),
             const SizedBox(height: AppSpacing.sm),

@@ -29,4 +29,14 @@ auth.init().finally(async () => {
   const { router } = await import('./router')
   app.use(router)
   app.mount('#app')
+  // Заставка из index.html: даём анимации знака дойти до конца (~1.1 с от загрузки), затем растворяем и убираем из DOM
+  const boot = document.getElementById('boot')
+  if (boot) {
+    const started = Number(boot.dataset.started ?? performance.timeOrigin)
+    const wait = Math.max(0, 1100 - (Date.now() - started))
+    window.setTimeout(() => {
+      boot.classList.add('out')
+      window.setTimeout(() => boot.remove(), 400)
+    }, wait)
+  }
 })

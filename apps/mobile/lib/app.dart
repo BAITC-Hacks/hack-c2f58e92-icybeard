@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'router/app_router.dart';
 import 'state/session.dart';
 import 'theme/app_theme.dart';
+import 'widgets/darumen_mark.dart';
 
 /// Корень приложения: роутер создаётся один раз от сессии, тема светлая/тёмная по системе, локаль — из сессии
 /// (меняется без пересоздания роутера, системные виджеты локализуются делегатами).
@@ -35,6 +36,9 @@ class _DarumenAppState extends State<DarumenApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: _router,
+      // Заставка со знаком поверх первого экрана: один раз при холодном старте, дальше роутер живёт как обычно.
+      // INTRO_MS — длительность заставки в мс (для отладки: --dart-define=INTRO_MS=6000).
+      builder: (_, child) => DarumenIntro(duration: const Duration(milliseconds: int.fromEnvironment('INTRO_MS', defaultValue: 1400)), child: child ?? const SizedBox.shrink()),
       debugShowCheckedModeBanner: false,
     );
   }
