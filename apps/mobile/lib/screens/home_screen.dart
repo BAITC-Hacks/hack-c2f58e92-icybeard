@@ -11,6 +11,7 @@ import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../theme/typography.dart';
+import '../widgets/darumen_mark.dart';
 import '../widgets/error_box.dart';
 import '../widgets/format.dart';
 import '../widgets/org_name.dart';
@@ -95,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
     };
     return PageScaffold(
       title: s.navHome,
+      leading: const HomeMarkAnchor(),
       onRefresh: session.isAuthenticated ? _load : null,
       children: [
         if (!session.isAuthenticated) ...[

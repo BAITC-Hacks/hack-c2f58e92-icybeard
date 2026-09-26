@@ -24,10 +24,16 @@
   <body>
     <!-- Заставка до монтирования приложения: знак Darumen собирается (блок → дуга → сектор), main.ts убирает её после mount -->
     <style>
-      #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: #0b2a4a; z-index: 9999; transition: opacity .35s ease; }
-      #boot.out { opacity: 0; pointer-events: none; }
+      #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; z-index: 9999; }
+      #boot::before { content: ''; position: absolute; inset: 0; background: #0b2a4a; transition: opacity .6s ease; }
+      #boot svg, #boot .w { position: relative; }
+      #boot.out { pointer-events: none; }
+      #boot.out::before, #boot.out .w { opacity: 0; }
+      #boot.out:not(.fly) svg { opacity: 0; transition: opacity .5s ease; }
+      #boot.fly .l { fill: #0b2a4a; transition: fill .4s ease .3s; }
+      :root.darumen-dark #boot.fly .l { fill: #f1f8fb; }
       #boot svg { width: 120px; height: 114px; }
-      #boot .w { margin: 0; font: 600 34px/1 Onest, 'Segoe UI', system-ui, sans-serif; letter-spacing: -1.2px; color: #f1f8fb; opacity: 0; transform: translateY(10px); animation: boot-word .6s ease-out 3.1s forwards; }
+      #boot .w { margin: 0; font: 600 34px/1 Onest, 'Segoe UI', system-ui, sans-serif; letter-spacing: -1.2px; color: #f1f8fb; opacity: 0; transform: translateY(10px); animation: boot-word .6s ease-out 3.1s forwards; transition: opacity .3s ease; }
       #boot .l { transform-origin: 35.5px 50px; animation: boot-block 1.2s cubic-bezier(.2,.9,.3,1.2) both; }
       #boot .a { stroke-dasharray: 40; stroke-dashoffset: 40; animation: boot-arc 1.4s ease-in-out 1s forwards; }
       #boot .f { transform-origin: 48px 50px; transform: scaleX(0); animation: boot-fill 1s cubic-bezier(.2,.8,.2,1) 2.2s forwards; }

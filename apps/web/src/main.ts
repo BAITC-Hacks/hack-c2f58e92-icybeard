@@ -29,14 +29,26 @@ auth.init().finally(async () => {
   const { router } = await import('./router')
   app.use(router)
   app.mount('#app')
-  // Заставка из index.html: даём анимации знака дойти до конца (4 с от загрузки, как в мобилке), затем растворяем и убираем из DOM
+  // Заставка из index.html: после сборки знака (~4 с) фон и слово растворяются, а знак перелетает в знак шапки
+  // (data-brand-mark) — плавный переход в интерфейс. Без якоря на странице знак просто растворяется.
   const boot = document.getElementById('boot')
   if (boot) {
     const started = Number(boot.dataset.started ?? performance.timeOrigin)
     const wait = Math.max(0, 4000 - (Date.now() - started))
     window.setTimeout(() => {
+      const mark = boot.querySelector('svg')
+      const anchor = document.querySelector<HTMLElement>('[data-brand-mark]')
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      if (mark && anchor && !reduced) {
+        const from = mark.getBoundingClientRect()
+        const to = anchor.getBoundingClientRect()
+        mark.style.transition = 'transform .7s cubic-bezier(.4,0,.2,1)'
+        mark.style.transformOrigin = 'top left'
+        mark.style.transform = `translate(${to.left - from.left}px, ${to.top - from.top}px) scale(${to.width / from.width})`
+        boot.classList.add('fly')
+      }
       boot.classList.add('out')
-      window.setTimeout(() => boot.remove(), 400)
+      window.setTimeout(() => boot.remove(), 750)
     }, wait)
   }
 })

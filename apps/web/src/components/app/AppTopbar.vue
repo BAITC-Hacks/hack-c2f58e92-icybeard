@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BrandMark from '@/components/app/BrandMark.vue'
 import Button from 'primevue/button'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -26,7 +27,7 @@ const links = computed(() =>
 <template>
   <header class="topbar">
     <div class="inner">
-      <RouterLink class="brand" to="/">Darumen Health</RouterLink>
+      <RouterLink class="brand" to="/"><BrandMark :size="26" /><span>Darumen Health</span></RouterLink>
       <nav>
         <RouterLink v-for="link in links" :key="link.to" :to="link.to">{{ link.label }}</RouterLink>
       </nav>

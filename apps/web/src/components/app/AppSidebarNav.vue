@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BrandMark from '@/components/app/BrandMark.vue'
 import Button from 'primevue/button'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -41,7 +42,7 @@ const roleLabel = computed(() => (auth.role ? t('decision.role.' + auth.role) : 
 <template>
   <div class="sidenav">
     <RouterLink class="brand" to="/" title="Darumen Health" @click="emit('navigate')">
-      <span class="brand-mark" aria-hidden="true">D</span><span class="label">Darumen Health</span>
+      <BrandMark :size="28" /><span class="label">Darumen Health</span>
     </RouterLink>
     <nav class="groups" :aria-label="t('shell.menu')">
       <div v-for="g in groups" :key="g.group" class="group">

@@ -10,6 +10,7 @@ import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../theme/typography.dart';
+import '../widgets/darumen_mark.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/format.dart';
 import '../widgets/load_state_view.dart';
@@ -119,6 +120,7 @@ class _WorklistScreenState extends State<WorklistScreen> {
     final session = context.watch<Session>();
     final regionName = _regions.where((r) => r.kato == session.region).map((r) => r.name).firstOrNull ?? session.region;
     return PageScaffold(
+      leading: const HomeMarkAnchor(),
       title: s.patientsTitle(regionName),
       actions: [
         PopupMenuButton<_Sort>(
