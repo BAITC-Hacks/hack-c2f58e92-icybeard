@@ -789,3 +789,82 @@ class ChecklistDefinition {
         validityLabel: json['validityLabel'] as String? ?? '',
       );
 }
+
+/// Витрина гостя «сегодня и завтра»: погода по столице региона, бытовые советы по погоде и новости о здравоохранении.
+class WeatherDay {
+  const WeatherDay({required this.date, required this.tMin, required this.tMax, required this.precipitationProbability, required this.windMax, required this.uvIndex, required this.code});
+
+  factory WeatherDay.fromJson(Map<String, dynamic> json) => WeatherDay(
+        date: json['date'] as String,
+        tMin: (json['tMin'] as num).toDouble(),
+        tMax: (json['tMax'] as num).toDouble(),
+        precipitationProbability: (json['precipitationProbability'] as num).toInt(),
+        windMax: (json['windMax'] as num).toDouble(),
+        uvIndex: (json['uvIndex'] as num).toDouble(),
+        code: json['code'] as String,
+      );
+
+  final String date;
+  final double tMin;
+  final double tMax;
+  final int precipitationProbability;
+  final double windMax;
+  final double uvIndex;
+  /// clear · cloudy · fog · rain · snow · thunder
+  final String code;
+}
+
+class WeatherTip {
+  const WeatherTip({required this.code, required this.day, required this.text});
+
+  factory WeatherTip.fromJson(Map<String, dynamic> json) => WeatherTip(code: json['code'] as String, day: (json['day'] as num).toInt(), text: json['text'] as String);
+
+  final String code;
+  /// 0 — сегодня, 1 — завтра.
+  final int day;
+  final String text;
+}
+
+class NewsItem {
+  const NewsItem({required this.title, required this.url, required this.publishedAt, required this.source});
+
+  factory NewsItem.fromJson(Map<String, dynamic> json) =>
+      NewsItem(title: json['title'] as String, url: json['url'] as String, publishedAt: json['publishedAt'] as String?, source: json['source'] as String);
+
+  final String title;
+  final String url;
+  final String? publishedAt;
+  final String source;
+}
+
+class Daily {
+  const Daily({required this.regionKato, required this.regionName, required this.capital, required this.weatherAvailable, required this.weatherSource, required this.days, required this.tips, required this.newsAvailable, required this.newsSource, required this.news});
+
+  factory Daily.fromJson(Map<String, dynamic> json) {
+    final weather = json['weather'] as Map<String, dynamic>;
+    final news = json['news'] as Map<String, dynamic>;
+    return Daily(
+      regionKato: json['regionKato'] as String,
+      regionName: json['regionName'] as String,
+      capital: json['capital'] as String,
+      weatherAvailable: weather['available'] as bool,
+      weatherSource: weather['source'] as String,
+      days: (weather['days'] as List<dynamic>).map((d) => WeatherDay.fromJson(d as Map<String, dynamic>)).toList(),
+      tips: (json['tips'] as List<dynamic>).map((t) => WeatherTip.fromJson(t as Map<String, dynamic>)).toList(),
+      newsAvailable: news['available'] as bool,
+      newsSource: news['source'] as String,
+      news: (news['items'] as List<dynamic>).map((n) => NewsItem.fromJson(n as Map<String, dynamic>)).toList(),
+    );
+  }
+
+  final String regionKato;
+  final String regionName;
+  final String capital;
+  final bool weatherAvailable;
+  final String weatherSource;
+  final List<WeatherDay> days;
+  final List<WeatherTip> tips;
+  final bool newsAvailable;
+  final String newsSource;
+  final List<NewsItem> news;
+}

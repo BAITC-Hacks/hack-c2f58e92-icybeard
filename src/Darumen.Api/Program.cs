@@ -5,6 +5,7 @@ using Darumen.Modules.Insight;
 using Darumen.Modules.Intake;
 using Darumen.Modules.Journal;
 using Darumen.Modules.Medicines;
+using Darumen.Modules.Public;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
 using Darumen.Modules.Simulation;
@@ -51,7 +52,8 @@ builder.Services.AddDarumenModules(
     new RefDataModule(),
     new IntakeModule(),
     new MedicinesModule(),
-    new InsightModule());
+    new InsightModule(),
+    new PublicModule());
 
 var app = builder.Build();
 

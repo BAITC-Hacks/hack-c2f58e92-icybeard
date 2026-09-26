@@ -277,3 +277,14 @@ export interface IntakeUploadResult {
 
 export interface IntakeApproveResult { contract: string; reprocessed: IntakeUploadResult | null }
 export interface IntakeQuarantineResponse { items: Record<string, unknown>[]; total: number }
+
+/** Гостю на главной: погода по столице региона на сегодня и завтра, бытовые советы по погоде и новости о здравоохранении. */
+export interface WeatherDay { date: string; tMin: number; tMax: number; precipitationProbability: number; windMax: number; uvIndex: number; code: 'clear' | 'cloudy' | 'fog' | 'rain' | 'snow' | 'thunder' }
+export interface WeatherTip { code: string; day: 0 | 1; text: string }
+export interface NewsItem { title: string; url: string; publishedAt: string | null; source: string }
+export interface DailyResponse {
+  regionKato: string; regionName: string; capital: string; asOf: string
+  weather: { available: boolean; source: string; days: WeatherDay[] }
+  tips: WeatherTip[]
+  news: { available: boolean; source: string; items: NewsItem[] }
+}

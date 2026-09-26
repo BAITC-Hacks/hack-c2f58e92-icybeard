@@ -116,6 +116,22 @@ class S {
 
   // ---------- главная ----------
   String get homeMyHospitalization => _t('Моя госпитализация', 'Менің емдеуге жатқызылуым');
+  String get tomorrow => _t('Завтра', 'Ертең');
+  String weatherTitle(String city) => _t('Погода · $city', 'Ауа райы · $city');
+  String precip(int pct) => _t('осадки $pct %', 'жауын-шашын $pct %');
+  String weatherNote(String source) => _t('Прогноз $source; советы — бытовые предупреждения, не медицинские рекомендации.', '$source болжамы; кеңестер — тұрмыстық ескертулер, медициналық ұсыныс емес.');
+  String get weatherUnavailable => _t('Прогноз сейчас недоступен.', 'Болжам қазір қолжетімсіз.');
+  String get newsTitle => _t('Новости о здравоохранении', 'Денсаулық сақтау жаңалықтары');
+  String get newsUnavailable => _t('Лента новостей сейчас недоступна.', 'Жаңалықтар лентасы қазір қолжетімсіз.');
+  String weatherWord(String code) => switch (code) {
+        'clear' => _t('ясно', 'ашық'),
+        'cloudy' => _t('облачно', 'бұлтты'),
+        'fog' => _t('туман', 'тұман'),
+        'rain' => _t('дождь', 'жаңбыр'),
+        'snow' => _t('снег', 'қар'),
+        'thunder' => _t('гроза', 'найзағай'),
+        _ => code,
+      };
   String get homeGuestCardTitle => _t('Войдите через eGov mobile, чтобы видеть своё направление', 'Жолдамаңызды көру үшін eGov mobile арқылы кіріңіз');
   String get homeTileWait => _t('Сколько ждут', 'Қанша күтеді');
   String get homeTileMedicines => _t('Лекарства', 'Дәрілер');

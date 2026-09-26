@@ -6,6 +6,9 @@
     <Project Path="src/Darumen.Shared/Darumen.Shared.csproj" />
   </Folder>
   <Folder Name="/src/Darumen.Modules/" />
+  <Folder Name="/src/Darumen.Modules/Public/">
+    <Project Path="src/Darumen.Modules/Public/Darumen.Modules.Public.csproj" />
+  </Folder>
   <Folder Name="/src/Darumen.Modules/Queue/">
     <Project Path="src/Darumen.Modules/Queue/Darumen.Modules.Queue.csproj" />
   </Folder>

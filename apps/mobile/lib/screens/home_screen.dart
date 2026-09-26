@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/client.dart';
 import '../api/models.dart';
@@ -96,9 +97,11 @@ class _HomeScreenState extends State<HomeScreen> {
       title: s.navHome,
       onRefresh: session.isAuthenticated ? _load : null,
       children: [
-        if (!session.isAuthenticated)
-          _GuestCard(s: s)
-        else ...[
+        if (!session.isAuthenticated) ...[
+          _GuestCard(s: s),
+          const SizedBox(height: AppSpacing.md),
+          _DailyCards(regionKato: session.region),
+        ] else ...[
           if (answer != null) ...[_AnswerCard(decision: answer), const SizedBox(height: AppSpacing.md)],
           _RouteCard(state: _state, onRetry: _load, onStillWaiting: _stillWaiting),
         ],
@@ -300,6 +303,188 @@ class _Tile extends StatelessWidget {
               Text(label, style: Theme.of(context).textTheme.labelMedium, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Гостю: погода на сегодня и завтра по столице региона с бытовыми советами и новости о здравоохранении.
+/// Вошедшему этот блок не показывается — у него на главной маршрут. Любой сбой источника — подпись, не ошибка.
+class _DailyCards extends StatefulWidget {
+  const _DailyCards({required this.regionKato});
+
+  final String regionKato;
+
+  @override
+  State<_DailyCards> createState() => _DailyCardsState();
+}
+
+class _DailyCardsState extends State<_DailyCards> {
+  LoadState<Daily> _state = const Loading();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _DailyCards oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.regionKato != widget.regionKato) {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    setState(() => _state = const Loading());
+    try {
+      final daily = await context.read<Session>().api.daily(regionKato: widget.regionKato);
+      if (mounted) {
+        setState(() => _state = Loaded(daily));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _state = Failed(e));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    return switch (_state) {
+      Loading() => const ListSkeleton(count: 2, itemHeight: 140),
+      Failed() => Card(child: Padding(padding: const EdgeInsets.all(AppSpacing.lg), child: Text(s.weatherUnavailable, style: theme.textTheme.bodySmall))),
+      Loaded<Daily>(data: final d) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _WeatherCard(daily: d),
+            const SizedBox(height: AppSpacing.md),
+            _NewsCard(daily: d),
+          ],
+        ),
+    };
+  }
+}
+
+class _WeatherCard extends StatelessWidget {
+  const _WeatherCard({required this.daily});
+
+  final Daily daily;
+
+  static IconData _icon(String code) => switch (code) {
+        'clear' => Icons.wb_sunny_outlined,
+        'fog' => Icons.foggy,
+        'rain' => Icons.water_drop_outlined,
+        'snow' => Icons.ac_unit,
+        'thunder' => Icons.thunderstorm_outlined,
+        _ => Icons.cloud_outlined,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.weatherTitle(daily.capital), style: theme.textTheme.titleMedium),
+            const SizedBox(height: AppSpacing.md),
+            if (!daily.weatherAvailable)
+              Text(s.weatherUnavailable, style: theme.textTheme.bodySmall)
+            else ...[
+              Row(
+                children: [
+                  for (var i = 0; i < daily.days.length && i < 2; i++) ...[
+                    if (i > 0) const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(border: Border.all(color: colors.hairline), borderRadius: BorderRadius.circular(AppRadius.md)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${i == 0 ? s.today : s.tomorrow} · ${dateShort(daily.days[i].date)}', style: theme.textTheme.labelSmall),
+                            const SizedBox(height: AppSpacing.xs),
+                            Row(
+                              children: [
+                                Icon(_icon(daily.days[i].code), color: colors.accent, size: 22),
+                                const SizedBox(width: AppSpacing.xs),
+                                Text('${daily.days[i].tMax.round()}°', style: theme.textTheme.headlineSmall?.merge(AppType.numeric)),
+                                Text(' / ${daily.days[i].tMin.round()}°', style: theme.textTheme.bodyMedium?.merge(AppType.numeric).copyWith(color: colors.muted)),
+                              ],
+                            ),
+                            Text('${s.weatherWord(daily.days[i].code)} · ${s.precip(daily.days[i].precipitationProbability)}', style: theme.textTheme.labelSmall, maxLines: 2),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              for (final tip in daily.tips)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                  child: Text.rich(TextSpan(children: [
+                    TextSpan(text: '${tip.day == 0 ? s.today : s.tomorrow}: ', style: theme.textTheme.labelSmall?.copyWith(color: colors.muted)),
+                    TextSpan(text: tip.text, style: theme.textTheme.bodySmall),
+                  ])),
+                ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(s.weatherNote(daily.weatherSource), style: theme.textTheme.labelSmall?.copyWith(color: colors.muted)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NewsCard extends StatelessWidget {
+  const _NewsCard({required this.daily});
+
+  final Daily daily;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(s.newsTitle, style: theme.textTheme.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            if (!daily.newsAvailable || daily.news.isEmpty)
+              Text(s.newsUnavailable, style: theme.textTheme.bodySmall)
+            else
+              for (final n in daily.news)
+                InkWell(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  onTap: () => launchUrl(Uri.parse(n.url), mode: LaunchMode.externalApplication),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(n.title, style: theme.textTheme.bodyMedium, maxLines: 3, overflow: TextOverflow.ellipsis),
+                        Text('${n.source}${n.publishedAt != null ? ' · ${dateShort(n.publishedAt!)}' : ''}', style: theme.textTheme.labelSmall?.copyWith(color: colors.muted)),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
         ),
       ),
     );

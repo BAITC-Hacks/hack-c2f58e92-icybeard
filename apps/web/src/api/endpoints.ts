@@ -2,7 +2,7 @@ import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, EquipmentOrganization, EquipmentResponse, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
-  LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, RouteStandard, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
+  DailyResponse, LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, RouteStandard, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistResponse, SignalKind,
 } from './types'
 
@@ -117,4 +117,8 @@ export const intake = {
     api<IntakeApproveResult>(`/api/v1/intake/drafts/${encodeURIComponent(dataset)}/approve`, { body }),
   quarantine: (dataset: string, batchId?: string) =>
     api<IntakeQuarantineResponse>('/api/v1/intake/quarantine', { query: { dataset, batchId } }),
+}
+
+export const pub = {
+  daily: (regionKato?: string) => api<DailyResponse>('/api/v1/public/daily', { query: { regionKato } }),
 }
