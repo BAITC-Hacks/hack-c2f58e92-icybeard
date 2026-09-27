@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../l10n/strings.dart';
 import '../theme/tokens.dart';
+import 'circle_button.dart';
 import 'origin_tag.dart';
 
-/// Заголовок раздела с меткой происхождения справа.
+/// Заголовок раздела 17/500 с меткой происхождения справа — для секций вне карточек.
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key, this.origin});
 
@@ -12,25 +15,18 @@ class SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: AppSpacing.lg, bottom: AppSpacing.sm),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+        padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
+        child: Row(
+          children: [
+            Expanded(child: Text(text, style: Theme.of(context).textTheme.titleMedium)),
+            if (origin != null) OriginTag(origin!),
+          ],
         ),
-        if (origin != null) OriginTag(origin!),
-      ],
-    ),
-  );
+      );
 }
 
 class Section extends StatelessWidget {
-  const Section({
-    super.key,
-    required this.title,
-    this.origin,
-    required this.child,
-  });
+  const Section({super.key, required this.title, this.origin, required this.child});
 
   final String title;
   final Origin? origin;
@@ -38,59 +34,109 @@ class Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SectionTitle(title, origin: origin),
-      child,
-    ],
-  );
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [SectionTitle(title, origin: origin), child],
+      );
 }
 
-/// Каркас экрана: AppBar, SafeArea, ListView с единым отступом 16 и pull-to-refresh при наличии onRefresh.
+/// Каркас экрана «Тихой клиники»: без AppBar — шапка `padding 0 20 12` с круглой кнопкой назад (если есть куда
+/// вернуться) или знаком слева, H1 29/500 и круглыми кнопками справа; контент — ListView `padding 4 20`, gap 12
+/// между детьми; нижняя зона `padding 12 20 24` для primary-кнопки. Pull-to-refresh при наличии onRefresh.
 class PageScaffold extends StatelessWidget {
   const PageScaffold({
     super.key,
     required this.title,
+    this.leading,
     this.actions,
     required this.children,
     this.onRefresh,
     this.bottom,
-    this.leading,
+    this.showBack,
+    this.gap = AppSpacing.md,
   });
 
   final String title;
 
-  /// Виджет слева от заголовка (знак Darumen на главной — в него прилетает заставка).
+  /// Виджет слева от заголовка, когда кнопки «назад» нет (знак Darumen на корневых экранах).
   final Widget? leading;
   final List<Widget>? actions;
   final List<Widget> children;
   final Future<void> Function()? onRefresh;
+
+  /// Primary-кнопка в нижней зоне.
   final Widget? bottom;
+
+  /// null — кнопка назад показывается, если роутер или навигатор может вернуться.
+  final bool? showBack;
+
+  /// Расстояние между детьми контента.
+  final double gap;
+
+  static bool _canPop(BuildContext context) {
+    final router = GoRouter.maybeOf(context);
+    return router?.canPop() ?? Navigator.of(context).canPop();
+  }
+
+  static void _pop(BuildContext context) {
+    final router = GoRouter.maybeOf(context);
+    if (router != null) {
+      router.pop();
+    } else {
+      Navigator.of(context).maybePop();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final list = ListView(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.sm,
-        AppSpacing.lg,
-        AppSpacing.xxl,
-      ),
-      children: children,
+    final s = S.at(context);
+    final theme = Theme.of(context);
+    final back = showBack ?? _canPop(context);
+    final list = ListView.separated(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xs, AppSpacing.page, AppSpacing.xl),
+      itemCount: children.length,
+      separatorBuilder: (_, _) => SizedBox(height: gap),
+      itemBuilder: (_, i) => children[i],
     );
     return Scaffold(
-      appBar: AppBar(
-        title: Text(title),
-        actions: actions,
-        leading: leading,
-        leadingWidth: leading == null ? null : 56,
-      ),
       body: SafeArea(
-        child: onRefresh == null
-            ? list
-            : RefreshIndicator(onRefresh: onRefresh!, child: list),
+        bottom: bottom == null,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.md),
+              child: Row(
+                children: [
+                  if (back) CircleIconButton(icon: Icons.arrow_back, label: s.back, onTap: () => _pop(context)) else ?leading,
+                  if (back || leading != null) const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(title, style: theme.textTheme.headlineMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  ),
+                  if (actions != null)
+                    for (final action in actions!) ...[const SizedBox(width: AppSpacing.md), action],
+                ],
+              ),
+            ),
+            Expanded(child: onRefresh == null ? list : RefreshIndicator(onRefresh: onRefresh!, child: list)),
+          ],
+        ),
       ),
-      bottomNavigationBar: bottom,
+      bottomNavigationBar: bottom == null ? null : BottomAction(child: bottom!),
     );
   }
+}
+
+/// Нижняя зона экрана `padding 12 20 24` с учётом системного отступа — под primary-кнопку.
+class BottomAction extends StatelessWidget {
+  const BottomAction({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
+          child: child,
+        ),
+      );
 }

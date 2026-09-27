@@ -14,12 +14,12 @@ withDefaults(defineProps<{ kind?: 'kpi' | 'lines' | 'table' | 'chart'; lines?: n
 </template>
 
 <style scoped>
-.skeleton { display: flex; flex-direction: column; gap: 8px; }
-.bar { display: block; border-radius: 6px; background: var(--dm-neutral-soft); animation: pulse 1.4s ease-in-out infinite; }
+.skeleton { display: flex; flex-direction: column; gap: 10px; }
+.bar { display: block; border-radius: var(--dm-radius-sm); background: var(--dm-neutral-soft); animation: pulse 1.4s ease-in-out infinite; }
 .bar.line { height: 14px; }
-.bar.value { height: 28px; width: 60%; }
-.bar.area { height: 220px; width: 100%; }
-.skeleton.table .bar.line { height: 32px; }
+.bar.value { height: 42px; width: 50%; border-radius: var(--dm-radius-md); }
+.bar.area { height: 220px; width: 100%; border-radius: var(--dm-radius-md); }
+.skeleton.table .bar.line { height: 36px; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .bar { animation: none; } }
 </style>

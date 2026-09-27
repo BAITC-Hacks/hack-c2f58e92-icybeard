@@ -28,7 +28,7 @@ interface Turn { question: string; at: string; answer?: AskResponse; error?: unk
 const STEPS = ['parse', 'tools', 'answer'] as const
 const STEP_MS = 1500
 
-const { t } = useI18n()
+const { t, tm } = useI18n()
 const { dateTime } = useLocaleFormat()
 const question = ref('')
 const turns = ref<Turn[]>([])
@@ -38,16 +38,21 @@ const status = ref<InsightStatus | null>(null)
 const thread = ref<HTMLElement | null>(null)
 let stepTimer = 0
 
-/** Группы эталонных вопросов: «Заголовок::вопрос|вопрос;Заголовок::…» из словаря. */
-const groups = computed(() =>
-  t('gov.insight.groups')
+/** Группы эталонных вопросов: «Заголовок::вопрос|вопрос;Заголовок::…» из словаря; если словарь даёт только
+ * заголовок, вопросы берутся из gov.insight.examples одной группой. */
+const groups = computed(() => {
+  // tm — сырое сообщение: t() трактует «|» как разделитель форм множественного числа
+  const parsed = String(tm('gov.insight.groups'))
     .split(';')
     .map((g) => {
       const [title, questions] = g.split('::')
       return { title: title?.trim() ?? '', questions: (questions ?? '').split('|').map((q) => q.trim()).filter(Boolean) }
     })
-    .filter((g) => g.questions.length),
-)
+    .filter((g) => g.questions.length)
+  if (parsed.length) return parsed
+  const examples = String(tm('gov.insight.examples')).split('|').map((q) => q.trim()).filter(Boolean)
+  return examples.length ? [{ title: t('gov.insight.groups'), questions: examples }] : []
+})
 const available = computed(() => status.value?.available !== false)
 /** Использованные витрины и инструменты по всем ответам — правая колонка. */
 const sources = computed(() => ({
@@ -158,21 +163,21 @@ onBeforeUnmount(() => window.clearInterval(stepTimer))
 <style scoped>
 .columns { display: grid; grid-template-columns: 260px 1fr 240px; gap: var(--dm-space-4); align-items: start; }
 .group + .group { margin-top: 12px; }
-.group-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dm-muted); margin-bottom: 4px; }
-.question { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 6px 8px; border-radius: var(--dm-radius-sm); color: var(--dm-ink); font: inherit; font-size: 0.9rem; cursor: pointer; }
-.question:hover:not(:disabled) { background: var(--dm-accent-soft); color: var(--dm-accent); }
+.group-title { font-size: var(--dm-text-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dm-muted); margin-bottom: 4px; }
+.question { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 6px 8px; border-radius: var(--dm-radius-sm); color: var(--dm-ink); font: inherit; font-size: var(--dm-text-sm); cursor: pointer; }
+.question:hover:not(:disabled) { background: var(--dm-surface-2); color: var(--dm-ink); }
 .question:disabled { color: var(--dm-muted); cursor: default; }
 .thread { min-height: 320px; max-height: 60vh; overflow: auto; display: flex; flex-direction: column; gap: 16px; }
 .q { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-.bubble { background: var(--dm-accent-soft); color: var(--dm-accent); padding: 8px 12px; border-radius: 12px 12px 2px 12px; max-width: 85%; }
-.a { margin-top: 8px; padding: 12px; }
+.bubble { background: var(--dm-ink); color: var(--dm-surface); padding: 8px 14px; border-radius: 12px 12px 2px 12px; max-width: 85%; font-size: var(--dm-text-md); }
+.a { margin-top: 8px; padding: 16px; background: var(--dm-surface-2); }
 .a-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 6px; }
-.a-number { font-size: 2rem; font-weight: 600; }
+.a-number { font-size: var(--dm-text-kpi); font-weight: 500; letter-spacing: -0.02em; line-height: 1; margin: 4px 0; }
 .a-number .unit { font-size: 1rem; color: var(--dm-muted); font-weight: 400; }
 .a-text { white-space: pre-wrap; margin: 4px 0 8px; }
 .a-chart { height: 260px; }
 .steps { display: flex; gap: 16px; flex-wrap: wrap; color: var(--dm-muted); }
-.step.active { color: var(--dm-accent); }
+.step.active { color: var(--dm-ink); font-weight: 500; }
 .step.done { color: var(--dm-ok); }
 .ask { margin-top: 12px; display: flex; gap: 8px; align-items: flex-end; }
 .ask :deep(textarea) { flex: 1; }

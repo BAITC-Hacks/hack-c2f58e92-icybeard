@@ -95,11 +95,20 @@ describe('auth store (Keycloak)', () => {
     expect(auth.actor).toBe('chief1')
     expect(auth.roles).toEqual(['chief'])
     expect(auth.region).toBe('75')
+    expect(auth.moCode).toBeNull()
     expect(auth.hasRole('chief', 'regulator')).toBe(true)
     expect(auth.hasRole('doctor')).toBe(false)
     expect(auth.roleHome()).toBe('/gov/regions/75')
     expect(await auth.authHeaders()).toEqual({ Authorization: 'Bearer jwt' })
     expect(kc.updateToken).toHaveBeenCalledWith(30)
+  })
+
+  it('a chief with mo_code lands in the organization portal', async () => {
+    signedIn(['chief'], { region_kato: '75', mo_code: '028B' })
+    const auth = useAuthStore()
+    await auth.init()
+    expect(auth.moCode).toBe('028B')
+    expect(auth.roleHome()).toBe('/gov/organizations/028B')
   })
 
   it('admin passes every role check', async () => {

@@ -45,5 +45,5 @@ const refdata = useRefdataStore()
 </template>
 
 <style scoped>
-.wait { font-weight: 600; min-width: 5ch; text-align: right; }
+.wait { font-weight: 500; min-width: 5ch; text-align: right; }
 </style>

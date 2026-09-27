@@ -3,22 +3,20 @@ import Message from 'primevue/message'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { pub } from '@/api/endpoints'
-import type { DailyResponse } from '@/api/types'
+import { medicines, queue } from '@/api/endpoints'
+import type { CheckResponse, PredictResponse } from '@/api/types'
 import LoginPanel from '@/components/app/LoginPanel.vue'
-import AppCard from '@/components/ui/AppCard.vue'
-import PageShell from '@/components/ui/PageShell.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
-import { num } from '@/lib/format'
-import { dateShort } from '@/lib/route'
+import OriginTag from '@/components/OriginTag.vue'
+import StatusTag from '@/components/ui/StatusTag.vue'
+import { days, num, pct } from '@/lib/format'
 import { readPref, WAIT_PREFS } from '@/lib/prefs'
 import { roleHome } from '@/router/roles'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
-/** Страница входа — единственная страница без сессии (кроме памятки по QR). Рядом с входом — погода на сегодня и
- * завтра по столице региона с бытовыми советами и новости о здравоохранении; регион — последний выбранный на
- * /wait, иначе г. Алматы. Вошедший попадает сюда только с ?denied (страница не для его роли). */
+/** Страница входа (W-Home) — единственная страница без сессии (кроме памятки по QR). Слева заголовок, подводка и
+ * карточка «Вход»; справа две плавающие карточки-примера («Сколько ждут», «Проверка рецепта») — статичные примеры
+ * с публичных эндпоинтов, не ссылки; внизу ряд фактов о данных. Вошедший попадает сюда только с ?denied. */
 const DEFAULT_REGION = '75'
 
 const { t } = useI18n()
@@ -27,12 +25,11 @@ const route = useRoute()
 const router = useRouter()
 const refdata = useRefdataStore()
 
-const dailyRegion = readPref(WAIT_PREFS.region) ?? DEFAULT_REGION
-const daily = ref<DailyResponse | null>(null)
-const dailyBusy = ref(true)
-const WEATHER_ICON: Record<string, string> = { clear: 'pi pi-sun', cloudy: 'pi pi-cloud', fog: 'pi pi-align-justify', rain: 'pi pi-cloud-download', snow: 'pi pi-asterisk', thunder: 'pi pi-bolt' }
-const weatherIcon = (code: string) => WEATHER_ICON[code] ?? 'pi pi-cloud'
-const dayLabel = (i: number) => (i === 0 ? t('home.today') : t('home.tomorrow'))
+const exampleRegion = readPref(WAIT_PREFS.region) ?? DEFAULT_REGION
+const exampleProfile = ref<string>(readPref(WAIT_PREFS.profile) ?? '')
+const wait = ref<PredictResponse | null>(null)
+const rxId = ref<string | null>(null)
+const rx = ref<CheckResponse | null>(null)
 
 const denied = computed(() => (typeof route.query.denied === 'string' ? route.query.denied : ''))
 /** Роли, которым открыта страница из ?denied — подсказка над кнопкой входа. */
@@ -46,82 +43,99 @@ const loginHint = computed(() => {
   return deniedRoles.value ? t('home.deniedGuestRole', { page: denied.value, roles: deniedRoles.value }) : t('home.deniedGuest', { page: denied.value })
 })
 
+async function loadWaitExample() {
+  if (!exampleProfile.value) exampleProfile.value = refdata.topProfileCode()
+  if (!exampleProfile.value) return
+  wait.value = await queue.predict({ regionKato: exampleRegion, profileCode: exampleProfile.value })
+}
+
+async function loadRxExample() {
+  const top = (await medicines.topMnn(1)).items[0]
+  if (!top) return
+  rxId.value = top.mnnId
+  rx.value = await medicines.check({ mnnId: top.mnnId })
+}
+
 onMounted(async () => {
-  try {
-    const [d] = await Promise.all([pub.daily(dailyRegion), refdata.load()])
-    daily.value = d
-  } catch {
-    daily.value = null // погода, новости и факты — необязательная витрина: без API страница остаётся страницей входа
-  } finally {
-    dailyBusy.value = false
-  }
+  // примеры и факты — витрина: без API страница остаётся страницей входа
+  await refdata.load().catch(() => undefined)
+  await Promise.all([loadWaitExample().catch(() => (wait.value = null)), loadRxExample().catch(() => (rx.value = null))])
 })
 </script>
 
 <template>
-  <PageShell :title="t('home.title')" :lead="t('home.lead')">
+  <main class="page home">
     <Message v-if="denied && auth.isAuthenticated" severity="warn" :closable="false" data-testid="denied">
       {{ deniedRoles ? t('home.deniedRoleNamed', { page: denied, roles: deniedRoles }) : t('home.deniedRole', { page: denied }) }}
-      <RouterLink :to="roleHome(auth.role, auth.region)">{{ t('home.goHome') }}</RouterLink>
+      <RouterLink :to="roleHome(auth.role, auth.region, auth.moCode)">{{ t('home.goHome') }}</RouterLink>
     </Message>
-    <div class="home-grid">
-      <LoginPanel :hint="loginHint" />
-      <div class="daily-grid" data-testid="daily">
-        <AppCard :title="daily ? t('home.weatherTitle', { city: daily.capital }) : t('home.weatherTitleShort')" data-testid="weather">
-          <Skeleton v-if="dailyBusy && !daily" kind="kpi" />
-          <template v-else-if="daily?.weather.available">
-            <div class="weather-days">
-              <div v-for="(d, i) in daily.weather.days.slice(0, 2)" :key="d.date" class="weather-day">
-                <div class="muted small">{{ dayLabel(i) }} · {{ dateShort(d.date) }}</div>
-                <div class="weather-main"><i :class="weatherIcon(d.code)" aria-hidden="true" /> <span class="tabular">{{ Math.round(d.tMax) }}°</span><span class="muted tabular"> / {{ Math.round(d.tMin) }}°</span></div>
-                <div class="muted small">{{ t('home.weather.' + d.code) }} · {{ t('home.precip', { pct: d.precipitationProbability }) }}</div>
-              </div>
-            </div>
-            <ul class="tips">
-              <li v-for="tip in daily.tips" :key="tip.code + tip.day"><span class="tip-day">{{ dayLabel(tip.day) }}</span> {{ tip.text }}</li>
-            </ul>
-            <p class="muted small">{{ t('home.weatherNote', { source: daily.weather.source }) }}</p>
-          </template>
-          <p v-else class="muted">{{ t('home.weatherUnavailable') }}</p>
-        </AppCard>
-        <AppCard :title="t('home.newsTitle')" data-testid="news">
-          <Skeleton v-if="dailyBusy && !daily" kind="lines" />
-          <template v-else-if="daily?.news.available && daily.news.items.length">
-            <ul class="news">
-              <li v-for="n in daily.news.items" :key="n.url">
-                <a :href="n.url" target="_blank" rel="noopener">{{ n.title }}</a>
-                <div class="muted small">{{ n.source }}<template v-if="n.publishedAt"> · {{ dateShort(n.publishedAt) }}</template></div>
-              </li>
-            </ul>
-          </template>
-          <p v-else class="muted">{{ t('home.newsUnavailable') }}</p>
-        </AppCard>
+
+    <div class="hero-grid">
+      <div class="intro">
+        <h1>{{ t('home.headline') }}</h1>
+        <p class="lead intro-lead">{{ t('home.lead') }}</p>
+        <LoginPanel :hint="loginHint" />
+      </div>
+
+      <div class="examples">
+        <section class="card example example-wait" data-testid="example-wait">
+          <div class="example-head"><span class="eyebrow">{{ t('home.exampleWait') }}</span><span class="spacer" /><OriginTag kind="ml" /></div>
+          <span class="muted small">{{ refdata.regionName(exampleRegion) }} · {{ refdata.profileName(exampleProfile).toLowerCase() }}</span>
+          <div class="hero-value tabular"><span class="hero-number">{{ wait ? `≈ ${days(wait.p50Days)}` : '—' }}</span><span class="hero-unit">{{ t('common.days') }}</span></div>
+          <span class="hero-label">{{ t('hero.half') }}</span>
+          <span v-if="wait" class="muted small tabular">{{ t('hero.nineOfTen', { days: days(wait.p90Days) }) }} · {{ t('hero.within30', { pct: pct(wait.pWithin30Days) }) }}</span>
+          <span class="caption">{{ t('home.exampleTag') }}</span>
+        </section>
+
+        <section class="card example example-rx" data-testid="example-rx">
+          <div class="example-head">
+            <span class="eyebrow">{{ t('home.exampleRx') }}</span><span class="spacer" />
+            <StatusTag v-if="rx" :value="rx.covered ? t('medicines.covered') : t('medicines.notCovered')" :tone="rx.covered ? 'ok' : 'warn'" />
+          </div>
+          <span class="rx-title">{{ rxId ? t('medicines.mnnShort', { id: rxId }) : '—' }}</span>
+          <div class="rx-row"><span class="muted">{{ t('home.rxMedian') }}</span><span class="tabular rx-value">{{ rx && rx.fillDaysP50 !== null ? `${days(rx.fillDaysP50)} ${t('common.days')}` : '—' }}</span></div>
+          <div class="rx-row last"><span class="muted">{{ t('home.rxNineOfTen') }}</span><span class="tabular rx-value">{{ rx && rx.fillDaysP90 !== null ? t('home.rxUpTo', { days: days(rx.fillDaysP90) }) : '—' }}</span></div>
+          <span class="caption">{{ t('home.exampleTag') }}</span>
+        </section>
       </div>
     </div>
 
     <div class="facts-row" data-testid="data-facts">
-      <div class="fact"><div class="fact-value tabular">{{ refdata.referralsTotal ? num(Math.round(refdata.referralsTotal / 1000)) : '—' }} {{ t('home.thousand') }}</div><div class="muted small">{{ t('home.factReferrals') }}</div></div>
-      <div class="fact"><div class="fact-value tabular">{{ refdata.regionsCount || '—' }}</div><div class="muted small">{{ t('home.factRegions') }}</div></div>
-      <div class="fact"><div class="fact-value">{{ t('home.factPeriodValue') }}</div><div class="muted small">{{ t('home.factPeriod') }}</div></div>
-      <p class="muted small provenance">{{ t('home.factsNote') }}</p>
+      <div class="fact"><span class="fact-value tabular">{{ refdata.referralsTotal ? `${num(Math.round(refdata.referralsTotal / 1000))} ${t('home.thousand')}` : '—' }}</span><span class="muted small">{{ t('home.factReferrals') }}</span></div>
+      <div class="fact"><span class="fact-value tabular">{{ refdata.regionsCount || '—' }}</span><span class="muted small">{{ t('home.factRegions') }}</span></div>
+      <div class="fact"><span class="fact-value">{{ t('home.factPeriodValue') }}</span><span class="muted small">{{ t('home.factPeriod') }}</span></div>
+      <span class="spacer" />
+      <span class="caption provenance">{{ t('home.factsNote') }}</span>
     </div>
-  </PageShell>
+  </main>
 </template>
 
 <style scoped>
-.home-grid { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: var(--dm-space-4); align-items: start; }
-.daily-grid { display: grid; gap: var(--dm-space-4); }
-.weather-days { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dm-space-3); }
-.weather-day { border: 1px solid var(--dm-hairline); border-radius: var(--dm-radius-md); padding: var(--dm-space-3); display: grid; gap: 4px; }
-.weather-main { font-size: 1.6rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.weather-main i { color: var(--dm-accent); font-size: 1.3rem; }
-.tips { margin: var(--dm-space-3) 0 var(--dm-space-2); padding-left: 0; list-style: none; display: grid; gap: 6px; }
-.tip-day { display: inline-block; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dm-muted); margin-right: 6px; }
-.news { margin: 0; padding-left: 0; list-style: none; display: grid; gap: var(--dm-space-3); }
-.news a { color: var(--dm-ink); text-decoration: none; }
-.news a:hover { color: var(--dm-accent); }
-.facts-row { display: flex; flex-wrap: wrap; gap: var(--dm-space-5); margin-top: var(--dm-space-5); padding-top: var(--dm-space-4); border-top: 1px solid var(--dm-hairline); align-items: flex-start; }
-.fact-value { font-size: 1.4rem; font-weight: 600; }
-.provenance { flex-basis: 100%; margin: 0; }
-@media (max-width: 760px) { .home-grid { grid-template-columns: 1fr; } }
+.home { gap: 40px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+.intro { display: flex; flex-direction: column; gap: 20px; }
+.intro-lead { font-size: var(--dm-text-base); max-width: 52ch; }
+.examples { position: relative; min-height: 488px; }
+.example { position: absolute; display: flex; flex-direction: column; gap: 12px; }
+.example-wait { top: 0; left: 0; width: min(400px, 100%); }
+.example-rx { top: 300px; right: 0; width: min(340px, 100%); }
+.example-head { display: flex; align-items: center; gap: 10px; }
+.spacer { flex: 1; }
+.hero-value { display: flex; align-items: baseline; gap: 10px; }
+.hero-number { font-size: var(--dm-text-hero); font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+.hero-unit { font-size: var(--dm-text-base); color: var(--dm-muted); }
+.hero-label { font-size: var(--dm-text-md); }
+.rx-title { font-size: var(--dm-text-lg); font-weight: 500; letter-spacing: -0.01em; }
+.rx-row { display: flex; justify-content: space-between; gap: 12px; font-size: var(--dm-text-sm); padding: 8px 0; border-bottom: 1px solid var(--dm-hairline); }
+.rx-row.last { border-bottom: 0; padding-bottom: 0; }
+.rx-value { font-weight: 500; }
+.facts-row { border-top: 1px solid var(--dm-hairline); padding-top: 24px; display: flex; align-items: flex-end; gap: 48px; flex-wrap: wrap; }
+.fact { display: flex; flex-direction: column; gap: 4px; }
+.fact-value { font-size: 29px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.05; }
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 24px; }
+  .examples { min-height: 0; display: grid; gap: 16px; }
+  .example { position: static; width: auto; }
+  .facts-row { gap: 24px; }
+}
 </style>

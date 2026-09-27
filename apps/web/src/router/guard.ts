@@ -5,6 +5,7 @@ export interface GuardAuth {
   isAuthenticated: boolean
   role: Role | null
   region: string | null
+  moCode?: string | null
   hasRole: (...roles: Role[]) => boolean
 }
 
@@ -25,7 +26,7 @@ export function resolveEntry(to: Target, auth: GuardAuth): true | string | Denie
     return denied
   }
   if (isHome && !to.query.denied) {
-    const home = roleHome(auth.role, auth.region)
+    const home = roleHome(auth.role, auth.region, auth.moCode ?? null)
     if (home !== '/') return home
   }
   return true

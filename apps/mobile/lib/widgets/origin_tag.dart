@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import 'status_chip.dart';
 
 /// Откуда число: прогноз модели, расчёт по формуле/справочнику или черновик языковой модели.
 enum Origin { ml, formula, ai }
 
-/// Метка происхождения — порт `OriginTag.vue`: та же конвенция «каждое число подписано». Тап открывает пояснение.
+/// Метка происхождения — та же конвенция, что в вебе: «каждое число подписано». Чип radius 8 («ML-модель» —
+/// heal-wash/ink, «формула» — soft/ink-2, «AI» — coral-wash/ink); тап открывает пояснение.
 class OriginTag extends StatelessWidget {
   const OriginTag(this.kind, {super.key});
 
@@ -26,7 +28,7 @@ class OriginTag extends StatelessWidget {
       button: true,
       label: '$label. $note',
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         onTap: () => showModalBottomSheet<void>(
           context: context,
           showDragHandle: true,
@@ -38,19 +40,12 @@ class OriginTag extends StatelessWidget {
               children: [
                 Text(label, style: Theme.of(sheet).textTheme.titleMedium),
                 const SizedBox(height: AppSpacing.sm),
-                Text(note, style: Theme.of(sheet).textTheme.bodyMedium),
+                Text(note, style: Theme.of(sheet).textTheme.bodySmall),
               ],
             ),
           ),
         ),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 2),
-          decoration: BoxDecoration(color: tone.bg, borderRadius: BorderRadius.circular(AppRadius.pill)),
-          child: Text(
-            label.toUpperCase(),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: tone.fg, fontSize: 11, letterSpacing: 0.6, fontWeight: FontWeight.w600),
-          ),
-        ),
+        child: ToneChip(label: label, fg: tone.fg, bg: tone.bg),
       ),
     );
   }

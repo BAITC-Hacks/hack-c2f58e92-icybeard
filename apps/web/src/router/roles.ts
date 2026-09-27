@@ -6,14 +6,16 @@ export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value)
 }
 
-/** Домашний экран роли: гражданин → свой маршрут, врач → рабочий список, главврач → свой регион, регулятор → карта, стюард → консоль; без роли — страница входа. */
-export function roleHome(role: Role | null, region: string | null = null): string {
+/** Домашний экран роли: гражданин → свой маршрут, врач → рабочий список, главврач → кабинет своей организации
+ * (клейм mo_code), без него — свой регион, регулятор → карта, стюард → консоль; без роли — страница входа. */
+export function roleHome(role: Role | null, region: string | null = null, moCode: string | null = null): string {
   switch (role) {
     case 'citizen':
       return '/me/route'
     case 'doctor':
       return '/doctor/worklist'
     case 'chief':
+      if (moCode) return `/gov/organizations/${moCode}`
       return region ? `/gov/regions/${region}` : '/gov'
     case 'regulator':
     case 'admin':
@@ -25,9 +27,11 @@ export function roleHome(role: Role | null, region: string | null = null): strin
   }
 }
 
-/** Группы боковой навигации персонала (doctor, chief, regulator, steward, admin); citizen — верхняя полоса гражданина. */
-export type NavGroup = 'patients' | 'region' | 'data' | 'citizen'
-export const NAV_GROUPS: readonly NavGroup[] = ['patients', 'region', 'data']
+/** Группы боковой навигации персонала: врач — «Пациенты»; главврач — «Больница» · «Общее»; регулятор —
+ * «Министерство» · «Данные» (стюард — только «Данные»); «Регион» — запасная группа главврача без mo_code;
+ * citizen — верхняя полоса гражданина. Порядок массива — порядок групп в сайдбаре. */
+export type NavGroup = 'patients' | 'hospital' | 'ministry' | 'region' | 'common' | 'data' | 'citizen'
+export const NAV_GROUPS: readonly NavGroup[] = ['patients', 'hospital', 'ministry', 'region', 'common', 'data']
 
 /** Роли, которым показывается боковой каркас; гражданин (и страница входа) видят верхнюю полосу. */
 export function usesSidebar(role: Role | null): boolean {
@@ -42,8 +46,12 @@ declare module 'vue-router' {
     title?: string
     /** Позиция в меню; без поля маршрут в меню не попадает. */
     nav?: number
-    /** Группа навигации: сайдбар персонала (patients/region/data) или верхняя полоса гражданина (citizen). */
+    /** Группа навигации: сайдбар персонала (patients/hospital/ministry/common/data) или верхняя полоса гражданина (citizen). */
     group?: NavGroup
+    /** Группа для отдельных ролей, если отличается от group (журнал решений: врачу — «Пациенты», главврачу — «Общее»). */
+    groupByRole?: Partial<Record<Role, NavGroup>>
+    /** Кому показывать пункт в меню; без поля — всем, кому открыт маршрут (roles). */
+    navRoles?: Role[]
     /** Ключ i18n короткой подписи пункта меню (в сайдбаре — «Карта», «Ассистент»); без него — title. */
     navTitle?: string
     /** Иконка PrimeIcons пункта меню (свёрнутый сайдбар показывает только её). */

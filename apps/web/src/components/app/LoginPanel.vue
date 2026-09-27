@@ -5,8 +5,8 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 
-/** Вход: eGov mobile — единственная заливная кнопка, вход по логину — контурная. Без входа приложение не открывается.
- * `hint` — подсказка над кнопкой входа (например, какая роль нужна для страницы из ?denied). */
+/** Карточка «Вход» (W-Home): eGov mobile — primary (ink), вход по логину — secondary (soft). Гостевого режима нет:
+ * без входа приложение не открывается. `hint` — подсказка над кнопками (какая роль нужна для страницы из ?denied). */
 defineProps<{ hint?: string }>()
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -29,21 +29,20 @@ function loginFromRoadmap() {
 <template>
   <section class="card login-panel">
     <h2>{{ t('auth.loginTitle') }}</h2>
-    <p class="muted">{{ t('auth.loginLead') }}</p>
+    <p class="muted small lead-text">{{ t('auth.loginLead') }}</p>
     <p v-if="hint" class="hint" data-testid="denied">{{ hint }}</p>
     <div class="buttons">
       <Button :label="t('auth.loginEgov')" icon="pi pi-mobile" data-testid="login-egov" @click="onEgov" />
       <Button
         :label="t('auth.login')"
         severity="secondary"
-        outlined
         :disabled="auth.keycloakUnavailable"
         :title="auth.keycloakUnavailable ? t('auth.unavailable') : undefined"
         data-testid="login-primary"
         @click="auth.login()"
       />
     </div>
-    <p class="muted note">{{ auth.keycloakUnavailable ? t('auth.unavailable') : t('auth.syntheticNote') }}</p>
+    <p class="caption note">{{ auth.keycloakUnavailable ? t('auth.unavailable') : t('auth.syntheticNote') }}</p>
     <Dialog v-model:visible="roadmap" modal :header="t('auth.roadmapTitle')" :style="{ width: 'min(480px, 92vw)' }" data-testid="egov-roadmap">
       <p class="roadmap">{{ t('auth.roadmap') }}</p>
       <template #footer>
@@ -54,10 +53,12 @@ function loginFromRoadmap() {
 </template>
 
 <style scoped>
-.login-panel h2 { margin-bottom: 4px; }
-.hint { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--dm-radius-sm); background: var(--dm-warn-soft); color: var(--dm-warn); font-size: 0.9rem; }
-.buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.login-panel { display: flex; flex-direction: column; gap: 12px; max-width: 440px; }
+.login-panel h2 { margin: 0; }
+.lead-text { margin: 0; }
+.hint { margin: 0; padding: 10px 12px; border-radius: var(--dm-radius-sm); background: var(--dm-warn-soft); color: var(--dm-warn); font-size: var(--dm-text-sm); }
+.buttons { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
 .buttons :deep(.p-button) { justify-content: center; }
-.note { font-size: 0.85rem; margin: 12px 0 0; }
+.note { margin: 0; }
 .roadmap { margin: 0; line-height: 1.5; }
 </style>

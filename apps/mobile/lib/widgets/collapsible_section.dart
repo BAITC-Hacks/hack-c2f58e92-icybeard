@@ -5,9 +5,9 @@ import '../theme/tones.dart';
 import '../theme/typography.dart';
 import 'origin_tag.dart';
 
-/// Свёртываемая секция с итоговой строкой: заголовок, справа итог («7 истекли, 3 действуют») и шеврон.
-/// Метка происхождения — одна на секцию, у заголовка. Раскрытие анимируется по высоте без прыжков
-/// (AnimatedSize от верхнего края); при prefers-reduced-motion — мгновенно.
+/// Свёртываемая секция в белой карточке: заголовок 17/500, справа итог («7 истекли, 3 действуют») 14 ink-2 и
+/// шеврон. Метка происхождения — одна на секцию, у заголовка. Раскрытие анимируется по высоте (AnimatedSize);
+/// при prefers-reduced-motion — мгновенно.
 class CollapsibleSection extends StatefulWidget {
   const CollapsibleSection({
     super.key,
@@ -25,7 +25,7 @@ class CollapsibleSection extends StatefulWidget {
   final bool initiallyExpanded;
   final Widget child;
 
-  /// Отступ 16 вокруг содержимого; false — для списков ListTile, у которых свои отступы.
+  /// Отступ 16 вокруг содержимого; false — для списков, у которых свои отступы.
   final bool padded;
 
   @override
@@ -41,7 +41,10 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
     final colors = AppPalette.of(context);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final duration = reduceMotion ? Duration.zero : AppDurations.fast * 1.5;
-    return Card(
+    return Material(
+      color: colors.card,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -50,10 +53,9 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
             expanded: _expanded,
             label: widget.summary == null ? widget.title : '${widget.title}. ${widget.summary}',
             child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadius.md),
               onTap: () => setState(() => _expanded = !_expanded),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.md, AppSpacing.md),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 14, AppSpacing.md, 14),
                 child: Row(
                   children: [
                     Flexible(
@@ -61,8 +63,8 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Flexible(child: Text(widget.title, style: theme.textTheme.titleSmall, maxLines: 2, overflow: TextOverflow.ellipsis)),
-                          if (widget.origin != null) ...[const SizedBox(width: AppSpacing.sm), OriginTag(widget.origin!)],
+                          Flexible(child: Text(widget.title, style: theme.textTheme.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis)),
+                          if (widget.origin != null) ...[const SizedBox(width: AppSpacing.sm), Flexible(child: OriginTag(widget.origin!))],
                         ],
                       ),
                     ),
@@ -98,11 +100,9 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Divider(),
+                      const Divider(indent: AppSpacing.lg, endIndent: AppSpacing.lg),
                       Padding(
-                        padding: widget.padded
-                            ? const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg)
-                            : EdgeInsets.zero,
+                        padding: widget.padded ? const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg) : EdgeInsets.zero,
                         child: widget.child,
                       ),
                     ],

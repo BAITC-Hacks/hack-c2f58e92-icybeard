@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
-/// Скелетон загрузки: мягкий пульс прозрачности без сторонних пакетов; уважает prefers-reduced-motion.
+/// Скелетон загрузки: soft-блок с мягким пульсом прозрачности без сторонних пакетов; уважает prefers-reduced-motion.
 class Skeleton extends StatefulWidget {
   const Skeleton({super.key, this.height = 14, this.width, this.radius = AppRadius.sm});
 
@@ -31,18 +31,28 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
     return AnimatedBuilder(
       animation: _controller,
       builder: (_, _) => Opacity(
-        opacity: reduceMotion ? 0.5 : 0.35 + 0.35 * _controller.value,
+        opacity: reduceMotion ? 0.7 : 0.5 + 0.5 * _controller.value,
         child: Container(
           height: widget.height,
           width: widget.width,
-          decoration: BoxDecoration(color: colors.faint, borderRadius: BorderRadius.circular(widget.radius)),
+          decoration: BoxDecoration(color: colors.neutralSoft, borderRadius: BorderRadius.circular(widget.radius)),
         ),
       ),
     );
   }
 }
 
-/// Три плитки KPI в ряд, как на экранах ожидания и маршрута.
+/// Плейсхолдер карточки: белый блок radius 16 нужной высоты.
+class CardSkeleton extends StatelessWidget {
+  const CardSkeleton({super.key, this.height = 160});
+
+  final double height;
+
+  @override
+  Widget build(BuildContext context) => Skeleton(height: height, radius: AppRadius.lg);
+}
+
+/// Три плитки KPI в ряд.
 class KpiRowSkeleton extends StatelessWidget {
   const KpiRowSkeleton({super.key, this.count = 3});
 

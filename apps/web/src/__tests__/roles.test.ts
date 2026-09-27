@@ -13,6 +13,7 @@ describe('roles', () => {
     expect(roleHome('citizen')).toBe('/me/route')
     expect(roleHome('doctor')).toBe('/doctor/worklist')
     expect(roleHome('chief', '75')).toBe('/gov/regions/75')
+    expect(roleHome('chief', '75', '028B')).toBe('/gov/organizations/028B')
     expect(roleHome('chief')).toBe('/gov')
     expect(roleHome('regulator')).toBe('/gov')
     expect(roleHome('admin')).toBe('/gov')

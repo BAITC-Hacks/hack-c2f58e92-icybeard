@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-/** Спарклайн в плитке KPI: ломаная по значениям, цвет — currentColor (через токены родителя). */
+/** Спарклайн в KPI-карточке: ломаная по значениям, цвет — ink-2 (через currentColor родителя). */
 const props = withDefaults(defineProps<{ values: (number | null)[]; width?: number; height?: number }>(), { width: 88, height: 26 })
 
 const points = computed(() => {
@@ -26,5 +26,5 @@ const points = computed(() => {
 </template>
 
 <style scoped>
-.spark { display: block; color: var(--dm-accent); overflow: visible; }
+.spark { display: block; color: var(--dm-muted); overflow: visible; }
 </style>

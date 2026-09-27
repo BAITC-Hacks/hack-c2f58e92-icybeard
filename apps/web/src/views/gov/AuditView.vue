@@ -87,7 +87,7 @@ onMounted(() => load())
         <InputText v-model="actor" size="small" :placeholder="t('gov.audit.actorPlaceholder')" data-testid="audit-actor" @keyup.enter="load()" />
       </IconField>
       <Button :label="t('gov.audit.refresh')" icon="pi pi-refresh" size="small" severity="secondary" text :loading="loading" @click="load()" />
-      <Button :label="t('shell.exportCsv')" icon="pi pi-download" size="small" severity="secondary" outlined :disabled="visible.length === 0" @click="exportCsv" />
+      <Button :label="t('shell.exportCsv')" icon="pi pi-download" size="small" severity="secondary" :disabled="visible.length === 0" @click="exportCsv" />
     </template>
     <div class="toolbar">
       <div class="chips"><button v-for="r in roles" :key="r" type="button" class="chip-filter" :class="{ active: role === r }" @click="role = role === r ? null : r">{{ roleLabel(r) }} <span class="count">{{ count((e) => e.role === r) }}</span></button></div>

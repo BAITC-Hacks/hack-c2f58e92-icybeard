@@ -22,8 +22,9 @@ import 'guards.dart';
 
 /// Два shell'а с уникальными префиксами (go_router не матчит одинаковые пути в разных shell'ах):
 /// citizen — `/home` (с вложенными `route`, `wait`, `medicines`, `vaccination`), `/updates`, `/profile`;
-/// doctor — `/doctor/patients` (с `:ref` и `:ref/referral`), `/doctor/referral` (с `decisions`), `/doctor/scribe`,
-/// `/doctor/profile`. Переходы — `context.go`, чтобы стек ветки и кнопка «назад» были согласованы.
+/// doctor — `/doctor/patients` (с `:ref`, `:ref/referral`, `:ref/scribe`), `/doctor/decisions`, `/doctor/profile`.
+/// Ассистент направления и скрайб без пациента (`/doctor/referral`, `/doctor/scribe`) живут вне вкладок.
+/// Переходы — `context.go`, чтобы стек ветки и кнопка «назад» были согласованы.
 GoRouter buildRouter(Session session) => GoRouter(
       initialLocation: '/',
       refreshListenable: session,
@@ -32,7 +33,7 @@ GoRouter buildRouter(Session session) => GoRouter(
         GoRoute(path: '/', redirect: (_, _) => session.home),
         GoRoute(path: '/login', builder: (_, state) => LoginScreen(from: state.uri.queryParameters['from'])),
         StatefulShellRoute.indexedStack(
-          builder: (context, _, shell) => AppShell(shell: shell, destinations: _citizenDestinations(S.at(context))),
+          builder: (context, _, shell) => AppShell(shell: shell, destinations: citizenDestinations(S.at(context))),
           branches: [
             StatefulShellBranch(routes: [
               GoRoute(
@@ -57,7 +58,7 @@ GoRouter buildRouter(Session session) => GoRouter(
           ],
         ),
         StatefulShellRoute.indexedStack(
-          builder: (context, _, shell) => AppShell(shell: shell, destinations: _doctorDestinations(S.at(context))),
+          builder: (context, _, shell) => AppShell(shell: shell, destinations: doctorDestinations(S.at(context))),
           branches: [
             StatefulShellBranch(routes: [
               GoRoute(
@@ -76,34 +77,34 @@ GoRouter buildRouter(Session session) => GoRouter(
                           profileCode: state.uri.queryParameters['profileCode'],
                         ),
                       ),
+                      GoRoute(path: 'scribe', builder: (_, state) => ScribeScreen(patientRef: state.pathParameters['ref'])),
                     ],
                   ),
                 ],
               ),
             ]),
-            StatefulShellBranch(routes: [
-              GoRoute(
-                path: '/doctor/referral',
-                builder: (_, state) => ReferralScreen(moCode: state.uri.queryParameters['moCode'], profileCode: state.uri.queryParameters['profileCode']),
-                routes: [GoRoute(path: 'decisions', builder: (_, _) => const DecisionsScreen())],
-              ),
-            ]),
-            StatefulShellBranch(routes: [GoRoute(path: '/doctor/scribe', builder: (_, _) => const ScribeScreen())]),
+            StatefulShellBranch(routes: [GoRoute(path: '/doctor/decisions', builder: (_, _) => const DecisionsScreen())]),
             StatefulShellBranch(routes: [GoRoute(path: '/doctor/profile', builder: (_, _) => const ProfileScreen())]),
           ],
         ),
+        GoRoute(
+          path: '/doctor/referral',
+          builder: (_, state) => ReferralScreen(moCode: state.uri.queryParameters['moCode'], profileCode: state.uri.queryParameters['profileCode']),
+        ),
+        GoRoute(path: '/doctor/scribe', builder: (_, _) => const ScribeScreen()),
       ],
     );
 
-List<ShellDestination> _citizenDestinations(S s) => [
-      ShellDestination(label: s.navHome, icon: Icons.home_outlined, selectedIcon: Icons.home),
-      ShellDestination(label: s.navUpdates, icon: Icons.notifications_none, selectedIcon: Icons.notifications),
-      ShellDestination(label: s.navProfile, icon: Icons.person_outline, selectedIcon: Icons.person),
+/// Вкладки гражданина: Главная · Уведомления · Профиль.
+List<ShellDestination> citizenDestinations(S s) => [
+      ShellDestination(label: s.navHome, icon: Icons.home_outlined, path: '/home'),
+      ShellDestination(label: s.navUpdates, icon: Icons.notifications_none, path: '/updates'),
+      ShellDestination(label: s.navProfile, icon: Icons.person_outline, path: '/profile'),
     ];
 
-List<ShellDestination> _doctorDestinations(S s) => [
-      ShellDestination(label: s.navPatients, icon: Icons.people_outline, selectedIcon: Icons.people),
-      ShellDestination(label: s.navReferral, icon: Icons.assignment_outlined, selectedIcon: Icons.assignment),
-      ShellDestination(label: s.navScribe, icon: Icons.mic_none, selectedIcon: Icons.mic),
-      ShellDestination(label: s.navProfile, icon: Icons.person_outline, selectedIcon: Icons.person),
+/// Вкладки врача: Пациенты · Решения · Профиль (ассистент и скрайб открываются из маршрута пациента).
+List<ShellDestination> doctorDestinations(S s) => [
+      ShellDestination(label: s.navPatients, icon: Icons.people_outline, path: '/doctor/patients'),
+      ShellDestination(label: s.navDecisions, icon: Icons.history, path: '/doctor/decisions'),
+      ShellDestination(label: s.navProfile, icon: Icons.person_outline, path: '/doctor/profile'),
     ];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { days, indexColor, pct, shortOrgName, signed } from '@/lib/format'
+import { days, indexColor, indexStep, pct, shortOrgName, signed } from '@/lib/format'
 
 describe('shortOrgName', () => {
   it.each([
@@ -54,9 +54,13 @@ describe('format', () => {
     expect(signed(0)).toBe('0.0')
   })
 
-  it('maps the index to a hue from red to green, lighter on the dark theme', () => {
-    expect(indexColor(0)).toBe('hsl(0 55% 42%)')
-    expect(indexColor(100)).toBe('hsl(120 55% 42%)')
-    expect(indexColor(50, true)).toBe('hsl(60 55% 58%)')
+  it('maps the index to one of the five map-scale steps (below 60 → 87 and above)', () => {
+    expect(indexStep(0)).toBe(1)
+    expect(indexStep(59.9)).toBe(1)
+    expect(indexStep(60)).toBe(2)
+    expect(indexStep(79.9)).toBe(3)
+    expect(indexStep(86)).toBe(4)
+    expect(indexStep(87)).toBe(5)
+    expect(indexColor(100)).toBe('var(--dm-map-5)')
   })
 })

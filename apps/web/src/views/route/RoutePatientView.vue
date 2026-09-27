@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
-import Textarea from 'primevue/textarea'
+import InputText from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -12,8 +12,7 @@ import RouteHistory from '@/components/route/RouteHistory.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import CollapsibleSection from '@/components/ui/CollapsibleSection.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import KpiRow from '@/components/ui/KpiRow.vue'
-import KpiTile from '@/components/ui/KpiTile.vue'
+import HeroNumber from '@/components/ui/HeroNumber.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StageStepper from '@/components/ui/StageStepper.vue'
@@ -22,21 +21,23 @@ import { useRouteData } from '@/composables/useRouteData'
 import { days, pct, refusalWords, shortOrgName, signed } from '@/lib/format'
 import { dateShort, nextActionKey } from '@/lib/route'
 
-/** Маршрут пациента для врача (/route/{ref}): шапка с шевронами стадий и флагами, слева панель врача (следующий шаг,
- * сигнал пациента с кнопками и причиной), прогноз с «почему так» и этапы; справа факты, анализы итогом,
- * «где быстрее» с «Направить», решения; липкая панель действий внизу. */
+/** Маршрут пациента для врача (W-Patient): «← Пациенты», реф с чипами флагов, подпись фактов, горизонтальный прогресс
+ * этапов; слева «Прогноз для текущей организации» с «почему так», справа сигнал пациента (heal-wash), «Где быстрее»
+ * с кнопками «Направить», анализы; внизу панель действий: причина, «Открыть направление», «Оставить в текущей»,
+ * ссылка на скрайб. */
 const props = defineProps<{ patientRef: string }>()
 const { t } = useI18n()
 const toast = useToast()
 const r = useRouteData(() => props.patientRef)
 const reason = ref('')
 
-const FLAG_TONES: Record<string, 'warn' | 'danger' | 'accent'> = { stuck_over_30: 'warn', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'accent' }
+const FLAG_TONES: Record<string, 'neutral' | 'danger' | 'accent'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'accent' }
 const doctor = computed(() => r.data.value?.doctor ?? null)
 const nextAction = computed(() => {
   const key = nextActionKey(doctor.value?.nextActionCode)
   return key ? t(key) : (doctor.value?.nextAction ?? '')
 })
+const alternativesCount = computed(() => r.data.value?.alternatives.length ?? 0)
 
 function requireReason(): boolean {
   if (reason.value.trim()) return true
@@ -65,136 +66,110 @@ watch(() => props.patientRef, r.load)
 </script>
 
 <template>
-  <PageShell :title="t('route.patientTitle')" :as-of="r.data.value?.asOf" :back="{ to: { name: 'worklist' }, label: t('nav.worklist') }">
-    <template #title-extra> <span class="mono muted ref">{{ patientRef }}</span></template>
-    <template v-if="r.data.value" #subtitle>
-      {{ r.data.value.organization.profileName }} · <span :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }}</span>
+  <PageShell :title="patientRef" :back="{ to: { name: 'worklist' }, label: t('nav.group.patients') }">
+    <template v-if="doctor" #title-extra>
+      <StatusTag v-for="f in doctor.riskFlags" :key="f" :value="t('route.flags.' + f)" :tone="FLAG_TONES[f] ?? 'neutral'" />
+    </template>
+    <template v-if="r.data.value && doctor" #subtitle>
+      {{ r.data.value.organization.profileName }} · <span :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }}</span> · {{ r.data.value.organization.moCode }} ·
+      {{ t('route.since', { date: dateShort(r.data.value.dates.registeredAt), days: r.data.value.daysWaiting }) }} · {{ t('route.priority').toLowerCase() }} {{ Math.round(doctor.priority) }} · {{ t('shell.asOf', { date: dateShort(r.data.value.asOf) }) }}
     </template>
     <ErrorBox :error="r.error.value" />
-    <EmptyState v-if="r.forbidden.value" :title="t('route.forbidden')" icon="pi pi-lock"><RouterLink :to="{ name: 'worklist' }">{{ t('nav.worklist') }}</RouterLink></EmptyState>
-    <EmptyState v-else-if="r.notFound.value" :title="t('route.refNotFound')" :text="patientRef" icon="pi pi-search"><RouterLink :to="{ name: 'worklist' }">{{ t('nav.worklist') }}</RouterLink></EmptyState>
-    <template v-else-if="r.busy.value && !r.data.value">
-      <AppCard><Skeleton :lines="2" /></AppCard>
-      <div class="grid cols-2" style="margin-top: 16px"><AppCard><Skeleton :lines="5" /></AppCard><AppCard><Skeleton :lines="5" /></AppCard></div>
-    </template>
+    <EmptyState v-if="r.forbidden.value" :title="t('route.forbidden')" icon="pi pi-lock"><RouterLink class="link-arrow" :to="{ name: 'worklist' }">{{ t('nav.worklist') }}</RouterLink></EmptyState>
+    <EmptyState v-else-if="r.notFound.value" :title="t('route.refNotFound')" :text="patientRef" icon="pi pi-search"><RouterLink class="link-arrow" :to="{ name: 'worklist' }">{{ t('nav.worklist') }}</RouterLink></EmptyState>
+    <div v-else-if="r.busy.value && !r.data.value" class="main-grid">
+      <AppCard><Skeleton :lines="6" /></AppCard>
+      <AppCard><Skeleton :lines="5" /></AppCard>
+    </div>
 
     <template v-if="r.data.value && doctor">
-      <AppCard dense>
-        <StageStepper :stages="r.data.value.timeline" chevrons />
-        <div class="chips head-chips">
-          <StatusTag v-for="f in doctor.riskFlags" :key="f" :value="t('route.flags.' + f)" :tone="FLAG_TONES[f] ?? 'neutral'" />
-          <span class="muted small">{{ t('route.priority') }} <b class="tabular">{{ Math.round(doctor.priority) }}</b> · {{ t('route.daysWaitingShort', { days: r.data.value.daysWaiting }) }}</span>
-        </div>
-      </AppCard>
+      <StageStepper :stages="r.data.value.timeline" norms class="progress" />
 
-      <div class="grid cols-2" style="margin-top: 16px">
-        <div class="col">
-          <AppCard :title="t('route.doctorPanel')" origin="ml" data-testid="doctor-panel">
-            <div class="next-step"><span class="muted small">{{ t('route.nextAction') }}</span><div class="next-text">{{ nextAction }}</div></div>
-            <p class="muted small">{{ doctor.explanation }}</p>
-            <div v-if="r.openSig.value" class="signal" data-testid="signal-banner">
-              <div class="signal-title" :title="r.openSig.value.toMoName ?? ''">
-                <i class="pi pi-comment" aria-hidden="true" /> {{ t('route.patientSignal.' + r.openSig.value.kind, { name: shortOrgName(r.openSig.value.toMoName) }) }}
-              </div>
-              <div class="muted small">{{ dateShort(r.openSig.value.recordedAt) }}<template v-if="r.openSig.value.comment"> · «{{ r.openSig.value.comment }}»</template></div>
-              <div class="field" style="margin-top: 8px">
-                <label>{{ t('route.reason') }}</label>
-                <Textarea v-model="reason" rows="2" auto-resize data-testid="redirect-reason" />
-              </div>
-              <div class="actions">
-                <Button v-if="r.requestedAlternative.value" :label="t('route.referHere')" :loading="r.acting.value === r.requestedAlternative.value.mo.moCode" :disabled="r.acting.value !== null" @click="redirect(r.requestedAlternative.value.mo.moCode)" />
-                <Button :label="t('route.keepHere')" severity="secondary" :loading="r.acting.value === 'keep'" :disabled="r.acting.value !== null" data-testid="keep" @click="keep()" />
-              </div>
-            </div>
-          </AppCard>
-
-          <AppCard :title="t('route.forecast')" :origin="r.data.value.forecast.fromModel ? 'ml' : 'formula'" style="margin-top: 16px">
-            <KpiRow>
-              <KpiTile :value="days(r.data.value.forecast.p50Days)" :label="t('route.p50')" />
-              <KpiTile :value="days(r.data.value.forecast.p90Days)" :label="t('route.p90')" />
-              <KpiTile :value="doctor.refusalOrgInTraining ? pct(doctor.pRefusal) : refusalWords(doctor.pRefusal)" :label="t('route.refusal')" />
-            </KpiRow>
-            <p v-if="r.target.value" class="muted small" style="margin: 10px 0 0">{{ t('route.benchmark', { days: days(r.target.value.value), source: r.target.value.source }) }}</p>
-            <div v-if="doctor.shap" class="why">
-              <CollapsibleSection :title="t('explanationCard.title')" :summary="doctor.shap.factors.length ? `${doctor.shap.factors.length}` : ''">
-                <p class="muted small">{{ doctor.shap.summary }}</p>
-                <div v-for="f in doctor.shap.factors" :key="f.name" class="factor">
-                  <span>{{ f.text }}</span>
-                  <span class="contribution" :class="f.contribution >= 0 ? 'plus' : 'minus'">{{ signed(f.contribution) }} {{ t('common.days') }}</span>
-                </div>
-              </CollapsibleSection>
-            </div>
-          </AppCard>
-
-          <AppCard :title="t('route.stages')" origin="formula" style="margin-top: 16px">
-            <ol class="stages">
-              <li v-for="s in r.data.value.timeline" :key="s.code" :class="s.status">
-                <span class="stage-title">{{ s.title }}</span>
-                <span class="muted small">{{ s.date ? dateShort(s.date) : (s.norm ?? '') }}</span>
-              </li>
-            </ol>
-          </AppCard>
-        </div>
-
-        <div class="col">
-          <AppCard :title="t('route.facts')">
-            <dl class="facts">
-              <dt>{{ t('common.organization') }}</dt><dd :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }} <span class="mono muted">{{ r.data.value.organization.moCode }}</span></dd>
-              <dt>{{ t('common.profile') }}</dt><dd>{{ r.data.value.organization.profileName }}</dd>
-              <dt>{{ t('route.dates.issued') }}</dt><dd class="tabular">{{ dateShort(r.data.value.dates.issuedAt) }}</dd>
-              <dt>{{ t('route.dates.registered') }}</dt><dd class="tabular">{{ dateShort(r.data.value.dates.registeredAt) }} · {{ t('route.daysWaitingShort', { days: r.data.value.daysWaiting }) }}</dd>
-              <dt>{{ t('route.dates.planned') }}</dt><dd class="tabular">{{ dateShort(r.data.value.dates.plannedAt) }}</dd>
-              <dt>{{ t('route.dates.expected') }}</dt><dd class="tabular">{{ dateShort(r.data.value.dates.expectedAt) }}</dd>
-              <dt>{{ t('route.priority') }}</dt><dd class="tabular">{{ Math.round(doctor.priority) }}</dd>
-            </dl>
-          </AppCard>
-
-          <div style="margin-top: 16px">
-            <CollapsibleSection :title="t('route.checklist')" :summary="t('route.checklistSummary', { expired: r.expired.value, valid: r.valid.value })" :tone="r.expired.value ? 'danger' : undefined" origin="formula">
-              <RouteChecklist :items="r.data.value.checklist" :standard="r.data.value.standard" />
-            </CollapsibleSection>
+      <div class="main-grid">
+        <AppCard :title="t('route.forecastCurrentOrg')" label :origin="r.data.value.forecast.fromModel ? 'ml' : 'formula'" data-testid="doctor-panel">
+          <div class="org-line" :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }} <span class="caption">{{ r.data.value.organization.moCode }}</span></div>
+          <HeroNumber :value="days(r.data.value.forecast.p50Days)" :unit="`${t('common.days')} — ${t('hero.half')}`" label="" compact class="hero-line" />
+          <div class="facts-line muted tabular">
+            <span>{{ t('hero.nineOfTen', { days: days(r.data.value.forecast.p90Days) }) }}</span><span>·</span>
+            <span>{{ t('route.refusal') }} <b class="ink">{{ doctor.refusalOrgInTraining ? pct(doctor.pRefusal) : refusalWords(doctor.pRefusal) }}</b></span>
+            <template v-if="alternativesCount"><span>·</span><span>{{ t('route.alternativesCount', { n: alternativesCount }) }}</span></template>
           </div>
+          <div class="next-step"><span class="eyebrow">{{ t('route.nextAction') }}</span><div class="next-text">{{ nextAction }}</div><p class="muted small" style="margin: 4px 0 0">{{ doctor.explanation }}</p></div>
+          <template v-if="doctor.shap">
+            <div class="eyebrow why-title">{{ t('explanationCard.title') }}</div>
+            <div v-for="f in doctor.shap.factors" :key="f.name" class="factor small">
+              <span>{{ f.text }}</span>
+              <span class="contribution" :class="f.contribution >= 0 ? 'plus' : 'minus'">{{ signed(f.contribution) }} {{ t('common.days') }}</span>
+            </div>
+          </template>
+          <p class="caption" style="margin: 10px 0 0">
+            <template v-if="r.target.value">{{ t('route.benchmark', { days: days(r.target.value.value), source: r.target.value.source }) }} · </template>{{ t('route.expectedDateShort', { date: dateShort(r.data.value.dates.expectedAt) }) }}
+          </p>
+        </AppCard>
 
-          <AppCard :title="t('route.whereFaster')" :origin="r.data.value.alternativesModel ? 'ml' : undefined" style="margin-top: 16px">
+        <div class="col">
+          <section v-if="r.openSig.value" class="card signal-banner" data-testid="signal-banner">
+            <i class="pi pi-comment" aria-hidden="true" />
+            <span class="signal-text">
+              <span class="signal-title" :title="r.openSig.value.toMoName ?? ''">{{ t('route.patientSignal.' + r.openSig.value.kind, { name: shortOrgName(r.openSig.value.toMoName) }) }}</span>
+              <span class="muted small"><template v-if="r.openSig.value.comment">«{{ r.openSig.value.comment }}» · </template>{{ dateShort(r.openSig.value.recordedAt) }}</span>
+            </span>
+          </section>
+
+          <AppCard :title="t('route.whereFaster')" :origin="r.data.value.alternativesModel ? 'ml' : undefined">
+            <template #header><span class="caption">{{ t('route.sameRegionProfile') }}</span></template>
             <RouteAlternatives :items="r.data.value.alternatives" audience="doctor" :acting="r.acting.value" :action-label="t('route.referHere')" @act="redirect($event)" />
+            <div class="row current-row">
+              <div class="row-main" :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }} · {{ t('route.current') }}</div>
+              <div class="row-value muted">{{ days(r.data.value.forecast.p50Days) }} / {{ days(r.data.value.forecast.p90Days) }} {{ t('common.days') }}</div>
+            </div>
           </AppCard>
 
-          <AppCard :title="t('route.signalsTitle')" style="margin-top: 16px"><RouteFeed :entries="r.entries.value" audience="doctor" /></AppCard>
-          <AppCard :title="t('route.pastReferrals')" style="margin-top: 16px"><RouteHistory :items="r.data.value.history" /></AppCard>
+          <CollapsibleSection :title="t('route.checklist')" :summary="t('route.checklistSummary', { expired: r.expired.value, valid: r.valid.value })" :tone="r.expired.value ? 'danger' : undefined" origin="formula">
+            <RouteChecklist :items="r.data.value.checklist" :standard="r.data.value.standard" />
+          </CollapsibleSection>
         </div>
+      </div>
+
+      <div class="grid cols-2">
+        <AppCard :title="t('route.signalsTitle')"><RouteFeed :entries="r.entries.value" audience="doctor" /></AppCard>
+        <AppCard :title="t('route.pastReferrals')"><RouteHistory :items="r.data.value.history" /></AppCard>
       </div>
 
       <div class="sticky-actions">
-        <div v-if="!r.openSig.value" class="field reason-inline">
-          <label>{{ t('route.reason') }}</label>
-          <Textarea v-model="reason" rows="1" auto-resize :placeholder="t('route.reason')" data-testid="redirect-reason" />
-        </div>
-        <span class="spacer" />
+        <InputText v-model="reason" :placeholder="t('route.reason')" class="reason-inline" data-testid="redirect-reason" />
         <RouterLink :to="{ name: 'referral', query: { moCode: r.data.value.organization.moCode, profileCode: r.data.value.organization.profileCode } }">
-          <Button :label="t('route.referralAssistant')" icon="pi pi-compass" severity="secondary" outlined />
+          <Button :label="t('route.openReferral')" />
         </RouterLink>
+        <Button :label="t('route.keepCurrent')" severity="secondary" :loading="r.acting.value === 'keep'" :disabled="r.acting.value !== null" data-testid="keep" @click="keep()" />
+        <Button v-if="r.openSig.value && r.requestedAlternative.value" :label="t('route.referHere')" severity="secondary" :loading="r.acting.value === r.requestedAlternative.value.mo.moCode" :disabled="r.acting.value !== null" @click="redirect(r.requestedAlternative.value.mo.moCode)" />
+        <span class="spacer" />
+        <RouterLink class="link-arrow small" :to="{ name: 'scribe' }">{{ t('route.scribeLink') }}</RouterLink>
       </div>
-      <p class="muted small">{{ r.data.value.basis }} · {{ t('route.synthetic', { asOf: dateShort(r.data.value.asOf) }) }}</p>
+      <p class="caption">{{ r.data.value.basis }} · {{ t('route.synthetic', { asOf: dateShort(r.data.value.asOf) }) }}</p>
     </template>
   </PageShell>
 </template>
 
 <style scoped>
-.ref { font-weight: 400; font-size: 0.8em; }
-.head-chips { margin-top: 10px; }
-.next-step { margin-bottom: 6px; }
-.next-text { font-size: 1.1rem; font-weight: 600; }
-.signal { margin-top: 12px; padding: 12px; border-radius: var(--dm-radius-sm); background: var(--dm-accent-soft); }
-.signal-title { font-weight: 600; }
-.signal .actions { margin-top: 8px; }
-.why { margin-top: 12px; }
-.stages { list-style: none; margin: 0; padding: 0; }
-.stages li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0 6px 14px; border-left: 2px solid var(--dm-hairline); }
-.stages li.done { border-color: var(--dm-accent); }
-.stages li.current { border-color: var(--dm-accent); }
-.stages li.current .stage-title { font-weight: 600; }
-.stages li.upcoming .stage-title { color: var(--dm-muted); }
-.sticky-actions .spacer { flex: 1; }
-.reason-inline { flex: 1 1 320px; }
-.reason-inline label { display: none; }
+.progress { padding-top: 4px; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
+.org-line { font-size: var(--dm-text-lg); font-weight: 500; letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
+.hero-line { margin: 10px 0 2px; }
+.hero-line :deep(.hero-label) { display: none; }
+.facts-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: var(--dm-text-base); padding-bottom: 8px; }
+.facts-line .ink { color: var(--dm-ink); font-weight: 500; }
+.next-step { border-top: 1px solid var(--dm-hairline); padding-top: 12px; margin-top: 4px; }
+.next-text { font-size: var(--dm-text-base); font-weight: 500; margin-top: 4px; }
+.why-title { padding: 12px 0 4px; border-top: 1px solid var(--dm-hairline); margin-top: 12px; }
+.signal-banner { background: var(--dm-accent-soft); display: flex; align-items: center; gap: 12px; padding: 16px 24px; }
+.signal-banner i { font-size: 1.3rem; }
+.signal-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.signal-title { font-size: var(--dm-text-md); font-weight: 500; }
+.current-row { color: var(--dm-muted); border-top: 1px solid var(--dm-hairline); }
+.sticky-actions { gap: 12px; }
+.reason-inline { flex: 1 1 280px; }
+.spacer { flex: 1; }
+@media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
 </style>

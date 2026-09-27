@@ -83,16 +83,15 @@ flutter:
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
 
-  # Onest (SIL OFL 1.1, лицензия в assets/fonts/OFL.txt) — тот же шрифт, что в питч-деке; покрывает казахскую
-  # кириллицу (ә ғ қ ң ө ұ ү һ і). Статические начертания, а не вариативный файл: Flutter выбирает начертание по weight.
+  # Manrope (SIL OFL 1.1, лицензия в assets/fonts/OFL-Manrope.txt) — единый шрифт «Тихой клиники» (docs/design-system.md);
+  # покрывает казахскую кириллицу (ә ғ қ ң ө ұ ү һ і). Статические начертания, а не вариативный файл: Flutter выбирает
+  # начертание по weight.
   fonts:
-    - family: Onest
+    - family: Manrope
       fonts:
-        - asset: assets/fonts/Onest-Regular.ttf
+        - asset: assets/fonts/Manrope-Regular.ttf
           weight: 400
-        - asset: assets/fonts/Onest-Medium.ttf
+        - asset: assets/fonts/Manrope-Medium.ttf
           weight: 500
-        - asset: assets/fonts/Onest-SemiBold.ttf
+        - asset: assets/fonts/Manrope-SemiBold.ttf
           weight: 600
-        - asset: assets/fonts/Onest-Bold.ttf
-          weight: 700

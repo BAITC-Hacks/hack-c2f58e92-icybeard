@@ -58,11 +58,12 @@ class S {
   String get navPatients => _t('Пациенты', 'Науқастар');
   String get navReferral => _t('Направление', 'Жолдама');
   String get navScribe => _t('Скрайб', 'Скрайб');
+  String get navDecisions => _t('Решения', 'Шешімдер');
 
   // ---------- метки происхождения (как OriginTag в вебе) ----------
-  String get originMl => _t('ML‑модель', 'ML‑модель');
-  String get originFormula => _t('формула', 'формула');
-  String get originAi => _t('AI‑черновик', 'AI‑жоба');
+  String get originMl => 'ML-модель';
+  String get originFormula => _t('Формула', 'Формула');
+  String get originAi => 'AI';
   String get originMlNote => _t(
         'Прогноз обученной модели. Качество проверено на отложенном месяце против простого правила; цифры — ориентир, не обещание.',
         'Оқытылған модельдің болжамы. Сапасы қарапайым ережемен салыстырып, кейінге қалдырылған айда тексерілген; сандар — бағдар, уәде емес.',
@@ -345,7 +346,7 @@ class S {
   // ---------- экраны ----------
   String get waitTitle => _t('Сколько ждут', 'Қанша күтеді');
   String get waitSubtitle => _t('Ожидание плановой госпитализации по региону и профилю, где быстрее', 'Аймақ пен бейін бойынша жоспарлы емдеуге жатқызуды күту, қайда жылдамырақ');
-  String get medicinesTitle => _t('Лекарства', 'Дәрілер');
+  String get medicinesTitle => _t('Проверка рецепта', 'Рецептті тексеру');
   String get medicinesSubtitle => _t('Покрытие, сроки обеспечения, признаки дефицита', 'Қамту, қамтамасыз ету мерзімдері, тапшылық белгілері');
   String get worklistTitle => _t('Пациенты', 'Науқастар');
   String get worklistSubtitle => _t('Пациенты на маршруте с приоритетами и флагами', 'Бағыттағы пациенттер, басымдықтар мен белгілермен');
@@ -520,4 +521,94 @@ class S {
     };
     return map[name] ?? name;
   }
+
+  // ---------- «Тихая клиника»: шапка, hero и карточки ----------
+  String get back => _t('Назад', 'Артқа');
+  String switchLanguage(String code) => code == 'kk' ? 'Қазақ тіліне ауысу' : 'Переключить на русский';
+
+  /// Hero «до N дн. до госпитализации»: число и подпись-единица рядом.
+  (String, String) heroUntil(String days) => _locale == 'kk' ? ('$days күнге', 'дейін емдеуге жатқызу') : ('до $days', 'дн. до госпитализации');
+  String stageOf(int step, int total) => _t('Этап $step из $total', '$total кезеңнің $step-і');
+  String forecastLine(String p50, String p90) => _t('Половина — $p50 дн., 9 из 10 — до $p90 дн.', 'Жартысы — $p50 күн, 10-ның 9-ы — $p90 күнге дейін');
+  String fewerDays(int days) => _t('Там ждут на $days дн. меньше', 'Онда $days күнге аз күтеді');
+  String get waitLabel => _t('Срок ожидания', 'Күту мерзімі');
+  String get halfHospitalized => _t('половина госпитализированных ждёт не дольше', 'емдеуге жатқызылғандардың жартысы одан артық күтпейді');
+  String get proposedByDoctor => _t('· предложил врач', '· дәрігер ұсынды');
+  String get currentOrgTag => _t('· текущая', '· ағымдағы');
+  String requestConsiderName(String name) => _t('Попросить рассмотреть $name', '$name қарауды сұрау');
+  String get requestAlreadySent => _t('Запрос отправлен · ждёт ответа врача', 'Сұрау жіберілді · дәрігер жауабын күтуде');
+  String get approxDays => _t('≈', '≈');
+
+  // ---------- проверка рецепта ----------
+  String get mnnFieldLabel => _t('МНН или название', 'ХПА немесе атауы');
+  String get mnnFieldHint => _t('Начните вводить', 'Теруді бастаңыз');
+  String get coveredChip => _t('Покрыт ОСМС', 'МӘМС қамтиды');
+  String get notCoveredChip => _t('Не покрыт', 'Қамтылмаған');
+  String programLine(String? program, String? category, String? nosology) => [
+        // название программы из витрины уже может начинаться со слова «Программа» — не дублируем
+        if (program != null && program.isNotEmpty) program.startsWith('Программа') ? program : _t('Программа $program', '$program бағдарламасы'),
+        if (category != null && category.isNotEmpty) _t('категория $category', '$category санаты'),
+        if (nosology != null && nosology.isNotEmpty) _t('нозология $nosology', '$nosology нозологиясы'),
+      ].join(' · ');
+  String get fillHalf => _t('Половина получает', 'Жартысы алады');
+  String get fillNine => _t('9 из 10 получают', '10-ның 9-ы алады');
+  String get fillWithin14 => _t('Обеспечено за 14 дней', '14 күнде қамтамасыз етілген');
+  String upToDays(String days) => _t('до $days дн.', '$days күнге дейін');
+  String daysValue(String days) => _t('$days дн.', '$days күн');
+  String get shortageNoSigns => _t('признаков нет', 'белгілер жоқ');
+  String shortageSigns(String score) => _t('есть признаки · балл $score', 'белгілер бар · балл $score');
+  String get noneInOpenData => _t('нет в открытых данных', 'ашық деректерде жоқ');
+  String modelDataLine(String name, String version, String date) => _t('Модель $name $version · данные по $date', '$name $version моделі · $date дейінгі деректер');
+
+  // ---------- вакцинация ----------
+  String get coverageKz => _t('Охват · Казахстан', 'Қамту · Қазақстан');
+  String whoChip(int year) => _t('ВОЗ/ЮНИСЕФ · $year', 'ДДСҰ/ЮНИСЕФ · $year');
+  String get vaccinationBenchNote => _t('Оценки охвата ВОЗ/ЮНИСЕФ, не административная отчётность — внешний ориентир.', 'ДДСҰ/ЮНИСЕФ қамту бағалаулары, әкімшілік есептілік емес — сыртқы бағдар.');
+
+  // ---------- профиль ----------
+  String get notificationsRow => _t('Уведомления', 'Хабарламалар');
+  String get dataConsents => _t('Данные и согласия', 'Деректер мен келісімдер');
+  String get fromEgov => _t('из eGov', 'eGov-тан');
+  String get consentsBody => _t(
+        'Стенд работает на синтетических пациентах поверх реальных очередей МЗ РК. ИИН показывается только маской, персональные данные не хранятся.',
+        'Стенд ҚР ДСМ нақты кезектері үстіндегі синтетикалық науқастармен жұмыс істейді. ЖСН тек маскамен көрсетіледі, дербес деректер сақталмайды.',
+      );
+
+  // ---------- рабочий список (пилюли и статусы строк) ----------
+  String get filterToday => _t('Сегодня', 'Бүгін');
+  String get filterAll => _t('Все', 'Барлығы');
+  String get statusAwaiting => _t('ожидает решения', 'шешім күтуде');
+  String get statusRisk => _t('риск отказа', 'бас тарту қаупі');
+  String get statusFaster => _t('есть быстрее', 'жылдамырағы бар');
+  String get statusSignal => _t('запрос пациента', 'науқас сұрауы');
+  String get searchPatient => _t('Поиск пациента', 'Науқасты іздеу');
+  String get searchByRefHint => _t('Номер пациента, например SYN-75', 'Науқас нөмірі, мысалы SYN-75');
+  String get worklistTodayEmpty => _t('Сегодня нет пациентов с флагами или запросами', 'Бүгін жалаушасы немесе сұрауы бар науқастар жоқ');
+
+  // ---------- маршрут пациента и направление (врач) ----------
+  String get recommendationLabel => _t('Рекомендация', 'Ұсыныс');
+  String get forecastLabel => _t('Прогноз', 'Болжам');
+  String get halfNoLonger => _t('дн. · половина ждёт не дольше', 'күн · жартысы одан артық күтпейді');
+  String riskRefusalLine(String value) => _t('Риск отказа $value', 'Бас тарту қаупі $value');
+  String priorityLine(int value) => _t('приоритет $value', 'басымдық $value');
+  String get openReferral => _t('Открыть направление', 'Жолдаманы ашу');
+  String patientLine(String ref, String purpose, String territory) => _t('Пациент $ref · $purpose · $territory', 'Науқас $ref · $purpose · $territory');
+  String get recommendationChip => _t('рекомендация', 'ұсыныс');
+  String get reasonHint => _t('Причина попадает в журнал', 'Себебі журналға түседі');
+  String get reasonShortLabel => _t('Причина', 'Себебі');
+  String get confirmReferral => _t('Подтвердить направление', 'Жолдаманы растау');
+  String get modelDisclaimer => _t('Прогноз — оценка модели, решение остаётся за врачом.', 'Болжам — модель бағасы, шешім дәрігерде қалады.');
+  String altLine(String p50, String risk) => _t('≈ $p50 дн. · половина ждёт не дольше · риск отказа $risk', '≈ $p50 күн · жартысы одан артық күтпейді · бас тарту қаупі $risk');
+  String get patientRequestPrefix => _t('Пациент просит', 'Науқас сұрайды');
+
+  // ---------- журнал решений ----------
+  String get matched => _t('совпало', 'сәйкес келді');
+  String get differed => _t('иначе', 'басқаша');
+  String keptLine(String name) => _t('Оставлен: $name', 'Қалдырылды: $name');
+  String referralLine(String name) => _t('Направление: $name', 'Жолдама: $name');
+
+  // ---------- скрайб ----------
+  String get scribeStopButton => _t('Остановить', 'Тоқтату');
+  String get scribeRecordingCaption => _t('Пациент дал согласие на запись', 'Науқас жазуға келісім берді');
+  String get scribeReadyCaption => _t('Нажмите «Записать» или вставьте текст консультации', '«Жазу» түймесін басыңыз немесе қабылдау мәтінін қойыңыз');
 }

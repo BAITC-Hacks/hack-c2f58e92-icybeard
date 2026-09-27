@@ -25,7 +25,7 @@ const option = computed(() => ({
     {
       type: 'bar',
       data: [
-        { value: props.before, itemStyle: { color: theme.value.palette[2] } },
+        { value: props.before, itemStyle: { color: theme.value.ink } },
         { value: props.after, itemStyle: { color: theme.value.accent } },
       ],
       barWidth: 56,

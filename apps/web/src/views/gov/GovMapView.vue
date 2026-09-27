@@ -15,19 +15,23 @@ import OverloadedTable from '@/components/OverloadedTable.vue'
 import RegionMap from '@/components/RegionMap.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import CollapsibleSection from '@/components/ui/CollapsibleSection.vue'
+import KpiRow from '@/components/ui/KpiRow.vue'
+import KpiTile from '@/components/ui/KpiTile.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import SearchSelect from '@/components/ui/SearchSelect.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import Sparkline from '@/components/ui/Sparkline.vue'
-import { days, pct } from '@/lib/format'
+import { describeEntity, streamTitle, type EntityNames } from '@/lib/anomaly'
+import { days, num, pct, shortOrgName } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
-/** Карта регионов: KPI со спарклайнами по месяцам индекса, карта и таблица в одной карточке с общей подсветкой,
- * лента сигналов с фильтром по статусу; остальные витрины по стране — свёрнутыми секциями. */
+/** Карта регионов (W-Gov): четыре KPI-карточки, слева карта со шкалой пяти синих и коралловыми точками аномалий,
+ * справа список аномалий и перегруженные организации; ниже рейтинг регионов, лента сигналов с подтверждением и
+ * остальные витрины по стране — свёрнутыми секциями. */
 /** «Регионов ниже порога» — индекс ниже середины шкалы 0…100. */
 const INDEX_THRESHOLD = 50
-const HISTORY_MONTHS = 6
+const ANOMALY_ROWS = 5
+const OVERLOADED_ROWS = 5
 const SIGNAL_STATUSES = ['open', 'acknowledged', 'dismissed'] as const
 
 const { t } = useI18n()
@@ -39,7 +43,6 @@ const toast = useToast()
 const month = ref<string | null>(null)
 const profile = ref<string>('all')
 const index = ref<IndexResponse | null>(null)
-const history = ref<{ month: string; avgP90: number; shareOver30: number; below: number }[]>([])
 const openAnomalies = ref<Anomaly[]>([])
 const openTotal = ref(0)
 const anomalies = ref<Anomaly[]>([])
@@ -55,18 +58,16 @@ const profileOptions = computed(() => [{ profileCode: 'all', name: t('common.all
 const mean = (values: number[]) => (values.length ? values.reduce((s, v) => s + v, 0) / values.length : NaN)
 const kpis = computed(() => {
   const items = index.value?.items ?? []
-  return {
-    avgP90: mean(items.map((i) => i.p90Days)),
-    shareOver30: mean(items.map((i) => i.shareOver30)),
-    below: items.filter((i) => i.indexValue < INDEX_THRESHOLD).length,
-  }
+  return { avgP90: mean(items.map((i) => i.p90Days)), shareOver30: mean(items.map((i) => i.shareOver30)), below: items.filter((i) => i.indexValue < INDEX_THRESHOLD).length }
 })
-/** Открытые сигналы по периодам — спарклайн из самой ленты (отдельной истории у сигналов нет). */
-const signalSpark = computed(() => {
-  const counts = new Map<string, number>()
-  for (const a of openAnomalies.value) counts.set(a.period, (counts.get(a.period) ?? 0) + 1)
-  return [...counts.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, n]) => n)
-})
+const anomalyRegions = computed(() => new Set(openAnomalies.value.map((a) => a.regionKato).filter((k): k is string => !!k)))
+/** Регион для ссылки «Открыть …»: наведённый, иначе первый по рейтингу. */
+const focusRegion = computed(() => hovered.value ?? index.value?.items[0]?.regionKato ?? null)
+const names: EntityNames = {
+  region: (kato) => refdata.regionName(kato),
+  profile: (code) => refdata.profileName(code),
+  organization: (moCode) => shortOrgName(refdata.organizationName(moCode)),
+}
 
 async function load() {
   loading.value = true
@@ -77,21 +78,11 @@ async function load() {
     if (month.value !== idx.month) settingMonth = true
     month.value = idx.month
     overloaded.value = ov.items
-    await loadHistory(idx.months)
   } catch (e) {
     error.value = e
   } finally {
     loading.value = false
   }
-}
-
-/** История KPI по последним месяцам индекса — для спарклайнов. */
-async function loadHistory(months: string[]) {
-  const recent = months.slice(-HISTORY_MONTHS)
-  const responses = await Promise.all(recent.map((m) => analytics.index(m, profileCode.value).catch(() => null)))
-  history.value = responses.flatMap((r, i) =>
-    r ? [{ month: recent[i]!, avgP90: mean(r.items.map((x) => x.p90Days)), shareOver30: mean(r.items.map((x) => x.shareOver30)), below: r.items.filter((x) => x.indexValue < INDEX_THRESHOLD).length }] : [],
-  )
 }
 
 async function loadSignals() {
@@ -148,70 +139,97 @@ watch(signalStatus, loadSignals)
 </script>
 
 <template>
-  <PageShell :title="t('gov.map.title')" :lead="t('gov.map.lead')" :as-of="index?.month">
+  <PageShell :title="t('gov.map.title')">
+    <template #subtitle>
+      {{ t('gov.map.subtitle') }}<template v-if="index"> · {{ t('gov.map.indexFor') }} {{ index.month }}</template><template v-if="refdata.referralsTotal"> · {{ num(Math.round(refdata.referralsTotal / 1000)) }} {{ t('home.thousand') }} {{ t('home.factReferrals') }}</template>
+    </template>
     <template #actions>
-      <Select v-model="month" :options="index?.months ?? []" :placeholder="t('common.month')" size="small" />
       <SearchSelect v-model="profile" :options="profileOptions" option-label="name" option-value="profileCode" size="small" class="profile-select" />
-      <Button :label="t('gov.map.reportPdf')" icon="pi pi-file-pdf" size="small" severity="secondary" outlined :loading="downloading" @click="report('pdf')" />
-      <Button label="Excel" icon="pi pi-file-excel" size="small" severity="secondary" outlined :loading="downloading" @click="report('xlsx')" />
+      <Select v-model="month" :options="index?.months ?? []" :placeholder="t('common.month')" size="small" />
+      <Button :label="t('gov.map.reportPdf')" icon="pi pi-file-pdf" size="small" severity="secondary" :loading="downloading" @click="report('pdf')" />
+      <Button label="Excel" icon="pi pi-file-excel" size="small" severity="secondary" :loading="downloading" @click="report('xlsx')" />
     </template>
     <ErrorBox :error="error" />
 
-    <div class="kpi" data-testid="gov-kpis">
-      <div class="item">
-        <div class="kpi-top"><span class="value">{{ days(kpis.avgP90) }}</span><Sparkline :values="history.map((h) => h.avgP90)" /></div>
-        <div class="label">{{ t('gov.map.kpiAvgP90') }}</div>
-      </div>
-      <div class="item">
-        <div class="kpi-top"><span class="value">{{ pct(kpis.shareOver30) }}</span><Sparkline :values="history.map((h) => h.shareOver30)" /></div>
-        <div class="label">{{ t('gov.map.kpiShareOver30') }}</div>
-      </div>
-      <div class="item">
-        <div class="kpi-top"><span class="value">{{ openTotal }}</span><Sparkline :values="signalSpark" /></div>
-        <div class="label">{{ t('gov.map.openSignals') }}</div>
-      </div>
-      <div class="item">
-        <div class="kpi-top"><span class="value">{{ index ? kpis.below : '—' }}</span><Sparkline :values="history.map((h) => h.below)" /></div>
-        <div class="label">{{ t('gov.map.kpiBelow', { threshold: INDEX_THRESHOLD }) }}</div>
-      </div>
-    </div>
+    <KpiRow data-testid="gov-kpis">
+      <KpiTile :value="days(kpis.avgP90)" :unit="t('common.days')" :label="t('gov.map.kpiAvgP90')" origin="formula" :loading="loading && !index" />
+      <KpiTile :value="pct(kpis.shareOver30)" :label="t('gov.map.kpiShareOver30')" origin="formula" :loading="loading && !index" />
+      <KpiTile :value="index ? kpis.below : '—'" :label="t('gov.map.kpiBelow', { threshold: INDEX_THRESHOLD })" origin="formula" :loading="loading && !index" />
+      <KpiTile :value="overloaded.length" :label="t('gov.map.kpiOverloaded')" :chip="openTotal ? t('gov.map.signalsChip', { n: openTotal }) : undefined" origin="formula" :loading="loading && !index" />
+    </KpiRow>
 
-    <AppCard :title="`${t('gov.map.indexFor')} ${index?.month ?? '…'}`" origin="formula" style="margin-top: 16px">
-      <template #header><span class="muted small">{{ loading ? t('common.loading') : t('gov.map.hoverHint') }}</span></template>
-      <div class="map-grid">
-        <RegionMap :regions="refdata.regions" :index="index?.items ?? []" :highlight="hovered" @select="toRegion" @hover="hovered = $event" />
-        <Skeleton v-if="loading && !index" kind="table" :lines="8" />
-        <IndexTable v-else :items="index?.items ?? []" :highlight="hovered" @select="toRegion" @hover="hovered = $event" />
-      </div>
-      <p class="muted small" style="margin: 12px 0 0">{{ index?.method }}</p>
-      <!-- значения и правило применения: refdata/external_benchmarks.yaml -->
-      <p class="muted small" style="margin: 4px 0 0">{{ t('gov.map.benchmark') }}</p>
-    </AppCard>
-
-    <AppCard :title="t('gov.map.signals')" origin="formula" style="margin-top: 16px" data-testid="signals">
-      <template #header>
-        <div class="chips">
-          <button v-for="s in SIGNAL_STATUSES" :key="s" type="button" class="chip-filter" :class="{ active: signalStatus === s }" @click="signalStatus = s">
-            {{ t('anomaly.status.' + s) }} <span v-if="s === 'open'" class="count">{{ openTotal }}</span>
-          </button>
+    <div class="main-grid">
+      <AppCard :title="t('gov.map.indexByRegion')" origin="formula">
+        <template #header>
+          <RouterLink v-if="focusRegion" class="link-arrow small" :to="{ name: 'region', params: { kato: focusRegion } }">{{ t('gov.map.openRegion', { name: refdata.regionName(focusRegion) }) }}</RouterLink>
+        </template>
+        <RegionMap :regions="refdata.regions" :index="index?.items ?? []" :highlight="hovered" :anomalies="anomalyRegions" @select="toRegion" @hover="hovered = $event" />
+        <div class="legend caption">
+          <span v-for="(label, i) in ['below60', 'r60', 'r70', 'r80', 'r87']" :key="label" class="legend-item"><span class="swatch" :style="{ background: `var(--dm-map-${i + 1})` }" />{{ t('gov.map.legend.' + label) }}</span>
+          <span class="legend-item"><span class="swatch dot" />{{ t('gov.map.legend.anomaly') }}</span>
+          <span>· {{ t('gov.map.legend.higherBetter') }}</span>
         </div>
-      </template>
-      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
-    </AppCard>
+        <p class="caption" style="margin: 8px 0 0">{{ index?.method }}</p>
+      </AppCard>
 
-    <div class="extras">
-      <CollapsibleSection :title="t('gov.map.overloaded')" origin="formula" :summary="String(overloaded.length)">
-        <OverloadedTable :items="overloaded" @organization="router.push({ name: 'organization', params: { moCode: $event } })" @simulate="router.push({ name: 'simulator', query: { region: $event.regionKato, profile: $event.profileCode } })" />
-      </CollapsibleSection>
-      <CountryExtras />
+      <div class="col">
+        <AppCard :title="t('gov.map.anomaliesTitle')" origin="ml" data-testid="signals">
+          <template #header><span class="caption">{{ index?.month ?? '' }}</span></template>
+          <Skeleton v-if="loading && openAnomalies.length === 0" :lines="4" />
+          <p v-else-if="openAnomalies.length === 0" class="muted">{{ t('anomalyFeed.empty') }}</p>
+          <div v-else class="rows">
+            <RouterLink v-for="a in openAnomalies.slice(0, ANOMALY_ROWS)" :key="a.id" class="row anomaly-row" :to="a.regionKato ? { name: 'region', params: { kato: a.regionKato } } : { name: 'gov' }">
+              <span class="anomaly-dot" :class="{ idle: a.severity !== 'critical' }" aria-hidden="true" />
+              <span class="row-main">
+                <span class="anomaly-title">{{ describeEntity(a.entity, a.regionKato, names).join(' · ') }} · {{ streamTitle(a.streamId) }}</span>
+                <span class="row-sub">{{ a.period }} · {{ t('anomalyFeed.observed') }} {{ num(a.observed) }} {{ t('anomalyFeed.atExpected') }} {{ num(a.expected) }}</span>
+              </span>
+            </RouterLink>
+          </div>
+          <a v-if="openTotal > ANOMALY_ROWS" class="link-arrow small" href="#signals-feed" style="margin-top: 12px">{{ t('gov.map.allSignals') }} · {{ openTotal }}</a>
+        </AppCard>
+
+        <AppCard :title="t('gov.map.overloaded')" origin="formula">
+          <template #header><RouterLink class="link-arrow small" :to="{ name: 'simulator' }">{{ t('nav.simulator') }}</RouterLink></template>
+          <Skeleton v-if="loading && overloaded.length === 0" kind="table" :lines="3" />
+          <OverloadedTable v-else :items="overloaded" :limit="OVERLOADED_ROWS" @organization="router.push({ name: 'organization', params: { moCode: $event } })" @simulate="router.push({ name: 'simulator', query: { region: $event.regionKato, profile: $event.profileCode } })" />
+        </AppCard>
+      </div>
     </div>
+
+    <CollapsibleSection :title="t('gov.map.ranking')" origin="formula" :summary="index ? `${index.items.length}` : ''">
+      <Skeleton v-if="loading && !index" kind="table" :lines="8" />
+      <IndexTable v-else :items="index?.items ?? []" :highlight="hovered" @select="toRegion" @hover="hovered = $event" />
+      <!-- значения и правило применения: refdata/external_benchmarks.yaml -->
+      <p class="caption" style="margin: 12px 0 0">{{ t('gov.map.benchmark') }}</p>
+    </CollapsibleSection>
+
+    <CollapsibleSection id="signals-feed" :title="t('gov.map.signals')" origin="ml" :summary="String(openTotal)">
+      <div class="chips" style="margin-bottom: 12px">
+        <button v-for="s in SIGNAL_STATUSES" :key="s" type="button" class="chip-filter" :class="{ active: signalStatus === s }" @click="signalStatus = s">
+          {{ t('anomaly.status.' + s) }} <span v-if="s === 'open'" class="count">{{ openTotal }}</span>
+        </button>
+      </div>
+      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
+    </CollapsibleSection>
+
+    <div class="extras"><CountryExtras /></div>
   </PageShell>
 </template>
 
 <style scoped>
-.profile-select { min-width: 260px; }
-.kpi-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
-.map-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: var(--dm-space-4); align-items: start; }
-.extras { display: flex; flex-direction: column; gap: var(--dm-space-3); margin-top: 16px; }
-@media (max-width: 1000px) { .map-grid { grid-template-columns: 1fr; } }
+.profile-select { min-width: 220px; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
+.legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.swatch.dot { border-radius: 50%; background: var(--dm-accent); width: 10px; height: 10px; }
+.anomaly-row { text-decoration: none; color: inherit; justify-content: flex-start; align-items: flex-start; gap: 12px; }
+.anomaly-row:hover .anomaly-title { color: var(--dm-accent-hover); }
+.anomaly-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dm-accent); flex: none; margin-top: 7px; }
+.anomaly-dot.idle { background: var(--dm-dot-idle); }
+.anomaly-title { font-size: var(--dm-text-md); line-height: 1.35; }
+.extras { display: flex; flex-direction: column; gap: var(--dm-space-3); }
+@media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
 </style>

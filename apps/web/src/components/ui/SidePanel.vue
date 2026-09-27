@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Drawer from 'primevue/drawer'
 
-/** Панель деталей справа: открывается по клику в таблице, закрывается крестиком или Esc. */
+/** Панель деталей справа: открывается по клику в таблице, закрывается крестиком или Esc. Заголовок 20 / 500. */
 defineProps<{ title: string; subtitle?: string; width?: string }>()
 const visible = defineModel<boolean>('visible', { default: false })
 </script>
@@ -21,6 +21,6 @@ const visible = defineModel<boolean>('visible', { default: false })
 
 <style scoped>
 .side-head { min-width: 0; }
-.side-title { font-weight: 600; font-size: 1.05rem; }
+.side-title { font-weight: 500; font-size: var(--dm-text-lg); letter-spacing: -0.01em; }
 .side-foot { display: flex; gap: 8px; flex-wrap: wrap; }
 </style>

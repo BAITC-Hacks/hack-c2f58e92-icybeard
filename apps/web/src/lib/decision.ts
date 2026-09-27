@@ -10,6 +10,8 @@ const t = i18n.global.t
 
 export const SUBJECT_REFERRAL = 'referral'
 export const SUBJECT_ANOMALY = 'anomaly'
+/** Решения по маршруту пациента (redirect / keep) пишутся с предметом route. */
+export const SUBJECT_ROUTE = 'route'
 
 const ROLE_IDS = ['doctor', 'chief', 'regulator', 'steward', 'admin', 'citizen']
 
@@ -22,6 +24,7 @@ export interface DecisionNames {
 export function subjectLabel(subject: string): string {
   if (subject === SUBJECT_REFERRAL) return t('decision.subjectReferral')
   if (subject === SUBJECT_ANOMALY) return t('decision.subjectAnomaly')
+  if (subject === SUBJECT_ROUTE) return t('decision.subjectRoute')
   return subject
 }
 

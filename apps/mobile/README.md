@@ -1,9 +1,11 @@
 # Darumen — мобильное приложение
 
 Flutter-клиент Darumen Health для двух ролей: **гражданин** (Главная с карточкой «Моя госпитализация», Мой путь,
-Сколько ждут, Лекарства, Вакцинация, Уведомления, Профиль) и **врач ПМСП** (Пациенты → маршрут пациента →
-ассистент направления, Скрайб, Профиль). Структура — по образцу NHS App: три вкладки у гражданина, статусы вместо
-новостей, каждое число подписано меткой происхождения («ML‑модель», «формула», «AI‑черновик»).
+Сколько ждут, Проверка рецепта, Вакцинация, Уведомления, Профиль) и **врач ПМСП** (Пациенты → маршрут пациента →
+ассистент направления и AI-скрайб, Журнал решений, Профиль). Дизайн — «Тихая клиника» (`docs/design-system.md`,
+доски холста Claude Design): молочный фон, чернильные карточки-кнопки, коралл как единственный сигнал, плавающая
+пилюля навигации с тремя вкладками у каждой роли; каждое число подписано меткой происхождения («ML-модель»,
+«Формула», «AI»).
 
 ## Запуск
 
@@ -20,20 +22,25 @@ flutter run --dart-define=API_BASE=https://dc.jurek.kz --dart-define=KEYCLOAK_UR
 
 Вход — Keycloak (realm `darumen`, клиент `darumen-mobile`): демо-пользователи `citizen1` и `doctor1`, пароль `darumen`.
 Кнопка «Войти через eGov mobile» до появления доступа от НИТ ведёт на экран «Скоро» (см. `docs/egov-auth.md`).
-Гость видит публичные экраны без входа. Токены хранятся в защищённом хранилище платформы (`flutter_secure_storage`);
+Гостевого режима нет: без входа открыт только экран входа. Токены хранятся в защищённом хранилище платформы (`flutter_secure_storage`);
 на web-таргете — в localStorage браузера.
 
 ## Структура
 
-- `lib/theme/` — токены «Clinical Minimal» (`tokens.dart`), типографика Onest (`typography.dart`), тона статусов
-  (`tones.dart`), сборка светлой и тёмной тем (`app_theme.dart`). Экраны не используют `Colors.*` напрямую — CI это проверяет.
-- `lib/widgets/` — `PageScaffold`, `Section`, `KpiTile`, `OriginTag`, `StatusChip`, `RouteTimeline`, `ChecklistTile`,
-  `EmptyState`, `Skeleton`, `ErrorBox`, `LoadStateView`, `RouteView` (общее тело маршрута для обеих ролей), `AppShell`.
-- `lib/router/` — два `StatefulShellRoute` (гражданин `/home`, `/updates`, `/profile`; врач `/doctor/*`) и чистый `guard`.
+- `lib/theme/` — токены «Тихой клиники» (`tokens.dart`, паритет с `design/tokens.json` проверяет `theme_test`),
+  шкала Manrope (`typography.dart`), тона чипов (`tones.dart`), сборка светлой и тёмной тем (`app_theme.dart`).
+  Экраны не используют `Colors.*` напрямую — CI это проверяет.
+- `lib/widgets/` — `PageScaffold` (шапка с круглыми кнопками и H1, нижняя зона под primary-кнопку), `AppCard` /
+  `CardLabel` / `ListRow` / `FieldLabel`, `SignalCard` (coral-wash), `PillFilter`, `CircleIconButton` / `LanguageButton`,
+  `HeroNumber`, `StageStepper` (полосы + маркер), `RouteTimeline`, `WaitBars`, `OriginTag`, `StatusChip`, `EmptyState`,
+  `Skeleton`, `ErrorBox`, `LoadStateView`, `RouteView` / `DoctorRouteView`, `AppShell` с плавающей `FloatingNav`.
+- `lib/router/` — два `StatefulShellRoute` (гражданин `/home`, `/updates`, `/profile`; врач `/doctor/patients`,
+  `/doctor/decisions`, `/doctor/profile`; ассистент и скрайб — `/doctor/patients/:ref/{referral,scribe}` и без
+  пациента `/doctor/referral`, `/doctor/scribe` вне вкладок) и чистый `guard`.
 - `lib/state/` — `Session` (роль, регион и ИИН из клеймов токена), `TokenStore`, `LoadState`.
 - `lib/api/` — `ApiClient` (Bearer + `Accept-Language`) и модели, включая `PatientRoute` (`docs/api.md`, раздел Route).
 - `lib/l10n/strings.dart` — ручной словарь RU/KK; казахский длиннее на ~15 %, подписи вкладок ≤ 12 символов.
-- `assets/fonts/` — Onest 400/500/600/700 (SIL OFL 1.1, `OFL.txt`), покрывает казахскую кириллицу, есть `tnum`.
+- `assets/fonts/` — Manrope 400/500/600 (SIL OFL 1.1, `OFL-Manrope.txt`), покрывает казахскую кириллицу, есть `tnum`.
 
 ## Проверка
 
@@ -41,5 +48,8 @@ flutter run --dart-define=API_BASE=https://dc.jurek.kz --dart-define=KEYCLOAK_UR
 flutter analyze && flutter test
 ```
 
-Тесты: guard роутера по ролям, сессия с мок-Keycloak (клеймы, обновление токена, invalid_grant), тема и токены,
-виджеты (таймлайн, метка происхождения, чек-лист, казахский при масштабе 1.3× без переполнений), модели API.
+Тесты: guard роутера по ролям, shell с плавающей навигацией (три вкладки у каждой роли, скрытие на вложенных
+экранах), сессия с мок-Keycloak (клеймы, обновление токена, invalid_grant), тема и токены (паритет с
+`design/tokens.json`), экраны на мок-API (вход без гостя, главная без погоды, маршрут с «Понятно», рабочий список,
+журнал, скрайб), виджеты (степпер, таймлайн, метка происхождения, чек-лист, казахский при масштабе 1.3× без
+переполнений), модели API.

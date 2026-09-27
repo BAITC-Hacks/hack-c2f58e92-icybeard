@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../api/client.dart';
+import '../api/models.dart';
 import '../config/env.dart';
 import '../l10n/strings.dart';
 import '../router/guards.dart';
@@ -12,14 +13,19 @@ import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../theme/typography.dart';
+import '../widgets/app_card.dart';
+import '../widgets/circle_button.dart';
 import '../widgets/darumen_mark.dart';
 import '../widgets/error_box.dart';
+import '../widgets/hero_number.dart';
+import '../widgets/origin_tag.dart';
+import '../widgets/stage_stepper.dart';
+import '../widgets/status_chip.dart';
 
-/// Вход по образцу приветственных экранов (MyFitnessPal на Mobbin): язык справа сверху, «Добро пожаловать в darumen»,
-/// карусель из трёх карточек о том, что даёт приложение (стадия направления, прогноз ожидания, сроки анализов),
-/// заголовок и точки под ней, а кнопки прижаты к низу — под большой палец: единственная заливная — eGov mobile
-/// (до доступа от НИТ ведёт на лист «Скоро», ничего не имитирует), «Войти по логину» открывает нижний лист
-/// с логином и паролем Keycloak. Никаких предзаполненных учёток.
+/// Вход по доске Main: круглая кнопка языка справа сверху, «Добро пожаловать в darumen», карусель белых карточек о
+/// том, что даёт приложение (стадия направления, прогноз ожидания, сроки анализов), подпись под ней, кнопки внизу:
+/// primary — eGov mobile (до доступа от НИТ ведёт на лист «Скоро», ничего не имитирует), secondary — вход по логину
+/// нижним листом Keycloak. Гостевого режима нет: без входа открыт только этот экран.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.from});
 
@@ -33,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
   static const _slides = 3;
   static const _autoAdvance = Duration(seconds: 4);
 
-  final _pages = PageController(viewportFraction: 0.86);
+  final _pages = PageController();
   int _page = 0;
   Timer? _timer;
 
@@ -60,11 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!_pages.hasClients) {
         return;
       }
-      _pages.animateToPage(
-        (_page + 1) % _slides,
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeOutCubic,
-      );
+      _pages.animateToPage((_page + 1) % _slides, duration: const Duration(milliseconds: 450), curve: Curves.easeOutCubic);
     });
   }
 
@@ -74,19 +76,14 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       showDragHandle: true,
       builder: (sheet) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          0,
-          AppSpacing.xl,
-          AppSpacing.xxl,
-        ),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(s.egovSoonTitle, style: Theme.of(sheet).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
-            Text(s.egovSoonBody),
+            Text(s.egovSoonBody, style: Theme.of(sheet).textTheme.bodySmall),
             const SizedBox(height: AppSpacing.lg),
             OutlinedButton(
               onPressed: () {
@@ -114,152 +111,92 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final s = S.at(context);
     final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
-    final session = context.watch<Session>();
-    final headlines = [
-      s.loginSlideStage,
-      s.loginSlideForecast,
-      s.loginSlideChecklist,
-    ];
+    final headlines = [s.loginSlideStage, s.loginSlideForecast, s.loginSlideChecklist];
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.sm,
-                AppSpacing.xl,
-                0,
-              ),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: _LanguageToggle(
-                  locale: session.locale,
-                  onChanged: session.setLocale,
-                ),
-              ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.md),
+              child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [LanguageButton()]),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              s.loginWelcome,
-              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const DarumenMark(size: 30),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  'darumen',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: DarumenBrand.navy,
-                    letterSpacing: -0.8,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.lg),
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final cardHeight = (constraints.maxHeight - 96).clamp(
-                    180.0,
-                    360.0,
-                  );
-                  return Column(
-                    children: [
-                      SizedBox(
-                        height: cardHeight,
-                        child: NotificationListener<ScrollNotification>(
-                          onNotification: (n) {
-                            if (n is ScrollStartNotification &&
-                                n.dragDetails != null) {
-                              _restartTimer();
-                            }
-                            return false;
-                          },
-                          child: PageView.builder(
-                            controller: _pages,
-                            itemCount: _slides,
-                            onPageChanged: (i) => setState(() => _page = i),
-                            itemBuilder: (_, i) => Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.xs,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.xs, AppSpacing.page, 0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: AppSpacing.xl),
+                    Text(s.loginWelcome, style: theme.textTheme.bodySmall),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const DarumenMark(size: 42),
+                        const SizedBox(width: 10),
+                        Text('darumen', style: theme.textTheme.displaySmall),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cardHeight = (constraints.maxHeight - 88).clamp(160.0, 300.0);
+                          return Column(
+                            children: [
+                              SizedBox(
+                                height: cardHeight,
+                                child: NotificationListener<ScrollNotification>(
+                                  onNotification: (n) {
+                                    if (n is ScrollStartNotification && n.dragDetails != null) {
+                                      _restartTimer();
+                                    }
+                                    return false;
+                                  },
+                                  child: PageView.builder(
+                                    controller: _pages,
+                                    itemCount: _slides,
+                                    onPageChanged: (i) => setState(() => _page = i),
+                                    itemBuilder: (_, i) => _SlideCard(index: i),
+                                  ),
+                                ),
                               ),
-                              child: _SlideCard(index: i),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.xl,
-                        ),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 250),
-                          child: Text(
-                            headlines[_page],
-                            key: ValueKey(_page),
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.titleMedium,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          for (var i = 0; i < _slides; i++)
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 250),
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              width: i == _page ? 18 : 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: i == _page
-                                    ? colors.accent
-                                    : colors.faint,
-                                borderRadius: BorderRadius.circular(4),
+                              const SizedBox(height: AppSpacing.md),
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 250),
+                                child: Text(
+                                  headlines[_page],
+                                  key: ValueKey(_page),
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.35),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            ),
-                        ],
+                              const SizedBox(height: AppSpacing.md),
+                              _Dots(count: _slides, current: _page),
+                            ],
+                          );
+                        },
                       ),
-                    ],
-                  );
-                },
+                    ),
+                  ],
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.md,
-                AppSpacing.xl,
-                AppSpacing.lg,
-              ),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.xl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   FilledButton.icon(
                     onPressed: Env.egovEnabled ? null : _egov,
-                    icon: const Icon(Icons.qr_code_2),
+                    icon: const Icon(Icons.qr_code_2, size: 20),
                     label: Text(s.loginWithEgov),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
-                  TextButton(
-                    onPressed: _passwordSheet,
-                    child: Text(s.loginWithPassword),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    s.loginPrivacyNote,
-                    style: theme.textTheme.labelSmall,
-                    textAlign: TextAlign.center,
-                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  OutlinedButton(onPressed: _passwordSheet, child: Text(s.loginWithPassword)),
+                  const SizedBox(height: AppSpacing.md),
+                  Text(s.loginPrivacyNote, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
                 ],
               ),
             ),
@@ -270,7 +207,41 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-/// Карточка карусели: Navy-фон бренда, внутри мини-превью экрана приложения (без фотографий и стока).
+class _Dots extends StatelessWidget {
+  const _Dots({required this.count, required this.current});
+
+  final int count;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppPalette.of(context);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < count; i++)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: i == current ? 16 : AppSizes.dot,
+            height: AppSizes.dot,
+            decoration: BoxDecoration(color: i == current ? colors.accent : colors.dotIdle, borderRadius: BorderRadius.circular(AppRadius.xs)),
+          ),
+      ],
+    );
+  }
+}
+
+/// Пример этапов для карточки «Стадия направления»: третий из пяти — текущий.
+const _demoStages = [
+  RouteStage(code: RouteCodes.referralIssued, order: 1, title: '', status: RouteCodes.done),
+  RouteStage(code: RouteCodes.examination, order: 2, title: '', status: RouteCodes.done),
+  RouteStage(code: RouteCodes.waitlisted, order: 3, title: '', status: RouteCodes.current),
+  RouteStage(code: RouteCodes.dateAssigned, order: 4, title: '', status: RouteCodes.upcoming),
+  RouteStage(code: RouteCodes.hospitalized, order: 5, title: '', status: RouteCodes.upcoming),
+];
+
+/// Карточка карусели — белая, как карточки приложения; на низких экранах содержимое уменьшается целиком.
 class _SlideCard extends StatelessWidget {
   const _SlideCard({required this.index});
 
@@ -279,234 +250,49 @@ class _SlideCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: DarumenBrand.navy,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      // На низких экранах содержимое уменьшается целиком, а не переполняет карточку.
+    final theme = Theme.of(context);
+    return AppCard(
       child: LayoutBuilder(
         builder: (context, constraints) => FittedBox(
           fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.topLeft,
           child: SizedBox(
             width: constraints.maxWidth,
             child: switch (index) {
-              0 => _StageCard(s: s),
-              1 => _ForecastCard(s: s),
-              _ => _ChecklistCard(s: s),
+              0 => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CardLabel(s.loginValueStage, trailing: StatusChip(s.loginCardWaitlisted, tone: StatusTone.ok)),
+                    const SizedBox(height: 14),
+                    const StageStepper(stages: _demoStages),
+                    const SizedBox(height: 14),
+                    Text('3 / 5 · ${s.loginCardWaitlisted.toLowerCase()}', style: theme.textTheme.bodySmall?.merge(AppType.numeric)),
+                  ],
+                ),
+              1 => HeroNumber(
+                  label: s.loginValueForecast,
+                  origin: Origin.ml,
+                  value: s.heroUntil('21').$1,
+                  unit: s.heroUntil('21').$2,
+                  caption: s.loginCardHalf,
+                ),
+              _ => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CardLabel(s.loginValueChecklist, trailing: const OriginTag(Origin.formula)),
+                    const SizedBox(height: AppSpacing.xs),
+                    for (final (i, (name, valid)) in const [('ОАК', false), ('ЭКГ', false), ('ВИЧ', true), ('ФЛГ', true)].indexed)
+                      ListRow(
+                        title: name,
+                        last: i == 3,
+                        trailing: StatusChip(valid ? s.loginCardValid : s.loginCardExpired, tone: valid ? StatusTone.ok : StatusTone.danger),
+                      ),
+                  ],
+                ),
             },
           ),
         ),
       ),
-    );
-  }
-}
-
-const _mist = DarumenBrand.mist;
-const _sky = DarumenBrand.sky;
-final _mistMuted = _mist.withValues(alpha: 0.72);
-
-Widget _cardLabel(BuildContext context, String text) => Text(
-  text,
-  style: Theme.of(
-    context,
-  ).textTheme.labelMedium?.copyWith(color: _mistMuted, letterSpacing: 0.4),
-);
-
-Widget _panel({required Widget child}) => Container(
-  padding: const EdgeInsets.all(AppSpacing.lg),
-  decoration: BoxDecoration(
-    color: _mist.withValues(alpha: 0.08),
-    borderRadius: BorderRadius.circular(AppRadius.lg),
-    border: Border.all(color: _mist.withValues(alpha: 0.12)),
-  ),
-  child: child,
-);
-
-class _StageCard extends StatelessWidget {
-  const _StageCard({required this.s});
-
-  final S s;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _cardLabel(context, s.loginValueStage.toUpperCase()),
-        const SizedBox(height: AppSpacing.lg),
-        _panel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: _sky.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  s.loginCardWaitlisted,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: _sky,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Row(
-                children: [
-                  for (var i = 0; i < 5; i++) ...[
-                    Container(
-                      width: i == 2 ? 16 : 10,
-                      height: i == 2 ? 16 : 10,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: i < 2
-                            ? _sky
-                            : (i == 2
-                                  ? DarumenBrand.navy
-                                  : _mist.withValues(alpha: 0.18)),
-                        border: i == 2
-                            ? Border.all(color: _sky, width: 3)
-                            : null,
-                      ),
-                    ),
-                    if (i < 4)
-                      Expanded(
-                        child: Container(
-                          height: 3,
-                          color: i < 2 ? _sky : _mist.withValues(alpha: 0.18),
-                        ),
-                      ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                '3 / 5 · ${s.loginCardWaitlisted.toLowerCase()}',
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: _mistMuted)
-                    .merge(AppType.numeric),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ForecastCard extends StatelessWidget {
-  const _ForecastCard({required this.s});
-
-  final S s;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _cardLabel(context, s.loginValueForecast.toUpperCase()),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          s.loginCardNineOfTen,
-          style: theme.textTheme.headlineMedium
-              ?.copyWith(color: _mist, fontWeight: FontWeight.w600, height: 1.1)
-              .merge(AppType.numeric),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          s.loginCardHalf,
-          style: theme.textTheme.bodyLarge
-              ?.copyWith(color: _mistMuted)
-              .merge(AppType.numeric),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            for (final h in [0.35, 0.55, 0.45, 0.8, 1.0, 0.7, 0.5])
-              Expanded(
-                child: Container(
-                  height: 56 * h,
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  decoration: BoxDecoration(
-                    color: h == 1.0 ? _sky : _sky.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ChecklistCard extends StatelessWidget {
-  const _ChecklistCard({required this.s});
-
-  final S s;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final rows = [('ОАК', false), ('ЭКГ', false), ('ВИЧ', true), ('ФЛГ', true)];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _cardLabel(context, s.loginValueChecklist.toUpperCase()),
-        const SizedBox(height: AppSpacing.lg),
-        _panel(
-          child: Column(
-            children: [
-              for (final (name, valid) in rows)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: _mist,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: (valid ? _sky : _mist).withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          valid ? s.loginCardValid : s.loginCardExpired,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: valid ? _sky : _mistMuted,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -573,52 +359,39 @@ class _PasswordSheetState extends State<_PasswordSheet> {
   Widget build(BuildContext context) {
     final s = S.at(context);
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.xl,
-        0,
-        AppSpacing.xl,
-        AppSpacing.xl + MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xl + MediaQuery.viewInsetsOf(context).bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            s.loginWithPassword,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          Text(s.loginWithPassword, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: AppSpacing.lg),
+          FieldLabel(s.usernameLabel),
           TextField(
             controller: _username,
             autofocus: true,
             autocorrect: false,
             textInputAction: TextInputAction.next,
-            decoration: InputDecoration(labelText: s.usernameLabel),
+            decoration: InputDecoration(hintText: s.usernameLabel),
           ),
           const SizedBox(height: AppSpacing.md),
+          FieldLabel(s.passwordLabel),
           TextField(
             controller: _password,
             obscureText: !_showPassword,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _busy ? null : _login(),
             decoration: InputDecoration(
-              labelText: s.passwordLabel,
+              hintText: s.passwordLabel,
               errorText: _invalid ? s.loginFailed : null,
               suffixIcon: IconButton(
-                icon: Icon(
-                  _showPassword
-                      ? Icons.visibility_off_outlined
-                      : Icons.visibility_outlined,
-                ),
+                icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
                 onPressed: () => setState(() => _showPassword = !_showPassword),
               ),
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          FilledButton(
-            onPressed: _busy ? null : _login,
-            child: Text(_busy ? s.loggingInButton : s.loginButton),
-          ),
+          FilledButton(onPressed: _busy ? null : _login, child: Text(_busy ? s.loggingInButton : s.loginButton)),
           if (_error != null) ...[
             const SizedBox(height: AppSpacing.md),
             ErrorBox(error: _error, onRetry: _busy ? null : _login),
@@ -627,23 +400,4 @@ class _PasswordSheetState extends State<_PasswordSheet> {
       ),
     );
   }
-}
-
-class _LanguageToggle extends StatelessWidget {
-  const _LanguageToggle({required this.locale, required this.onChanged});
-
-  final String locale;
-  final void Function(String locale) onChanged;
-
-  @override
-  Widget build(BuildContext context) => SegmentedButton<String>(
-    segments: const [
-      ButtonSegment(value: 'ru', label: Text('РУС')),
-      ButtonSegment(value: 'kk', label: Text('ҚАЗ')),
-    ],
-    selected: {locale},
-    showSelectedIcon: false,
-    style: const ButtonStyle(visualDensity: VisualDensity.compact),
-    onSelectionChanged: (v) => onChanged(v.first),
-  );
 }

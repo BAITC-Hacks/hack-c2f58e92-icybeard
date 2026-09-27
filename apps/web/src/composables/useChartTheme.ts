@@ -5,9 +5,13 @@ export interface ChartTheme {
   ink: string
   muted: string
   hairline: string
+  /** коралл — единственный сигнал: выделенный столбец, прогноз, аномалия */
   accent: string
   surface: string
+  /** ряды графиков: ink, coral, два синих из шкалы карты */
   palette: string[]
+  /** шкала карты и индекса: пять синих от «ниже 60» к «87 и выше» */
+  scale: string[]
   band: string
   font: string
 }
@@ -30,6 +34,7 @@ export function useChartTheme() {
       accent: cssVar('--dm-accent'),
       surface: cssVar('--dm-surface'),
       palette: ['--dm-chart-1', '--dm-chart-2', '--dm-chart-3', '--dm-chart-4'].map(cssVar),
+      scale: ['--dm-map-1', '--dm-map-2', '--dm-map-3', '--dm-map-4', '--dm-map-5'].map(cssVar),
       band: cssVar('--dm-chart-band'),
       font: cssVar('--dm-font-sans'),
     }

@@ -4,7 +4,7 @@
 
 ## Общие соглашения
 
-- **Аутентификация:** `Authorization: Bearer <JWT от Keycloak>` (реалм `darumen`, аудитория `darumen-api`, роли реалма в `realm_access.roles`, атрибут `region_kato`). Публичные эндпоинты помечены. Роли: `citizen`, `doctor`, `chief`, `regulator`, `steward`, `admin` (admin проходит все политики). В режиме `Auth:Mode=headers` (тесты, разработка без Keycloak) роль берётся из заголовков `X-Actor`, `X-Role`, `X-Region`. Без роли: 401, с чужой ролью: 403. Каждый запрос врача, главврача, регулятора и стюарда пишется в `journal.audit` (`GET /api/v1/journal/audit`, regulator).
+- **Аутентификация:** `Authorization: Bearer <JWT от Keycloak>` (реалм `darumen`, аудитория `darumen-api`, роли реалма в `realm_access.roles`, атрибуты `region_kato`, `iin` у гражданина и `mo_code` у главврача — код его организации для портала «Больница»). Публичные эндпоинты помечены. Роли: `citizen`, `doctor`, `chief`, `regulator`, `steward`, `admin` (admin проходит все политики). В режиме `Auth:Mode=headers` (тесты, разработка без Keycloak) роль берётся из заголовков `X-Actor`, `X-Role`, `X-Region`. Без роли: 401, с чужой ролью: 403. Каждый запрос врача, главврача, регулятора и стюарда пишется в `journal.audit` (`GET /api/v1/journal/audit`, regulator).
 - **Ошибки:** RFC 9457 `application/problem+json`: `{ "type", "title", "status", "detail", "instance", "errors": { "field": ["..."] } }`.
 - **Локаль:** заголовок `Accept-Language: ru | kk`; объяснения и названия приходят на выбранном языке.
 - **Версия модели:** каждый ответ с прогнозом содержит `model: { name, version, trainedThrough }`.

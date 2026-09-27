@@ -11,7 +11,8 @@ import { useChartTheme } from '@/composables/useChartTheme'
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent])
 
-const props = defineProps<{ history: HistoryPoint[]; points?: ForecastPoint[]; title?: string; unit?: string }>()
+/** `bare` — без обёртки-карточки (график внутри AppCard). История — ink, прогноз — coral пунктиром, полоса интервала — синий. */
+const props = defineProps<{ history: HistoryPoint[]; points?: ForecastPoint[]; title?: string; unit?: string; bare?: boolean }>()
 const { t } = useI18n()
 const { theme, base, axis } = useChartTheme()
 
@@ -33,18 +34,22 @@ const option = computed(() => {
     yAxis: { type: 'value', name: props.unit ?? '', ...axis.value },
     dataZoom: periods.length > 40 ? [{ type: 'slider', start: Math.max(0, 100 - (40 / periods.length) * 100) }] : [],
     series: [
-      { name: t('seriesChart.fact'), type: 'line', data: history, showSymbol: false, lineStyle: { width: 2 } },
+      { name: t('seriesChart.fact'), type: 'line', data: history, showSymbol: false, lineStyle: { width: 2, color: theme.value.ink }, itemStyle: { color: theme.value.ink } },
       { name: t('seriesChart.lower'), type: 'line', data: lo, stack: 'band', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
       { name: t('seriesChart.interval80'), type: 'line', data: band, stack: 'band', lineStyle: { opacity: 0 }, areaStyle: { color: theme.value.band }, showSymbol: false, silent: true, tooltip: { show: false } },
-      { name: t('seriesChart.forecast'), type: 'line', data: yhat, showSymbol: false, lineStyle: { type: 'dashed', width: 2, color: theme.value.accent } },
+      { name: t('seriesChart.forecast'), type: 'line', data: yhat, showSymbol: false, lineStyle: { type: 'dashed', width: 2, color: theme.value.accent }, itemStyle: { color: theme.value.accent } },
     ],
   }
 })
 </script>
 
 <template>
-  <div class="card">
-    <h2 v-if="title">{{ title }}</h2>
+  <div :class="{ card: !bare }">
+    <h2 v-if="title" :class="{ 'chart-title': bare }">{{ title }}</h2>
     <VChart class="chart" :option="option" autoresize />
   </div>
 </template>
+
+<style scoped>
+.chart-title { font-size: var(--dm-text-md); font-weight: 500; color: var(--dm-muted); margin: 0 0 4px; }
+</style>

@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import type { IndexItem } from '@/api/types'
-import { useChartTheme } from '@/composables/useChartTheme'
 import { days, indexColor, pct } from '@/lib/format'
 
-/** Ранжированная таблица регионов по индексу; наведение и клик уходят наружу — подсветка общая с картой. */
+/** Ранжированная таблица регионов по индексу: квадратик ступени шкалы (пять синих) рядом со значением; наведение и
+ * клик уходят наружу — подсветка общая с картой. */
 defineProps<{ items: IndexItem[]; highlight?: string | null }>()
 const emit = defineEmits<{ select: [kato: string]; hover: [kato: string | null] }>()
 const { t } = useI18n()
-const { isDark } = useChartTheme()
 </script>
 
 <template>
@@ -29,7 +28,7 @@ const { isDark } = useChartTheme()
         >
           <td class="muted">{{ item.rank }}</td>
           <td>{{ item.name }}</td>
-          <td class="num"><span class="index" :style="{ color: indexColor(item.indexValue, isDark) }">{{ item.indexValue.toFixed(1) }}</span></td>
+          <td class="num"><span class="index"><span class="swatch" :style="{ background: indexColor(item.indexValue) }" aria-hidden="true" />{{ item.indexValue.toFixed(1) }}</span></td>
           <td class="num">{{ pct(item.shareOver30) }}</td>
           <td class="num">{{ days(item.p90Days) }}</td>
           <td class="num muted">{{ item.n }}</td>
@@ -41,5 +40,6 @@ const { isDark } = useChartTheme()
 
 <style scoped>
 .index-wrap { max-height: 520px; overflow-y: auto; }
-.index { font-weight: 600; }
+.index { font-weight: 500; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
 </style>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../api/client.dart';
@@ -13,9 +14,9 @@ import '../widgets/route_view.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 
-/// «Мой путь» гражданина: стадия и прогноз в шапке, степпер, «Что сейчас», свёрнутые секции. Двусторонний
-/// маршрут: варианты «Вы ещё ждёте?» и «Попросить» у альтернатив шлют сигнал врачу (один Idempotency-Key на
-/// нажатие); «Понятно» под ответом врача запоминается в сессии. Экран открыт только после входа.
+/// «Мой путь» гражданина по доске M-Route: hero-карточка «Этап k из 5 · до N дн.», карточка этапов, ответ врача
+/// карточкой-сигналом и кнопка «Понятно» внизу (запоминается в сессии), свёрнутые секции. Двусторонний маршрут:
+/// «Вы ещё ждёте?» и «Попросить» шлют сигнал врачу с одним Idempotency-Key на нажатие.
 class RouteScreen extends StatefulWidget {
   const RouteScreen({super.key});
 
@@ -85,28 +86,30 @@ class _RouteScreenState extends State<RouteScreen> {
     await _signal(RouteCodes.requestRedirect, toMoCode: alternative.moCode, comment: comment);
   }
 
+  /// По карточке-сигналу — «Сколько ждут» с профилем маршрута, где предложенная организация выделена.
+  void _openWait(PatientRoute route) =>
+      context.go('/home/wait?region=${Uri.encodeComponent(route.regionKato)}&profile=${Uri.encodeComponent(route.organization.profileCode)}');
+
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
     final session = context.watch<Session>();
+    final route = switch (_state) { Loaded<PatientRoute>(:final data) => data, _ => null };
+    final answer = route?.latestDecision;
+    final unseen = answer != null && answer.decisionId != session.seenDecisionId;
     return PageScaffold(
       title: s.routeTitle,
       onRefresh: _load,
+      bottom: unseen ? FilledButton(onPressed: () => session.markDecisionSeen(answer.decisionId), child: Text(s.gotIt)) : null,
       children: [
         LoadStateView<PatientRoute>(
           state: _state,
           onRetry: _load,
           skeleton: const Column(
             children: [
-              Skeleton(height: 28, width: 200),
-              SizedBox(height: AppSpacing.sm),
-              Skeleton(height: 16),
-              SizedBox(height: AppSpacing.lg),
-              Skeleton(height: 56, radius: AppRadius.md),
-              SizedBox(height: AppSpacing.lg),
-              Skeleton(height: 140, radius: AppRadius.md),
+              CardSkeleton(height: 220),
               SizedBox(height: AppSpacing.md),
-              ListSkeleton(),
+              CardSkeleton(height: 300),
             ],
           ),
           builder: (_, route) => RouteView(
@@ -114,7 +117,7 @@ class _RouteScreenState extends State<RouteScreen> {
             onSignal: (kind) => _signal(kind),
             onRequest: _request,
             seenDecisionId: session.seenDecisionId,
-            onAcknowledge: route.latestDecision == null ? null : () => session.markDecisionSeen(route.latestDecision!.decisionId),
+            onOpenAnswer: () => _openWait(route),
           ),
         ),
       ],

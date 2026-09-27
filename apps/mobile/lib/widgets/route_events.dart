@@ -10,7 +10,7 @@ enum RouteEventKind { stage, doctor, citizen, checklist }
 /// Событие ленты «Уведомления»: дата (ISO), заголовок в одну строку с коротким именем организации, подстрока —
 /// причина в кавычках или этап. Ничего нерелевантного (как Messages в NHS App).
 class RouteEvent {
-  const RouteEvent(this.at, this.title, this.kind, {this.detail, this.opensRoute = false});
+  const RouteEvent(this.at, this.title, this.kind, {this.detail, this.opensRoute = false, this.isNew = false});
 
   final String at;
   final String title;
@@ -19,6 +19,9 @@ class RouteEvent {
 
   /// У предложения врача — действие «Открыть маршрут».
   final bool opensRoute;
+
+  /// Coral-точка в списке: решение врача, которое ещё не закрыто «Понятно», или открытый запрос гражданина.
+  final bool isNew;
 
   IconData get icon => switch (kind) {
         RouteEventKind.stage => Icons.flag_outlined,
@@ -30,7 +33,7 @@ class RouteEvent {
 
 /// Лента выводится на клиенте из маршрута: пройденные стадии, решения врача, сигналы гражданина и сроки анализов
 /// (истекающие и истёкшие — логистика документов, не медицина). Свежие первыми; даты ISO сравниваются как строки.
-List<RouteEvent> routeEvents(PatientRoute route, S s) {
+List<RouteEvent> routeEvents(PatientRoute route, S s, {String? seenDecisionId}) {
   final events = <RouteEvent>[
     for (final stage in route.timeline)
       if (stage.date != null && stage.status != RouteCodes.upcoming) RouteEvent(stage.date!, stage.title, RouteEventKind.stage),
@@ -41,6 +44,7 @@ List<RouteEvent> routeEvents(PatientRoute route, S s) {
         RouteEventKind.doctor,
         detail: decision.reason == null || decision.reason!.isEmpty ? null : '«${decision.reason}»',
         opensRoute: decision.kind == RouteCodes.redirect,
+        isNew: decision.decisionId != seenDecisionId,
       ),
     for (final signal in route.signals)
       RouteEvent(
@@ -48,6 +52,7 @@ List<RouteEvent> routeEvents(PatientRoute route, S s) {
         s.signalText(signal.kind, signal.toMoName == null ? null : shortOrgName(signal.toMoName!)),
         RouteEventKind.citizen,
         detail: signal.open ? s.awaitingDoctor : (signal.comment == null || signal.comment!.isEmpty ? null : '«${signal.comment}»'),
+        isNew: signal.open,
       ),
     for (final item in route.checklist)
       if (item.status == RouteCodes.expiring)

@@ -3,10 +3,11 @@ import { resolveEntry, type GuardAuth } from '@/router/guard'
 import type { Role } from '@/router/roles'
 
 const anonymous: GuardAuth = { isAuthenticated: false, role: null, region: null, hasRole: () => false }
-const signedIn = (role: Role, region: string | null = null): GuardAuth => ({
+const signedIn = (role: Role, region: string | null = null, moCode: string | null = null): GuardAuth => ({
   isAuthenticated: true,
   role,
   region,
+  moCode,
   hasRole: (...roles) => role === 'admin' || roles.includes(role),
 })
 const to = (path: string, meta: Record<string, unknown> = {}, name = path === '/' ? 'home' : path.slice(1), query = {}) => ({ name, path, meta, query })
@@ -23,6 +24,7 @@ describe('resolveEntry', () => {
   it('sends a signed-in user from the login page to the home of the role', () => {
     expect(resolveEntry(to('/'), signedIn('citizen'))).toBe('/me/route')
     expect(resolveEntry(to('/'), signedIn('chief', '75'))).toBe('/gov/regions/75')
+    expect(resolveEntry(to('/'), signedIn('chief', '75', '028B'))).toBe('/gov/organizations/028B')
     expect(resolveEntry(to('/', {}, 'home', { denied: '/gov' }), signedIn('citizen'))).toBe(true)
   })
 

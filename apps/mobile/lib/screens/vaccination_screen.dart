@@ -7,15 +7,17 @@ import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
-import '../theme/typography.dart';
+import '../widgets/app_card.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/hero_number.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/status_chip.dart';
 
-/// Оценки охвата WUENIC (ВОЗ/ЮНИСЕФ) по Казахстану: одно предложение и чип «внешний ориентир», группы по вакцине
-/// («БЦЖ · 2025 — 86 %» крупно, тонкая полоса, предыдущие годы мелко), годы строками по тапу, источник один раз внизу.
+/// Оценки охвата WUENIC (ВОЗ/ЮНИСЕФ) по Казахстану, доска M-Vaccination: hero-карточка первой вакцины («86 %» +
+/// «БЦЖ, 2021», чип bench-wash «ВОЗ/ЮНИСЕФ · 2021», динамика по годам, подпись об ориентире), остальные вакцины
+/// строками с динамикой и процентом справа, источник внизу.
 class VaccinationScreen extends StatefulWidget {
   const VaccinationScreen({super.key});
 
@@ -32,6 +34,10 @@ class VaccineGroup {
 
   VaccinationEstimate get latest => years.last;
   List<VaccinationEstimate> get previous => years.sublist(0, years.length - 1);
+
+  /// «2019 · 81 % → 2020 · 86 % → 2021 · 86 %».
+  String trend({bool withPercent = true}) =>
+      years.map((y) => '${y.year} · ${y.coveragePct.toStringAsFixed(0)}${withPercent ? ' %' : ''}').join(' → ');
 }
 
 /// Группировка по коду вакцины с сохранением порядка API; годы внутри — по возрастанию.
@@ -73,33 +79,64 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
   Widget build(BuildContext context) {
     final s = S.at(context);
     final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
     return PageScaffold(
       title: s.vaccinationTitle,
       onRefresh: _load,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: Text(s.vaccinationLead, style: theme.textTheme.bodySmall)),
-            const SizedBox(width: AppSpacing.sm),
-            StatusChip(s.externalBenchmark, tone: StatusTone.neutral),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.md),
         LoadStateView<List<VaccinationEstimate>>(
           state: _state,
           onRetry: _load,
-          skeleton: const ListSkeleton(count: 5, itemHeight: 88),
+          skeleton: const Column(children: [CardSkeleton(height: 200), SizedBox(height: AppSpacing.md), CardSkeleton(height: 180)]),
           isEmpty: (items) => items.isEmpty,
           empty: EmptyState(icon: Icons.vaccines_outlined, title: s.noVaccineData),
           builder: (_, items) {
             final groups = groupVaccines(items, s.locale);
+            final first = groups.first;
+            final rest = groups.skip(1).toList();
             final source = items.first;
             return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (final group in groups) Padding(padding: const EdgeInsets.only(bottom: AppSpacing.sm), child: _VaccineCard(group: group)),
-                const SizedBox(height: AppSpacing.sm),
+                AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      HeroNumber(
+                        label: s.coverageKz,
+                        trailing: StatusChip(s.whoChip(first.latest.year), tone: StatusTone.bench),
+                        value: '${first.latest.coveragePct.toStringAsFixed(0)} %',
+                        unit: '${first.title}, ${first.latest.year}',
+                        caption: first.trend(),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      Text(s.vaccinationBenchNote, style: theme.textTheme.labelSmall?.copyWith(color: colors.faint)),
+                    ],
+                  ),
+                ),
+                if (rest.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  AppCard(
+                    padding: AppCard.list,
+                    child: Column(
+                      children: [
+                        for (final (i, g) in rest.indexed)
+                          ListRow(
+                            title: g.title,
+                            subtitle: g.trend(withPercent: false),
+                            last: i == rest.length - 1,
+                            trailing: RowValue(
+                              '${g.latest.coveragePct.toStringAsFixed(0)} %',
+                              strong: true,
+                              size: 17,
+                              color: g.latest.coveragePct < 80 ? colors.danger : colors.ink,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.md),
                 Text('${s.sourceLabel}: ${source.source}', style: theme.textTheme.labelSmall),
                 if (source.note != null && source.note!.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xs),
@@ -110,85 +147,6 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
           },
         ),
       ],
-    );
-  }
-}
-
-class _VaccineCard extends StatefulWidget {
-  const _VaccineCard({required this.group});
-
-  final VaccineGroup group;
-
-  @override
-  State<_VaccineCard> createState() => _VaccineCardState();
-}
-
-class _VaccineCardState extends State<_VaccineCard> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
-    final group = widget.group;
-    final latest = group.latest;
-    final duration = MediaQuery.disableAnimationsOf(context) ? Duration.zero : AppDurations.fast * 1.5;
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        onTap: () => setState(() => _expanded = !_expanded),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Expanded(child: Text('${group.title} · ${latest.year}', style: theme.textTheme.titleSmall, maxLines: 2, overflow: TextOverflow.ellipsis)),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text('${latest.coveragePct.toStringAsFixed(0)} %', style: theme.textTheme.headlineSmall?.merge(AppType.numeric)),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                child: LinearProgressIndicator(value: (latest.coveragePct / 100).clamp(0, 1), minHeight: 4, backgroundColor: colors.hairline),
-              ),
-              if (group.previous.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  group.previous.map((y) => y.coveragePct.toStringAsFixed(0)).join(' → '),
-                  style: theme.textTheme.labelSmall?.merge(AppType.numeric),
-                ),
-              ],
-              AnimatedSize(
-                duration: duration,
-                alignment: Alignment.topCenter,
-                child: _expanded
-                    ? Column(
-                        children: [
-                          const Divider(height: AppSpacing.xl),
-                          for (final y in group.years)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                children: [
-                                  Text('${y.year}', style: theme.textTheme.bodyMedium?.merge(AppType.numeric)),
-                                  const Spacer(),
-                                  Text('${y.coveragePct.toStringAsFixed(0)} %', style: theme.textTheme.bodyMedium?.merge(AppType.numeric)),
-                                ],
-                              ),
-                            ),
-                        ],
-                      )
-                    : const SizedBox(width: double.infinity),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -15,6 +15,7 @@ import 'package:darumen/widgets/redirect_reason_dialog.dart';
 import 'package:darumen/widgets/route_events.dart';
 import 'package:darumen/widgets/route_timeline.dart';
 import 'package:darumen/widgets/route_view.dart';
+import 'package:darumen/widgets/signal_card.dart';
 import 'package:darumen/widgets/stage_stepper.dart';
 import 'package:darumen/widgets/status_chip.dart';
 import 'package:flutter/material.dart';
@@ -70,24 +71,29 @@ PatientRoute citizenRoute({bool validationDue = true, List<Map<String, dynamic>>
     });
 
 void main() {
-  testWidgets('timeline shows dates for passed stages and the norm for upcoming ones', (tester) async {
+  testWidgets('timeline rows show short labels, dd.MM for passed stages, the norm for upcoming ones and a dash without it', (tester) async {
     await tester.pumpWidget(host(const RouteTimeline(stages: stages)));
-    expect(find.text('Направление выдано'), findsOneWidget);
-    expect(find.text('06.02.2025'), findsOneWidget);
+    expect(find.text('Выдано'), findsOneWidget);
+    expect(find.text('06.02'), findsOneWidget);
+    expect(find.text('Лист ожидания'), findsOneWidget);
     expect(find.text('в течение 2 рабочих дней'), findsOneWidget);
+    expect(find.text('—'), findsOneWidget);
+    expect(find.byType(StageMarker), findsNWidgets(3), reason: 'маркер у текущего и пустые круги у двух предстоящих');
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('stage stepper shows five short labels with dates under passed stages', (tester) async {
+  testWidgets('stage stepper draws bars with one marker and labels first · current · last', (tester) async {
     await tester.pumpWidget(host(const StageStepper(stages: stages)));
+    expect(find.byType(StageBar), findsNWidgets(4));
+    expect(find.byType(StageMarker), findsOneWidget);
     expect(find.text('Выдано'), findsOneWidget);
     expect(find.text('Лист ожидания'), findsOneWidget);
     expect(find.text('Стационар'), findsOneWidget);
-    expect(find.text('06.02'), findsOneWidget);
-    expect(find.text('07.02'), findsNWidgets(2));
+    expect(find.text('Анализы'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(host(const StageStepper(stages: stages, compact: true)));
     expect(find.text('Выдано'), findsNothing);
+    expect(find.byType(StageMarker), findsOneWidget);
   });
 
   testWidgets('kazakh labels at 1.3x text scale do not overflow the new widgets', (tester) async {
@@ -108,8 +114,8 @@ void main() {
       textScale: 1.3,
     ));
     expect(tester.takeException(), isNull);
-    expect(find.text('ML‑МОДЕЛЬ'), findsNWidgets(2));
-    expect(find.text('Берілді'), findsOneWidget);
+    expect(find.text('ML-модель'), findsNWidgets(2));
+    expect(find.text('Берілді'), findsNWidgets(2), reason: 'степпер и строка таймлайна');
   });
 
   testWidgets('collapsible section shows its summary and expands on tap without errors', (tester) async {
@@ -139,8 +145,9 @@ void main() {
         ),
       ),
     )));
-    expect(find.text('Регион · г. Алматы'), findsOneWidget);
-    await tester.tap(find.text('Регион · г. Алматы'));
+    expect(find.text('Регион'), findsOneWidget);
+    expect(find.text('г. Алматы'), findsOneWidget);
+    await tester.tap(find.text('г. Алматы'));
     await tester.pumpAndSettle();
     expect(find.text('г. Астана'), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'акмол');
@@ -163,8 +170,8 @@ void main() {
 
   testWidgets('origin tag opens an explanation sheet on tap', (tester) async {
     await tester.pumpWidget(host(const OriginTag(Origin.ml)));
-    expect(find.text('ML‑МОДЕЛЬ'), findsOneWidget);
-    await tester.tap(find.text('ML‑МОДЕЛЬ'));
+    expect(find.text('ML-модель'), findsOneWidget);
+    await tester.tap(find.text('ML-модель'));
     await tester.pumpAndSettle();
     expect(find.textContaining('отложенном месяце'), findsOneWidget);
   });
@@ -194,9 +201,11 @@ void main() {
     Alternative? requested;
     await tester.pumpWidget(host(RouteView(route: citizenRoute(), onSignal: signals.add, onRequest: (a) => requested = a)));
     expect(find.text('В листе ожидания'), findsOneWidget);
-    expect(find.text('9 из 10 — до 106 дн. · половина — 47 дн.'), findsOneWidget);
+    expect(find.text('Половина — 47 дн., 9 из 10 — до 106 дн.'), findsOneWidget);
+    expect(find.text('до 106'), findsOneWidget);
     expect(find.text('Вы ещё ждёте госпитализацию?'), findsOneWidget);
     expect(find.text('Уже лечился в другом месте'), findsOneWidget);
+    await tester.ensureVisible(find.text('Да, жду'));
     await tester.tap(find.text('Да, жду'));
     expect(signals, ['still_waiting']);
     expect(find.text('Достар Мед ≈ 9 дн.'), findsOneWidget);
@@ -210,8 +219,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('citizen route shows the doctor answer with "got it" and the pending request chip', (tester) async {
-    var acknowledged = false;
+  testWidgets('citizen route shows the doctor answer as a signal card, then "what now" with the pending request chip', (tester) async {
     final route = citizenRoute(
       validationDue: false,
       decisions: [
@@ -221,14 +229,18 @@ void main() {
         {'decisionId': 'a', 'recordedAt': '2025-02-21T10:00:00+00:00', 'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': longOrg, 'open': true},
       ],
     );
-    await tester.pumpWidget(host(RouteView(route: route, onSignal: (_) {}, onRequest: (_) {}, onAcknowledge: () => acknowledged = true, seenDecisionId: null)));
-    expect(find.text('Ответ врача'), findsOneWidget);
+    var opened = false;
+    await tester.pumpWidget(host(RouteView(route: route, onSignal: (_) {}, onRequest: (_) {}, seenDecisionId: null, onOpenAnswer: () => opened = true)));
+    expect(find.byType(SignalCard), findsOneWidget);
     expect(find.text('Врач предложил Достар Мед'), findsOneWidget);
-    expect(find.text('«ближе к дому»'), findsOneWidget);
-    await tester.tap(find.text('Понятно'));
-    expect(acknowledged, isTrue);
-    // после «Понятно» — «Что сейчас» с чипом ожидания ответа и следующим этапом
-    await tester.pumpWidget(host(RouteView(route: route, onSignal: (_) {}, onRequest: (_) {}, onAcknowledge: () {}, seenDecisionId: 'd1')));
+    expect(find.textContaining('«ближе к дому»'), findsOneWidget);
+    expect(find.text('Что сейчас'), findsNothing);
+    await tester.ensureVisible(find.text('Врач предложил Достар Мед'));
+    await tester.tap(find.text('Врач предложил Достар Мед'));
+    expect(opened, isTrue);
+    // после «Понятно» (экран запоминает решение) — «Что сейчас» с чипом ожидания ответа и следующим этапом
+    await tester.pumpWidget(host(RouteView(route: route, onSignal: (_) {}, onRequest: (_) {}, seenDecisionId: 'd1')));
+    expect(find.byType(SignalCard), findsNothing);
     expect(find.text('Что сейчас'), findsOneWidget);
     expect(find.text('ждёт ответа врача'), findsOneWidget);
     expect(find.text('Следующий этап: Дата госпитализации назначена'), findsOneWidget);
@@ -266,16 +278,20 @@ void main() {
       },
       onKeep: (reason) => kept = reason,
     )));
-    expect(find.text('Приоритет 12'), findsOneWidget);
+    expect(find.textContaining('приоритет 12'), findsOneWidget);
+    expect(find.text('РЕКОМЕНДАЦИЯ'), findsOneWidget);
+    expect(find.text('≈ 9'), findsOneWidget, reason: 'hero — лучшая альтернатива');
+    expect(find.text('Риск отказа 20 %'), findsOneWidget, reason: 'риск отказа виден только врачу');
     expect(find.text('Следующий шаг: ждать вызова'), findsOneWidget);
     expect(find.text('Пациент просит Достар Мед'), findsOneWidget);
-    expect(find.text('риск отказа'), findsOneWidget);
     expect(find.text('Вы ещё ждёте госпитализацию?'), findsNothing);
     expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Оставить')).enabled, isFalse, reason: 'без причины кнопки заблокированы');
     await tester.enterText(find.byType(TextField).first, 'профиль совпадает');
     await tester.pump();
+    await tester.ensureVisible(find.text('Оставить'));
     await tester.tap(find.text('Оставить'));
     expect(kept, 'профиль совпадает');
+    await tester.ensureVisible(find.text('Направить сюда'));
     await tester.tap(find.text('Направить сюда'));
     expect(redirected?.moCode, '22GN');
     expect(redirectReason, 'профиль совпадает');

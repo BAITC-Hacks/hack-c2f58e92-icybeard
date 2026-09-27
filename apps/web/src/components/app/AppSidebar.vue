@@ -6,8 +6,8 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppSidebarNav from './AppSidebarNav.vue'
 
-/** Боковой каркас персонала: aside 240 px (до 1100 px — 64 px, только иконки), на телефоне — верхняя полоска
- * с кнопкой меню и drawer с тем же наполнением. */
+/** Боковой каркас персонала: белый aside 240 px без рамки (до 1100 px — 64 px, только иконки), на телефоне — верхняя
+ * полоска с кнопкой меню и drawer с тем же наполнением. */
 const { t } = useI18n()
 const open = ref(false)
 </script>
@@ -24,9 +24,9 @@ const open = ref(false)
 </template>
 
 <style scoped>
-.sidebar { width: 240px; flex: none; position: sticky; top: 0; height: 100vh; background: var(--dm-surface); border-right: 1px solid var(--dm-hairline); overflow: hidden; }
-.mobilebar { display: none; align-items: center; gap: 6px; padding: 6px 10px; background: var(--dm-surface); border-bottom: 1px solid var(--dm-hairline); }
-.mobilebar .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--dm-accent); text-decoration: none; }
+.sidebar { width: 240px; flex: none; position: sticky; top: 0; height: 100vh; background: var(--dm-surface); overflow: hidden; }
+.mobilebar { display: none; align-items: center; gap: 6px; padding: 6px 10px; background: var(--dm-surface); }
+.mobilebar .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; letter-spacing: -0.02em; color: var(--dm-ink); text-decoration: none; }
 @media (max-width: 1100px) { .sidebar { width: 64px; } }
 @media (max-width: 640px) { .sidebar { display: none; } .mobilebar { display: flex; } }
 </style>

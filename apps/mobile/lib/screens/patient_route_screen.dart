@@ -13,15 +13,15 @@ import '../widgets/doctor_route_view.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_box.dart';
 import '../widgets/format.dart';
-import '../widgets/org_name.dart';
-import '../widgets/picker_sheet.dart';
 import '../widgets/redirect_reason_dialog.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 
-/// Маршрут пациента для врача: реф в шапке, панель врача первой, сигнал пациента с полем причины, прогноз и
-/// свёрнутые секции; липкая панель «Направить» (лист альтернатив → причина) и «Ассистент». Перенаправление и
-/// «Оставить» пишутся одним Idempotency-Key на нажатие; после записи маршрут перечитывается.
+/// Маршрут пациента для врача по доске M-Patient: реф крупно, подпись «профиль · ждёт N дн. · приоритет P»,
+/// карточка «Рекомендация» с hero «≈ N дн.» лучшей альтернативы, риском отказа и запросом пациента, список
+/// альтернатив (тап — перенаправить с причиной), свёрнутые секции; внизу «Открыть направление» (ассистент) и
+/// «AI-скрайб». Перенаправление и «Оставить» пишутся одним Idempotency-Key на нажатие; после записи маршрут
+/// перечитывается. Риск отказа показывается только врачу.
 class PatientRouteScreen extends StatefulWidget {
   const PatientRouteScreen({super.key, required this.patientRef, this.preview});
 
@@ -60,7 +60,12 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
 
   Future<void> _redirect(Alternative alternative, {String? reason}) async {
     final s = S.at(context);
-    final text = reason ?? await RedirectReasonDialog.show(context, organization: alternative.name, subtitle: '≈ ${days(alternative.p50Days)} ${s.daysUnit}');
+    final text = reason ??
+        await RedirectReasonDialog.show(
+          context,
+          organization: alternative.name,
+          subtitle: '≈ ${days(alternative.p50Days)} ${s.daysUnit} · ${s.riskShort(pct(alternative.pRefusal))}',
+        );
     if (text == null || text.isEmpty || !mounted) {
       return;
     }
@@ -70,28 +75,6 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
   Future<void> _keep(String reason) async {
     final s = S.at(context);
     await _record(() => context.read<Session>().api.keepRoute(widget.patientRef, reason: reason, idempotencyKey: newIdempotencyKey()), s.keepDone);
-  }
-
-  /// «Направить» из липкой панели: лист альтернатив, затем причина.
-  Future<void> _referSheet() async {
-    final s = S.at(context);
-    final route = _route;
-    if (route == null || route.alternatives.isEmpty) {
-      return;
-    }
-    final moCode = await PickerSheet.show<String>(
-      context,
-      title: s.whereToRefer,
-      items: [
-        for (final a in route.alternatives)
-          PickerItem(a.moCode, shortOrgName(a.name), detail: '≈ ${days(a.p50Days)} ${s.daysUnit} · ${s.riskShort(pct(a.pRefusal))}'),
-      ],
-      search: route.alternatives.length > 5,
-    );
-    final chosen = route.alternatives.where((a) => a.moCode == moCode).firstOrNull;
-    if (chosen != null && mounted) {
-      await _redirect(chosen);
-    }
   }
 
   Future<void> _record(Future<String> Function() call, String done) async {
@@ -114,13 +97,17 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
     }
   }
 
+  String get _ref => Uri.encodeComponent(widget.patientRef);
+
   void _openAssistant() {
     final route = _route;
     final preview = widget.preview;
     final moCode = route?.organization.moCode ?? preview?.moCode ?? '';
     final profile = route?.organization.profileCode ?? preview?.profileCode ?? '';
-    context.go('/doctor/patients/${Uri.encodeComponent(widget.patientRef)}/referral?moCode=$moCode&profileCode=$profile');
+    context.go('/doctor/patients/$_ref/referral?moCode=$moCode&profileCode=$profile');
   }
+
+  void _openScribe() => context.go('/doctor/patients/$_ref/scribe');
 
   @override
   Widget build(BuildContext context) {
@@ -129,38 +116,29 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
     final preview = widget.preview;
     final route = _route;
     return PageScaffold(
-      title: widget.patientRef,
+      title: s.patientRouteTitle,
       onRefresh: _load,
-      bottom: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.md),
-          child: Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _busy || route == null || route.alternatives.isEmpty ? null : _referSheet,
-                  icon: const Icon(Icons.alt_route),
-                  label: Text(s.referButton),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(child: OutlinedButton.icon(onPressed: _openAssistant, icon: const Icon(Icons.assignment_outlined), label: Text(s.assistantShort))),
-            ],
-          ),
-        ),
+      bottom: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton(onPressed: _busy ? null : _openAssistant, child: Text(s.openReferral)),
+          const SizedBox(height: AppSpacing.sm),
+          OutlinedButton.icon(onPressed: _openScribe, icon: const Icon(Icons.mic_none, size: 20), label: Text(s.scribeTitle)),
+        ],
       ),
       children: [
         if (_busy) const LinearProgressIndicator(),
         switch (_state) {
           Loading<PatientRoute>() => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (preview != null) Align(alignment: Alignment.centerLeft, child: OrgName(preview.moName, prefix: '${s.waitingFor(preview.daysWaiting)} · ')),
+                Text(widget.patientRef, style: theme.textTheme.headlineSmall?.merge(AppType.numeric)),
+                if (preview != null) Text('${s.waitingFor(preview.daysWaiting)} · ${shortOrgName(preview.moName)}', style: theme.textTheme.bodySmall),
                 const SizedBox(height: AppSpacing.md),
-                const Skeleton(height: 160, radius: AppRadius.md),
-                const SizedBox(height: AppSpacing.lg),
-                const KpiRowSkeleton(),
-                const SizedBox(height: AppSpacing.lg),
-                const ListSkeleton(),
+                const CardSkeleton(height: 220),
+                const SizedBox(height: AppSpacing.md),
+                const CardSkeleton(height: 160),
               ],
             ),
           Failed<PatientRoute>(:final error) => switch (error) {
@@ -170,10 +148,7 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
             },
           Loaded<PatientRoute>(:final data) => DoctorRouteView(route: data, busy: _busy, onRedirect: _redirect, onKeep: _keep),
         },
-        if (route != null) ...[
-          const SizedBox(height: AppSpacing.sm),
-          Text(s.routeSynthetic(dateShort(route.asOf)), style: theme.textTheme.labelSmall?.merge(AppType.numeric)),
-        ],
+        if (route != null) Text(s.routeSynthetic(dateShort(route.asOf)), style: theme.textTheme.labelSmall?.merge(AppType.numeric)),
       ],
     );
   }

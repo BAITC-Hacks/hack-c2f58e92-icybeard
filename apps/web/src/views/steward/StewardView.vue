@@ -166,7 +166,7 @@ onMounted(async () => {
       <i class="pi pi-cloud-upload" aria-hidden="true" />
       <div class="drop-title">{{ uploading ? t('steward.uploading') : t('steward.dropTitle') }}</div>
       <p class="muted small">{{ t('steward.dropText') }}</p>
-      <label class="p-button p-button-secondary p-button-outlined p-button-sm picker"><input ref="fileInput" type="file" accept=".csv,.txt" hidden :aria-label="t('steward.chooseFile')" @change="onPick" />{{ t('steward.chooseFile') }}</label>
+      <label class="p-button p-button-secondary p-button-sm picker"><input ref="fileInput" type="file" accept=".csv,.txt" hidden :aria-label="t('steward.chooseFile')" @change="onPick" />{{ t('steward.chooseFile') }}</label>
       <div v-if="expectedDatasets.length" class="chips expected">
         <span class="muted small">{{ t('steward.expected') }}:</span>
         <StatusTag v-for="d in expectedDatasets" :key="d" :value="d" tone="neutral" />
@@ -185,7 +185,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <AppCard :title="t('steward.batches')" style="margin-top: 16px">
+    <AppCard :title="t('steward.batches')">
       <template #header><span class="muted small">{{ items.length }}</span></template>
       <Skeleton v-if="loading" kind="table" :lines="6" />
       <EmptyState v-else-if="items.length === 0" :title="t('steward.noBatches')" icon="pi pi-database"><code>make data</code> <span class="muted small">{{ t('steward.noBatchesSuffix') }}</span></EmptyState>
@@ -271,15 +271,15 @@ onMounted(async () => {
 
 <style scoped>
 .dropzone { border: 2px dashed var(--dm-hairline); text-align: center; padding: var(--dm-space-5); transition: border-color 0.15s ease, background-color 0.15s ease; }
-.dropzone.dragging { border-color: var(--dm-accent); background: var(--dm-accent-soft); }
+.dropzone.dragging { border-color: var(--dm-ink); background: var(--dm-surface-2); }
 .dropzone i { font-size: 1.8rem; color: var(--dm-accent); }
-.drop-title { font-weight: 600; margin-top: 6px; }
+.drop-title { font-weight: 500; font-size: var(--dm-text-lg); margin-top: 6px; }
 .picker { cursor: pointer; margin-top: 4px; }
 .expected { justify-content: center; margin-top: 12px; }
 .result { text-align: left; margin-top: 12px; }
 .result p { margin: 2px 0; }
 .nowrap { white-space: nowrap; }
-.extras { display: flex; flex-direction: column; gap: var(--dm-space-3); margin-top: 16px; }
+.extras { display: flex; flex-direction: column; gap: var(--dm-space-3); }
 .draft { align-items: flex-start; }
-.panel-sub { font-size: 0.95rem; margin: 16px 0 8px; }
+.panel-sub { font-size: var(--dm-text-base); margin: 16px 0 8px; }
 </style>

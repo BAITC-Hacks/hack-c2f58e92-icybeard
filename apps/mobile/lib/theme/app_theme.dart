@@ -4,32 +4,32 @@ import 'tokens.dart';
 import 'tones.dart';
 import 'typography.dart';
 
-/// Светлая и тёмная темы из одних токенов: явная ColorScheme (без seed), плоский AppBar, карточки без тени с
-/// hairline-границей, кнопки 48 px, NavigationBar с мягким индикатором. Компонентные темы задают вид один раз —
-/// экраны не несут собственных стилей.
+/// Светлая и тёмная темы из одних токенов «Тихой клиники»: фон ground, белые карточки radius 16 без рамки и тени,
+/// primary-кнопки 52 px ink/белый, secondary — soft/ink, поля 52 px на soft-фоне без рамки, чипы radius 8.
+/// Компонентные темы задают вид один раз — экраны не несут собственных стилей и не трогают `Colors.*`.
 abstract final class AppTheme {
   static ThemeData light() => _build(AppColors.light, Brightness.light);
 
   static ThemeData dark() => _build(AppColors.dark, Brightness.dark);
 
   static ThemeData _build(AppColors c, Brightness brightness) {
-    final onAccent = brightness == Brightness.light ? Colors.white : c.surface;
+    final onInk = brightness == Brightness.light ? AppColors.white : c.surface;
     final scheme = ColorScheme(
       brightness: brightness,
-      primary: c.accent,
-      onPrimary: onAccent,
+      primary: c.ink,
+      onPrimary: onInk,
       primaryContainer: c.accentSoft,
-      onPrimaryContainer: c.accent,
-      secondary: c.muted,
-      onSecondary: c.surface,
+      onPrimaryContainer: c.ink,
+      secondary: c.accent,
+      onSecondary: onInk,
       secondaryContainer: c.neutralSoft,
       onSecondaryContainer: c.ink,
-      tertiary: c.warn,
-      onTertiary: onAccent,
-      tertiaryContainer: c.warnSoft,
-      onTertiaryContainer: c.warn,
+      tertiary: c.ok,
+      onTertiary: onInk,
+      tertiaryContainer: c.okSoft,
+      onTertiaryContainer: c.ok,
       error: c.danger,
-      onError: onAccent,
+      onError: onInk,
       errorContainer: c.dangerSoft,
       onErrorContainer: c.danger,
       surface: c.surface,
@@ -45,13 +45,16 @@ abstract final class AppTheme {
       inverseSurface: c.ink,
       onInverseSurface: c.surface,
       inversePrimary: c.accentSoft,
-      shadow: Colors.black,
-      scrim: Colors.black54,
-      surfaceTint: Colors.transparent,
+      shadow: AppColors.shadow,
+      scrim: AppColors.scrim,
+      surfaceTint: AppColors.transparent,
     );
     final text = AppType.textTheme(c);
     final radius = BorderRadius.circular(AppRadius.md);
-    final hairline = BorderSide(color: c.hairline);
+    final noBorder = OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none);
+    final buttonShape = RoundedRectangleBorder(borderRadius: radius);
+    const buttonSize = Size.fromHeight(AppSizes.control);
+    const buttonPadding = EdgeInsets.symmetric(horizontal: AppSpacing.xl);
 
     return ThemeData(
       useMaterial3: true,
@@ -62,101 +65,121 @@ abstract final class AppTheme {
       fontFamily: AppType.family,
       textTheme: text,
       dividerColor: c.hairline,
+      splashFactory: InkSparkle.splashFactory,
       appBarTheme: AppBarTheme(
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: c.surface,
-        surfaceTintColor: Colors.transparent,
+        surfaceTintColor: AppColors.transparent,
         foregroundColor: c.ink,
         centerTitle: false,
-        titleTextStyle: text.titleLarge,
+        titleTextStyle: text.headlineMedium,
       ),
       cardTheme: CardThemeData(
         elevation: 0,
         color: c.card,
-        surfaceTintColor: Colors.transparent,
+        surfaceTintColor: AppColors.transparent,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: radius, side: hairline),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(48),
-          shape: RoundedRectangleBorder(borderRadius: radius),
+          minimumSize: buttonSize,
+          padding: buttonPadding,
+          shape: buttonShape,
           textStyle: text.labelLarge,
+          backgroundColor: c.ink,
+          foregroundColor: onInk,
+          disabledBackgroundColor: c.neutralSoft,
+          disabledForegroundColor: c.faint,
         ),
       ),
+      // secondary-кнопка: soft-фон, текст ink, без рамки (OutlinedButton и FilledButton.tonal выглядят одинаково)
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(48),
+          minimumSize: buttonSize,
+          padding: buttonPadding,
+          backgroundColor: c.neutralSoft,
           foregroundColor: c.ink,
-          side: hairline,
-          shape: RoundedRectangleBorder(borderRadius: radius),
+          disabledForegroundColor: c.faint,
+          side: BorderSide.none,
+          shape: buttonShape,
           textStyle: text.labelLarge,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: c.accent, textStyle: text.labelLarge),
+        style: TextButton.styleFrom(
+          foregroundColor: c.ink,
+          disabledForegroundColor: c.faint,
+          textStyle: text.titleSmall,
+          shape: buttonShape,
+          minimumSize: const Size(0, AppSizes.compact),
+        ),
       ),
+      iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(foregroundColor: c.ink)),
       chipTheme: ChipThemeData(
         backgroundColor: c.neutralSoft,
-        selectedColor: c.accentSoft,
-        side: hairline,
+        selectedColor: c.ink,
+        side: BorderSide.none,
         labelStyle: text.labelMedium,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        shape: const StadiumBorder(),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.xs),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: c.card,
+        fillColor: c.neutralSoft,
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
-        border: OutlineInputBorder(borderRadius: radius, borderSide: hairline),
-        enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: hairline),
-        focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: c.accent, width: 1.5)),
-        errorBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: c.danger)),
-        focusedErrorBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: c.danger, width: 1.5)),
-        labelStyle: text.bodySmall,
+        border: noBorder,
+        enabledBorder: noBorder,
+        focusedBorder: noBorder,
+        disabledBorder: noBorder,
+        errorBorder: noBorder,
+        focusedErrorBorder: noBorder,
+        // label живёт над полем (FieldLabel); labelText, если остался, ведёт себя как плейсхолдер
+        floatingLabelBehavior: FloatingLabelBehavior.never,
+        labelStyle: text.bodyMedium?.copyWith(color: c.faint),
         helperStyle: text.labelSmall,
+        errorStyle: text.labelSmall?.copyWith(color: c.danger),
         hintStyle: text.bodyMedium?.copyWith(color: c.faint),
-      ),
-      navigationBarTheme: NavigationBarThemeData(
-        height: 64,
-        backgroundColor: c.surface,
-        surfaceTintColor: Colors.transparent,
-        indicatorColor: c.accentSoft,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        iconTheme: WidgetStateProperty.resolveWith(
-          (states) => IconThemeData(color: states.contains(WidgetState.selected) ? c.accent : c.muted, size: 22),
-        ),
-        labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => text.labelSmall!.copyWith(color: states.contains(WidgetState.selected) ? c.ink : c.muted),
-        ),
+        prefixIconColor: c.muted,
+        suffixIconColor: c.muted,
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: SegmentedButton.styleFrom(
-          selectedBackgroundColor: c.accentSoft,
-          selectedForegroundColor: c.accent,
+          backgroundColor: c.card,
+          selectedBackgroundColor: c.ink,
+          selectedForegroundColor: onInk,
           foregroundColor: c.ink,
-          side: hairline,
-          textStyle: text.labelMedium,
+          side: BorderSide.none,
+          textStyle: text.labelMedium?.copyWith(fontSize: 14),
         ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? c.ink : AppColors.transparent),
+        checkColor: WidgetStatePropertyAll(onInk),
+        side: BorderSide(color: c.muted, width: 1.5),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xs)),
       ),
       dividerTheme: DividerThemeData(color: c.hairline, thickness: 1, space: 1),
       listTileTheme: ListTileThemeData(
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
         iconColor: c.muted,
-        titleTextStyle: text.bodyLarge,
-        subtitleTextStyle: text.bodySmall,
+        titleTextStyle: text.row,
+        subtitleTextStyle: text.rowDetail.copyWith(color: c.faint),
+        selectedColor: c.ink,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.ink,
-        contentTextStyle: text.bodyMedium?.copyWith(color: c.surface),
+        contentTextStyle: text.bodySmall?.copyWith(color: onInk, fontSize: 15),
+        actionTextColor: c.accent,
         shape: RoundedRectangleBorder(borderRadius: radius),
       ),
-      progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: c.ink, linearTrackColor: c.neutralSoft),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: c.card,
-        surfaceTintColor: Colors.transparent,
+        surfaceTintColor: AppColors.transparent,
+        dragHandleColor: c.hairline,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       ),
       extensions: [AppTones.from(c), AppPalette(c)],

@@ -23,7 +23,7 @@ void main() {
     expect(guard(anonymous, '/'), '/login');
     expect(guard(anonymous, '/login'), isNull);
     expect(guard(anonymous, '/home'), '/login?from=%2Fhome');
-    expect(guard(anonymous, '/home/wait'), '/login?from=%2Fhome%2Fwait');
+    expect(guard(anonymous, '/home/wait'), '/login?from=%2Fhome%2Fwait', reason: 'гостевого режима нет — даже публичные справочники за входом');
     expect(guard(anonymous, '/home/route'), '/login?from=%2Fhome%2Froute');
     expect(guard(anonymous, '/updates'), '/login?from=%2Fupdates');
     expect(guard(anonymous, '/doctor/patients'), '/login?from=%2Fdoctor%2Fpatients');
@@ -35,14 +35,19 @@ void main() {
     expect(guard(citizen, '/home/route'), isNull);
     expect(guard(citizen, '/profile'), isNull);
     expect(guard(citizen, '/doctor/scribe'), '/home');
+    expect(guard(citizen, '/doctor/decisions'), '/home');
   });
 
-  test('doctor: lives in the doctor shell only', () {
+  test('doctor: lives in the doctor shell only, decisions is a tab, assistant and scribe stay reachable', () {
     expect(guard(doctor, '/'), '/doctor/patients');
     expect(guard(doctor, '/login'), '/doctor/patients');
     expect(guard(doctor, '/doctor/patients'), isNull);
     expect(guard(doctor, '/doctor/patients/SYN-75-028B-381-01'), isNull);
-    expect(guard(doctor, '/doctor/referral/decisions'), isNull);
+    expect(guard(doctor, '/doctor/patients/SYN-75-028B-381-01/referral'), isNull);
+    expect(guard(doctor, '/doctor/patients/SYN-75-028B-381-01/scribe'), isNull);
+    expect(guard(doctor, '/doctor/decisions'), isNull);
+    expect(guard(doctor, '/doctor/referral'), isNull);
+    expect(guard(doctor, '/doctor/scribe'), isNull);
     expect(guard(doctor, '/home'), '/doctor/patients');
     expect(guard(doctor, '/updates'), '/doctor/patients');
   });

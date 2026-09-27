@@ -12,8 +12,9 @@ class Tone {
   static Tone lerp(Tone a, Tone b, double t) => Tone(Color.lerp(a.fg, b.fg, t)!, Color.lerp(a.bg, b.bg, t)!);
 }
 
-/// Единственный источник цвета для OriginTag (ml / formula / ai) и StatusChip (ok / warn / danger / neutral / accent).
-/// Экраны не обращаются к `Colors.*` напрямую — это проверяет CI-grep.
+/// Единственный источник цвета для OriginTag (ml / formula / ai) и StatusChip (ok / warn / danger / neutral /
+/// accent / bench). Метки происхождения по системе: «ML-модель» — heal-wash/ink, «формула» — soft/ink-2,
+/// «AI» — coral-wash/ink; внешний ориентир — bench-wash/ink. Экраны не обращаются к `Colors.*` — это проверяет CI.
 class AppTones extends ThemeExtension<AppTones> {
   const AppTones({
     required this.ml,
@@ -24,17 +25,19 @@ class AppTones extends ThemeExtension<AppTones> {
     required this.danger,
     required this.neutral,
     required this.accent,
+    required this.bench,
   });
 
   factory AppTones.from(AppColors c) => AppTones(
-        ml: Tone(c.accent, c.accentSoft),
+        ml: Tone(c.ink, c.accentSoft),
         formula: Tone(c.muted, c.neutralSoft),
-        ai: Tone(c.warn, c.warnSoft),
+        ai: Tone(c.ink, c.dangerSoft),
         ok: Tone(c.ok, c.okSoft),
-        warn: Tone(c.warn, c.warnSoft),
+        warn: Tone(c.danger, c.dangerSoft),
         danger: Tone(c.danger, c.dangerSoft),
         neutral: Tone(c.muted, c.neutralSoft),
-        accent: Tone(c.accent, c.accentSoft),
+        accent: Tone(c.accent, c.neutralSoft),
+        bench: Tone(c.ink, c.benchSoft),
       );
 
   final Tone ml;
@@ -45,11 +48,12 @@ class AppTones extends ThemeExtension<AppTones> {
   final Tone danger;
   final Tone neutral;
   final Tone accent;
+  final Tone bench;
 
   static AppTones of(BuildContext context) => Theme.of(context).extension<AppTones>() ?? AppTones.from(AppColors.light);
 
   @override
-  AppTones copyWith({Tone? ml, Tone? formula, Tone? ai, Tone? ok, Tone? warn, Tone? danger, Tone? neutral, Tone? accent}) => AppTones(
+  AppTones copyWith({Tone? ml, Tone? formula, Tone? ai, Tone? ok, Tone? warn, Tone? danger, Tone? neutral, Tone? accent, Tone? bench}) => AppTones(
         ml: ml ?? this.ml,
         formula: formula ?? this.formula,
         ai: ai ?? this.ai,
@@ -58,6 +62,7 @@ class AppTones extends ThemeExtension<AppTones> {
         danger: danger ?? this.danger,
         neutral: neutral ?? this.neutral,
         accent: accent ?? this.accent,
+        bench: bench ?? this.bench,
       );
 
   @override
@@ -74,11 +79,12 @@ class AppTones extends ThemeExtension<AppTones> {
       danger: Tone.lerp(danger, other.danger, t),
       neutral: Tone.lerp(neutral, other.neutral, t),
       accent: Tone.lerp(accent, other.accent, t),
+      bench: Tone.lerp(bench, other.bench, t),
     );
   }
 }
 
-/// Доступ к сырым токенам темы из виджетов (hairline для коннекторов таймлайна, faint для скелетонов и т.п.).
+/// Доступ к сырым токенам темы из виджетов (hairline для строк, neutralSoft для вставок, accent для точек).
 class AppPalette extends ThemeExtension<AppPalette> {
   const AppPalette(this.colors);
 

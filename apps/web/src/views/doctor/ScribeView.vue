@@ -219,7 +219,7 @@ onBeforeUnmount(() => recorder.dispose())
     </AppCard>
     <ErrorBox :error="error" />
 
-    <div class="grid cols-2" style="margin-top: 16px">
+    <div class="grid cols-2">
       <div class="col">
         <AppCard v-if="!sessionId" :title="t('doctor.scribe.consentTitle')">
           <label class="consent-row"><Checkbox v-model="consent" binary input-id="consent" /> <span>{{ t('doctor.scribe.consent') }}</span></label>
@@ -238,8 +238,8 @@ onBeforeUnmount(() => recorder.dispose())
           </div>
           <div class="actions rec-actions">
             <Button v-if="recorder.canRecord && !recorder.recording.value" :label="t('doctor.scribe.recordMic')" icon="pi pi-microphone" :disabled="approved || busy" @click="record" />
-            <Button v-if="recorder.recording.value" :label="t('doctor.scribe.stop')" icon="pi pi-stop" severity="danger" rounded @click="recorder.stop()" />
-            <label v-if="!approved" class="p-button p-button-secondary p-button-outlined p-button-sm upload">{{ t('doctor.scribe.uploadFile') }}<input type="file" accept="audio/*" hidden @change="onFile" /></label>
+            <Button v-if="recorder.recording.value" :label="t('doctor.scribe.stop')" icon="pi pi-stop" @click="recorder.stop()" />
+            <label v-if="!approved" class="p-button p-button-secondary p-button-sm upload">{{ t('doctor.scribe.uploadFile') }}<input type="file" accept="audio/*" hidden @change="onFile" /></label>
             <Button :label="t('doctor.scribe.pasteText')" size="small" text severity="secondary" :disabled="approved" @click="showTyped = !showTyped" />
           </div>
           <div v-if="showTyped" class="field" style="margin-top: 12px">
@@ -252,7 +252,7 @@ onBeforeUnmount(() => recorder.dispose())
           </div>
         </AppCard>
 
-        <AppCard v-if="sessionId" :title="t('doctor.scribe.transcript')" style="margin-top: 16px">
+        <AppCard v-if="sessionId" :title="t('doctor.scribe.transcript')">
           <div v-if="segments.length" class="transcript-segments">
             <p v-for="(segment, i) in segments" :key="i" class="segment" :class="{ 'segment-highlight': isSegmentHighlighted(segment) }">
               <span class="mono muted">[{{ segment.t0.toFixed(0) }}–{{ segment.t1.toFixed(0) }}]</span>
@@ -302,7 +302,7 @@ onBeforeUnmount(() => recorder.dispose())
             <StatusTag :value="t('doctor.scribe.audioDeleted')" tone="ok" icon="pi pi-trash" />
             <div class="link-row">
               <a v-if="leafletUrl" :href="leafletUrl" target="_blank" class="mono">{{ leafletUrl }}</a>
-              <Button :label="t('shell.copyLink')" icon="pi pi-copy" size="small" severity="secondary" outlined @click="copyLink" />
+              <Button :label="t('shell.copyLink')" icon="pi pi-copy" size="small" severity="secondary" @click="copyLink" />
             </div>
             <div v-if="qrDataUrl" class="qr-block">
               <img :src="qrDataUrl" :alt="t('doctor.scribe.qrAlt')" width="200" height="200" />
@@ -322,14 +322,14 @@ onBeforeUnmount(() => recorder.dispose())
 <style scoped>
 .session { display: flex; gap: var(--dm-space-4); align-items: flex-end; flex-wrap: wrap; }
 .session .field { min-width: 120px; }
-.timer { font-size: 1.1rem; }
+.timer { font-size: var(--dm-text-kpi); font-weight: 600; letter-spacing: -0.02em; font-family: inherit; line-height: 1; }
 .timer.live { color: var(--dm-danger); }
 .session-id { margin-left: auto; }
-.consent-row { display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer; }
+.consent-row { display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; }
 .what { margin: 8px 0 0; padding-left: 20px; }
-.wave { display: flex; align-items: center; gap: 3px; height: 56px; padding: 0 4px; border-radius: var(--dm-radius-sm); background: var(--dm-surface-2); }
-.wave .bar { flex: 1; background: var(--dm-faint); border-radius: 2px; transition: height 0.08s linear; }
-.wave.live .bar { background: var(--dm-accent); }
+.wave { display: flex; align-items: center; gap: 3px; height: 56px; padding: 0 4px; border-radius: var(--dm-radius-md); background: var(--dm-surface-2); }
+.wave .bar { flex: 1; background: var(--dm-dot-idle); border-radius: 2px; transition: height 0.08s linear; }
+.wave.live .bar { background: var(--dm-ink); }
 .rec-actions { align-items: center; }
 .upload { cursor: pointer; }
 .segment { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
@@ -337,5 +337,5 @@ onBeforeUnmount(() => recorder.dispose())
 .section { margin-bottom: 8px; }
 .result { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .link-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; word-break: break-all; }
-.models { margin-top: 16px; }
+.models { margin: 0; }
 </style>

@@ -8,7 +8,7 @@ import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
-import '../widgets/alternative_row.dart';
+import '../widgets/app_card.dart';
 import '../widgets/collapsible_section.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_box.dart';
@@ -19,10 +19,12 @@ import '../widgets/picker_sheet.dart';
 import '../widgets/redirect_reason_dialog.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/wait_bars.dart';
 
-/// «Сколько ждут»: две строки-селектора (регион, профиль) открывают листы с поиском, результат считается при
-/// выборе обоих — без кнопки. Главное число «≈ N дней — половина ждёт не дольше» [ML], ориентир МЗ РК [формула],
-/// «Где быстрее» с чипом риска и «Попросить» для вошедшего гражданина, «Как считается» свёрнуто.
+/// «Сколько ждут» по доске M-Wait: два soft-селектора (регион, профиль), hero-карточка «≈ N дн. · половина
+/// госпитализированных ждёт не дольше · 9 из 10 — до M дн. · ориентир МЗ РК», карточка «Где быстрее» с барами
+/// (ширина пропорциональна p50, коралловый бар — у организации, которую предложил врач) и CTA внизу «Попросить
+/// рассмотреть …». Результат считается при выборе обоих селекторов — без кнопки.
 class WaitScreen extends StatefulWidget {
   const WaitScreen({super.key, this.regionKato, this.profileCode});
 
@@ -50,6 +52,9 @@ class _WaitScreenState extends State<WaitScreen> {
   LoadState<_WaitData>? _state;
   Object? _refdataError;
 
+  /// Маршрут гражданина — чтобы подсветить организацию, которую предложил врач, и не дублировать открытый запрос.
+  PatientRoute? _route;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +62,21 @@ class _WaitScreenState extends State<WaitScreen> {
     _region = widget.regionKato ?? session.region;
     _profile = widget.profileCode ?? session.lastProfile;
     _loadRefdata();
+    if (session.isCitizen) {
+      _loadRoute();
+    }
+  }
+
+  Future<void> _loadRoute() async {
+    final session = context.read<Session>();
+    try {
+      final route = await session.api.myRoute(regionKato: session.regionFromAccount ? null : session.region);
+      if (mounted) {
+        setState(() => _route = route);
+      }
+    } catch (_) {
+      // без маршрута экран остаётся публичным справочником
+    }
   }
 
   Future<void> _loadRefdata() async {
@@ -166,6 +186,7 @@ class _WaitScreenState extends State<WaitScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.requestSent)));
+        await _loadRoute();
       }
     } catch (e) {
       if (mounted) {
@@ -174,34 +195,38 @@ class _WaitScreenState extends State<WaitScreen> {
     }
   }
 
+  /// CTA: предложенная врачом организация, если она в списке, иначе самая быстрая; пока запрос открыт — кнопки нет.
+  Alternative? _ctaTarget(_WaitData data) {
+    if (!context.read<Session>().isCitizen || data.alternatives.isEmpty || _route?.openRequest != null) {
+      return null;
+    }
+    final proposed = _route?.latestRedirect?.toMoCode;
+    return data.alternatives.where((a) => a.moCode == proposed).firstOrNull ?? data.alternatives.first;
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
     final session = context.watch<Session>();
     final state = _state;
+    final data = switch (state) { Loaded<_WaitData>(:final data) => data, _ => null };
+    final cta = data == null ? null : _ctaTarget(data);
     final regionName = _regions.where((r) => r.kato == _region).map((r) => r.name).firstOrNull ?? _region;
     final profileName = _profiles.where((p) => p.code == _profile).map((p) => p.name).firstOrNull;
     return PageScaffold(
       title: s.waitTitle,
+      gap: AppSpacing.sm,
+      bottom: cta == null ? null : FilledButton(onPressed: () => _request(cta), child: Text(s.requestConsiderName(shortOrgName(cta.name)))),
       children: [
         PickerRow(label: s.regionLabel, value: regionName, placeholder: s.choosePlaceholder, onTap: _pickRegion, enabled: _regions.isNotEmpty),
-        const SizedBox(height: AppSpacing.sm),
         PickerRow(label: s.profileShort, value: profileName, placeholder: s.choosePlaceholder, onTap: _pickProfile, enabled: _profiles.isNotEmpty),
-        if (_refdataError != null) ...[const SizedBox(height: AppSpacing.md), ErrorBox(error: _refdataError, onRetry: _loadRefdata)],
-        const SizedBox(height: AppSpacing.lg),
+        if (_refdataError != null) ErrorBox(error: _refdataError, onRetry: _loadRefdata),
+        const SizedBox(height: AppSpacing.xs),
         if (state == null)
           EmptyState(icon: Icons.tune, title: s.chooseRegionProfile, body: s.chooseRegionProfileBody)
         else
           switch (state) {
-            Loading<_WaitData>() => const Column(
-                children: [
-                  Skeleton(height: 44, width: 160, radius: AppRadius.sm),
-                  SizedBox(height: AppSpacing.md),
-                  Skeleton(height: 16),
-                  SizedBox(height: AppSpacing.xl),
-                  ListSkeleton(count: 3),
-                ],
-              ),
+            Loading<_WaitData>() => const Column(children: [CardSkeleton(height: 200), SizedBox(height: AppSpacing.md), CardSkeleton(height: 220)]),
             Failed<_WaitData>(:final error) => _noData(error)
                 ? EmptyState(
                     icon: Icons.search_off,
@@ -210,7 +235,12 @@ class _WaitScreenState extends State<WaitScreen> {
                     action: OutlinedButton(onPressed: _pickProfile, child: Text(s.changeProfile)),
                   )
                 : ErrorBox(error: error, onRetry: _run),
-            Loaded<_WaitData>(:final data) => _Result(data: data, target: _target, onRequest: session.isCitizen ? _request : null),
+            Loaded<_WaitData>(:final data) => _Result(
+                data: data,
+                target: _target,
+                proposedMoCode: _route?.latestRedirect?.toMoCode,
+                onRequest: session.isCitizen && _route?.openRequest == null ? _request : null,
+              ),
           },
       ],
     );
@@ -220,10 +250,11 @@ class _WaitScreenState extends State<WaitScreen> {
 }
 
 class _Result extends StatelessWidget {
-  const _Result({required this.data, required this.target, this.onRequest});
+  const _Result({required this.data, required this.target, this.proposedMoCode, this.onRequest});
 
   final _WaitData data;
   final RouteBenchmark? target;
+  final String? proposedMoCode;
   final void Function(Alternative alternative)? onRequest;
 
   @override
@@ -233,42 +264,38 @@ class _Result extends StatelessWidget {
     final p = data.prediction;
     final index = data.index;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        HeroNumber(
-          value: '≈ ${days(p.p50Days)}',
-          unit: s.daysWord,
-          caption: s.halfCaption,
-          line: s.heroLine(days(p.p90Days), pct(p.pWithin30Days)),
-          origin: Origin.ml,
+        AppCard(
+          child: HeroNumber(
+            label: s.waitLabel,
+            origin: Origin.ml,
+            value: '≈ ${days(p.p50Days)}',
+            unit: s.daysUnit,
+            caption: s.halfHospitalized,
+            line: [s.nineOfTenShort(days(p.p90Days)), if (target != null) s.benchmarkShort(days(target!.value))].join('\n'),
+          ),
         ),
-        if (target != null) ...[
-          const SizedBox(height: AppSpacing.md),
-          Row(
+        const SizedBox(height: AppSpacing.md),
+        AppCard(
+          padding: AppCard.plain,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: Text(s.benchmarkShort(days(target!.value)), style: theme.textTheme.bodyMedium?.merge(AppType.numeric))),
-              const SizedBox(width: AppSpacing.sm),
-              const OriginTag(Origin.formula),
+              Row(
+                children: [
+                  Expanded(child: Text(s.fasterSection, style: theme.textTheme.titleMedium)),
+                  const OriginTag(Origin.ml),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (data.alternatives.isEmpty)
+                Text(s.noOrgsForProfile, style: theme.textTheme.bodySmall)
+              else
+                WaitBars(alternatives: data.alternatives, proposedMoCode: proposedMoCode, onTap: onRequest),
             ],
           ),
-        ],
-        SectionTitle(s.fasterSection),
-        if (data.alternatives.isEmpty)
-          Text(s.noOrgsForProfile, style: theme.textTheme.bodySmall)
-        else
-          Card(
-            child: Column(
-              children: [
-                for (final (i, a) in data.alternatives.indexed) ...[
-                  if (i > 0) const Divider(),
-                  AlternativeRow(
-                    alternative: a,
-                    trailing: onRequest == null ? null : TextButton(onPressed: () => onRequest!(a), child: Text(s.requestConsider)),
-                  ),
-                ],
-              ],
-            ),
-          ),
+        ),
         const SizedBox(height: AppSpacing.md),
         CollapsibleSection(
           title: s.howCounted,
@@ -280,7 +307,7 @@ class _Result extends StatelessWidget {
               const SizedBox(height: AppSpacing.sm),
               Text(s.nhsNote, style: theme.textTheme.bodySmall),
               const SizedBox(height: AppSpacing.sm),
-              Text(s.modelTrained(p.model.name, p.model.version, p.model.trainedThrough), style: theme.textTheme.labelSmall),
+              Text(s.modelTrained(p.model.name, p.model.version, p.model.trainedThrough), style: theme.textTheme.labelSmall?.merge(AppType.numeric)),
             ],
           ),
         ),

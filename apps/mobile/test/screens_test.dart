@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:darumen/screens/decisions_screen.dart';
 import 'package:darumen/screens/home_screen.dart';
 import 'package:darumen/screens/login_screen.dart';
+import 'package:darumen/screens/route_screen.dart';
 import 'package:darumen/screens/scribe_screen.dart';
 import 'package:darumen/screens/updates_screen.dart';
 import 'package:darumen/screens/worklist_screen.dart';
+import 'package:darumen/widgets/signal_card.dart';
 import 'package:darumen/state/session.dart';
 import 'package:darumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -74,66 +76,109 @@ Map<String, Object> worklistItem(String ref, {List<String> flags = const [], int
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('login screen: language toggle, carousel with dots, bottom buttons and the password sheet', (tester) async {
+  testWidgets('login screen: round language button, white carousel card, bottom buttons, no guest mode, password sheet', (tester) async {
     final session = await apiSession(roles: [], api: {});
     await tester.pumpWidget(app(session, const LoginScreen()));
     await tester.pump();
-    expect(find.text('РУС'), findsOneWidget);
     expect(find.text('ҚАЗ'), findsOneWidget);
+    expect(find.text('РУС'), findsNothing, reason: 'кнопка показывает язык, на который переключит');
+    expect(find.text('darumen'), findsOneWidget);
     expect(find.text('Видите, на каком этапе ваше направление'), findsOneWidget);
     expect(find.byType(PageView), findsOneWidget);
+    expect(find.text('В листе ожидания'), findsOneWidget);
     expect(find.text('Войти через eGov mobile'), findsOneWidget);
+    expect(find.text('Войти по логину'), findsOneWidget);
     expect(find.text('Продолжить как гость'), findsNothing);
     expect(find.byType(TextField), findsNothing);
     await tester.drag(find.byType(PageView), const Offset(-400, 0));
     await tester.pumpAndSettle();
     expect(find.text('Знаете, сколько обычно ждут такие пациенты'), findsOneWidget);
+    expect(find.text('до 21'), findsOneWidget);
+    await tester.tap(find.text('ҚАЗ'));
+    await tester.pumpAndSettle();
+    expect(session.locale, 'kk');
     await tester.tap(find.text('Войти по логину'));
     await tester.pumpAndSettle();
     expect(find.byType(TextField), findsNWidgets(2));
-    await tester.tap(find.text('ҚАЗ'), warnIfMissed: false);
-    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('home screen for a citizen: route card, three equal tiles, then weather and news', (tester) async {
-    final session = await apiSession(roles: ['citizen'], api: {
-      '/route/me': {
+  Map<String, Object> citizenRoute() => {
         'patientRef': 'SYN-75-028B-381-01',
+        'regionKato': '75',
         'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
         'forecast': {'p50Days': 47, 'p90Days': 106, 'fromModel': true},
         'timeline': [
+          {'code': 'referral_issued', 'order': 1, 'title': 'Направление выдано', 'date': '2025-02-06', 'status': 'done'},
           {'code': 'waitlisted', 'order': 3, 'title': 'Внесено в лист ожидания', 'date': '2025-02-17', 'status': 'current'},
+          {'code': 'hospitalized', 'order': 5, 'title': 'Госпитализация', 'status': 'upcoming'},
         ],
-      },
+        'alternatives': [
+          {'mo': {'moCode': '22GN', 'name': dostar}, 'p50Days': 9, 'p90Days': 20, 'pRefusal': 0.1, 'distanceKm': 12},
+        ],
+        'decisions': [
+          {'decisionId': 'd', 'recordedAt': '2025-02-20T10:00:00+00:00', 'toMoCode': '22GN', 'toMoName': dostar, 'reason': 'ближе к дому', 'kind': 'redirect'},
+        ],
+        'signals': [
+          {'decisionId': 'a', 'recordedAt': '2025-02-19T10:00:00+00:00', 'kind': 'still_waiting', 'open': false},
+        ],
+      };
+
+  testWidgets('home screen for a citizen: hero card, doctor signal with the day difference, three tiles, no weather or news', (tester) async {
+    final session = await apiSession(roles: ['citizen'], api: {
+      '/route/me': citizenRoute(),
       '/public/daily': {
         'regionKato': '75', 'regionName': 'г. Алматы', 'capital': 'Алматы',
-        'weather': {'available': true, 'source': 'Open-Meteo', 'days': [
-          {'date': '2026-09-27', 'tMin': 12, 'tMax': 31, 'precipitationProbability': 10, 'windMax': 20, 'uvIndex': 7, 'code': 'clear'},
-          {'date': '2026-09-28', 'tMin': 10, 'tMax': 24, 'precipitationProbability': 70, 'windMax': 55, 'uvIndex': 3, 'code': 'rain'},
-        ]},
-        'tips': [{'code': 'heat', 'day': 0, 'text': 'Жара до 31°: пейте воду и избегайте солнца днём.'}],
-        'news': {'available': true, 'source': 'Tengrinews', 'items': [
-          {'title': 'В Алматы открыли новую поликлинику', 'url': 'https://example.kz/n1', 'publishedAt': '2026-09-27T08:00:00+00:00', 'source': 'Tengrinews'},
-        ]},
+        'weather': {'available': true, 'source': 'Open-Meteo', 'days': []},
+        'tips': [],
+        'news': {'available': true, 'source': 'Tengrinews', 'items': [{'title': 'В Алматы открыли новую поликлинику', 'url': 'https://example.kz/n1', 'publishedAt': null, 'source': 'Tengrinews'}]},
       },
     });
     await tester.pumpWidget(app(session, const HomeScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('Моя госпитализация'), findsOneWidget);
-    expect(find.textContaining('Войдите'), findsNothing);
+    expect(find.text('МОЯ ГОСПИТАЛИЗАЦИЯ'), findsOneWidget, reason: 'label над hero — uppercase');
+    expect(find.text('до 106'), findsOneWidget, reason: 'hero — 9 из 10 таких пациентов, p90');
+    expect(find.text('дн. до госпитализации'), findsOneWidget);
+    expect(find.text('В листе ожидания'), findsOneWidget);
+    expect(find.text('ML-модель'), findsOneWidget);
+    expect(find.text('Открыть маршрут'), findsOneWidget);
+    expect(find.byType(SignalCard), findsOneWidget);
+    expect(find.text('Врач предложил Достар Мед'), findsOneWidget);
+    expect(find.text('Там ждут на 38 дн. меньше'), findsOneWidget, reason: 'p50 текущей 47 − p50 предложенной 9');
     expect(find.text('Сколько ждут'), findsOneWidget);
     expect(find.text('Лекарства'), findsOneWidget);
     expect(find.text('Вакцинация'), findsOneWidget);
-    await tester.drag(find.byType(ListView).first, const Offset(0, -900));
-    await tester.pumpAndSettle();
-    expect(find.text('Погода · Алматы'), findsOneWidget);
-    expect(find.textContaining('пейте воду'), findsOneWidget);
-    expect(find.text('В Алматы открыли новую поликлинику'), findsOneWidget);
+    expect(find.textContaining('Погода'), findsNothing);
+    expect(find.text('В Алматы открыли новую поликлинику'), findsNothing);
+    expect(find.text('Продолжить как гость'), findsNothing);
+    expect(find.text('Данные МЗ РК, I квартал 2025. Без персональных данных.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('worklist counts flags on the client, filters locally and shows the signal row with actions', (tester) async {
+  testWidgets('route screen: stage k of n, timeline rows, doctor answer as a signal card and «Понятно» at the bottom', (tester) async {
+    final session = await apiSession(roles: ['citizen'], api: {'/route/me': citizenRoute()});
+    await tester.pumpWidget(app(session, const RouteScreen()));
+    await tester.pumpAndSettle();
+    expect(find.text('Мой путь'), findsOneWidget);
+    expect(find.text('ЭТАП 2 ИЗ 3'), findsOneWidget);
+    expect(find.text('до 106'), findsOneWidget);
+    expect(find.text('Половина — 47 дн., 9 из 10 — до 106 дн.'), findsOneWidget);
+    expect(find.text('Выдано'), findsOneWidget);
+    expect(find.text('06.02'), findsOneWidget);
+    expect(find.text('Стационар'), findsOneWidget);
+    expect(find.byType(SignalCard), findsOneWidget);
+    expect(find.text('Врач предложил Достар Мед'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Понятно'), findsOneWidget);
+    await tester.tap(find.text('Понятно'));
+    await tester.pumpAndSettle();
+    expect(session.seenDecisionId, 'd');
+    expect(find.byType(SignalCard), findsNothing);
+    expect(find.text('Понятно'), findsNothing);
+    expect(find.text('Что сейчас'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('worklist: «Сегодня» keeps flagged patients, «Все» shows everyone, rows carry one status chip, search filters by ref', (tester) async {
     final session = await apiSession(roles: ['doctor'], region: '75', api: {
       '/journal/worklist': {
         'items': [
@@ -142,75 +187,61 @@ void main() {
           worklistItem('SYN-75-0290-241-03', flags: ['patient_signal'], priority: 15, days: 40, next: 'wait_for_call', signal: {
             'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': dostar, 'comment': 'живу рядом', 'recordedAt': '2026-09-25T10:00:00+00:00',
           }),
+          worklistItem('SYN-75-0290-241-04', priority: 5, days: 3),
         ],
         'synthetic': true, 'asOf': '2025-03-31', 'regionKato': '75', 'modelBacked': true,
       },
     });
     await tester.pumpWidget(app(session, const WorklistScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('Пациенты · 75'), findsOneWidget);
+    expect(find.text('Пациенты'), findsOneWidget);
     expect(find.text('данные на 31.03.2025'), findsOneWidget);
-    expect(find.text('3'), findsOneWidget, reason: 'плитка «Все»');
-    expect(find.text('Запрос пациента'), findsWidgets);
-    expect(find.text('Городской перинатальный центр'), findsNWidgets(3));
-    expect(find.text('Проверить до вызова'), findsOneWidget);
-    expect(find.text('Предложить быстрее'), findsOneWidget);
-    expect(find.text('Просит Достар Мед — „живу рядом“'), findsOneWidget);
-    expect(find.text('Направить сюда'), findsOneWidget);
-    expect(find.text('Оставить'), findsOneWidget);
+    expect(find.text('Сегодня'), findsOneWidget);
+    expect(find.text('риск отказа'), findsOneWidget);
+    expect(find.text('есть быстрее'), findsOneWidget);
+    expect(find.text('запрос пациента'), findsOneWidget);
+    expect(find.text('SYN-75-0290-241-04'), findsNothing, reason: 'без флагов и сигнала — не «сегодня»');
+    expect(find.textContaining('ждёт 85 дн. · Городской перинатальный центр'), findsOneWidget);
     // сортировка по приоритету: SYN-…-01 первым
     final first = tester.getTopLeft(find.text('SYN-75-0290-241-01'));
     final second = tester.getTopLeft(find.text('SYN-75-0290-241-02'));
     expect(first.dy, lessThan(second.dy));
-    // плитка-счётчик идёт в дереве раньше одноимённого чипа в строке
-    await tester.tap(find.text('> 30 дней').first);
+    await tester.tap(find.text('Все'));
     await tester.pumpAndSettle();
-    expect(find.text('SYN-75-0290-241-01'), findsOneWidget);
-    expect(find.text('SYN-75-0290-241-02'), findsNothing);
-    expect(find.text('SYN-75-0290-241-03'), findsNothing);
-    await tester.tap(find.text('Есть быстрее').first);
+    expect(find.text('SYN-75-0290-241-04'), findsOneWidget);
+    expect(find.text('ожидает решения'), findsOneWidget);
+    await tester.tap(find.byTooltip('Поиск пациента'));
     await tester.pumpAndSettle();
-    expect(find.text('SYN-75-0290-241-02'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), '241-04');
+    await tester.pumpAndSettle();
+    expect(find.text('SYN-75-0290-241-04'), findsOneWidget);
+    expect(find.text('SYN-75-0290-241-01'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('updates are grouped by day with short names and the open-route action', (tester) async {
-    final session = await apiSession(roles: ['citizen'], api: {
-      '/route/me': {
-        'patientRef': 'SYN-75-028B-381-01',
-        'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
-        'forecast': {'p50Days': 47, 'p90Days': 106, 'fromModel': true},
-        'timeline': [
-          {'code': 'waitlisted', 'order': 3, 'title': 'Внесено в лист ожидания', 'date': '2025-02-17', 'status': 'current'},
-        ],
-        'decisions': [
-          {'decisionId': 'd', 'recordedAt': '2025-02-20T10:00:00+00:00', 'toMoCode': '22GN', 'toMoName': dostar, 'reason': 'ближе к дому', 'kind': 'redirect'},
-        ],
-        'signals': [
-          {'decisionId': 'a', 'recordedAt': '2025-02-19T10:00:00+00:00', 'kind': 'still_waiting', 'open': false},
-        ],
-      },
-    });
+  testWidgets('updates are grouped by day inside one card with a coral dot on the unseen doctor answer', (tester) async {
+    final session = await apiSession(roles: ['citizen'], api: {'/route/me': citizenRoute()});
     await tester.pumpWidget(app(session, const UpdatesScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('20 февраля 2025'), findsOneWidget);
-    expect(find.text('19 февраля 2025'), findsOneWidget);
-    expect(find.text('17 февраля 2025'), findsOneWidget);
+    expect(find.text('20 ФЕВРАЛЯ 2025'), findsOneWidget);
+    expect(find.text('19 ФЕВРАЛЯ 2025'), findsOneWidget);
+    expect(find.text('17 ФЕВРАЛЯ 2025'), findsOneWidget);
     expect(find.text('Врач предложил Достар Мед'), findsOneWidget);
     expect(find.text('«ближе к дому»'), findsOneWidget);
-    expect(find.text('Открыть маршрут'), findsOneWidget);
     expect(find.text('Вы подтвердили, что ждёте'), findsOneWidget);
+    expect(find.text('Push через eGov mobile — после интеграции'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('decisions journal filters by subject, groups by day and opens the details sheet', (tester) async {
+  testWidgets('decisions journal: pills filter by subject, day groups, «совпало»/«иначе» chips and the details sheet', (tester) async {
     final session = await apiSession(roles: ['doctor'], region: '75', api: {
       '/journal/decisions': {
         'items': [
           {'decisionId': 'aaaa-1', 'subject': 'route', 'subjectId': 'SYN-75-08IV-121-01', 'recommended': {'moCode': '031N'}, 'chosen': {'moCode': '22GN'}, 'reason': 'ожидание короче', 'recordedAt': '2025-02-25T12:26:38+00:00'},
           {'decisionId': 'bbbb-2', 'subject': 'referral', 'subjectId': '75.028B.381.11', 'recommended': null, 'chosen': {'moCode': '028B'}, 'reason': 'kc', 'recordedAt': '2025-02-10T12:07:20+00:00'},
+          {'decisionId': 'cccc-3', 'subject': 'route', 'subjectId': 'SYN-75-08IV-121-02', 'recommended': {'moCode': '031N'}, 'chosen': {'moCode': '031N'}, 'reason': 'профиль совпадает', 'recordedAt': '2025-02-10T09:00:00+00:00'},
         ],
-        'page': 1, 'size': 50, 'total': 2,
+        'page': 1, 'size': 50, 'total': 3,
       },
       '/refdata/organizations': {
         'items': [
@@ -222,24 +253,26 @@ void main() {
     await tester.pumpWidget(app(session, const DecisionsScreen()));
     await tester.pumpAndSettle();
     expect(find.text('Региональный военный госпиталь → Достар Мед'), findsOneWidget);
-    expect(find.text('— → 028B'), findsOneWidget, reason: 'организация вне справочника — кодом');
-    expect(find.text('«ожидание короче»'), findsOneWidget);
-    expect(find.text('25 февраля 2025'), findsOneWidget);
-    // чип-фильтр идёт в дереве раньше чипа предмета в строке
-    await tester.tap(find.text('Направление').first);
+    expect(find.text('Направление: 028B'), findsOneWidget, reason: 'организация вне справочника — кодом');
+    expect(find.text('Оставлен: Региональный военный госпиталь'), findsOneWidget);
+    expect(find.text('совпало'), findsOneWidget);
+    expect(find.text('иначе'), findsNWidgets(2));
+    expect(find.textContaining('«ожидание короче»'), findsOneWidget);
+    expect(find.text('25 ФЕВРАЛЯ 2025'), findsOneWidget);
+    await tester.tap(find.text('Направление'));
     await tester.pumpAndSettle();
     expect(find.text('Региональный военный госпиталь → Достар Мед'), findsNothing);
     await tester.tap(find.text('Все'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Региональный военный госпиталь → Достар Мед'));
     await tester.pumpAndSettle();
-    expect(find.text('Ключ записи (decisionId)'), findsOneWidget);
+    expect(find.text('КЛЮЧ ЗАПИСИ (DECISIONID)'), findsOneWidget);
     expect(find.text('aaaa-1'), findsOneWidget);
     expect(find.textContaining('(22GN)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('scribe: consent enables start, the record step offers the microphone, paste fallback and the draft button', (tester) async {
+  testWidgets('scribe: consent enables «Начать», the record step offers the microphone, paste fallback and the draft button', (tester) async {
     final session = await apiSession(roles: ['doctor'], api: {'/scribe/sessions': {'sessionId': 's1'}});
     await tester.pumpWidget(app(session, const ScribeScreen()));
     expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Начать')).enabled, isFalse);
@@ -250,6 +283,7 @@ void main() {
     expect(find.text('Записать'), findsOneWidget);
     expect(find.text('Вставить текст'), findsOneWidget);
     expect(find.text('Составить черновик'), findsOneWidget);
+    expect(find.text('00:00'), findsOneWidget);
     expect(find.text('RU'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

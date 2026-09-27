@@ -4,11 +4,9 @@ import '../api/models.dart';
 import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
-import '../theme/typography.dart';
-import 'format.dart';
 
-/// Горизонтальный степпер этапов Стандарта: пять точек с коннекторами, короткие подписи и даты под
-/// пройденными. `compact` — только точки (мини-степпер в карточке на главной).
+/// Прогресс этапов Стандарта: полосы 3 px radius 2 (пройдено — ink, впереди — hairline) и точка 14 px coral с
+/// обводкой 2 px ink на текущем; под ними три подписи 12 ink-2 — первый · текущий · последний. `compact` — только полосы.
 class StageStepper extends StatelessWidget {
   const StageStepper({super.key, required this.stages, this.compact = false});
 
@@ -18,94 +16,88 @@ class StageStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
+    final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
     final ordered = [...stages]..sort((a, b) => a.order.compareTo(b.order));
     if (ordered.isEmpty) {
       return const SizedBox.shrink();
     }
     final current = ordered.indexWhere((x) => x.status == RouteCodes.current);
+    final labels = [
+      s.stageShort(ordered.first.code),
+      if (current > 0 && current < ordered.length - 1) s.stageShort(ordered[current].code),
+      s.stageShort(ordered.last.code),
+    ];
     return Semantics(
       label: current < 0 ? null : s.stepperSemantics(current + 1, ordered.length, ordered[current].title),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (var i = 0; i < ordered.length; i++)
-            Expanded(
-              child: _Step(
-                stage: ordered[i],
-                label: s.stageShort(ordered[i].code),
-                leftDone: i > 0 && ordered[i - 1].status == RouteCodes.done,
-                rightDone: ordered[i].status == RouteCodes.done,
-                first: i == 0,
-                last: i == ordered.length - 1,
-                compact: compact,
-              ),
+          Row(
+            children: [
+              for (final (i, stage) in ordered.indexed) ...[
+                if (i > 0) const SizedBox(width: AppSpacing.xs),
+                if (stage.status == RouteCodes.current) StageMarker(active: true) else Expanded(child: StageBar(done: stage.status == RouteCodes.done)),
+              ],
+            ],
+          ),
+          if (!compact) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                for (final (i, label) in labels.indexed)
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: theme.textTheme.labelSmall?.copyWith(color: colors.muted, letterSpacing: 0),
+                      textAlign: i == 0 ? TextAlign.start : i == labels.length - 1 ? TextAlign.end : TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
             ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _Step extends StatelessWidget {
-  const _Step({
-    required this.stage,
-    required this.label,
-    required this.leftDone,
-    required this.rightDone,
-    required this.first,
-    required this.last,
-    required this.compact,
-  });
+/// Полоса этапа 3 px: ink — пройдено, hairline — впереди.
+class StageBar extends StatelessWidget {
+  const StageBar({super.key, required this.done});
 
-  final RouteStage stage;
-  final String label;
-  final bool leftDone;
-  final bool rightDone;
-  final bool first;
-  final bool last;
-  final bool compact;
+  final bool done;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final colors = AppPalette.of(context);
-    final done = stage.status == RouteCodes.done;
-    final current = stage.status == RouteCodes.current;
-    final size = current ? 16.0 : 10.0;
-    final passed = done || current;
-    return Column(
-      children: [
-        SizedBox(
-          height: 16,
-          child: Row(
-            children: [
-              Expanded(child: Container(height: 2, color: first ? null : (leftDone ? colors.accent : colors.hairline))),
-              Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: done ? colors.accent : colors.card,
-                  border: Border.all(color: passed ? colors.accent : colors.hairline, width: current ? 3 : 2),
-                ),
-              ),
-              Expanded(child: Container(height: 2, color: last ? null : (rightDone ? colors.accent : colors.hairline))),
-            ],
-          ),
-        ),
-        if (!compact) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(color: passed ? colors.ink : colors.muted, fontWeight: current ? FontWeight.w600 : FontWeight.w500),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (passed && stage.date != null)
-            Text(dayMonth(stage.date), style: theme.textTheme.labelSmall?.merge(AppType.numeric), textAlign: TextAlign.center),
-        ],
-      ],
+    return Container(
+      height: AppSizes.bar,
+      decoration: BoxDecoration(color: done ? colors.ink : colors.hairline, borderRadius: BorderRadius.circular(2)),
+    );
+  }
+}
+
+/// Маркер этапа 14 px: активный — coral с обводкой 2 px ink, неактивный — пустой круг с обводкой hairline.
+class StageMarker extends StatelessWidget {
+  const StageMarker({super.key, required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppPalette.of(context);
+    return Container(
+      width: AppSizes.marker,
+      height: AppSizes.marker,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: active ? colors.accent : AppColors.transparent,
+        border: Border.all(color: active ? colors.ink : colors.hairline, width: 2),
+      ),
     );
   }
 }

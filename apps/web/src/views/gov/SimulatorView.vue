@@ -126,7 +126,7 @@ onMounted(async () => {
             <p class="muted small">{{ result.model.name }} {{ result.model.version }} · {{ t('gov.simulator.bedsBenchmark') }}</p>
           </AppCard>
 
-          <AppCard v-if="moves" :title="t('gov.simulator.redistributeTitle', { moves: moves.moves.length, days: num(-moves.totalDeltaDays), horizon: moves.horizonDays })" origin="formula" style="margin-top: 16px">
+          <AppCard v-if="moves" :title="t('gov.simulator.redistributeTitle', { moves: moves.moves.length, days: num(-moves.totalDeltaDays), horizon: moves.horizonDays })" origin="formula">
             <p v-if="moves.moves.length === 0" class="muted">{{ t('gov.simulator.noMoves') }}</p>
             <div v-else class="rows">
               <div v-for="(m, i) in moves.moves" :key="m.fromMo.moCode + m.toMo.moCode" class="row">
@@ -152,7 +152,7 @@ onMounted(async () => {
 .slider { margin: 0 6px; }
 .control :deep(.num-input) { width: 100%; text-align: right; }
 .pair-row { display: flex; align-items: center; gap: var(--dm-space-4); flex-wrap: wrap; margin-bottom: 12px; }
-.arrow { font-size: 1.4rem; color: var(--dm-muted); }
-.delta-value { font-size: 1.4rem; font-weight: 600; }
+.arrow { font-size: 1.4rem; color: var(--dm-danger); }
+.delta-value { font-size: var(--dm-text-xl); font-weight: 500; letter-spacing: -0.01em; }
 .assumptions { margin: 12px 0 0; padding-left: 18px; }
 </style>

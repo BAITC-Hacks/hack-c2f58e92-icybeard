@@ -3,7 +3,7 @@ import Button from 'primevue/button'
 import IconField from 'primevue/iconfield'
 import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
-import SelectButton from 'primevue/selectbutton'
+import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -11,6 +11,7 @@ import { useRouter } from 'vue-router'
 import { journal, route as routeApi } from '@/api/endpoints'
 import type { PatientRoute, WorklistItem } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import AppCard from '@/components/ui/AppCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import KpiRow from '@/components/ui/KpiRow.vue'
 import KpiTile from '@/components/ui/KpiTile.vue'
@@ -24,11 +25,13 @@ import { dateShort, nextActionKey } from '@/lib/route'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
-/** Рабочий список врача: полный список региона грузится один раз, чипы-счётчики и поиск считаются на клиенте;
- * строки с запросом пациента — акцентная полоса и ответ прямо в строке; клик по строке — панель с превью маршрута. */
+/** Рабочий список врача (W-Worklist): «Пациенты · регион», пилюли-фильтры по флагам, четыре KPI-карточки, карточка
+ * списка со строками 48 px (пациент · профиль · организация · ждёт · приоритет · статус · «Открыть →»). Полный
+ * список региона грузится один раз, фильтры и поиск считаются на клиенте; строки с запросом пациента — ответ прямо
+ * в строке; клик по строке — панель с превью маршрута. */
 const FLAGS = ['patient_signal', 'stuck_over_30', 'refusal_risk', 'faster_alternative'] as const
 type Flag = (typeof FLAGS)[number]
-const FLAG_TONES: Record<Flag, 'warn' | 'danger' | 'accent'> = { stuck_over_30: 'warn', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'accent' }
+const FLAG_TONES: Record<Flag, 'neutral' | 'danger' | 'accent'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'accent' }
 const STAGE_TONES: Record<string, 'neutral' | 'accent' | 'ok'> = { registered: 'neutral', waiting: 'accent', called: 'ok' }
 
 const { t, te } = useI18n()
@@ -45,8 +48,8 @@ const flag = ref<Flag | null>(null)
 const search = ref('')
 const sortBy = ref<'priority' | 'days'>('priority')
 const sortOptions = computed(() => [
-  { label: t('doctor.worklist.priority'), value: 'priority' },
-  { label: t('doctor.worklist.daysShort'), value: 'days' },
+  { label: t('doctor.worklist.sortLabel', { by: t('doctor.worklist.priority').toLowerCase() }), value: 'priority' },
+  { label: t('doctor.worklist.sortLabel', { by: t('doctor.worklist.daysShort').toLowerCase() }), value: 'days' },
 ])
 
 const counts = computed(() => Object.fromEntries(FLAGS.map((f) => [f, items.value.filter((i) => i.riskFlags.includes(f)).length])) as Record<Flag, number>)
@@ -63,6 +66,11 @@ const flagLabel = (f: string) => (te(`route.flags.${f}`) ? t(`route.flags.${f}`)
 function stageLabel(item: WorklistItem): string {
   const key = `doctor.worklist.stageCode.${item.stageCode}`
   return te(key) ? t(key) : item.stage
+}
+/** Главный чип строки: запрос пациента, иначе риск отказа, иначе первый флаг, иначе этап. */
+function primaryFlag(item: WorklistItem): { label: string; tone: 'neutral' | 'danger' | 'accent' | 'ok' } {
+  const f = (['patient_signal', 'refusal_risk', 'faster_alternative', 'stuck_over_30'] as const).find((x) => item.riskFlags.includes(x))
+  return f ? { label: flagLabel(f), tone: FLAG_TONES[f] } : { label: stageLabel(item), tone: STAGE_TONES[item.stageCode] ?? 'neutral' }
 }
 /** Короткая подпись следующего шага (doctor.worklist.actionShort.<code>); незнакомый код — русская подпись API как есть. */
 function nextAction(item: WorklistItem): string {
@@ -148,77 +156,83 @@ onMounted(async () => {
 </script>
 
 <template>
-  <PageShell
-    :title="`${t('doctor.worklist.title')} · ${refdata.regionName(auth.region)}`"
-    :origin="modelBacked ? 'ml' : 'formula'"
-    :origin-note="modelBacked ? t('doctor.worklist.note') : t('doctor.worklist.noteFallback')"
-    :lead="t('doctor.worklist.lead')"
-    :as-of="asOf || undefined"
-  >
-    <p v-if="!busy && !modelBacked" class="lead synthetic">{{ t('doctor.worklist.noteFallback') }}</p>
-    <div class="toolbar">
-      <div class="chips" role="group" :aria-label="t('doctor.worklist.flags')">
-        <button type="button" class="chip-filter" :class="{ active: flag === null }" @click="flag = null">{{ t('common.allShort') }} <span class="count">{{ items.length }}</span></button>
-        <button v-for="f in FLAGS" :key="f" type="button" class="chip-filter" :class="{ active: flag === f }" :data-testid="`flag-${f}`" @click="flag = flag === f ? null : f">
-          {{ flagLabel(f) }} <span class="count">{{ counts[f] }}</span>
-        </button>
-      </div>
-      <span class="spacer" />
+  <PageShell :title="`${t('nav.group.patients')} · ${refdata.regionName(auth.region)}`">
+    <template #subtitle>
+      {{ t('doctor.worklist.subtitle') }}<template v-if="asOf"> · {{ t('shell.asOf', { date: dateShort(asOf) }) }}</template> · {{ t('doctor.worklist.syntheticShort') }}
+    </template>
+    <template #actions>
       <IconField>
         <InputIcon class="pi pi-search" />
         <InputText v-model="search" size="small" :placeholder="t('doctor.worklist.searchRef')" data-testid="worklist-search" />
       </IconField>
-      <SelectButton v-model="sortBy" :options="sortOptions" option-label="label" option-value="value" size="small" :allow-empty="false" />
+      <Select v-model="sortBy" :options="sortOptions" option-label="label" option-value="value" size="small" />
+    </template>
+    <p v-if="!busy && !modelBacked" class="lead synthetic">{{ t('doctor.worklist.noteFallback') }}</p>
+
+    <div class="chips" role="group" :aria-label="t('doctor.worklist.flags')">
+      <button type="button" class="chip-filter" :class="{ active: flag === null }" @click="flag = null">{{ t('common.allShort') }} · {{ items.length }}</button>
+      <button v-for="f in FLAGS" :key="f" type="button" class="chip-filter" :class="{ active: flag === f }" :data-testid="`flag-${f}`" @click="flag = flag === f ? null : f">{{ flagLabel(f) }} · {{ counts[f] }}</button>
     </div>
     <ErrorBox :error="error" />
-    <Skeleton v-if="busy && items.length === 0" kind="table" :lines="8" />
-    <EmptyState v-else-if="visible.length === 0" :title="t('doctor.worklist.empty')" :text="flag || search ? t('doctor.worklist.emptyFilter') : undefined" />
-    <div v-else class="table-wrap card dense-card">
-      <table class="dense-table" data-testid="worklist-table">
-        <thead>
-          <tr>
-            <th>{{ t('doctor.worklist.patient') }}</th><th>{{ t('common.profile') }}</th><th>{{ t('doctor.worklist.stage') }}</th>
-            <th class="num">{{ t('doctor.worklist.daysShort') }}</th><th>{{ t('doctor.worklist.priority') }}</th><th>{{ t('doctor.worklist.flags') }}</th>
-            <th>{{ t('doctor.worklist.nextStep') }}</th><th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <template v-for="item in visible" :key="item.patientRef">
-            <tr class="clickable" :class="{ accent: item.patientSignal, selected: selected?.patientRef === item.patientRef && panelOpen }" @click="openPanel(item)">
-              <td><RouterLink :to="{ name: 'patient-route', params: { patientRef: item.patientRef } }" class="mono" data-testid="worklist-patient" @click.stop>{{ item.patientRef }}</RouterLink></td>
-              <td class="profile" :title="item.moName">{{ refdata.profileName(item.profileCode) }}<div class="muted small">{{ shortOrgName(item.moName) }}</div></td>
-              <td><StatusTag :value="stageLabel(item)" :tone="STAGE_TONES[item.stageCode] ?? 'neutral'" /></td>
-              <td class="num">{{ item.daysWaiting }}</td>
-              <td><PriorityBar :value="item.priority" :max="maxPriority" /></td>
-              <td><div class="chips"><StatusTag v-for="f in item.riskFlags" :key="f" :value="flagLabel(f)" :tone="FLAG_TONES[f as Flag] ?? 'neutral'" /></div></td>
-              <td class="next">
-                <div v-if="item.patientSignal" class="signal" data-testid="worklist-signal" :title="item.patientSignal.toMoName ?? ''">
-                  {{ t('route.patientSignal.' + item.patientSignal.kind, { name: shortOrgName(item.patientSignal.toMoName) }) }}<span v-if="item.patientSignal.comment" class="muted"> — «{{ item.patientSignal.comment }}»</span>
-                </div>
-                <span class="muted"><i class="pi pi-arrow-right step-icon" aria-hidden="true" /> {{ nextAction(item) }}</span>
-              </td>
-              <td class="actions-cell" @click.stop>
-                <template v-if="item.patientSignal">
-                  <Button v-if="item.patientSignal.toMoCode" :label="t('route.referHereShort')" size="small" :disabled="sending !== null" @click="startAnswer(item, 'redirect')" />
-                  <Button :label="t('route.keepHere')" size="small" severity="secondary" outlined :disabled="sending !== null" @click="startAnswer(item, 'keep')" />
-                </template>
-                <RouterLink v-else :to="{ name: 'referral', query: { moCode: item.moCode, profileCode: item.profileCode } }" class="muted small" :title="t('doctor.worklist.openReferral')"><i class="pi pi-compass" /></RouterLink>
-              </td>
+
+    <KpiRow>
+      <KpiTile :value="items.length" :label="t('doctor.worklist.kpiTotal')" :loading="busy && items.length === 0" />
+      <KpiTile :value="counts.stuck_over_30" :label="t('doctor.worklist.kpiStuck')" :loading="busy && items.length === 0" />
+      <KpiTile :value="counts.refusal_risk" :label="t('doctor.worklist.kpiRisk')" :origin="modelBacked ? 'ml' : 'formula'" :loading="busy && items.length === 0" />
+      <KpiTile :value="counts.faster_alternative" :label="t('doctor.worklist.kpiFaster')" :origin="modelBacked ? 'ml' : 'formula'" :loading="busy && items.length === 0" />
+    </KpiRow>
+
+    <AppCard :title="t('doctor.worklist.title')" :origin="modelBacked ? 'ml' : 'formula'" :origin-note="modelBacked ? t('doctor.worklist.note') : t('doctor.worklist.noteFallback')">
+      <template #header><span class="caption">{{ t('doctor.worklist.shown', { shown: visible.length, total: items.length }) }}</span></template>
+      <Skeleton v-if="busy && items.length === 0" kind="table" :lines="8" />
+      <EmptyState v-else-if="visible.length === 0" :title="t('doctor.worklist.empty')" :text="flag || search ? t('doctor.worklist.emptyFilter') : undefined" />
+      <div v-else class="table-wrap">
+        <table class="dense-table" data-testid="worklist-table">
+          <thead>
+            <tr>
+              <th>{{ t('doctor.worklist.patient') }}</th><th>{{ t('common.profile') }}</th><th>{{ t('common.organization') }}</th>
+              <th class="num">{{ t('doctor.worklist.daysWaiting') }}</th><th class="num">{{ t('doctor.worklist.priority') }}</th><th>{{ t('doctor.worklist.status') }}</th>
+              <th>{{ t('doctor.worklist.nextStep') }}</th><th></th>
             </tr>
-            <tr v-if="answering?.ref === item.patientRef" class="answer-row">
-              <td colspan="8">
-                <div class="answer">
-                  <span class="muted small">{{ answering.action === 'redirect' ? t('route.referHereShort') : t('route.keepHere') }} · {{ t('route.reason') }}</span>
-                  <InputText v-model="reason" size="small" :placeholder="t('route.reasonPlaceholder')" data-testid="worklist-reason" @keyup.enter="sendAnswer(item)" />
-                  <Button :label="t('common.confirm')" size="small" :loading="sending === item.patientRef" data-testid="worklist-send" @click="sendAnswer(item)" />
-                  <Button :label="t('common.cancel')" size="small" text severity="secondary" @click="answering = null" />
-                </div>
-              </td>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            <template v-for="item in visible" :key="item.patientRef">
+              <tr class="clickable" :class="{ accent: item.patientSignal, selected: selected?.patientRef === item.patientRef && panelOpen }" @click="openPanel(item)">
+                <td class="ref"><RouterLink :to="{ name: 'patient-route', params: { patientRef: item.patientRef } }" class="ref-link" data-testid="worklist-patient" @click.stop>{{ item.patientRef }}</RouterLink></td>
+                <td class="clip">{{ refdata.profileName(item.profileCode) }}</td>
+                <td class="clip muted" :title="item.moName">{{ shortOrgName(item.moName) }}</td>
+                <td class="num">{{ item.daysWaiting }}</td>
+                <td class="num"><PriorityBar :value="item.priority" :max="maxPriority" /></td>
+                <td><StatusTag :value="primaryFlag(item).label" :tone="primaryFlag(item).tone" /></td>
+                <td class="next">
+                  <div v-if="item.patientSignal" class="signal" data-testid="worklist-signal" :title="item.patientSignal.toMoName ?? ''">
+                    {{ t('route.patientSignal.' + item.patientSignal.kind, { name: shortOrgName(item.patientSignal.toMoName) }) }}<span v-if="item.patientSignal.comment" class="muted"> — «{{ item.patientSignal.comment }}»</span>
+                  </div>
+                  <span class="muted">{{ nextAction(item) }}</span>
+                </td>
+                <td class="actions-cell" @click.stop>
+                  <template v-if="item.patientSignal">
+                    <Button v-if="item.patientSignal.toMoCode" :label="t('route.referHereShort')" size="small" :disabled="sending !== null" @click="startAnswer(item, 'redirect')" />
+                    <Button :label="t('route.keepHere')" size="small" severity="secondary" :disabled="sending !== null" @click="startAnswer(item, 'keep')" />
+                  </template>
+                  <RouterLink v-else :to="{ name: 'patient-route', params: { patientRef: item.patientRef } }" class="link-arrow small">{{ t('shell.open') }}</RouterLink>
+                </td>
+              </tr>
+              <tr v-if="answering?.ref === item.patientRef" class="answer-row">
+                <td colspan="8">
+                  <div class="answer">
+                    <span class="muted small">{{ answering.action === 'redirect' ? t('route.referHereShort') : t('route.keepHere') }} · {{ t('route.reason') }}</span>
+                    <InputText v-model="reason" size="small" :placeholder="t('route.reasonPlaceholder')" data-testid="worklist-reason" @keyup.enter="sendAnswer(item)" />
+                    <Button :label="t('common.confirm')" size="small" :loading="sending === item.patientRef" data-testid="worklist-send" @click="sendAnswer(item)" />
+                    <Button :label="t('common.cancel')" size="small" text severity="secondary" @click="answering = null" />
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </AppCard>
 
     <SidePanel v-model:visible="panelOpen" :title="selected?.patientRef ?? ''" :subtitle="selected ? `${refdata.profileName(selected.profileCode)} · ${shortOrgName(selected.moName)}` : ''">
       <ErrorBox :error="previewError" />
@@ -228,18 +242,16 @@ onMounted(async () => {
           <StatusTag :value="t('route.stage.' + preview.stage)" tone="accent" />
           <StatusTag v-for="f in preview.doctor.riskFlags" :key="f" :value="flagLabel(f)" :tone="FLAG_TONES[f as Flag] ?? 'neutral'" />
         </div>
-        <KpiRow>
-          <KpiTile :value="days(preview.forecast.p50Days)" :label="t('route.p50')" />
-          <KpiTile :value="days(preview.forecast.p90Days)" :label="t('route.p90')" />
-          <KpiTile :value="preview.doctor.refusalOrgInTraining ? pct(preview.doctor.pRefusal) : refusalWords(preview.doctor.pRefusal)" :label="t('route.refusal')" />
-        </KpiRow>
-        <dl class="facts" style="margin-top: 12px">
-          <dt>{{ t('route.nextAction') }}</dt><dd>{{ nextActionKey(preview.doctor.nextActionCode) ? t(nextActionKey(preview.doctor.nextActionCode)!) : preview.doctor.nextAction }}</dd>
-          <dt>{{ t('route.dates.registered') }}</dt><dd class="tabular">{{ dateShort(preview.dates.registeredAt) }} · {{ t('route.daysWaitingShort', { days: preview.daysWaiting }) }}</dd>
-          <dt>{{ t('route.dates.expected') }}</dt><dd class="tabular">{{ dateShort(preview.dates.expectedAt) }}</dd>
-          <dt>{{ t('route.checklist') }}</dt><dd>{{ t('route.checklistSummary', { expired: preview.checklist.filter((c) => c.status === 'expired').length, valid: preview.checklist.filter((c) => c.status !== 'expired').length }) }}</dd>
-          <dt>{{ t('route.whereFaster') }}</dt><dd>{{ preview.alternatives.length ? `${shortOrgName(preview.alternatives[0]!.mo.name)} · ≈ ${days(preview.alternatives[0]!.p50Days)} ${t('common.days')}` : '—' }}</dd>
-        </dl>
+        <div class="rows">
+          <div class="row"><span class="row-main muted">{{ t('route.p50') }}</span><span class="row-value">{{ days(preview.forecast.p50Days) }}</span></div>
+          <div class="row"><span class="row-main muted">{{ t('route.p90') }}</span><span class="row-value">{{ days(preview.forecast.p90Days) }}</span></div>
+          <div class="row"><span class="row-main muted">{{ t('route.refusal') }}</span><span class="row-value">{{ preview.doctor.refusalOrgInTraining ? pct(preview.doctor.pRefusal) : refusalWords(preview.doctor.pRefusal) }}</span></div>
+          <div class="row"><span class="row-main muted">{{ t('route.nextAction') }}</span><span class="row-value wrap">{{ nextActionKey(preview.doctor.nextActionCode) ? t(nextActionKey(preview.doctor.nextActionCode)!) : preview.doctor.nextAction }}</span></div>
+          <div class="row"><span class="row-main muted">{{ t('route.dates.registered') }}</span><span class="row-value">{{ dateShort(preview.dates.registeredAt) }} · {{ t('route.daysWaitingShort', { days: preview.daysWaiting }) }}</span></div>
+          <div class="row"><span class="row-main muted">{{ t('route.dates.expected') }}</span><span class="row-value">{{ dateShort(preview.dates.expectedAt) }}</span></div>
+          <div class="row"><span class="row-main muted">{{ t('route.checklist') }}</span><span class="row-value">{{ t('route.checklistSummary', { expired: preview.checklist.filter((c) => c.status === 'expired').length, valid: preview.checklist.filter((c) => c.status !== 'expired').length }) }}</span></div>
+          <div class="row"><span class="row-main muted">{{ t('route.whereFaster') }}</span><span class="row-value wrap">{{ preview.alternatives.length ? `${shortOrgName(preview.alternatives[0]!.mo.name)} · ≈ ${days(preview.alternatives[0]!.p50Days)} ${t('common.days')}` : '—' }}</span></div>
+        </div>
         <p class="muted small" style="margin-top: 12px">{{ preview.doctor.explanation }}</p>
       </template>
       <template #footer>
@@ -250,14 +262,15 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.dense-card { padding: 0 var(--dm-space-2); }
-.profile { max-width: 220px; }
-.next { max-width: 300px; }
-.signal { font-weight: 600; }
-.step-icon { font-size: 0.7rem; }
-.actions-cell { white-space: nowrap; }
-.actions-cell .p-button { margin-right: 4px; }
-.answer-row td { background: var(--dm-accent-soft); }
+.ref { font-weight: 500; white-space: nowrap; }
+.ref-link { text-decoration: none; }
+.clip { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.next { max-width: 280px; }
+.signal { font-weight: 500; }
+.actions-cell { white-space: nowrap; text-align: right; }
+.actions-cell .p-button { margin-left: 4px; }
+.answer-row td { background: var(--dm-surface-2); }
 .answer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .answer .p-inputtext { flex: 1 1 260px; }
+.row-value.wrap { white-space: normal; text-align: right; }
 </style>

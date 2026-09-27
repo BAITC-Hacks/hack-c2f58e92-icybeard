@@ -70,12 +70,12 @@ onMounted(async () => {
   <main class="page leaflet">
     <header class="doc-head">
       <div>
-        <div class="brand">Darumen Care</div>
+        <div class="brand">Darumen Health</div>
         <h1>{{ t('leaflet.title') }}</h1>
         <p v-if="approvedAt" class="muted">{{ t('leaflet.approvedBy') }} · {{ dateTime(approvedAt) }}<template v-if="language"> · {{ language.toUpperCase() }}</template></p>
       </div>
       <div class="doc-actions no-print">
-        <Button :label="t('shell.copyLink')" icon="pi pi-link" size="small" severity="secondary" outlined @click="copyLink" />
+        <Button :label="t('shell.copyLink')" icon="pi pi-link" size="small" severity="secondary" @click="copyLink" />
         <Button :label="t('shell.print')" icon="pi pi-print" size="small" severity="secondary" text @click="print" />
       </div>
     </header>
@@ -94,11 +94,11 @@ onMounted(async () => {
 
 <style scoped>
 .doc-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: var(--dm-space-4); }
-.brand { color: var(--dm-accent); font-weight: 700; font-size: 0.9rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.brand { color: var(--dm-ink); font-weight: 600; font-size: var(--dm-text-md); letter-spacing: -0.02em; }
 .doc-actions { display: flex; gap: 8px; }
-.doc { padding: var(--dm-space-5); font-size: 1.1rem; line-height: 1.6; }
+.doc { padding: 32px; font-size: var(--dm-text-base); line-height: 1.6; }
 .section + .section { margin-top: var(--dm-space-4); }
-.section h2 { font-size: 1.1rem; margin: 0 0 6px; }
+.section h2 { font-size: var(--dm-text-lg); margin: 0 0 6px; }
 .section p { margin: 0; white-space: pre-wrap; }
 .foot { margin-top: var(--dm-space-5); font-size: 0.85rem; line-height: 1.4; }
 @media print {

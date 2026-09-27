@@ -89,6 +89,20 @@
           }
         },
         {
+          "name": "mo_code",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "mo_code",
+            "claim.name": "mo_code",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
           "name": "audience darumen-api",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-audience-mapper",
@@ -145,6 +159,20 @@
           "config": {
             "user.attribute": "iin",
             "claim.name": "iin",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "mo_code",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "mo_code",
+            "claim.name": "mo_code",
             "jsonType.label": "String",
             "id.token.claim": "true",
             "access.token.claim": "true",
@@ -242,6 +270,9 @@
       "attributes": {
         "region_kato": [
           "75"
+        ],
+        "mo_code": [
+          "028B"
         ]
       }
     },

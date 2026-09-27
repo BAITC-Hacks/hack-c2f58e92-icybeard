@@ -8,15 +8,18 @@ import '../l10n/strings.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import '../theme/typography.dart';
+import '../widgets/app_card.dart';
+import '../widgets/darumen_mark.dart';
 import '../widgets/format.dart';
 import '../widgets/origin_tag.dart';
 import '../widgets/picker_sheet.dart';
 import '../widgets/section.dart';
 import '../widgets/status_chip.dart';
 
-/// Профиль: имя или логин с чипом роли и регионом, строки-значения (ИИН маской — никогда полностью, язык, регион),
-/// «Справочно» (как считаются прогнозы, вакцинация, журнал решений для врача), «Выйти» внизу, версия и подпись
-/// данных. ИИН показывается только маской. Адреса API — только сборкой (config/env.dart).
+/// Профиль по доске M-Profile: аватар-круг, имя, «ИИН •••• 4321 · из eGov» (только маской, никогда полностью), чип
+/// роли; строки Язык, Регион, Уведомления (лист «Push через eGov mobile — после интеграции»), Данные и согласия
+/// (как считаются прогнозы + подпись о данных), «Выйти» coral-text; внизу версия и подпись данных.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -76,37 +79,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _showOrigins() {
+  void _sheet(Widget Function(BuildContext sheet) body) => showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheet) => Padding(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xxl),
+          child: body(sheet),
+        ),
+      );
+
+  void _showNotifications() {
     final s = S.at(context);
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheet) => Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xxl),
-        child: Column(
+    _sheet((sheet) => Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(s.originsTitle, style: Theme.of(sheet).textTheme.titleMedium),
+            Text(s.notificationsRow, style: Theme.of(sheet).textTheme.titleLarge),
             const SizedBox(height: AppSpacing.sm),
-            Text(s.originsBody, style: Theme.of(sheet).textTheme.bodySmall),
-            const SizedBox(height: AppSpacing.lg),
-            for (final (origin, note) in [(Origin.ml, s.originMlNote), (Origin.formula, s.originFormulaNote), (Origin.ai, s.originAiNote)])
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    OriginTag(origin),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(child: Text(note, style: Theme.of(sheet).textTheme.bodySmall)),
-                  ],
-                ),
-              ),
+            Text(s.updatesPushRoadmap, style: Theme.of(sheet).textTheme.bodyMedium),
+            const SizedBox(height: AppSpacing.xs),
+            Text(s.updatesEmptyBody, style: Theme.of(sheet).textTheme.bodySmall),
           ],
-        ),
-      ),
-    );
+        ));
+  }
+
+  void _showConsents() {
+    final s = S.at(context);
+    _sheet((sheet) {
+      final theme = Theme.of(sheet);
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.originsTitle, style: theme.textTheme.titleLarge),
+          const SizedBox(height: AppSpacing.sm),
+          Text(s.originsBody, style: theme.textTheme.bodySmall),
+          const SizedBox(height: AppSpacing.lg),
+          for (final (origin, note) in [(Origin.ml, s.originMlNote), (Origin.formula, s.originFormulaNote), (Origin.ai, s.originAiNote)])
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  OriginTag(origin),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(child: Text(note, style: theme.textTheme.bodySmall)),
+                ],
+              ),
+            ),
+          Text(s.consentsBody, style: theme.textTheme.bodySmall),
+          const SizedBox(height: AppSpacing.sm),
+          Text(s.dataNote, style: theme.textTheme.labelSmall),
+        ],
+      );
+    });
   }
 
   Future<void> _logout() async {
@@ -122,96 +148,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final session = context.watch<Session>();
     final s = S.at(context);
     final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
     final regionName = _regions.where((r) => r.kato == session.region).map((r) => r.name).firstOrNull ?? session.region;
     final role = session.isDoctor ? s.roleDoctor : s.roleCitizen;
+    final identity = session.iin != null ? '${s.iinLabel} ${maskIin(session.iin)} · ${s.fromEgov}' : regionName;
     return PageScaffold(
       title: s.profileTitle,
+      leading: const DarumenMark(size: 28),
       children: [
-        Row(
-          children: [
-            Expanded(child: Text(session.username ?? '', style: theme.textTheme.headlineSmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
-            const SizedBox(width: AppSpacing.sm),
-            StatusChip(role, tone: StatusTone.accent),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(regionName, style: theme.textTheme.bodySmall),
-        const SizedBox(height: AppSpacing.lg),
-        Card(
+        AppCard(
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xs),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (session.iin != null) ...[
-                _ValueRow(label: s.iinLabel, value: '${maskIin(session.iin)} · ${s.regionFromAccount}'),
-                const Divider(),
-              ],
-              _ValueRow(label: s.languageLabel, value: s.languageName(session.locale), onTap: _pickLanguage),
-              const Divider(),
-              _ValueRow(
-                label: s.regionLabel,
-                value: session.regionFromAccount ? '$regionName · ${s.regionFromAccount}' : regionName,
+              Container(
+                padding: const EdgeInsets.fromLTRB(0, AppSpacing.xs, 0, AppSpacing.lg),
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: colors.hairline))),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: colors.neutralSoft),
+                      child: Icon(Icons.person_outline, color: colors.ink),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(session.username ?? '', style: theme.textTheme.titleLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 2),
+                          Text(identity, style: theme.textTheme.bodySmall?.merge(AppType.numeric), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    StatusChip(role, tone: StatusTone.neutral),
+                  ],
+                ),
+              ),
+              ListRow(title: s.languageLabel, trailing: RowValue(s.languageName(session.locale), size: 15), onTap: _pickLanguage),
+              ListRow(
+                title: s.regionLabel,
+                trailing: RowValue(session.regionFromAccount ? '$regionName · ${s.regionFromAccount}' : regionName, size: 15),
                 onTap: session.regionFromAccount || _regions.isEmpty ? null : _pickRegion,
+              ),
+              ListRow(title: s.notificationsRow, onTap: _showNotifications),
+              ListRow(title: s.dataConsents, onTap: _showConsents),
+              ListRow(
+                title: s.logout,
+                strong: true,
+                titleColor: colors.danger,
+                last: true,
+                chevron: false,
+                trailing: Icon(Icons.logout, size: 20, color: colors.danger),
+                onTap: _logout,
               ),
             ],
           ),
         ),
-        SectionTitle(s.referenceSection),
-        Card(
-          child: Column(
-            children: [
-              _ValueRow(label: s.originsTitle, onTap: _showOrigins),
-              const Divider(),
-              _ValueRow(label: s.vaccinationTitle, onTap: () => context.go('/home/vaccination')),
-              if (session.isDoctor) ...[
-                const Divider(),
-                _ValueRow(label: s.decisionsTitle, onTap: () => context.go('/doctor/referral/decisions')),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        OutlinedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout), label: Text(s.logout)),
-        const SizedBox(height: AppSpacing.lg),
         FutureBuilder<PackageInfo>(
           future: PackageInfo.fromPlatform(),
           builder: (_, snapshot) => Text(
-            snapshot.hasData ? s.appVersion('${snapshot.data!.version} (${snapshot.data!.buildNumber})') : '',
+            [
+              if (snapshot.hasData) s.appVersion('${snapshot.data!.version} (${snapshot.data!.buildNumber})'),
+              s.dataNote,
+            ].join(' · '),
             style: theme.textTheme.labelSmall,
-            textAlign: TextAlign.center,
           ),
         ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(s.dataNote, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
       ],
-    );
-  }
-}
-
-/// Строка «Метка … Значение ›»: значение справа, шеврон — если есть действие.
-class _ValueRow extends StatelessWidget {
-  const _ValueRow({required this.label, this.value, this.onTap});
-
-  final String label;
-  final String? value;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
-    return ListTile(
-      title: Text(label, style: theme.textTheme.bodyMedium),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (value != null)
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: Text(value!, style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end),
-            ),
-          if (onTap != null) Icon(Icons.chevron_right, color: colors.muted),
-        ],
-      ),
-      onTap: onTap,
     );
   }
 }

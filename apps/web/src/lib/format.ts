@@ -46,10 +46,17 @@ export function dateTime(iso: string | null | undefined, locale = localeTag()): 
 }
 
 /** Цвет индекса доступности: 0 (красный) → 100 (зелёный); в тёмной теме светлее, чтобы читаться на тёмной карте. */
-export function indexColor(value: number, dark = false): string {
-  const clamped = Math.max(0, Math.min(100, value))
-  const hue = (clamped / 100) * 120
-  return `hsl(${hue.toFixed(0)} 55% ${dark ? 58 : 42}%)`
+/** Ступень шкалы карты для индекса нагрузки (0…100): 1 — ниже 60, 2 — 60–69, 3 — 70–79, 4 — 80–86, 5 — 87 и выше.
+ * Цвета ступеней — --dm-map-1…5 (пять синих), ниже = светлее. */
+export const INDEX_SCALE_STEPS = [60, 70, 80, 87] as const
+export function indexStep(value: number): 1 | 2 | 3 | 4 | 5 {
+  const step = INDEX_SCALE_STEPS.filter((edge) => value >= edge).length
+  return (step + 1) as 1 | 2 | 3 | 4 | 5
+}
+
+/** CSS-переменная цвета ступени шкалы; для canvas и маркеров берётся вычисленное значение через useChartTheme.scale. */
+export function indexColor(value: number): string {
+  return `var(--dm-map-${indexStep(value)})`
 }
 
 /** Риск отказа словами относительно среднего по стране (11 % направлений заканчиваются отказом), на языке интерфейса. */

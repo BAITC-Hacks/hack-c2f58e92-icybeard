@@ -1,25 +1,41 @@
 <script setup lang="ts">
 import OriginTag from '@/components/OriginTag.vue'
 import Skeleton from './Skeleton.vue'
+import StatusTag from './StatusTag.vue'
 
-/** Плитка показателя: табличные цифры, подпись до двух строк (казахский длиннее). У чисел модели `origin` обязателен
- * по соглашению проекта — иначе непонятно, откуда число. */
-defineProps<{ value: string | number; label: string; origin?: 'ml' | 'formula' | 'ai'; hint?: string; tone?: 'ok' | 'warn' | 'danger'; loading?: boolean }>()
+/** KPI-карточка: белая radius 16, значение 42 / 500 + единица 17 ink-2, подпись 14 ink-2, при необходимости чип
+ * (coral-wash) рядом со значением. У чисел модели `origin` обязателен по соглашению проекта. */
+defineProps<{
+  value: string | number
+  unit?: string
+  label: string
+  origin?: 'ml' | 'formula' | 'ai'
+  hint?: string
+  /** чип рядом со значением («4 аномалии», «выше среднего по профилю») */
+  chip?: string
+  chipTone?: 'neutral' | 'ok' | 'warn' | 'danger' | 'accent'
+  tone?: 'ok' | 'warn' | 'danger'
+  loading?: boolean
+}>()
 </script>
 
 <template>
   <div class="item" :class="tone">
     <Skeleton v-if="loading" kind="kpi" />
-    <div v-else class="value tabular">{{ value }}</div>
-    <div class="label">{{ label }} <OriginTag v-if="origin" :kind="origin" /></div>
-    <div v-if="hint" class="hint muted">{{ hint }}</div>
+    <div v-else class="value tabular">
+      <span class="number">{{ value }}</span><span v-if="unit" class="unit">{{ unit }}</span>
+      <StatusTag v-if="chip" :value="chip" :tone="chipTone ?? 'danger'" class="chip" />
+    </div>
+    <div class="label-line"><span class="label">{{ label }}</span><OriginTag v-if="origin" :kind="origin" /></div>
+    <div v-if="hint" class="hint caption">{{ hint }}</div>
   </div>
 </template>
 
 <style scoped>
-.item.ok .value { color: var(--dm-ok); }
-.item.warn .value { color: var(--dm-warn); }
-.item.danger .value { color: var(--dm-danger); }
-.hint { font-size: 0.8rem; margin-top: 2px; }
-.label { min-height: 2.4em; }
+.value { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.label-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.label { min-height: 0; }
+.item.ok .number { color: var(--dm-ok); }
+.item.warn .number, .item.danger .number { color: var(--dm-danger); }
+.chip { align-self: center; }
 </style>

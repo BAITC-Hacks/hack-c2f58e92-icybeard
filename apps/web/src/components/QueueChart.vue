@@ -11,9 +11,10 @@ import { useChartTheme } from '@/composables/useChartTheme'
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
-const props = defineProps<{ days: QueueDay[]; title?: string }>()
+/** `bare` — без обёртки-карточки (график внутри AppCard). Цвета рядов — из useChartTheme: очередь ink, поток синие, отказы coral. */
+const props = defineProps<{ days: QueueDay[]; title?: string; bare?: boolean }>()
 const { t } = useI18n()
-const { base, axis } = useChartTheme()
+const { theme, base, axis } = useChartTheme()
 
 const option = computed(() => ({
   ...base.value,
@@ -23,16 +24,16 @@ const option = computed(() => ({
   xAxis: { type: 'category', data: props.days.map((d) => d.day), ...axis.value },
   yAxis: [{ type: 'value', name: t('queueChart.queue'), ...axis.value }, { type: 'value', name: t('queueChart.perDay'), ...axis.value }],
   series: [
-    { name: t('queueChart.queue'), type: 'line', data: props.days.map((d) => d.queueLen), showSymbol: false, lineStyle: { width: 2 } },
-    { name: t('queueChart.registered'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => d.registered), stack: 'flow' },
-    { name: t('queueChart.hospitalized'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.hospitalized), stack: 'flow' },
-    { name: t('queueChart.refused'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.refused), stack: 'flow' },
+    { name: t('queueChart.queue'), type: 'line', data: props.days.map((d) => d.queueLen), showSymbol: false, lineStyle: { width: 2, color: theme.value.ink }, itemStyle: { color: theme.value.ink } },
+    { name: t('queueChart.registered'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => d.registered), stack: 'flow', itemStyle: { color: theme.value.scale[2] } },
+    { name: t('queueChart.hospitalized'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.hospitalized), stack: 'flow', itemStyle: { color: theme.value.scale[3] } },
+    { name: t('queueChart.refused'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.refused), stack: 'flow', itemStyle: { color: theme.value.accent } },
   ],
 }))
 </script>
 
 <template>
-  <div class="card">
+  <div :class="{ card: !bare }">
     <h2 v-if="title">{{ title }}</h2>
     <VChart class="chart" :option="option" autoresize />
   </div>

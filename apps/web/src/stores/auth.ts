@@ -5,17 +5,21 @@ import { isRole, roleHome as homeOf, type Role } from '@/router/roles'
 
 export type { Role } from '@/router/roles'
 
-/** Клеймы токена, которые читает клиент; region_kato — атрибут пользователя (маппер клиента darumen-web в realm). */
+/** Клеймы токена, которые читает клиент; region_kato и mo_code — атрибуты пользователя (мапперы клиента darumen-web
+ * в realm); mo_code есть только у главврача и может отсутствовать — тогда null. */
 interface TokenClaims {
   preferred_username?: string
   realm_access?: { roles?: string[] }
   region_kato?: string
+  mo_code?: string
 }
 
 export const useAuthStore = defineStore('auth', () => {
   const actor = ref<string | null>(null)
   const roles = ref<Role[]>([])
   const region = ref<string | null>(null)
+  /** Код организации главврача (клейм mo_code) — домашний экран и портал «Больница». */
+  const moCode = ref<string | null>(null)
   /** Keycloak не ответил при старте: вместо кнопки входа — подпись на странице входа. */
   const keycloakUnavailable = ref(false)
   let keycloak: Keycloak | null = null
@@ -32,6 +36,7 @@ export const useAuthStore = defineStore('auth', () => {
     actor.value = parsed.preferred_username ?? null
     roles.value = (parsed.realm_access?.roles ?? []).filter(isRole)
     region.value = parsed.region_kato ?? null
+    moCode.value = parsed.mo_code || null
   }
 
   const url: string = import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8080'
@@ -105,7 +110,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   function roleHome(): string {
-    return homeOf(role.value, region.value)
+    return homeOf(role.value, region.value, moCode.value)
   }
 
   /** Куда вернуться после входа: на страницу, с которой отправили домой из-за роли, иначе на текущую. */
@@ -142,5 +147,5 @@ export const useAuthStore = defineStore('auth', () => {
     return { Authorization: `Bearer ${keycloak.token}` }
   }
 
-  return { actor, roles, role, region, isAuthenticated, keycloakUnavailable, hasRole, init, roleHome, login, logout, authHeaders }
+  return { actor, roles, role, region, moCode, isAuthenticated, keycloakUnavailable, hasRole, init, roleHome, login, logout, authHeaders }
 })

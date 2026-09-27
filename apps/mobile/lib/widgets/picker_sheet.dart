@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import '../theme/typography.dart';
 
 /// Пункт листа выбора: значение, подпись и необязательная вторая строка (объём, код).
 class PickerItem<T> {
@@ -63,12 +64,12 @@ class _PickerSheetState<T> extends State<PickerSheet<T>> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.sm),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.sm),
               child: Text(widget.title, style: theme.textTheme.titleMedium),
             ),
             if (widget.search)
               Padding(
-                padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.sm),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.sm),
                 child: TextField(
                   autocorrect: false,
                   onChanged: (v) => setState(() => _query = v),
@@ -80,14 +81,15 @@ class _PickerSheetState<T> extends State<PickerSheet<T>> {
                   ? Center(child: Text(s.pickerNothingFound, style: theme.textTheme.bodySmall))
                   : ListView.separated(
                       itemCount: visible.length,
-                      separatorBuilder: (_, _) => const Divider(),
+                      separatorBuilder: (_, _) => const Divider(indent: AppSpacing.page, endIndent: AppSpacing.page),
                       itemBuilder: (_, i) {
                         final item = visible[i];
                         final selected = widget.selected != null && item.value == widget.selected;
                         return ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: AppSpacing.xs),
                           title: Text(item.label, maxLines: 2, overflow: TextOverflow.ellipsis),
                           subtitle: item.detail == null ? null : Text(item.detail!, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          trailing: selected ? Icon(Icons.check, color: colors.accent) : null,
+                          trailing: selected ? Icon(Icons.check, color: colors.ink) : null,
                           selected: selected,
                           onTap: () => Navigator.of(context).pop(item.value),
                         );
@@ -101,13 +103,15 @@ class _PickerSheetState<T> extends State<PickerSheet<T>> {
   }
 }
 
-/// Строка-селектор «Метка · Значение» с шевроном; вторая строка мелко — для объёма или пояснения.
+/// Кнопка-селектор 48 px radius 12 на soft-фоне: колонка label 64 px (12/500 ink-2), значение 15/500 и «⌄».
 class PickerRow extends StatelessWidget {
   const PickerRow({super.key, required this.label, this.value, this.placeholder, this.detail, required this.onTap, this.enabled = true});
 
   final String label;
   final String? value;
   final String? placeholder;
+
+  /// Вторая строка мелко — в семантике и в подсказке под значением, если есть место.
   final String? detail;
   final VoidCallback onTap;
   final bool enabled;
@@ -120,46 +124,44 @@ class PickerRow extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
-      label: '$label: $shown',
-      child: InkWell(
+      label: '$label: $shown${detail == null ? '' : ' · $detail'}',
+      child: Material(
+        color: colors.neutralSoft,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        onTap: enabled ? onTap : null,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
-          decoration: BoxDecoration(
-            color: colors.card,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(color: colors.hairline),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(text: '$label · ', style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted)),
-                          TextSpan(
-                            text: shown,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: value == null ? colors.muted : colors.ink,
-                            ),
-                          ),
-                        ],
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (detail != null && detail!.isNotEmpty) Text(detail!, style: theme.textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ],
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: AppSizes.select),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+            child: Row(
+              children: [
+                // подпись занимает от 64 до 96 px, чтобы «Нозология» не переносилась по слогам
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 64, maxWidth: 96),
+                  child: Text(label, style: theme.textTheme.labelMedium?.copyWith(color: colors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(Icons.unfold_more, color: enabled ? colors.muted : colors.faint),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        shown,
+                        style: theme.textTheme.rowStrong.copyWith(color: value == null || !enabled ? colors.muted : colors.ink),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (detail != null && detail!.isNotEmpty)
+                        Text(detail!, style: theme.textTheme.labelSmall?.merge(AppType.numeric), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(Icons.expand_more, size: 20, color: enabled ? colors.muted : colors.faint),
+              ],
+            ),
           ),
         ),
       ),

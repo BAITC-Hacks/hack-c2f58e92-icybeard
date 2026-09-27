@@ -35,8 +35,8 @@ class ChecklistSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final item in route.checklist) ChecklistTile(item),
-          const SizedBox(height: AppSpacing.xs),
+          for (final (i, item) in route.checklist.indexed) ChecklistTile(item, last: i == route.checklist.length - 1),
+          const SizedBox(height: AppSpacing.md),
           Text(s.checklistNote, style: Theme.of(context).textTheme.labelSmall),
         ],
       ),
@@ -152,7 +152,7 @@ class SignalsSection extends StatelessWidget {
           for (final (i, entry) in rows.indexed) ...[
             if (i > 0) const Divider(),
             ListTile(
-              leading: Icon(entry.icon, color: colors.accent),
+              leading: Icon(entry.icon, color: colors.ink),
               title: Text(entry.title, maxLines: 2, overflow: TextOverflow.ellipsis),
               subtitle: Text(entry.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
             ),
@@ -249,7 +249,7 @@ class HistorySection extends StatelessWidget {
   }
 }
 
-/// Этапы вертикальной лентой (врач): свёрнуто, итог — текущая стадия.
+/// Этапы строками (врач): свёрнуто, итог — текущая стадия.
 class StagesSection extends StatelessWidget {
   const StagesSection({super.key, required this.route});
 

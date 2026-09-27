@@ -8,8 +8,8 @@ import 'format.dart';
 import 'org_name.dart';
 import 'status_chip.dart';
 
-/// Строка «Где быстрее»/«Альтернативы»: короткое имя организации, дни справа крупно, чип риска по требованию,
-/// действие («Попросить» / «Направить») справа.
+/// Строка «Где быстрее»/«Альтернативы»: короткое имя организации 15, дни справа 17/500, чип риска по требованию
+/// (только врачу), действие («Попросить» / «Направить») справа.
 class AlternativeRow extends StatelessWidget {
   const AlternativeRow({super.key, required this.alternative, this.trailing, this.showRisk = false, this.showP90 = false});
 
@@ -35,7 +35,7 @@ class AlternativeRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                OrgName(a.name, style: theme.textTheme.bodyMedium, maxLines: 2),
+                OrgName(a.name, style: theme.textTheme.row, maxLines: 2),
                 if (showRisk || notes.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Wrap(
@@ -43,7 +43,7 @@ class AlternativeRow extends StatelessWidget {
                     runSpacing: AppSpacing.xs,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (showRisk) StatusChip(s.riskShort(pct(a.pRefusal)), tone: a.pRefusal > 0.2 ? StatusTone.warn : StatusTone.neutral),
+                      if (showRisk) StatusChip(s.riskShort(pct(a.pRefusal)), tone: a.pRefusal > 0.2 ? StatusTone.danger : StatusTone.neutral),
                       if (notes.isNotEmpty) Text(notes.join(' · '), style: theme.textTheme.labelSmall),
                     ],
                   ),

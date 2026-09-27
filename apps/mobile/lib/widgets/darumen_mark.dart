@@ -2,12 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Цвета знака Darumen из darumen-assets/README.md: Navy, Sky, Mist. Знак живёт в своей палитре
-/// независимо от темы интерфейса (Clinical Minimal остаётся акцентом экранов).
+/// Цвета знака Darumen в интерфейсе «Тихой клиники» (docs/design-system.md): блок — ink, дуга и сектор — coral;
+/// на тёмном фоне заставки блок светлый (ink тёмной темы). Фон заставки — surface тёмной темы. Иконки приложения
+/// и системный сплэш остаются в бренд-палитре darumen-assets/ (Navy/Sky) — их перерисовка отдельная задача.
 abstract final class DarumenBrand {
-  static const navy = Color(0xFF0B2A4A);
-  static const sky = Color(0xFF29B6D8);
-  static const mist = Color(0xFFF1F8FB);
+  static const ink = Color(0xFF0F2C59);
+  static const coral = Color(0xFFFF7F50);
+  static const mist = Color(0xFFEEF2F7);
+  static const night = Color(0xFF0B1E3D);
 }
 
 /// Знак «D»: блок со скруглёнными левыми углами, дуга и сектор — геометрия из svg/mark.svg (viewBox 20 20 63 60).
@@ -56,7 +58,7 @@ class DarumenMarkPainter extends CustomPainter {
       canvas.drawRRect(
         rect,
         Paint()
-          ..color = (onDark ? DarumenBrand.mist : DarumenBrand.navy).withValues(
+          ..color = (onDark ? DarumenBrand.mist : DarumenBrand.ink).withValues(
             alpha: block.clamp(0, 1),
           ),
       );
@@ -66,7 +68,7 @@ class DarumenMarkPainter extends CustomPainter {
     if (arc > 0) {
       final sweep = math.pi / 2 * Curves.easeInOut.transform(arc.clamp(0, 1));
       final paint = Paint()
-        ..color = DarumenBrand.sky
+        ..color = DarumenBrand.coral
         ..style = PaintingStyle.stroke
         ..strokeWidth = 6
         ..strokeCap = StrokeCap.round;
@@ -93,7 +95,7 @@ class DarumenMarkPainter extends CustomPainter {
         ..close();
       canvas.save();
       canvas.clipRect(Rect.fromLTWH(48, 50, 40 * t, 32));
-      canvas.drawPath(path, Paint()..color = DarumenBrand.sky);
+      canvas.drawPath(path, Paint()..color = DarumenBrand.coral);
       canvas.restore();
     }
     canvas.restore();
@@ -126,7 +128,7 @@ class DarumenMark extends StatelessWidget {
 final GlobalKey homeMarkKey = GlobalKey(debugLabel: 'homeMark');
 
 class HomeMarkAnchor extends StatelessWidget {
-  const HomeMarkAnchor({super.key, this.size = 30});
+  const HomeMarkAnchor({super.key, this.size = 28});
 
   final double size;
 
@@ -142,7 +144,7 @@ class HomeMarkAnchor extends StatelessWidget {
   );
 }
 
-/// Заставка при открытии: знак собирается по центру Navy-фона (блок → дуга → сектор), под ним появляется слово,
+/// Заставка при открытии: знак собирается по центру тёмного фона (блок → дуга → сектор), под ним появляется слово,
 /// затем фон и слово растворяются, а знак улетает в шапку главной (в [HomeMarkAnchor]) — плавный переход в приложение.
 /// Если якоря на экране нет (вход, другой маршрут), знак просто растворяется. При отключённых анимациях — сразу приложение.
 class DarumenIntro extends StatefulWidget {
@@ -256,7 +258,7 @@ class _DarumenIntroState extends State<DarumenIntro>
                         Positioned.fill(
                           child: Opacity(
                             opacity: 1 - fly,
-                            child: const Material(color: DarumenBrand.navy),
+                            child: const Material(color: DarumenBrand.night),
                           ),
                         ),
                         Positioned(

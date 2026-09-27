@@ -5,12 +5,13 @@ import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../theme/typography.dart';
+import 'app_card.dart';
 import 'origin_tag.dart';
 
 final _parenthesized = RegExp(r'\s*\([^)]*\)\s*$');
 
-/// Факторы «Почему так» строками: подпись слева, вклад в днях справа табличными цифрами. Плюс — дольше (danger),
-/// минус — быстрее (ok). Первой строкой — базовое ожидание из сводки модели.
+/// Факторы «Почему так» строками: подпись слева, вклад в днях справа табличными цифрами. Плюс — дольше (coral-text),
+/// минус — быстрее (sage). Первой строкой — базовое ожидание из сводки модели.
 class FactorList extends StatelessWidget {
   const FactorList({super.key, required this.explanation, this.model});
 
@@ -26,7 +27,7 @@ class FactorList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (base.isNotEmpty) Text(base, style: theme.textTheme.bodyMedium?.merge(AppType.numeric)),
+        if (base.isNotEmpty) Text(base, style: theme.textTheme.row.merge(AppType.numeric)),
         for (final factor in explanation.factors)
           Padding(
             padding: const EdgeInsets.only(top: AppSpacing.sm),
@@ -37,7 +38,7 @@ class FactorList extends StatelessWidget {
                 const SizedBox(width: AppSpacing.md),
                 Text(
                   '${factor.contribution >= 0 ? '+' : '−'}${factor.contribution.abs().toStringAsFixed(1)} ${s.daysUnit}',
-                  style: theme.textTheme.bodyMedium?.merge(AppType.numeric).copyWith(color: factor.contribution >= 0 ? tones.danger.fg : tones.ok.fg),
+                  style: theme.textTheme.rowStrong.merge(AppType.numeric).copyWith(color: factor.contribution >= 0 ? tones.danger.fg : tones.ok.fg),
                 ),
               ],
             ),
@@ -51,7 +52,7 @@ class FactorList extends StatelessWidget {
   }
 }
 
-/// Карточка «Почему так» с меткой ML‑модели — для ассистента направления, где факторы показаны сразу.
+/// Карточка «Почему так» с меткой ML-модели — для ассистента направления, где факторы показаны сразу.
 class ExplanationCard extends StatelessWidget {
   const ExplanationCard({super.key, required this.explanation, this.model});
 
@@ -59,26 +60,15 @@ class ExplanationCard extends StatelessWidget {
   final ModelInfo? model;
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final s = S.at(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+  Widget build(BuildContext context) => AppCard(
+        padding: AppCard.plain,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(child: Text(s.whySo, style: theme.textTheme.titleSmall)),
-                const OriginTag(Origin.ml),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
+            CardLabel(S.at(context).whySo, trailing: const OriginTag(Origin.ml)),
+            const SizedBox(height: AppSpacing.md),
             FactorList(explanation: explanation, model: model),
           ],
         ),
-      ),
-    );
-  }
+      );
 }

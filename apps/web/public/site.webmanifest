@@ -1,8 +1,8 @@
 {
   "name": "Darumen",
   "short_name": "Darumen",
-  "theme_color": "#0B2A4A",
-  "background_color": "#F1F8FB",
+  "theme_color": "#0F2C59",
+  "background_color": "#F4F6F0",
   "display": "standalone",
   "icons": [
     {

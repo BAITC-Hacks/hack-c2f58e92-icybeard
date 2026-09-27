@@ -14,25 +14,33 @@ import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../theme/typography.dart';
+import '../widgets/app_card.dart';
+import '../widgets/circle_button.dart';
 import '../widgets/error_box.dart';
 import '../widgets/origin_tag.dart';
+import '../widgets/scribe_record_card.dart';
 import '../widgets/section.dart';
 import '../widgets/status_chip.dart';
 
-enum _Step { consent, record, draft, approved }
+enum ScribeStep { consent, record, draft, approved }
 
-/// AI-скрайб: тонкая полоса прогресса с четырьмя подписями; согласие (чекбокс, две строки о происходящем, язык);
-/// запись нижним листом с волной, таймером и «Стоп», стенограмма под листом и «Вставить текст» как запасной путь;
-/// черновик по разделам карточками [AI], «Утвердить все»; итог — ссылка, QR, «Исходные данные удалены сервером».
+/// AI-скрайб по доске M-Scribe: карточка записи (coral-точка, таймер 42/600, волна, строка согласия), карточка
+/// «Черновик» с чипом AI и разделами, primary-кнопка внизу по шагу: согласие → «Начать»; запись → «Остановить» /
+/// «Составить черновик» (микрофон или вставка текста); черновик → «Утвердить все»; итог — ссылка, QR, «Исходные
+/// данные удалены сервером». Открывается из маршрута пациента (реф в подписи) или без него.
 class ScribeScreen extends StatefulWidget {
-  const ScribeScreen({super.key});
+  const ScribeScreen({super.key, this.patientRef});
+
+  final String? patientRef;
 
   @override
   State<ScribeScreen> createState() => _ScribeScreenState();
 }
 
 class _ScribeScreenState extends State<ScribeScreen> {
-  _Step step = _Step.consent;
+  static const _bars = 24;
+
+  ScribeStep step = ScribeStep.consent;
   bool consent = false;
 
   /// ru | kk | auto; API принимает только ru|kk, «авто» — язык приложения.
@@ -48,11 +56,18 @@ class _ScribeScreenState extends State<ScribeScreen> {
   bool busy = false;
   // запись с микрофона: файл во временной папке, после распознавания удаляется; аудио на сервере — до утверждения
   final AudioRecorder _recorder = AudioRecorder();
+  bool recording = false;
   bool transcribing = false;
   String? notice;
+  int _seconds = 0;
+  Timer? _timer;
+  StreamSubscription<Amplitude>? _amplitude;
+  final _levels = List<double>.filled(_bars, 0);
 
   @override
   void dispose() {
+    _timer?.cancel();
+    _amplitude?.cancel();
     _recorder.dispose();
     transcript.dispose();
     leaflet.dispose();
@@ -64,7 +79,7 @@ class _ScribeScreenState extends State<ScribeScreen> {
 
   void _resetAll() {
     setState(() {
-      step = _Step.consent;
+      step = ScribeStep.consent;
       consent = false;
       sessionId = null;
       transcript.clear();
@@ -78,6 +93,8 @@ class _ScribeScreenState extends State<ScribeScreen> {
       error = null;
       retry = null;
       notice = null;
+      _seconds = 0;
+      _levels.fillRange(0, _bars, 0);
     });
   }
 
@@ -96,7 +113,7 @@ class _ScribeScreenState extends State<ScribeScreen> {
       }
       setState(() {
         sessionId = created.sessionId;
-        step = _Step.record;
+        step = ScribeStep.record;
       });
     } catch (e) {
       if (mounted) {
@@ -112,7 +129,7 @@ class _ScribeScreenState extends State<ScribeScreen> {
     }
   }
 
-  /// Запись: разрешение → старт → нижний лист с волной и таймером; «Стоп» закрывает лист и отправляет аудио.
+  /// Запись: разрешение → старт → таймер и волна прямо в карточке; «Остановить» внизу отправляет аудио.
   Future<void> _record() async {
     final s = S.at(context);
     if (!await _recorder.hasPermission()) {
@@ -126,22 +143,39 @@ class _ScribeScreenState extends State<ScribeScreen> {
     if (!mounted) {
       return;
     }
-    setState(() => notice = null);
-    await showModalBottomSheet<void>(
-      context: context,
-      isDismissible: false,
-      enableDrag: false,
-      builder: (_) => _RecordingSheet(recorder: _recorder, language: _sessionLanguage.toUpperCase()),
-    );
-    await _stopRecording();
+    setState(() {
+      notice = null;
+      recording = true;
+      _seconds = 0;
+      _levels.fillRange(0, _bars, 0);
+    });
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _seconds++));
+    try {
+      _amplitude = _recorder.onAmplitudeChanged(const Duration(milliseconds: 120)).listen((amp) {
+        // dBFS от −160 до 0: всё тише −60 считаем тишиной
+        final level = ((amp.current + 60) / 60).clamp(0.0, 1.0);
+        setState(() {
+          _levels.removeAt(0);
+          _levels.add(level);
+        });
+      });
+    } catch (_) {
+      // платформа без амплитуды — волна остаётся плоской
+    }
   }
 
   Future<void> _stopRecording() async {
+    _timer?.cancel();
+    await _amplitude?.cancel();
+    _amplitude = null;
     final path = await _recorder.stop();
     if (!mounted) {
       return;
     }
-    setState(() => transcribing = path != null);
+    setState(() {
+      recording = false;
+      transcribing = path != null;
+    });
     if (path == null || sessionId == null) {
       return;
     }
@@ -202,7 +236,7 @@ class _ScribeScreenState extends State<ScribeScreen> {
       setState(() {
         sections = draft.sections;
         leaflet.text = draft.leaflet;
-        step = _Step.draft;
+        step = ScribeStep.draft;
       });
     } catch (e) {
       if (mounted) {
@@ -236,7 +270,7 @@ class _ScribeScreenState extends State<ScribeScreen> {
       }
       setState(() {
         result = approved;
-        step = _Step.approved;
+        step = ScribeStep.approved;
       });
     } catch (e) {
       if (mounted) {
@@ -254,6 +288,9 @@ class _ScribeScreenState extends State<ScribeScreen> {
 
   Future<void> _discard() async {
     final api = context.read<Session>().api;
+    if (recording) {
+      await _stopRecording();
+    }
     final id = sessionId;
     if (id != null) {
       try {
@@ -277,6 +314,15 @@ class _ScribeScreenState extends State<ScribeScreen> {
     }
   }
 
+  Widget _bottom(S s) => switch (step) {
+        ScribeStep.consent => FilledButton(onPressed: consent && !busy ? _start : null, child: Text(s.scribeStartButton)),
+        ScribeStep.record => recording
+            ? FilledButton.icon(onPressed: _stopRecording, icon: const Icon(Icons.stop, size: 20), label: Text(s.scribeStopButton))
+            : FilledButton.icon(onPressed: busy || transcribing ? null : _makeDraft, icon: const Icon(Icons.description_outlined, size: 20), label: Text(s.scribeMakeDraftButton)),
+        ScribeStep.draft => FilledButton(onPressed: busy ? null : _approve, child: Text(s.scribeApproveButton)),
+        ScribeStep.approved => OutlinedButton(onPressed: _resetAll, child: Text(s.scribeNewSessionButton)),
+      };
+
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
@@ -284,193 +330,149 @@ class _ScribeScreenState extends State<ScribeScreen> {
     return PageScaffold(
       title: s.scribeTitle,
       actions: [
-        if (step == _Step.record || step == _Step.draft)
-          IconButton(icon: const Icon(Icons.close), tooltip: s.scribeDiscardButton, onPressed: busy ? null : _discard),
+        if (step == ScribeStep.record || step == ScribeStep.draft)
+          CircleIconButton(icon: Icons.close, label: s.scribeDiscardButton, onTap: busy ? null : _discard),
       ],
+      bottom: _bottom(s),
       children: [
-        _StepBar(step: step, labels: [s.scribeConsentShort, s.scribeRecordShort, s.scribeDraftShort, s.scribeApprovedShort]),
-        const SizedBox(height: AppSpacing.lg),
-        if (error != null) ...[ErrorBox(error: error, onRetry: busy ? null : retry), const SizedBox(height: AppSpacing.md)],
-        if (step == _Step.consent) _consentStep(s, theme),
-        if (step == _Step.record) ..._recordStep(s, theme),
-        if (step == _Step.draft) ..._draftStep(s, theme),
-        if (step == _Step.approved && result != null) ..._approvedStep(s, theme),
+        if (widget.patientRef != null) Text(widget.patientRef!, style: theme.textTheme.bodySmall?.merge(AppType.numeric)),
+        if (error != null) ErrorBox(error: error, onRetry: busy ? null : retry),
+        if (step == ScribeStep.consent) _consentStep(s, theme),
+        if (step == ScribeStep.record) ..._recordStep(s, theme),
+        if (step == ScribeStep.draft) ..._draftStep(s, theme),
+        if (step == ScribeStep.approved && result != null) ..._approvedStep(s, theme),
       ],
     );
   }
 
-  Widget _consentStep(S s, ThemeData theme) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              CheckboxListTile(
-                value: consent,
-                onChanged: (v) => setState(() => consent = v ?? false),
-                title: Text(s.scribeConsentLabel, style: theme.textTheme.titleSmall),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-              ),
-              const Divider(),
-              const SizedBox(height: AppSpacing.sm),
-              _InfoLine(icon: Icons.mic_none, text: s.scribeWhatHappens1),
-              const SizedBox(height: AppSpacing.sm),
-              _InfoLine(icon: Icons.description_outlined, text: s.scribeWhatHappens2),
-              const SizedBox(height: AppSpacing.lg),
-              Text(s.scribeLanguageLabel, style: theme.textTheme.labelSmall),
-              const SizedBox(height: AppSpacing.xs),
-              SegmentedButton<String>(
-                segments: [
-                  const ButtonSegment(value: 'ru', label: Text('РУС')),
-                  const ButtonSegment(value: 'kk', label: Text('ҚАЗ')),
-                  ButtonSegment(value: 'auto', label: Text(s.scribeLanguageAuto)),
+  Widget _consentStep(S s, ThemeData theme) => AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            CardLabel(s.scribeRecordShort, trailing: StatusChip(_sessionLanguage.toUpperCase(), tone: StatusTone.neutral)),
+            const SizedBox(height: AppSpacing.md),
+            InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+              onTap: () => setState(() => consent = !consent),
+              child: Row(
+                children: [
+                  Checkbox(value: consent, onChanged: (v) => setState(() => consent = v ?? false)),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(child: Text(s.scribeConsentLabel, style: theme.textTheme.rowStrong)),
                 ],
-                selected: {language},
-                showSelectedIcon: false,
-                onSelectionChanged: (v) => setState(() => language = v.first),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton.icon(onPressed: consent && !busy ? _start : null, icon: const Icon(Icons.play_arrow), label: Text(s.scribeStartButton)),
-            ],
-          ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _InfoLine(icon: Icons.mic_none, text: s.scribeWhatHappens1),
+            const SizedBox(height: AppSpacing.sm),
+            _InfoLine(icon: Icons.description_outlined, text: s.scribeWhatHappens2),
+            const SizedBox(height: AppSpacing.lg),
+            FieldLabel(s.scribeLanguageLabel),
+            SegmentedButton<String>(
+              segments: [
+                const ButtonSegment(value: 'ru', label: Text('РУС')),
+                const ButtonSegment(value: 'kk', label: Text('ҚАЗ')),
+                ButtonSegment(value: 'auto', label: Text(s.scribeLanguageAuto)),
+              ],
+              selected: {language},
+              showSelectedIcon: false,
+              onSelectionChanged: (v) => setState(() => language = v.first),
+            ),
+          ],
         ),
       );
 
   List<Widget> _recordStep(S s, ThemeData theme) => [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(child: Text(s.scribeTranscriptTitle, style: theme.textTheme.titleSmall)),
-                    StatusChip(_sessionLanguage.toUpperCase(), tone: StatusTone.neutral),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-                FilledButton.icon(onPressed: busy || transcribing ? null : _record, icon: const Icon(Icons.mic), label: Text(s.scribeRecordMic)),
-                if (transcribing) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
-                      const SizedBox(width: AppSpacing.sm),
-                      Flexible(child: Text(s.scribeTranscribing, style: theme.textTheme.bodySmall)),
-                    ],
-                  ),
-                ],
-                if (notice != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(notice!, style: theme.textTheme.bodySmall?.copyWith(color: AppTones.of(context).warn.fg)),
-                ],
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  controller: transcript,
-                  minLines: 4,
-                  maxLines: 10,
-                  decoration: InputDecoration(labelText: s.scribeTranscriptFieldLabel, alignLabelWithHint: true),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(onPressed: busy ? null : _pasteText, icon: const Icon(Icons.content_paste), label: Text(s.scribePasteText)),
-                ),
-              ],
-            ),
+        ScribeRecordCard(
+          recording: recording,
+          seconds: _seconds,
+          levels: _levels,
+          language: _sessionLanguage.toUpperCase(),
+          caption: recording ? s.scribeRecordingCaption : s.scribeReadyCaption,
+        ),
+        if (!recording)
+          Row(
+            children: [
+              Expanded(child: OutlinedButton.icon(onPressed: busy || transcribing ? null : _record, icon: const Icon(Icons.mic, size: 20), label: Text(s.scribeRecordMic))),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: OutlinedButton.icon(onPressed: busy ? null : _pasteText, icon: const Icon(Icons.content_paste, size: 20), label: Text(s.scribePasteText))),
+            ],
+          ),
+        if (transcribing)
+          Row(
+            children: [
+              const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(child: Text(s.scribeTranscribing, style: theme.textTheme.bodySmall)),
+            ],
+          ),
+        if (notice != null) Text(notice!, style: theme.textTheme.bodySmall?.copyWith(color: AppTones.of(context).danger.fg)),
+        AppCard(
+          padding: AppCard.plain,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CardLabel(s.scribeTranscriptTitle),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(controller: transcript, minLines: 3, maxLines: 10, decoration: InputDecoration(hintText: s.scribeTranscriptFieldLabel)),
+            ],
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        FilledButton.icon(onPressed: busy || transcribing ? null : _makeDraft, icon: const Icon(Icons.description_outlined), label: Text(s.scribeMakeDraftButton)),
       ];
 
   List<Widget> _draftStep(S s, ThemeData theme) => [
         Text(s.scribeDraftReviewCaption, style: theme.textTheme.bodySmall),
-        for (final section in sections)
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.md),
-            child: _DraftCard(title: s.scribeSectionLabel(section.name), controller: sectionControllers[section.name], minLines: 2),
+        AppCard(
+          padding: AppCard.plain,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CardLabel(s.scribeDraftShort, trailing: const OriginTag(Origin.ai)),
+              for (final section in sections) ...[
+                const SizedBox(height: AppSpacing.md),
+                FieldLabel(s.scribeSectionLabel(section.name)),
+                TextField(controller: sectionControllers[section.name], minLines: 2, maxLines: 8),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              FieldLabel(s.scribeLeafletLabel),
+              TextField(controller: leaflet, minLines: 3, maxLines: 8),
+            ],
           ),
-        Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.md),
-          child: _DraftCard(title: s.scribeLeafletLabel, controller: leaflet, minLines: 3),
         ),
-        const SizedBox(height: AppSpacing.md),
-        FilledButton.icon(onPressed: busy ? null : _approve, icon: const Icon(Icons.check_circle_outline), label: Text(s.scribeApproveButton)),
       ];
 
   List<Widget> _approvedStep(S s, ThemeData theme) => [
-        Text(s.scribeApprovedTitle, style: theme.textTheme.titleMedium),
-        SectionTitle(s.scribeLeafletUrlLabel),
-        Card(
-          child: ListTile(
-            title: SelectableText(result!.leafletUrl, style: theme.textTheme.bodySmall),
-            trailing: IconButton(icon: const Icon(Icons.copy_outlined), tooltip: s.copy, onPressed: () => _copy(result!.leafletUrl)),
+        AppCard(
+          padding: AppCard.plain,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(s.scribeApprovedTitle, style: theme.textTheme.titleMedium),
+              const SizedBox(height: AppSpacing.md),
+              FieldLabel(s.scribeLeafletUrlLabel),
+              Row(
+                children: [
+                  Expanded(child: SelectableText(result!.leafletUrl, style: theme.textTheme.bodySmall)),
+                  IconButton(icon: const Icon(Icons.copy_outlined), tooltip: s.copy, onPressed: () => _copy(result!.leafletUrl)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  // QR читается только на белом — единственное место с цветом вне палитры темы
+                  decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(AppRadius.md)),
+                  child: QrImageView(data: result!.leafletUrl, size: 200),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(s.scribeQrHint, style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
+              const SizedBox(height: AppSpacing.md),
+              _InfoLine(icon: Icons.delete_outline, text: s.scribeAudioDeletedNote),
+            ],
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        Center(
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.sm),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(AppRadius.md), border: Border.all(color: AppPalette.of(context).hairline)),
-            child: QrImageView(data: result!.leafletUrl, size: 200),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Center(child: Text(s.scribeQrHint, style: theme.textTheme.bodySmall, textAlign: TextAlign.center)),
-        const SizedBox(height: AppSpacing.md),
-        Row(
-          children: [
-            Icon(Icons.delete_outline, size: 18, color: AppPalette.of(context).muted),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(child: Text(s.scribeAudioDeletedNote, style: theme.textTheme.bodySmall)),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        OutlinedButton.icon(onPressed: _resetAll, icon: const Icon(Icons.refresh), label: Text(s.scribeNewSessionButton)),
       ];
-}
-
-/// Тонкая полоса прогресса с четырьмя подписями: пройденные и текущий сегменты — акцентные.
-class _StepBar extends StatelessWidget {
-  const _StepBar({required this.step, required this.labels});
-
-  final _Step step;
-  final List<String> labels;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final (i, label) in labels.indexed) ...[
-          if (i > 0) const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Column(
-              children: [
-                Container(
-                  height: 3,
-                  decoration: BoxDecoration(color: i <= step.index ? colors.accent : colors.hairline, borderRadius: BorderRadius.circular(AppRadius.pill)),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  label,
-                  style: theme.textTheme.labelSmall?.copyWith(color: i == step.index ? colors.ink : colors.muted, fontWeight: i == step.index ? FontWeight.w600 : FontWeight.w500),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
 }
 
 class _InfoLine extends StatelessWidget {
@@ -488,144 +490,4 @@ class _InfoLine extends StatelessWidget {
           Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
         ],
       );
-}
-
-/// Раздел черновика: заголовок, метка «AI‑черновик», редактируемый текст.
-class _DraftCard extends StatelessWidget {
-  const _DraftCard({required this.title, required this.controller, required this.minLines});
-
-  final String title;
-  final TextEditingController? controller;
-  final int minLines;
-
-  @override
-  Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text(title, style: Theme.of(context).textTheme.titleSmall)),
-                  const OriginTag(Origin.ai),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextField(controller: controller, minLines: minLines, maxLines: 8),
-            ],
-          ),
-        ),
-      );
-}
-
-/// Нижний лист записи: волна по амплитуде микрофона, таймер, чип языка и круглая кнопка «Стоп».
-class _RecordingSheet extends StatefulWidget {
-  const _RecordingSheet({required this.recorder, required this.language});
-
-  final AudioRecorder recorder;
-  final String language;
-
-  @override
-  State<_RecordingSheet> createState() => _RecordingSheetState();
-}
-
-class _RecordingSheetState extends State<_RecordingSheet> {
-  static const _bars = 24;
-  final _levels = List<double>.filled(_bars, 0.08);
-  late final Timer _timer;
-  StreamSubscription<Amplitude>? _amplitude;
-  int _seconds = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _seconds++));
-    try {
-      _amplitude = widget.recorder.onAmplitudeChanged(const Duration(milliseconds: 120)).listen((amp) {
-        // dBFS от −160 до 0: всё тише −60 считаем тишиной
-        final level = ((amp.current + 60) / 60).clamp(0.08, 1.0);
-        setState(() {
-          _levels.removeAt(0);
-          _levels.add(level);
-        });
-      });
-    } catch (_) {
-      // платформа без амплитуды — волна остаётся плоской
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    _amplitude?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.at(context);
-    final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
-    final mm = (_seconds ~/ 60).toString().padLeft(2, '0');
-    final ss = (_seconds % 60).toString().padLeft(2, '0');
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, AppSpacing.xl, AppSpacing.xl, AppSpacing.xxl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(s.scribeRecordingTitle, style: theme.textTheme.titleMedium, textAlign: TextAlign.center),
-            const SizedBox(height: AppSpacing.xl),
-            SizedBox(
-              height: 64,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  for (final level in _levels)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 2),
-                      child: AnimatedContainer(
-                        duration: AppDurations.fast,
-                        width: 4,
-                        height: 8 + 56 * level,
-                        decoration: BoxDecoration(color: colors.accent, borderRadius: BorderRadius.circular(AppRadius.pill)),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Row(
-              children: [
-                Text('$mm:$ss', style: theme.textTheme.headlineSmall?.merge(AppType.numeric)),
-                const Spacer(),
-                StatusChip(widget.language, tone: StatusTone.neutral),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Center(
-              child: Semantics(
-                button: true,
-                label: s.scribeStop,
-                child: Material(
-                  color: colors.danger,
-                  shape: const CircleBorder(),
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => Navigator.of(context).pop(),
-                    child: SizedBox(width: 72, height: 72, child: Icon(Icons.stop, size: 36, color: theme.colorScheme.onError)),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(s.scribeStop, style: theme.textTheme.labelMedium, textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
 }

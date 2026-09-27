@@ -104,7 +104,7 @@ onMounted(async () => {
         </div>
       </AppCard>
 
-      <div class="grid cols-2" style="margin-top: 16px">
+      <div class="grid cols-2">
         <AppCard v-for="b in breakdowns" :key="b.key" :title="b.title">
           <p class="muted small">{{ b.hint }}</p>
           <table class="dense-table">
@@ -123,7 +123,7 @@ onMounted(async () => {
     </template>
 
     <template v-if="report">
-      <AppCard :title="t('gov.quality.forecastsTitle')" origin="ml" style="margin-top: 16px">
+      <AppCard :title="t('gov.quality.forecastsTitle')" origin="ml">
         <template #header><span v-if="flatShare !== null" class="muted small">{{ t('gov.quality.flatTotal', { share: pct(flatShare) }) }}</span></template>
         <table class="dense-table">
           <thead><tr><th>{{ t('gov.quality.colStream') }}</th><th class="num">{{ t('gov.quality.colSeries') }}</th><th>{{ t('gov.quality.colMase') }}</th><th>{{ t('gov.quality.colChoice') }}</th><th class="num">{{ t('gov.quality.colFlat') }}</th></tr></thead>
@@ -147,7 +147,7 @@ onMounted(async () => {
         <p class="muted small" style="margin-top: 8px">{{ t('gov.quality.flatExplain') }}</p>
       </AppCard>
 
-      <div class="grid cols-2" style="margin-top: 16px">
+      <div class="grid cols-2">
         <AppCard :title="t('gov.quality.anomaliesTitle')" origin="formula">
           <template #header><span class="muted small">{{ t('gov.quality.labelledBy') }}: {{ labelledTotal(report.anomalyLabels) }} {{ t('gov.quality.signalsShort') }}</span></template>
           <div v-for="(a, id) in report.anomalies" :key="id" class="factor">
@@ -212,7 +212,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.vs { font-size: 0.85rem; font-weight: 400; }
+.vs { font-size: var(--dm-text-sm); font-weight: 400; letter-spacing: 0; }
 .kpi .item .label { margin-top: 6px; }
 .bar-cell { min-width: 200px; }
 </style>

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/strings.dart';
 import '../theme/tokens.dart';
+import 'app_card.dart';
 import 'format.dart';
 
 /// Нижний лист с одним текстовым полем: причина перенаправления или ответа «оставить» (врач), комментарий к
@@ -54,23 +55,24 @@ class _RedirectReasonDialogState extends State<RedirectReasonDialog> {
     final theme = Theme.of(context);
     final canConfirm = widget.optional || _filled;
     return Padding(
-      padding: EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xl + MediaQuery.viewInsetsOf(context).bottom),
+      padding: EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xl + MediaQuery.viewInsetsOf(context).bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(shortOrgName(widget.organization), style: theme.textTheme.titleMedium, maxLines: 3, overflow: TextOverflow.ellipsis),
+          Text(shortOrgName(widget.organization), style: theme.textTheme.titleLarge, maxLines: 3, overflow: TextOverflow.ellipsis),
           if (widget.subtitle != null) ...[
             const SizedBox(height: AppSpacing.xs),
             Text(widget.subtitle!, style: theme.textTheme.bodySmall, maxLines: 3, overflow: TextOverflow.ellipsis),
           ],
           const SizedBox(height: AppSpacing.lg),
+          FieldLabel(widget.label ?? s.redirectReasonLabel),
           TextField(
             controller: _controller,
             autofocus: !widget.optional,
             maxLines: 3,
             onChanged: (v) => setState(() => _filled = v.trim().isNotEmpty),
-            decoration: InputDecoration(labelText: widget.label ?? s.redirectReasonLabel, helperText: widget.optional ? null : s.reasonRequired),
+            decoration: InputDecoration(hintText: s.reasonHint, helperText: widget.optional ? null : s.reasonRequired),
           ),
           const SizedBox(height: AppSpacing.lg),
           Row(

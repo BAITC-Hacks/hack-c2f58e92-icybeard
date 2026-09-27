@@ -25,7 +25,7 @@ class KpiRow extends StatelessWidget {
       );
 }
 
-/// Плитка показателя: табличные цифры, подпись до двух строк (казахский длиннее), метка происхождения по требованию.
+/// Плитка показателя на soft-фоне radius 12: значение 24/500 табличными цифрами, подпись 12 ink-2 до двух строк.
 class KpiTile extends StatelessWidget {
   const KpiTile({super.key, required this.value, required this.label, this.unit, this.origin});
 
@@ -40,11 +40,7 @@ class KpiTile extends StatelessWidget {
     final colors = AppPalette.of(context);
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: colors.card,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colors.hairline),
-      ),
+      decoration: BoxDecoration(color: colors.neutralSoft, borderRadius: BorderRadius.circular(AppRadius.md)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

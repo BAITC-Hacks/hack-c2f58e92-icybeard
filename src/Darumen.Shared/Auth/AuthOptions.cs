@@ -49,5 +49,8 @@ public static class DarumenClaims
     public const string Region = "region_kato";
     /// <summary>ИИН гражданина (маппер `iin` на клиентах darumen-web и darumen-mobile); в демо-realm значения синтетические.</summary>
     public const string Iin = "iin";
+
+    /// <summary>Код организации главврача (атрибут пользователя `mo_code` в realm): портал «Больница» открывает свою организацию.</summary>
+    public const string MoCode = "mo_code";
     public const string RealmAccess = "realm_access";
 }

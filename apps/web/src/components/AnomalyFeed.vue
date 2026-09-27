@@ -45,7 +45,7 @@ function send() {
       <div class="row-main">
         <div class="chips head">
           <StatusTag :value="severityLabel(anomaly.severity)" :tone="TONES[severityTone(anomaly.severity)]" />
-          <b>{{ streamTitle(anomaly.streamId) }}</b>
+          <span class="strong">{{ streamTitle(anomaly.streamId) }}</span>
           <span class="muted">· {{ describeEntity(anomaly.entity, anomaly.regionKato, names).join(' · ') }}</span>
           <StatusTag v-if="anomaly.kind === 'shared'" :value="anomaly.affected ? `${t('anomalyFeed.sharedWave')} · ${anomaly.affected}` : t('anomalyFeed.sharedWave')" tone="neutral" />
           <StatusTag v-if="anomaly.status !== 'open'" :value="statusLabel(anomaly.status)" tone="neutral" />
@@ -71,6 +71,7 @@ function send() {
 
 <style scoped>
 .feed-row { align-items: flex-start; }
+.strong { font-weight: 500; }
 .head { row-gap: 4px; }
 .answer { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
 .answer .p-inputtext { flex: 1 1 220px; }

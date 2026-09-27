@@ -8,16 +8,20 @@ import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import '../theme/typography.dart';
+import '../widgets/app_card.dart';
+import '../widgets/darumen_mark.dart';
 import '../widgets/day_groups.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/format.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/route_events.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 
-/// Уведомления — только события маршрута (как Messages в NHS App), группами по дням: Сегодня · Вчера · 22 сентября.
-/// Строка: иконка типа (этап / врач / вы), заголовок в одну строку с коротким именем, подстрока — причина в
-/// кавычках или этап; у предложения врача — «Открыть маршрут». Push через eGov mobile — после интеграции.
+/// Уведомления по доске M-Updates — только события маршрута (как Messages в NHS App) внутри одной карточки,
+/// группами по дням: label «Сегодня · Вчера · 22 сентября», строки 56 px с coral-точкой у нового, заголовком 15,
+/// подстрокой 13 и временем справа; предложение врача открывает маршрут. Push через eGov mobile — после интеграции.
 class UpdatesScreen extends StatefulWidget {
   const UpdatesScreen({super.key});
 
@@ -53,89 +57,50 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   Widget build(BuildContext context) {
     final s = S.at(context);
     final theme = Theme.of(context);
+    final colors = AppPalette.of(context);
+    final seen = context.select<Session, String?>((x) => x.seenDecisionId);
     return PageScaffold(
       title: s.updatesTitle,
+      leading: const DarumenMark(size: 28),
       onRefresh: _load,
       children: [
         LoadStateView<PatientRoute>(
           state: _state,
           onRetry: _load,
-          skeleton: const ListSkeleton(count: 6),
+          skeleton: const CardSkeleton(height: 360),
           builder: (_, route) {
-            final groups = groupByDay(routeEvents(route, s), (e) => e.at, s);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (groups.isEmpty)
-                  EmptyState(icon: Icons.notifications_none, title: s.updatesEmptyTitle, body: s.updatesEmptyBody)
-                else
-                  for (final group in groups) ...[
+            final groups = groupByDay(routeEvents(route, s, seenDecisionId: seen), (e) => e.at, s);
+            if (groups.isEmpty) {
+              return EmptyState(icon: Icons.notifications_none, title: s.updatesEmptyTitle, body: s.updatesEmptyBody);
+            }
+            return AppCard(
+              padding: AppCard.list,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final (g, group) in groups.indexed) ...[
                     Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
-                      child: Text(group.label, style: theme.textTheme.labelSmall),
+                      padding: EdgeInsets.fromLTRB(0, g == 0 ? AppSpacing.md : AppSpacing.lg, 0, AppSpacing.xs),
+                      child: Text(group.label.toUpperCase(), style: theme.textTheme.overline.copyWith(color: colors.muted)),
                     ),
-                    Card(
-                      child: Column(
-                        children: [
-                          for (final (i, event) in group.items.indexed) ...[
-                            if (i > 0) const Divider(),
-                            _EventRow(event: event),
-                          ],
-                        ],
+                    for (final (i, event) in group.items.indexed)
+                      ListRow(
+                        dot: event.isNew,
+                        strong: event.isNew,
+                        title: event.title,
+                        subtitle: event.detail,
+                        last: g == groups.length - 1 && i == group.items.length - 1,
+                        trailing: Text(timeShort(event.at), style: theme.textTheme.labelSmall?.copyWith(color: colors.faint).merge(AppType.numeric)),
+                        onTap: event.opensRoute ? () => context.go('/home/route') : null,
                       ),
-                    ),
                   ],
-                const SizedBox(height: AppSpacing.lg),
-                Text(s.updatesPushRoadmap, style: theme.textTheme.labelSmall),
-              ],
+                ],
+              ),
             );
           },
         ),
+        Text(s.updatesPushRoadmap, style: theme.textTheme.labelSmall),
       ],
-    );
-  }
-}
-
-class _EventRow extends StatelessWidget {
-  const _EventRow({required this.event});
-
-  final RouteEvent event;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.at(context);
-    final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.sm),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(event.icon, color: event.kind == RouteEventKind.checklist ? colors.muted : colors.accent),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(event.title, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                if (event.detail != null && event.detail!.isNotEmpty)
-                  Text(event.detail!, style: theme.textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
-                if (event.opensRoute)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 36), tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                      onPressed: () => context.go('/home/route'),
-                      child: Text(s.openRoute),
-                    ),
-                  )
-                else
-                  const SizedBox(height: AppSpacing.xs),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
