@@ -3,8 +3,8 @@ import { computed } from 'vue'
 
 export interface BarItem { key: string; label: string; value: number; display?: string; highlight?: boolean; title?: string }
 
-/** Бары по образцу досок: подпись 150 px слева, дорожка soft 10 px radius 4, заливка ink (коралл — выделенная
- * строка), значение справа табличными цифрами. Ширина — доля от максимума. */
+/** Бары по образцу досок: подпись 150 px слева, дорожка inset 10 px radius 4, заливка фиолетовая (янтарь — выделенная
+ * строка: перегрузка, худший показатель), значение справа табличными цифрами. Ширина — доля от максимума. */
 const props = defineProps<{ items: BarItem[]; labelWidth?: number }>()
 const max = computed(() => Math.max(1e-9, ...props.items.map((i) => i.value)))
 </script>
@@ -24,7 +24,7 @@ const max = computed(() => Math.max(1e-9, ...props.items.map((i) => i.value)))
 .bar-row { display: flex; align-items: center; gap: 12px; }
 .bar-label { flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .track { flex: 1; height: 10px; border-radius: 4px; background: var(--dm-surface-2); overflow: hidden; }
-.fill { display: block; height: 100%; border-radius: 4px; background: var(--dm-ink); }
-.fill.highlight { background: var(--dm-accent); }
+.fill { display: block; height: 100%; border-radius: 4px; background: var(--dm-primary); }
+.fill.highlight { background: var(--dm-warn-strong); }
 .bar-value { width: 56px; text-align: right; flex: none; }
 </style>

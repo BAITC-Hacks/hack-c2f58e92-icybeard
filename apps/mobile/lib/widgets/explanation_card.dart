@@ -10,8 +10,8 @@ import 'origin_tag.dart';
 
 final _parenthesized = RegExp(r'\s*\([^)]*\)\s*$');
 
-/// Факторы «Почему так» строками: подпись слева, вклад в днях справа табличными цифрами. Плюс — дольше (coral-text),
-/// минус — быстрее (sage). Первой строкой — базовое ожидание из сводки модели.
+/// Факторы «Почему так» строками: подпись слева, вклад в днях справа табличными цифрами. Плюс — дольше (attention),
+/// минус — быстрее (good). Первой строкой — базовое ожидание из сводки модели.
 class FactorList extends StatelessWidget {
   const FactorList({super.key, required this.explanation, this.model});
 
@@ -38,7 +38,7 @@ class FactorList extends StatelessWidget {
                 const SizedBox(width: AppSpacing.md),
                 Text(
                   '${factor.contribution >= 0 ? '+' : '−'}${factor.contribution.abs().toStringAsFixed(1)} ${s.daysUnit}',
-                  style: theme.textTheme.rowStrong.merge(AppType.numeric).copyWith(color: factor.contribution >= 0 ? tones.danger.fg : tones.ok.fg),
+                  style: theme.textTheme.rowStrong.merge(AppType.numeric).copyWith(color: factor.contribution >= 0 ? tones.warn.fg : tones.ok.fg),
                 ),
               ],
             ),

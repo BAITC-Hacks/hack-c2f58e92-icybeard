@@ -2,9 +2,10 @@
 import OriginTag from '@/components/OriginTag.vue'
 import Skeleton from './Skeleton.vue'
 import StatusTag from './StatusTag.vue'
+import type { StatusTone } from './tones'
 
 /** KPI-карточка: белая radius 16, значение 42 / 500 + единица 17 ink-2, подпись 14 ink-2, при необходимости чип
- * (coral-wash) рядом со значением. У чисел модели `origin` обязателен по соглашению проекта. */
+ * (по умолчанию critical) рядом со значением. У чисел модели `origin` обязателен по соглашению проекта. */
 defineProps<{
   value: string | number
   unit?: string
@@ -13,7 +14,7 @@ defineProps<{
   hint?: string
   /** чип рядом со значением («4 аномалии», «выше среднего по профилю») */
   chip?: string
-  chipTone?: 'neutral' | 'ok' | 'warn' | 'danger' | 'accent'
+  chipTone?: StatusTone
   tone?: 'ok' | 'warn' | 'danger'
   loading?: boolean
 }>()
@@ -36,6 +37,7 @@ defineProps<{
 .label-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .label { min-height: 0; }
 .item.ok .number { color: var(--dm-ok); }
-.item.warn .number, .item.danger .number { color: var(--dm-danger); }
+.item.warn .number { color: var(--dm-warn); }
+.item.danger .number { color: var(--dm-danger); }
 .chip { align-self: center; }
 </style>

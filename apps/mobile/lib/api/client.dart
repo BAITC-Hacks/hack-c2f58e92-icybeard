@@ -55,7 +55,8 @@ class ApiClient {
   Future<dynamic> post(String path, Object body, {Map<String, String>? headers}) async =>
       _decode(await _http.post(_uri(path), headers: {..._headers(await _bearer()), ...?headers}, body: jsonEncode(body)));
 
-  Future<dynamic> delete(String path) async => _decode(await _http.delete(_uri(path), headers: _headers(await _bearer())));
+  Future<dynamic> delete(String path, [Map<String, String?>? query]) async =>
+      _decode(await _http.delete(_uri(path, query), headers: _headers(await _bearer())));
 
   dynamic _decode(http.Response response) {
     final text = utf8.decode(response.bodyBytes);
@@ -180,6 +181,19 @@ class ApiClient {
     final segments = (body['transcript'] as List<dynamic>?) ?? const [];
     return body['text'] as String? ?? segments.map((e) => (e as Map<String, dynamic>)['text'] as String? ?? '').join(' ');
   }
+
+  // ---------- я и мой аккаунт (docs/rbac.md) ----------
+  /// Кто вошёл: роли, разрешения `{code, scope}`, организация, ИИН маской.
+  Future<Me> me() async => Me.fromJson(await get('/api/v1/me') as Map<String, dynamic>);
+
+  Future<SecurityInfo> mySecurity() async => SecurityInfo.fromJson(await get('/api/v1/me/security') as Map<String, dynamic>);
+
+  Future<void> endSession(String sessionId) async => await delete('/api/v1/me/sessions/${Uri.encodeComponent(sessionId)}');
+
+  Future<void> endOtherSessions() async => await delete('/api/v1/me/sessions', {'keepCurrent': 'true'});
+
+  /// Ссылка на смену пароля уходит письмом; ответ 202 одинаковый для любой почты (без перебора адресов).
+  Future<void> requestPasswordReset(String email) async => await post('/api/v1/public/password-reset', {'email': email});
 
   void close() => _http.close();
 }

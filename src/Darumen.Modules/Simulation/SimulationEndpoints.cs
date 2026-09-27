@@ -33,7 +33,7 @@ public static class SimulationEndpoints
                     response.DeltaDays, [response.CiLow, response.CiHigh], response.Assumptions.ToList(), response.Model.ToDto(),
                     response.AdmissionsPerDay));
             })
-            .RequireAuthorization(Policies.Regulator)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovSimulator))
             .WithTags("Simulation").WithName("Simulate").WithSummary("Сценарий «что если» для региона и профиля")
             .Produces<SimulateResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
@@ -60,7 +60,7 @@ public static class SimulationEndpoints
                 return Results.Ok(new RedistributeResponseDto(
                     moves, response.TotalWaitDaysBefore, response.TotalWaitDaysAfter, response.TotalDeltaDays, response.HorizonDays, response.Model.ToDto()));
             })
-            .RequireAuthorization(Policies.Regulator)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovSimulator))
             .WithTags("Simulation").WithName("Redistribute").WithSummary("Жадное перераспределение направлений внутри региона и профиля")
             .Produces<RedistributeResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
     }

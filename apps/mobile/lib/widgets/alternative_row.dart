@@ -43,7 +43,7 @@ class AlternativeRow extends StatelessWidget {
                     runSpacing: AppSpacing.xs,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (showRisk) StatusChip(s.riskShort(pct(a.pRefusal)), tone: a.pRefusal > 0.2 ? StatusTone.danger : StatusTone.neutral),
+                      if (showRisk) StatusChip(s.riskShort(pct(a.pRefusal)), tone: a.pRefusal > 0.2 ? StatusTone.warn : StatusTone.neutral),
                       if (notes.isNotEmpty) Text(notes.join(' · '), style: theme.textTheme.labelSmall),
                     ],
                   ),

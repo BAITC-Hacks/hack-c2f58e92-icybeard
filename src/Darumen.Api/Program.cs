@@ -1,4 +1,5 @@
 using Darumen.Api;
+using Darumen.Modules.Access;
 using Darumen.Migrations;
 using Darumen.Modules.Analytics;
 using Darumen.Modules.Insight;
@@ -53,7 +54,8 @@ builder.Services.AddDarumenModules(
     new IntakeModule(),
     new MedicinesModule(),
     new InsightModule(),
-    new PublicModule());
+    new PublicModule(),
+    new AccessModule());
 
 var app = builder.Build();
 

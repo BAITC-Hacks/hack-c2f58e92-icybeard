@@ -1,4 +1,7 @@
 using Darumen.Api;
+using Darumen.Modules.Access.Data;
+using Darumen.Modules.Access.Identity;
+using Darumen.Modules.Access.Mail;
 using Darumen.Contracts.V1;
 using Darumen.Modules.Analytics;
 using Darumen.Modules.Insight;
@@ -8,6 +11,7 @@ using Darumen.Modules.Medicines;
 using Darumen.Modules.Public;
 using Darumen.Modules.Queue;
 using Darumen.Modules.RefData;
+using Darumen.Shared.Api;
 using Darumen.Shared.Auth;
 using Darumen.Shared.Messaging;
 using Darumen.Tests.Fakes;
@@ -37,17 +41,29 @@ public sealed class TestApp : WebApplicationFactory<Program>
 
     public FakeNews News { get; } = new();
 
-    /// <summary>Клиент с ролью для схемы заголовков.</summary>
-    public HttpClient CreateClient(string role, string actor = "user-1", string? region = null)
+    public InMemoryPermissionStore Permissions { get; } = new();
+
+    public FakeIdentityAdmin Identity { get; } = new();
+
+    public FakeEmailSender Mail { get; } = new();
+
+    public InMemoryInvitationStore Invitations { get; } = new();
+
+    public InMemoryOrgApplicationStore Applications { get; } = new();
+
+    public InMemoryAccountStore Accounts { get; } = new();
+
+    public InMemoryActivity Activity { get; } = new();
+
+    /// <summary>Клиент с ролью для схемы заголовков; moCode — клейм mo_code (scope own), session — клейм sid.</summary>
+    public HttpClient CreateClient(string role, string actor = "user-1", string? region = null, string? moCode = null, string? session = null)
     {
         var client = CreateClient();
         client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.ActorHeader, actor);
         client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.RoleHeader, role);
-        if (region is not null)
-        {
-            client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.RegionHeader, region);
-        }
-
+        AddHeader(client, HeaderAuthenticationHandler.RegionHeader, region);
+        AddHeader(client, HeaderAuthenticationHandler.MoCodeHeader, moCode);
+        AddHeader(client, HeaderAuthenticationHandler.SessionHeader, session);
         return client;
     }
 
@@ -56,6 +72,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
         builder.UseSetting(MigrationHostedService.Setting, "false");
         builder.UseSetting($"{MessagingOptions.Section}:Mode", MessagingOptions.StubMode);
         builder.UseSetting($"{AuthOptions.Section}:Mode", AuthOptions.HeadersMode);
+        // публичные формы ограничены по адресу, а у TestServer адрес один на все тесты класса; лимит проверяет отдельный тест
+        builder.UseSetting($"{RateLimitOptions.Section}:{nameof(RateLimitOptions.PublicFormsPerMinute)}", "10000");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<QueueIntelligence.QueueIntelligenceClient>();
@@ -84,6 +102,43 @@ public sealed class TestApp : WebApplicationFactory<Program>
             services.AddSingleton<INewsSource>(News);
             services.RemoveAll<IIntakeRepository>();
             services.AddSingleton<IIntakeRepository, InMemoryIntake>();
+            ReplaceAccess(services);
         });
+    }
+
+    private void ReplaceAccess(IServiceCollection services)
+    {
+        // журнал аудита пишется в Postgres фоновым писателем: в тестах он не нужен и не должен трогать базу разработчика
+        foreach (var writer in services.Where(d => d.ImplementationType == typeof(AuditWriter)).ToList())
+        {
+            services.Remove(writer);
+        }
+
+        services.RemoveAll<IPermissionStore>();
+        services.AddSingleton<IPermissionStore>(Permissions);
+        services.RemoveAll<IIdentityAdmin>();
+        services.AddSingleton<IIdentityAdmin>(Identity);
+        services.RemoveAll<IEmailSender>();
+        services.AddSingleton<IEmailSender>(Mail);
+        services.RemoveAll<IInvitationStore>();
+        services.AddSingleton<IInvitationStore>(Invitations);
+        services.RemoveAll<IOrgApplicationStore>();
+        services.AddSingleton<IOrgApplicationStore>(Applications);
+        services.RemoveAll<IAccountStore>();
+        services.AddSingleton<IAccountStore>(Accounts);
+        services.RemoveAll<IActivityReader>();
+        services.AddSingleton<IActivityReader>(Activity);
+        services.RemoveAll<IOrgDataStatus>();
+        services.AddSingleton<IOrgDataStatus>(Activity);
+        services.RemoveAll<IAuditRepository>();
+        services.AddSingleton<IAuditRepository, InMemoryAudit>();
+    }
+
+    private static void AddHeader(HttpClient client, string name, string? value)
+    {
+        if (value is not null)
+        {
+            client.DefaultRequestHeaders.Add(name, value);
+        }
     }
 }

@@ -1,43 +1,115 @@
 import Keycloak from 'keycloak-js'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { account } from '@/api/endpoints'
+import type { MeResponse } from '@/api/types'
 import { i18n } from '@/i18n'
-import { isRole, roleHome as homeOf, type Role } from '@/router/roles'
+import {
+  homePath, normalizeRoles, permissionsForRoles, primaryRole, scopeIn, usesSidebar as sidebarFor, type Permission, type RoleKey, type Scope,
+} from '@/lib/permissions'
 
-export type { Role } from '@/router/roles'
+export type { RoleKey as Role } from '@/lib/permissions'
 
 /** Клеймы токена, которые читает клиент; region_kato и mo_code — атрибуты пользователя (мапперы клиента darumen-web
- * в realm); mo_code есть только у главврача и может отсутствовать — тогда null. */
+ * в realm); mo_code есть у врача и администратора организации и может отсутствовать — тогда null. */
 interface TokenClaims {
   preferred_username?: string
+  name?: string
+  given_name?: string
+  email?: string
   realm_access?: { roles?: string[] }
   region_kato?: string
   mo_code?: string
 }
 
+/** Сколько ждать `/me` перед первой навигацией: дольше — роутер стартует на разрешениях из токена. */
+const ME_TIMEOUT_MS = 5000
+/** Признак «экран „Первый вход“ уже показан» — по пользователю, в localStorage. */
+const WELCOME_KEY = 'darumen.welcome.'
+
 export const useAuthStore = defineStore('auth', () => {
   const actor = ref<string | null>(null)
-  const roles = ref<Role[]>([])
+  const roles = ref<RoleKey[]>([])
   const region = ref<string | null>(null)
-  /** Код организации главврача (клейм mo_code) — домашний экран и портал «Больница». */
+  /** Код организации (клейм mo_code / `/me.moCode`) — scope `own`, домашний экран и кабинет организации. */
   const moCode = ref<string | null>(null)
+  const displayName = ref<string | null>(null)
+  /** Имя для приветствия («Добро пожаловать, Асель») — клейм given_name. */
+  const givenName = ref<string | null>(null)
+  const email = ref<string | null>(null)
+  /** Ответ `GET /me`; null — эндпоинт ещё не ответил или недоступен (тогда разрешения — из матрицы по ролям токена). */
+  const me = ref<MeResponse | null>(null)
+  /** Откуда разрешения: `token` — фолбэк по матрице docs/rbac.md, `api` — из `/me`. */
+  const permissionSource = ref<'token' | 'api'>('token')
+  const permissions = ref<Permission[]>([])
   /** Keycloak не ответил при старте: вместо кнопки входа — подпись на странице входа. */
   const keycloakUnavailable = ref(false)
   let keycloak: Keycloak | null = null
 
   const isAuthenticated = computed(() => actor.value !== null)
-  const role = computed<Role | null>(() => roles.value[0] ?? null)
+  const role = computed<RoleKey | null>(() => primaryRole(roles.value))
+  const sidebar = computed(() => isAuthenticated.value && sidebarFor(permissions.value))
 
-  function hasRole(...allowed: Role[]): boolean {
-    return roles.value.includes('admin') || roles.value.some((r) => allowed.includes(r))
+  /** Действующий scope разрешения: `own` без организации пуст; admin проходит всё. */
+  function scopeOf(code: string): Scope | null {
+    if (roles.value.includes('admin')) return 'all'
+    return scopeIn(permissions.value, code, moCode.value)
+  }
+  function can(code: string): boolean {
+    return scopeOf(code) !== null
+  }
+  function canAny(codes: readonly string[]): boolean {
+    return codes.length === 0 || codes.some(can)
   }
 
   function readToken() {
     const parsed = (keycloak?.tokenParsed ?? {}) as TokenClaims
     actor.value = parsed.preferred_username ?? null
-    roles.value = (parsed.realm_access?.roles ?? []).filter(isRole)
+    if (permissionSource.value === 'api') return
+    roles.value = normalizeRoles(parsed.realm_access?.roles)
     region.value = parsed.region_kato ?? null
     moCode.value = parsed.mo_code || null
+    displayName.value = parsed.name ?? null
+    givenName.value = parsed.given_name ?? null
+    email.value = parsed.email ?? null
+    permissions.value = permissionsForRoles(roles.value)
+  }
+
+  /** `GET /me`: разрешения, роли и организация с бэкенда. Пока эндпоинта нет (404) или он не ответил — остаётся
+   * фолбэк по ролям токена; возвращает, удалось ли загрузить. */
+  async function loadMe(): Promise<boolean> {
+    if (!isAuthenticated.value) return false
+    try {
+      const timeout = new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('me timeout')), ME_TIMEOUT_MS))
+      const response = await Promise.race([account.me(), timeout])
+      me.value = response
+      roles.value = normalizeRoles(response.roles)
+      permissions.value = response.permissions.map((p) => ({ code: p.code, scope: p.scope }))
+      moCode.value = response.moCode ?? moCode.value
+      region.value = response.regionKato ?? region.value
+      displayName.value = response.displayName ?? displayName.value
+      email.value = response.email ?? email.value
+      permissionSource.value = 'api'
+      return true
+    } catch (error) {
+      console.warn('GET /api/v1/me недоступен — разрешения из ролей токена (docs/rbac.md)', error)
+      return false
+    }
+  }
+
+  function welcomeSeen(): boolean {
+    try {
+      return !actor.value || window.localStorage.getItem(WELCOME_KEY + actor.value) === '1'
+    } catch {
+      return true
+    }
+  }
+  function markWelcomeSeen() {
+    try {
+      if (actor.value) window.localStorage.setItem(WELCOME_KEY + actor.value, '1')
+    } catch {
+      // без storage экран «Первый вход» просто покажется ещё раз
+    }
   }
 
   const url: string = import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8080'
@@ -70,6 +142,10 @@ export const useAuthStore = defineStore('auth', () => {
   async function init() {
     keycloak = new Keycloak({ url, realm, clientId: import.meta.env.VITE_KEYCLOAK_CLIENT ?? 'darumen-web' })
     const returning = window.location.hash.includes('state=') || window.location.hash.includes('error=')
+    // форма входа Keycloak устарела (вкладку оставили открытой): Keycloak 26 возвращает
+    // #error=temporarily_unavailable&error_description=authentication_expired — вход запускается заново молча
+    const loginExpired = /(^|[#&])error_description=authentication_expired(&|$)/.test(window.location.hash)
+    let authenticatedNow = false
     let hadSession = false
     try {
       hadSession = window.localStorage.getItem(SESSION_HINT) === '1'
@@ -88,6 +164,7 @@ export const useAuthStore = defineStore('auth', () => {
         pkceMethod: 'S256',
         checkLoginIframe: false,
       })
+      authenticatedNow = authenticated
       if (authenticated) readToken()
       try {
         if (authenticated) window.localStorage.setItem(SESSION_HINT, '1')
@@ -108,10 +185,21 @@ export const useAuthStore = defineStore('auth', () => {
         error,
       )
     }
+    if (loginExpired && !authenticatedNow && !keycloakUnavailable.value) {
+      if (window.location.hash) window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      await login()
+    }
   }
 
+  /** Домашний экран по разрешениям (docs/rbac.md); без сессии — страница входа. */
   function roleHome(): string {
-    return homeOf(role.value, region.value, moCode.value)
+    return isAuthenticated.value ? homePath({ can, moCode: moCode.value }) : '/'
+  }
+
+  /** Куда вести с `/` после входа: при первом входе — «Первый вход», затем — домашний экран. */
+  function landing(): string {
+    if (!isAuthenticated.value) return '/'
+    return welcomeSeen() ? roleHome() : '/welcome'
   }
 
   /** Куда вернуться после входа: на страницу, с которой отправили домой из-за роли, иначе на текущую. */
@@ -125,6 +213,17 @@ export const useAuthStore = defineStore('auth', () => {
     markRedirect()
     // страница входа Keycloak (тема darumen) открывается на языке интерфейса
     await keycloak?.login({ redirectUri: window.location.origin + returnPath(), locale: String(i18n.global.locale.value), ...options })
+  }
+
+  /** Действие Keycloak (kc_action): смена пароля или настройка приложения-аутентификатора; возврат на текущую страницу. */
+  async function accountAction(action: 'UPDATE_PASSWORD' | 'CONFIGURE_TOTP') {
+    markRedirect()
+    await keycloak?.login({ action, redirectUri: window.location.href, locale: String(i18n.global.locale.value) })
+  }
+
+  /** Запрос доступа к разделу: пишется в аудит и виден администратору организации/системы. */
+  async function requestAccess(permission: string, path: string, comment?: string) {
+    await account.requestAccess({ permission, path, ...(comment ? { comment } : {}) })
   }
 
   async function logout() {
@@ -149,5 +248,8 @@ export const useAuthStore = defineStore('auth', () => {
     return { Authorization: `Bearer ${keycloak.token}` }
   }
 
-  return { actor, roles, role, region, moCode, isAuthenticated, keycloakUnavailable, hasRole, init, roleHome, login, logout, authHeaders }
+  return {
+    actor, roles, role, region, moCode, displayName, givenName, email, me, permissions, permissionSource, isAuthenticated, keycloakUnavailable, sidebar,
+    scopeOf, can, canAny, init, loadMe, roleHome, landing, welcomeSeen, markWelcomeSeen, login, logout, accountAction, requestAccess, authHeaders,
+  }
 })

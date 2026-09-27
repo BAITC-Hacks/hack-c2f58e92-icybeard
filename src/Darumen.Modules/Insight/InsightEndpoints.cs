@@ -7,7 +7,7 @@ public static class InsightEndpoints
 {
     public static void Map(IEndpointRouteBuilder api)
     {
-        var group = api.MapGroup("/insight").WithTags("Insight").RequireAuthorization(Policies.ChiefOrRegulator);
+        var group = api.MapGroup("/insight").WithTags("Insight").RequireAuthorization(Permissions.Policy(Permissions.InsightAsk));
 
         group.MapPost("/ask", async (AskRequestDto body, InsightService service, CancellationToken ct) =>
             {

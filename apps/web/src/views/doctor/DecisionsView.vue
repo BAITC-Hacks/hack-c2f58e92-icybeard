@@ -4,14 +4,12 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { journal } from '@/api/endpoints'
 import type { Decision } from '@/api/types'
-import ErrorBox from '@/components/ErrorBox.vue'
+import AsyncState from '@/components/states/AsyncState.vue'
 import AppCard from '@/components/ui/AppCard.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import KpiRow from '@/components/ui/KpiRow.vue'
 import KpiTile from '@/components/ui/KpiTile.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import SidePanel from '@/components/ui/SidePanel.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
 import { downloadCsv } from '@/lib/csv'
@@ -65,6 +63,12 @@ const count = (pred: (d: Decision) => boolean) => inPeriod.value.filter(pred).le
 const matched = computed(() => count((d) => outcome(d) === 'matched'))
 const differ = computed(() => count((d) => outcome(d) === 'differ'))
 
+function resetFilters() {
+  subject.value = null
+  role.value = null
+  period.value = null
+}
+
 function open(d: Decision) {
   selected.value = d
   panelOpen.value = true
@@ -84,7 +88,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const page = await journal.decisions({ actor: auth.hasRole('regulator') ? undefined : 'me', size: 200 })
+    const page = await journal.decisions({ actor: auth.can('decisions.all') ? undefined : 'me', size: 200 })
     const codes = page.items.flatMap((d) => [organizationOf(d.recommended), organizationOf(d.chosen)]).filter((c): c is string => c !== null)
     await refdata.resolveOrganizations(codes)
     items.value = page.items
@@ -104,7 +108,7 @@ onMounted(async () => {
 
 <template>
   <PageShell :title="t('doctor.decisions.title')">
-    <template #subtitle>{{ auth.hasRole('regulator') ? t('doctor.decisions.leadRegulator') : t('doctor.decisions.subtitle') }} · {{ auth.actor }} · {{ t('doctor.decisions.total').toLowerCase() }} {{ total }}</template>
+    <template #subtitle>{{ auth.can('decisions.all') ? t('doctor.decisions.leadRegulator') : t('doctor.decisions.subtitle') }} · {{ auth.actor }} · {{ t('doctor.decisions.total').toLowerCase() }} {{ total }}</template>
     <template #actions>
       <div class="chips">
         <button v-for="p in PERIODS" :key="p" type="button" class="chip-filter" :class="{ active: period === p }" @click="period = period === p ? null : p">{{ t('doctor.decisions.periodLabel', { days: p }) }}</button>
@@ -120,8 +124,6 @@ onMounted(async () => {
         <button v-for="r in roles" :key="r" type="button" class="chip-filter" :class="{ active: role === r }" @click="role = role === r ? null : r">{{ roleLabel(r) }} · {{ count((d) => d.role === r) }}</button>
       </template>
     </div>
-    <ErrorBox :error="error" />
-
     <KpiRow>
       <KpiTile :value="inPeriod.length" :label="period ? t('doctor.decisions.kpiPeriod', { days: period }) : t('doctor.decisions.kpiAll')" :loading="loading && items.length === 0" />
       <KpiTile :value="matched" :label="t('doctor.decisions.kpiMatched')" :loading="loading && items.length === 0" />
@@ -129,9 +131,9 @@ onMounted(async () => {
     </KpiRow>
 
     <AppCard>
-      <Skeleton v-if="loading && items.length === 0" kind="table" :lines="6" />
-      <EmptyState v-else-if="visible.length === 0" :title="t('doctor.decisions.empty')" icon="pi pi-book" />
-      <div v-else class="table-wrap">
+      <AsyncState :loading="loading" :error="error" :empty="visible.length === 0" :filtered="items.length > 0 && !!(subject || role || period)" :lines="6"
+        :empty-title="t('doctor.decisions.empty')" :empty-text="t('doctor.decisions.emptyText')" empty-icon="pi pi-book" @retry="load" @reset="resetFilters">
+      <div class="table-wrap">
         <table class="dense-table" data-testid="decisions-table">
           <thead>
             <tr><th>{{ t('doctor.decisions.when') }}</th><th>{{ t('doctor.decisions.object') }}</th><th>{{ t('doctor.decisions.recommended') }}</th><th>{{ t('doctor.decisions.chosen') }}</th><th>{{ t('doctor.decisions.colOutcome') }}</th><th>{{ t('doctor.decisions.reason') }}</th></tr>
@@ -148,6 +150,7 @@ onMounted(async () => {
           </tbody>
         </table>
       </div>
+      </AsyncState>
       <p class="caption" style="margin: 12px 0 0">{{ t('doctor.decisions.keyNote') }}</p>
     </AppCard>
 

@@ -4,32 +4,33 @@ import 'tokens.dart';
 import 'tones.dart';
 import 'typography.dart';
 
-/// Светлая и тёмная темы из одних токенов «Тихой клиники»: фон ground, белые карточки radius 16 без рамки и тени,
-/// primary-кнопки 52 px ink/белый, secondary — soft/ink, поля 52 px на soft-фоне без рамки, чипы radius 8.
+/// Светлая и тёмная темы из одних токенов Палитры C: холст ground, белые карточки radius 16 без рамки и тени,
+/// primary-кнопки 52 px фиолетовый/белый, secondary — inset/ink, опасное действие — inset/critical ([AppButtons]),
+/// TextButton и ссылки — accentHover, поля на inset-фоне без рамки (в фокусе — обводка 2 px accent), чипы radius 8.
 /// Компонентные темы задают вид один раз — экраны не несут собственных стилей и не трогают `Colors.*`.
 abstract final class AppTheme {
-  static ThemeData light() => _build(AppColors.light, Brightness.light);
+  static ThemeData light() => _build(ColorTokens.light, Brightness.light);
 
-  static ThemeData dark() => _build(AppColors.dark, Brightness.dark);
+  static ThemeData dark() => _build(ColorTokens.dark, Brightness.dark);
 
-  static ThemeData _build(AppColors c, Brightness brightness) {
-    final onInk = brightness == Brightness.light ? AppColors.white : c.surface;
+  static ThemeData _build(ColorTokens c, Brightness brightness) {
+    final onAccent = c.onAccent;
     final scheme = ColorScheme(
       brightness: brightness,
-      primary: c.ink,
-      onPrimary: onInk,
+      primary: c.accent,
+      onPrimary: onAccent,
       primaryContainer: c.accentSoft,
-      onPrimaryContainer: c.ink,
-      secondary: c.accent,
-      onSecondary: onInk,
+      onPrimaryContainer: c.accentHover,
+      secondary: c.accentHover,
+      onSecondary: onAccent,
       secondaryContainer: c.neutralSoft,
       onSecondaryContainer: c.ink,
       tertiary: c.ok,
-      onTertiary: onInk,
+      onTertiary: onAccent,
       tertiaryContainer: c.okSoft,
       onTertiaryContainer: c.ok,
       error: c.danger,
-      onError: onInk,
+      onError: onAccent,
       errorContainer: c.dangerSoft,
       onErrorContainer: c.danger,
       surface: c.surface,
@@ -45,13 +46,14 @@ abstract final class AppTheme {
       inverseSurface: c.ink,
       onInverseSurface: c.surface,
       inversePrimary: c.accentSoft,
-      shadow: AppColors.shadow,
-      scrim: AppColors.scrim,
-      surfaceTint: AppColors.transparent,
+      shadow: ColorTokens.shadow,
+      scrim: ColorTokens.scrim,
+      surfaceTint: ColorTokens.transparent,
     );
     final text = AppType.textTheme(c);
     final radius = BorderRadius.circular(AppRadius.md);
     final noBorder = OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none);
+    OutlineInputBorder ring(Color color) => OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: color, width: 2));
     final buttonShape = RoundedRectangleBorder(borderRadius: radius);
     const buttonSize = Size.fromHeight(AppSizes.control);
     const buttonPadding = EdgeInsets.symmetric(horizontal: AppSpacing.xl);
@@ -70,7 +72,7 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         backgroundColor: c.surface,
-        surfaceTintColor: AppColors.transparent,
+        surfaceTintColor: ColorTokens.transparent,
         foregroundColor: c.ink,
         centerTitle: false,
         titleTextStyle: text.headlineMedium,
@@ -78,7 +80,7 @@ abstract final class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: c.card,
-        surfaceTintColor: AppColors.transparent,
+        surfaceTintColor: ColorTokens.transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
       ),
@@ -88,20 +90,20 @@ abstract final class AppTheme {
           padding: buttonPadding,
           shape: buttonShape,
           textStyle: text.labelLarge,
-          backgroundColor: c.ink,
-          foregroundColor: onInk,
+          backgroundColor: c.accent,
+          foregroundColor: onAccent,
           disabledBackgroundColor: c.neutralSoft,
-          disabledForegroundColor: c.faint,
+          disabledForegroundColor: c.muted,
         ),
       ),
-      // secondary-кнопка: soft-фон, текст ink, без рамки (OutlinedButton и FilledButton.tonal выглядят одинаково)
+      // secondary-кнопка: inset-фон, текст ink, без рамки (OutlinedButton и FilledButton.tonal выглядят одинаково)
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: buttonSize,
           padding: buttonPadding,
           backgroundColor: c.neutralSoft,
           foregroundColor: c.ink,
-          disabledForegroundColor: c.faint,
+          disabledForegroundColor: c.muted,
           side: BorderSide.none,
           shape: buttonShape,
           textStyle: text.labelLarge,
@@ -109,8 +111,8 @@ abstract final class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: c.ink,
-          disabledForegroundColor: c.faint,
+          foregroundColor: c.accentHover,
+          disabledForegroundColor: c.muted,
           textStyle: text.titleSmall,
           shape: buttonShape,
           minimumSize: const Size(0, AppSizes.compact),
@@ -119,7 +121,7 @@ abstract final class AppTheme {
       iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(foregroundColor: c.ink)),
       chipTheme: ChipThemeData(
         backgroundColor: c.neutralSoft,
-        selectedColor: c.ink,
+        selectedColor: c.accentSoft,
         side: BorderSide.none,
         labelStyle: text.labelMedium,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.xs),
@@ -131,32 +133,32 @@ abstract final class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
         border: noBorder,
         enabledBorder: noBorder,
-        focusedBorder: noBorder,
+        focusedBorder: ring(c.accent),
         disabledBorder: noBorder,
-        errorBorder: noBorder,
-        focusedErrorBorder: noBorder,
+        errorBorder: ring(c.danger),
+        focusedErrorBorder: ring(c.danger),
         // label живёт над полем (FieldLabel); labelText, если остался, ведёт себя как плейсхолдер
         floatingLabelBehavior: FloatingLabelBehavior.never,
-        labelStyle: text.bodyMedium?.copyWith(color: c.faint),
+        labelStyle: text.bodyMedium?.copyWith(color: c.muted),
         helperStyle: text.labelSmall,
         errorStyle: text.labelSmall?.copyWith(color: c.danger),
-        hintStyle: text.bodyMedium?.copyWith(color: c.faint),
+        hintStyle: text.bodyMedium?.copyWith(color: c.muted),
         prefixIconColor: c.muted,
         suffixIconColor: c.muted,
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: SegmentedButton.styleFrom(
           backgroundColor: c.card,
-          selectedBackgroundColor: c.ink,
-          selectedForegroundColor: onInk,
+          selectedBackgroundColor: c.accent,
+          selectedForegroundColor: onAccent,
           foregroundColor: c.ink,
           side: BorderSide.none,
           textStyle: text.labelMedium?.copyWith(fontSize: 14),
         ),
       ),
       checkboxTheme: CheckboxThemeData(
-        fillColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? c.ink : AppColors.transparent),
-        checkColor: WidgetStatePropertyAll(onInk),
+        fillColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? c.accent : ColorTokens.transparent),
+        checkColor: WidgetStatePropertyAll(onAccent),
         side: BorderSide(color: c.muted, width: 1.5),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xs)),
       ),
@@ -165,24 +167,49 @@ abstract final class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
         iconColor: c.muted,
         titleTextStyle: text.row,
-        subtitleTextStyle: text.rowDetail.copyWith(color: c.faint),
-        selectedColor: c.ink,
+        subtitleTextStyle: text.rowDetail.copyWith(color: c.muted),
+        selectedColor: c.accentHover,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.ink,
-        contentTextStyle: text.bodySmall?.copyWith(color: onInk, fontSize: 15),
-        actionTextColor: c.accent,
+        contentTextStyle: text.bodySmall?.copyWith(color: c.surface, fontSize: 15),
+        actionTextColor: c.accentSoft,
         shape: RoundedRectangleBorder(borderRadius: radius),
       ),
-      progressIndicatorTheme: ProgressIndicatorThemeData(color: c.ink, linearTrackColor: c.neutralSoft),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent, linearTrackColor: c.neutralSoft),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: c.card,
-        surfaceTintColor: AppColors.transparent,
+        surfaceTintColor: ColorTokens.transparent,
         dragHandleColor: c.hairline,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
       ),
       extensions: [AppTones.from(c), AppPalette(c)],
     );
   }
+}
+
+/// Кнопки вне темы по доске C-Tokens: «опасное действие» — inset-фон и critical-текст; малая кнопка 36 px (14/500)
+/// в состояниях экрана и строках списка. Цвета — из палитры темы, без литералов.
+abstract final class AppButtons {
+  static ButtonStyle danger(BuildContext context, {bool small = false}) {
+    final c = AppPalette.of(context);
+    return OutlinedButton.styleFrom(
+      backgroundColor: c.neutralSoft,
+      foregroundColor: c.danger,
+      side: BorderSide.none,
+      minimumSize: small ? const Size(0, AppSizes.small) : const Size.fromHeight(AppSizes.control),
+      padding: EdgeInsets.symmetric(horizontal: small ? 14 : AppSpacing.xl),
+      textStyle: small ? _smallText(context) : null,
+    );
+  }
+
+  /// Малая кнопка: primary (фиолетовая) для FilledButton, secondary (inset) для OutlinedButton.
+  static ButtonStyle small(BuildContext context) => ButtonStyle(
+        minimumSize: const WidgetStatePropertyAll(Size(0, AppSizes.small)),
+        padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpacing.lg)),
+        textStyle: WidgetStatePropertyAll(_smallText(context)),
+      );
+
+  static TextStyle? _smallText(BuildContext context) => Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 14);
 }

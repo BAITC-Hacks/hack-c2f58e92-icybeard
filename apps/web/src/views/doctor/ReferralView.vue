@@ -305,7 +305,7 @@ watch(() => [form.moCode, form.referralPurpose, form.territorialType, form.icd10
 .option:disabled { cursor: default; opacity: 0.8; }
 .radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--dm-muted); box-sizing: border-box; flex: none; display: grid; place-items: center; }
 .option.selected .radio { border-color: var(--dm-ink); }
-.radio-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dm-ink); }
+.radio-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dm-primary); }
 .option-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .option-title { font-size: var(--dm-text-md); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .option-wait { font-size: var(--dm-text-base); font-weight: 500; white-space: nowrap; }
@@ -322,7 +322,7 @@ watch(() => [form.moCode, form.referralPurpose, form.territorialType, form.icd10
 .why { margin-top: 12px; background: var(--dm-surface-2); }
 .why :deep(.head) { padding: 12px 16px; }
 .why :deep(.head-title) { font-size: var(--dm-text-md); }
-.human-note { border-top: 1px solid var(--dm-hairline); margin: 12px 0 0; padding-top: 12px; font-size: 13px; color: var(--dm-faint); }
+.human-note { border-top: 1px solid var(--dm-hairline); margin: 12px 0 0; padding-top: 12px; font-size: 13px; color: var(--dm-muted); }
 .confirm-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .spacer { flex: 1; }
 @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } .pair, .icd-reason { grid-template-columns: 1fr; } }

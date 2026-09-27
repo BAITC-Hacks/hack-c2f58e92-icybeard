@@ -11,8 +11,10 @@ const tokens = JSON.parse(readFileSync(resolve(process.cwd(), '../../design/toke
 /** Роль из design/tokens.json → переменная в tokens.css. */
 const VARS: Record<string, string> = {
   surface: '--dm-bg', card: '--dm-surface', ink: '--dm-ink', muted: '--dm-muted', faint: '--dm-faint', hairline: '--dm-hairline',
-  accent: '--dm-accent', accentSoft: '--dm-accent-soft', ok: '--dm-ok', okSoft: '--dm-ok-soft', warn: '--dm-warn', warnSoft: '--dm-warn-soft',
-  danger: '--dm-danger', dangerSoft: '--dm-danger-soft', neutralSoft: '--dm-neutral-soft',
+  accent: '--dm-accent', accentHover: '--dm-accent-hover', accentSoft: '--dm-accent-soft', neutralSoft: '--dm-neutral-soft',
+  ok: '--dm-ok', okSoft: '--dm-ok-soft', warn: '--dm-warn', warnSoft: '--dm-warn-soft', warnStrong: '--dm-warn-strong',
+  danger: '--dm-danger', dangerSoft: '--dm-danger-soft', info: '--dm-info', infoSoft: '--dm-info-soft', ai: '--dm-ai', aiSoft: '--dm-ai-soft',
+  benchSoft: '--dm-bench-soft', map1: '--dm-map-1', map2: '--dm-map-2', map3: '--dm-map-3', map4: '--dm-map-4', map5: '--dm-map-5',
 }
 
 function block(selector: string): Record<string, string> {
@@ -31,6 +33,17 @@ describe('design tokens', () => {
     for (const [role, variable] of Object.entries(VARS)) {
       expect(vars[variable], `${variable} for ${role}`).toBe(expected[role]!.toUpperCase())
     }
+  })
+
+  it.each(['light', 'dark'])('maps every %s role of design/tokens.json to a CSS variable', (theme) => {
+    expect(Object.keys(tokens[theme]!).filter((role) => !(role in VARS))).toEqual([])
+  })
+
+  it('uses the violet accent as the primary colour, with white text on it in the light theme', () => {
+    const light = block(':root')
+    expect(light['--dm-primary']).toBe(tokens.light!.accent!.toUpperCase())
+    expect(light['--dm-primary-contrast']).toBe('#FFFFFF')
+    expect(block('html.darumen-dark')['--dm-primary']).toBe(tokens.dark!.accent!.toUpperCase())
   })
 
   it('keeps the base size and family the mobile app uses', () => {

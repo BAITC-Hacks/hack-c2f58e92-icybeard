@@ -17,7 +17,7 @@ public static class DecisionRecording
     {
         var user = CurrentUser.From(http);
         var (decision, created) = await repository.RecordAsync(
-            new NewDecision(user.Actor, user.Role, subject, subjectId, recommendedJson, chosenJson, reason, IdempotencyKey(http)),
+            new NewDecision(user.Actor, user.Role, subject, subjectId, recommendedJson, chosenJson, reason, IdempotencyKey(http), user.MoCode),
             dto => new DecisionRecorded
             {
                 Meta = Events.Meta(),

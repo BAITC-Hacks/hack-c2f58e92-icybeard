@@ -8,14 +8,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { journal } from '@/api/endpoints'
 import type { AuditEntry } from '@/api/types'
-import ErrorBox from '@/components/ErrorBox.vue'
+import AsyncState from '@/components/states/AsyncState.vue'
 import AppCard from '@/components/ui/AppCard.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import KpiRow from '@/components/ui/KpiRow.vue'
 import KpiTile from '@/components/ui/KpiTile.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import SidePanel from '@/components/ui/SidePanel.vue'
-import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
 import { downloadCsv } from '@/lib/csv'
@@ -93,6 +91,12 @@ async function next() {
   }
 }
 
+function resetFilters() {
+  role.value = ''
+  method.value = ''
+  period.value = PERIODS[PERIODS.length - 1]!
+}
+
 function open(entry: AuditEntry) {
   selected.value = entry
   panelOpen.value = true
@@ -124,8 +128,6 @@ onMounted(() => load())
       <span class="spacer" />
       <span class="caption">{{ t('gov.audit.shown', { shown: pageRows.length, total: visible.length }) }} · {{ t('gov.audit.total') }}: {{ total }}</span>
     </div>
-    <ErrorBox :error="error" />
-
     <KpiRow data-testid="audit-kpis">
       <KpiTile :value="kpis.requests" :label="t('gov.audit.kpiRequests', { days: period })" :loading="loading && items.length === 0" />
       <KpiTile :value="kpis.actors" :label="t('gov.audit.kpiActors')" :loading="loading && items.length === 0" />
@@ -134,9 +136,9 @@ onMounted(() => load())
     </KpiRow>
 
     <AppCard>
-      <Skeleton v-if="loading && items.length === 0" kind="table" :lines="8" />
-      <EmptyState v-else-if="visible.length === 0" :title="t('gov.audit.empty')" icon="pi pi-history" />
-      <div v-else class="table-wrap">
+      <AsyncState :loading="loading" :error="error" :empty="visible.length === 0" :filtered="items.length > 0 && !!(role || method || period !== PERIODS[PERIODS.length - 1])" :lines="8"
+        :empty-title="t('gov.audit.empty')" empty-icon="pi pi-history" @retry="load()" @reset="resetFilters">
+      <div class="table-wrap">
         <table class="dense-table" data-testid="audit-table">
           <thead><tr><th>{{ t('gov.audit.colWhen') }}</th><th>{{ t('gov.audit.colUser') }}</th><th>{{ t('gov.audit.colRole') }}</th><th>{{ t('gov.audit.colAction') }}</th><th>{{ t('gov.audit.colObject') }}</th><th>{{ t('gov.audit.colResult') }}</th><th class="num">{{ t('gov.audit.colDurationShort') }}</th></tr></thead>
           <tbody>
@@ -152,6 +154,7 @@ onMounted(() => load())
           </tbody>
         </table>
       </div>
+      </AsyncState>
       <div v-if="visible.length" class="pager">
         <span class="caption">{{ t('gov.audit.pageOf', { page: pageIndex + 1, pages }) }}</span>
         <span class="spacer" />

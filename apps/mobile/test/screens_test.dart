@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:darumen/screens/decisions_screen.dart';
 import 'package:darumen/screens/home_screen.dart';
-import 'package:darumen/screens/login_screen.dart';
 import 'package:darumen/screens/route_screen.dart';
 import 'package:darumen/screens/scribe_screen.dart';
 import 'package:darumen/screens/updates_screen.dart';
@@ -22,12 +21,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'session_test.dart' show fakeJwt;
 
 /// Сессия с мок-Keycloak и мок-API в одном клиенте: токен с ролями, остальное — обработчик `api` по пути.
-Future<Session> apiSession({required List<String> roles, required Map<String, Object> api, String? region}) async {
+Future<Session> apiSession({required List<String> roles, required Map<String, Object> api, String? region, Map<String, Object?> claims = const {}}) async {
   FlutterSecureStorage.setMockInitialValues({});
   SharedPreferences.setMockInitialValues({});
   final client = MockClient((request) async {
     if (request.url.path.endsWith('/protocol/openid-connect/token')) {
-      final token = fakeJwt({'preferred_username': 'doctor1', 'realm_access': {'roles': roles}, 'region_kato': ?region});
+      final token = fakeJwt({'preferred_username': 'doctor1', 'realm_access': {'roles': roles}, 'region_kato': ?region, ...claims});
       return http.Response(jsonEncode({'access_token': token, 'refresh_token': 'r', 'expires_in': 300}), 200);
     }
     for (final entry in api.entries) {
@@ -75,33 +74,6 @@ Map<String, Object> worklistItem(String ref, {List<String> flags = const [], int
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-
-  testWidgets('login screen: round language button, white carousel card, bottom buttons, no guest mode, password sheet', (tester) async {
-    final session = await apiSession(roles: [], api: {});
-    await tester.pumpWidget(app(session, const LoginScreen()));
-    await tester.pump();
-    expect(find.text('ҚАЗ'), findsOneWidget);
-    expect(find.text('РУС'), findsNothing, reason: 'кнопка показывает язык, на который переключит');
-    expect(find.text('darumen'), findsOneWidget);
-    expect(find.text('Видите, на каком этапе ваше направление'), findsOneWidget);
-    expect(find.byType(PageView), findsOneWidget);
-    expect(find.text('В листе ожидания'), findsOneWidget);
-    expect(find.text('Войти через eGov mobile'), findsOneWidget);
-    expect(find.text('Войти по логину'), findsOneWidget);
-    expect(find.text('Продолжить как гость'), findsNothing);
-    expect(find.byType(TextField), findsNothing);
-    await tester.drag(find.byType(PageView), const Offset(-400, 0));
-    await tester.pumpAndSettle();
-    expect(find.text('Знаете, сколько обычно ждут такие пациенты'), findsOneWidget);
-    expect(find.text('до 21'), findsOneWidget);
-    await tester.tap(find.text('ҚАЗ'));
-    await tester.pumpAndSettle();
-    expect(session.locale, 'kk');
-    await tester.tap(find.text('Войти по логину'));
-    await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsNWidgets(2));
-    expect(tester.takeException(), isNull);
-  });
 
   Map<String, Object> citizenRoute() => {
         'patientRef': 'SYN-75-028B-381-01',
@@ -195,7 +167,8 @@ void main() {
     await tester.pumpWidget(app(session, const WorklistScreen()));
     await tester.pumpAndSettle();
     expect(find.text('Пациенты'), findsOneWidget);
-    expect(find.text('данные на 31.03.2025'), findsOneWidget);
+    expect(find.text('Данные на 31.03.2025'), findsOneWidget, reason: 'срез старше недели — баннер W-States «данные устарели»');
+    expect(find.text('Обновить'), findsOneWidget);
     expect(find.text('Сегодня'), findsOneWidget);
     expect(find.text('риск отказа'), findsOneWidget);
     expect(find.text('есть быстрее'), findsOneWidget);
@@ -216,6 +189,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('SYN-75-0290-241-04'), findsOneWidget);
     expect(find.text('SYN-75-0290-241-01'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'нет-такого');
+    await tester.pumpAndSettle();
+    expect(find.text('Ничего не найдено'), findsOneWidget, reason: 'пусто по фильтру — W-States');
+    await tester.tap(find.text('Сбросить фильтры'));
+    await tester.pumpAndSettle();
+    expect(find.text('SYN-75-0290-241-01'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

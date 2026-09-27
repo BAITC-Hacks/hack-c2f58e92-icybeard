@@ -13,6 +13,9 @@ public sealed class RateLimitOptions
 
     /// <summary>Запросов в минуту на пользователя к эндпоинтам, которые вызывают языковую модель или распознавание речи.</summary>
     public int ModelCallsPerMinute { get; set; } = 20;
+
+    /// <summary>Запросов в минуту с одного адреса к публичным формам: заявка организации, код почты, приглашение, восстановление пароля.</summary>
+    public int PublicFormsPerMinute { get; set; } = 10;
 }
 
 /// <summary>Ограничение частоты для дорогих вызовов: каждый вопрос Insight и черновик скрайба стоит денег провайдеру
@@ -21,6 +24,9 @@ public static class RateLimits
 {
     /// <summary>Политика для Insight и скрайба (имя используется и в маршрутах YARP в appsettings.json).</summary>
     public const string ModelCalls = "model-calls";
+
+    /// <summary>Анонимные POST (/public/org-applications, /public/invites, /public/password-reset): лимит на адрес клиента.</summary>
+    public const string PublicForms = "public-forms";
 
     public static IServiceCollection AddDarumenRateLimits(this IServiceCollection services, IConfiguration configuration)
     {
@@ -34,6 +40,14 @@ public static class RateLimits
                 {
                     // настройки читаются при первом запросе ключа: в тестах и на стенде лимит задаётся конфигурацией
                     PermitLimit = http.RequestServices.GetRequiredService<IOptions<RateLimitOptions>>().Value.ModelCallsPerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                }));
+            limiter.AddPolicy(PublicForms, http => RateLimitPartition.GetFixedWindowLimiter(
+                $"public:{http.Connection.RemoteIpAddress}",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = http.RequestServices.GetRequiredService<IOptions<RateLimitOptions>>().Value.PublicFormsPerMinute,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                 }));

@@ -24,7 +24,7 @@ import '../widgets/status_chip.dart';
 
 enum ScribeStep { consent, record, draft, approved }
 
-/// AI-скрайб по доске M-Scribe: карточка записи (coral-точка, таймер 42/600, волна, строка согласия), карточка
+/// AI-скрайб по доске M-Scribe: карточка записи (фиолетовая точка, таймер 42/600, волна, строка согласия), карточка
 /// «Черновик» с чипом AI и разделами, primary-кнопка внизу по шагу: согласие → «Начать»; запись → «Остановить» /
 /// «Составить черновик» (микрофон или вставка текста); черновик → «Утвердить все»; итог — ссылка, QR, «Исходные
 /// данные удалены сервером». Открывается из маршрута пациента (реф в подписи) или без него.
@@ -461,7 +461,7 @@ class _ScribeScreenState extends State<ScribeScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   // QR читается только на белом — единственное место с цветом вне палитры темы
-                  decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(AppRadius.md)),
+                  decoration: BoxDecoration(color: ColorTokens.white, borderRadius: BorderRadius.circular(AppRadius.md)),
                   child: QrImageView(data: result!.leafletUrl, size: 200),
                 ),
               ),

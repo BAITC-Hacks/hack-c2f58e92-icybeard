@@ -6,8 +6,8 @@ import '../theme/tones.dart';
 import '../theme/typography.dart';
 import 'status_chip.dart';
 
-/// Карточка записи скрайба: точка 10 px (coral — идёт запись), «Запись» 14/500, чип языка; таймер 42/600
-/// табличными цифрами; волна — столбики 3 px ink на 40 px (тишина — dot-idle); строка согласия 12 ink-3.
+/// Карточка записи скрайба по доске M-Scribe: точка 10 px (фиолетовая — идёт запись), «Запись» 14/500, чип языка;
+/// таймер 42/600 табличными цифрами; волна — столбики 3 px accent на 40 px (тишина — dot-off); строка согласия 12 ink-2.
 class ScribeRecordCard extends StatelessWidget {
   const ScribeRecordCard({super.key, required this.recording, required this.seconds, required this.levels, required this.language, required this.caption});
 
@@ -34,7 +34,7 @@ class ScribeRecordCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(width: 10, height: 10, decoration: BoxDecoration(shape: BoxShape.circle, color: recording ? colors.accent : colors.dotIdle)),
+              Container(width: 10, height: 10, decoration: BoxDecoration(shape: BoxShape.circle, color: recording ? colors.accent : colors.faint)),
               const SizedBox(width: 10),
               Expanded(child: Text(recording ? s.scribeRecordingTitle : s.scribeRecordShort, style: theme.textTheme.bodySmall?.copyWith(color: colors.ink, fontWeight: FontWeight.w500))),
               StatusChip(language, tone: StatusTone.neutral),
@@ -54,7 +54,7 @@ class ScribeRecordCard extends StatelessWidget {
                       duration: AppDurations.fast,
                       width: AppSizes.bar,
                       height: 8 + 30 * level,
-                      decoration: BoxDecoration(color: level > 0 ? colors.ink : colors.dotIdle, borderRadius: BorderRadius.circular(2)),
+                      decoration: BoxDecoration(color: level > 0 ? colors.accent : colors.faint, borderRadius: BorderRadius.circular(2)),
                     ),
                   ),
               ],
@@ -63,9 +63,9 @@ class ScribeRecordCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(Icons.check_circle_outline, size: 14, color: colors.faint),
+              Icon(Icons.check_circle_outline, size: 14, color: colors.muted),
               const SizedBox(width: AppSpacing.sm),
-              Expanded(child: Text(caption, style: theme.textTheme.labelSmall?.copyWith(color: colors.faint))),
+              Expanded(child: Text(caption, style: theme.textTheme.labelSmall?.copyWith(color: colors.muted))),
             ],
           ),
         ],

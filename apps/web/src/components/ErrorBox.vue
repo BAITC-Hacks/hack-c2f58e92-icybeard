@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import Message from 'primevue/message'
 import { ApiError } from '@/api/client'
+import StateNoAccess from '@/components/states/StateNoAccess.vue'
+import { isForbidden } from '@/lib/support'
 
+/** Сообщение об ошибке запроса. 403 от API на любой странице — состояние «Нет доступа к разделу» с запросом доступа
+ * (docs/rbac.md: проверки на клиенте — только UX, отказ API показывается как «Нет доступа»). */
 defineProps<{ error: unknown }>()
 
 function describe(error: unknown): string {
@@ -14,5 +18,10 @@ function describe(error: unknown): string {
 </script>
 
 <template>
-  <Message v-if="error" severity="error" :closable="false">{{ describe(error) }}</Message>
+  <div v-if="isForbidden(error)" class="card no-access"><StateNoAccess :detail="error.detail" :permissions="error.permissions" compact /></div>
+  <Message v-else-if="error" severity="error" :closable="false">{{ describe(error) }}</Message>
 </template>
+
+<style scoped>
+.no-access { padding: 0; }
+</style>

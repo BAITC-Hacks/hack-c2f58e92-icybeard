@@ -21,7 +21,7 @@ defineProps<{ title?: string; origin?: 'ml' | 'formula' | 'ai'; originNote?: str
 <style scoped>
 .card.dense { padding: var(--dm-space-4); }
 .card.link { display: block; text-decoration: none; color: inherit; }
-.card.link:hover { box-shadow: inset 0 0 0 2px var(--dm-ink); }
+.card.link:hover { box-shadow: inset 0 0 0 2px var(--dm-accent); }
 .card-head { display: flex; justify-content: space-between; align-items: center; gap: var(--dm-space-3); margin-bottom: var(--dm-space-3); flex-wrap: wrap; }
 .card-head h2 { margin: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .card-head .eyebrow { display: inline-flex; align-items: center; gap: 10px; }

@@ -1,5 +1,5 @@
 # Darumen logo assets
-Colours (с 27.09.2026, «Тихая клиника»): Navy #0F2C59 · Coral #FF7F50 · Mist #F4F6F0 · сплэш #0B1E3D; прежние Navy #0B2A4A / Sky #29B6D8 сняты. Wordmark: Golos Text SemiBold, −3.5% tracking.
+Colours (с 28.09.2026, Палитра C «Белый холст»): знак — блок Ink #333333, дуга и сектор Violet #5B5BD6; иконки на белом #FFFFFF; холст #F5F6F8. Прежние Navy/Sky и Navy/Coral сняты.
 
 ## Web — paste into <head>
 ```html
@@ -7,7 +7,7 @@ Colours (с 27.09.2026, «Тихая клиника»): Navy #0F2C59 · Coral #F
 <link rel="icon" href="/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon-180.png">
 <link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" content="#0F2C59">
+<meta name="theme-color" content="#5B5BD6">
 ```
 - svg/logo-animated.svg — looping loader/splash, pure CSS, stops under prefers-reduced-motion. Use via <img> or inline.
 - svg/lockup*.svg use live text (Golos Text via Google Fonts). Outline the text in Figma/Illustrator before production use.

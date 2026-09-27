@@ -23,6 +23,8 @@ namespace Darumen.Migrations.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.HasSequence("org_application_seq", "auth");
+
             modelBuilder.Entity("Darumen.Migrations.AnomalyAck", b =>
                 {
                     b.Property<string>("AnomalyId")
@@ -74,6 +76,10 @@ namespace Darumen.Migrations.Migrations
                         .HasColumnType("timestamptz")
                         .HasColumnName("at");
 
+                    b.Property<string>("Detail")
+                        .HasColumnType("text")
+                        .HasColumnName("detail");
+
                     b.Property<int>("DurationMs")
                         .HasColumnType("integer")
                         .HasColumnName("duration_ms");
@@ -83,6 +89,11 @@ namespace Darumen.Migrations.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("method");
+
+                    b.Property<string>("MoCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mo_code");
 
                     b.Property<string>("Path")
                         .IsRequired()
@@ -116,7 +127,519 @@ namespace Darumen.Migrations.Migrations
 
                     b.HasIndex("Actor", "At");
 
+                    b.HasIndex("MoCode", "At");
+
                     b.ToTable("audit", "journal");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthAccountRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text")
+                        .HasColumnName("comment");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<string>("MoCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mo_code");
+
+                    b.Property<string>("Path")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("path");
+
+                    b.Property<string>("Permission")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("permission");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MoCode", "At");
+
+                    b.HasIndex("UserId", "At");
+
+                    b.ToTable("account_requests", "auth");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthDoctorVerification", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTime>("DecidedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("doctor_verifications", "auth");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("AcceptedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<Guid?>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTime?>("DeclinedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("declined_at");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTime>("InvitedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("invited_at");
+
+                    b.Property<string>("InvitedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("invited_by");
+
+                    b.Property<string>("MoCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mo_code");
+
+                    b.Property<string>("RegionKato")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("region_kato");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("role");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InvitedBy");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "InvitedAt");
+
+                    b.ToTable("invitations", "auth");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthOrgApplication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AdminName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("admin_name");
+
+                    b.Property<string>("Bin")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("bin");
+
+                    b.Property<bool>("Consent")
+                        .HasColumnType("boolean")
+                        .HasColumnName("consent");
+
+                    b.Property<DateTime?>("DecidedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("DecidedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("decided_by");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("email");
+
+                    b.Property<int>("EmailCodeAttempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("email_code_attempts");
+
+                    b.Property<DateTime?>("EmailCodeExpiresAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("email_code_expires_at");
+
+                    b.Property<string>("EmailCodeHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("email_code_hash");
+
+                    b.Property<DateTime?>("EmailCodeSentAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("email_code_sent_at");
+
+                    b.Property<DateTime?>("EmailVerifiedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("email_verified_at");
+
+                    b.Property<Guid?>("InvitationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invitation_id");
+
+                    b.Property<string>("MoCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("mo_code");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("number");
+
+                    b.Property<string>("OrgName")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("org_name");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("phone");
+
+                    b.Property<string>("RegionKato")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("region_kato");
+
+                    b.Property<string>("RejectReason")
+                        .HasColumnType("text")
+                        .HasColumnName("reject_reason");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("StatusTokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("status_token_hash");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("submitted_at");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MoCode");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "SubmittedAt");
+
+                    b.ToTable("org_applications", "auth");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthRole", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("key");
+
+                    b.Property<bool>("Builtin")
+                        .HasColumnType("boolean")
+                        .HasColumnName("builtin");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DescriptionKk")
+                        .HasColumnType("text")
+                        .HasColumnName("description_kk");
+
+                    b.Property<string>("DescriptionRu")
+                        .HasColumnType("text")
+                        .HasColumnName("description_ru");
+
+                    b.Property<string>("TitleKk")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title_kk");
+
+                    b.Property<string>("TitleRu")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title_ru");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("roles", "auth");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthRolePermission", b =>
+                {
+                    b.Property<string>("Role")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("role");
+
+                    b.Property<string>("Permission")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("permission");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("scope");
+
+                    b.HasKey("Role", "Permission");
+
+                    b.ToTable("role_permissions", "auth", t =>
+                        {
+                            t.HasCheckConstraint("ck_role_permissions_scope", "scope IN ('all', 'own')");
+                        });
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthRolePermissionChange", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("actor");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Comment")
+                        .HasColumnType("text")
+                        .HasColumnName("comment");
+
+                    b.Property<string>("NewScope")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("new_scope");
+
+                    b.Property<string>("OldScope")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("old_scope");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("permission");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("role");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("At");
+
+                    b.HasIndex("Role", "At");
+
+                    b.ToTable("role_permission_changes", "auth");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthUserConsent", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Code")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("Granted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("granted");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId", "Code");
+
+                    b.ToTable("user_consents", "auth");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthUserSettings", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("actor");
+
+                    b.Property<string>("Language")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("language");
+
+                    b.Property<string>("Notifications")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("notifications");
+
+                    b.Property<string>("Phone")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("phone");
+
+                    b.Property<DateTime?>("ProfileCheckedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("profile_checked_at");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("time_zone");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_settings", "auth");
                 });
 
             modelBuilder.Entity("Darumen.Migrations.Decision", b =>
@@ -131,6 +654,11 @@ namespace Darumen.Migrations.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("actor");
+
+                    b.Property<string>("ActorMoCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("actor_mo_code");
 
                     b.Property<string>("Chosen")
                         .HasColumnType("jsonb")
@@ -177,6 +705,8 @@ namespace Darumen.Migrations.Migrations
                         .IsUnique();
 
                     b.HasIndex("Actor", "RecordedAt");
+
+                    b.HasIndex("ActorMoCode", "RecordedAt");
 
                     b.HasIndex("Subject", "SubjectId");
 
@@ -234,6 +764,15 @@ namespace Darumen.Migrations.Migrations
                     b.HasIndex("Dataset", "ReceivedAt");
 
                     b.ToTable("batches", "intake");
+                });
+
+            modelBuilder.Entity("Darumen.Migrations.AuthRolePermission", b =>
+                {
+                    b.HasOne("Darumen.Migrations.AuthRole", null)
+                        .WithMany()
+                        .HasForeignKey("Role")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

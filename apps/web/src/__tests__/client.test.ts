@@ -38,5 +38,16 @@ describe('api client', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect(error.status).toBe(422)
     expect(error.field('profileCode')).toBe('обязательное поле')
+    expect(error.field('ProfileCode')).toBe('обязательное поле')
+  })
+
+  it('keeps the missing permissions of a 403 permission_required problem', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ title: 'Нет доступа', status: 403, detail: 'permission_required', permissions: ['gov.map'] }), { status: 403 }),
+    )
+    const error = (await api('/api/v1/index').catch((e: unknown) => e)) as ApiError
+    expect(error.status).toBe(403)
+    expect(error.detail).toBe('permission_required')
+    expect(error.permissions).toEqual(['gov.map'])
   })
 })

@@ -9,7 +9,7 @@ import 'status_chip.dart';
 enum Origin { ml, formula, ai }
 
 /// Метка происхождения — та же конвенция, что в вебе: «каждое число подписано». Чип radius 8 («ML-модель» —
-/// heal-wash/ink, «формула» — soft/ink-2, «AI» — coral-wash/ink); тап открывает пояснение.
+/// infoSoft/ink, «формула» — inset/ink-2, «AI» — lavender/#4646B8); тап открывает пояснение.
 class OriginTag extends StatelessWidget {
   const OriginTag(this.kind, {super.key});
 

@@ -32,7 +32,7 @@ public static class RouteEndpoints
 
                 return await BuildAsync(parsed!, states!, RouteAudience.Citizen, Locale.From(http.Request), refData, decisions, queueService, ct);
             })
-            .RequireAuthorization(Policies.Citizen)
+            .RequireAuthorization(Permissions.Policy(Permissions.RouteOwn))
             .WithName("MyRoute")
             .WithSummary("Мой маршрут: синтетический пациент на реальных очередях региона — стадии Стандарта, прогноз ожидания, чек-лист обследований, где быстрее, решения врача, история")
             .Produces<RouteDto>().ProducesProblem(StatusCodes.Status404NotFound).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
@@ -73,7 +73,7 @@ public static class RouteEndpoints
                 return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, parsed!.Format(),
                     MoJson(parsed.MoCode), RouteSignals.Json(body.Kind!, request ? body.ToMoCode : null), comment, _ => "/api/v1/route/me", ct);
             })
-            .RequireAuthorization(Policies.Citizen)
+            .RequireAuthorization(Permissions.Policy(Permissions.RouteOwn))
             .WithName("MyRouteSignal")
             .WithSummary("Сигнал гражданина по своему маршруту: «ещё жду», «уже лечился в другом месте», «больше не нужно» или просьба рассмотреть организацию быстрее (toMoCode); врач видит его в рабочем списке и отвечает решением")
             .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
@@ -82,7 +82,7 @@ public static class RouteEndpoints
         group.MapGet("/{patientRef}", async (string patientRef, HttpContext http, IWorklistRepository worklist, IRefDataRepository refData,
                 IDecisionRepository decisions, QueueService queueService, CancellationToken ct) =>
             {
-                var (parsed, states, problem) = await ResolveAsync(patientRef, http, worklist, ct);
+                var (parsed, states, problem) = await ResolveAsync(patientRef, http, worklist, Permissions.WorklistView, ct);
                 if (problem is not null)
                 {
                     return problem;
@@ -90,7 +90,7 @@ public static class RouteEndpoints
 
                 return await BuildAsync(parsed!, states!, RouteAudience.Doctor, Locale.From(http.Request), refData, decisions, queueService, ct);
             })
-            .RequireAuthorization(Policies.Doctor)
+            .RequireAuthorization(Permissions.Policy(Permissions.WorklistView))
             .WithName("PatientRoute")
             .WithSummary("Маршрут пациента рабочего списка (реф SYN-регион-организация-профиль-NN) с панелью врача: приоритет, риск отказа, факторы")
             .Produces<RouteDto>().ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound);
@@ -98,7 +98,7 @@ public static class RouteEndpoints
         group.MapPost("/{patientRef}/redirect", async (string patientRef, RouteRedirectRequestDto body, HttpContext http, IWorklistRepository worklist,
                 IDecisionRepository decisions, QueueService queueService, CancellationToken ct) =>
             {
-                var (parsed, states, problem) = await ResolveAsync(patientRef, http, worklist, ct);
+                var (parsed, states, problem) = await ResolveAsync(patientRef, http, worklist, Permissions.ReferralConfirm, ct);
                 if (problem is not null)
                 {
                     return problem;
@@ -119,7 +119,7 @@ public static class RouteEndpoints
                 return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, reference,
                     MoJson(await RecommendedAsync(parsed, states!, queueService, ct)), MoJson(body.ToMoCode!), body.Reason, _ => $"/api/v1/route/{reference}", ct);
             })
-            .RequireAuthorization(Policies.Doctor)
+            .RequireAuthorization(Permissions.Policy(Permissions.ReferralConfirm))
             .WithName("RedirectRoute")
             .WithSummary("Перенаправить пациента в другую организацию с причиной: решение (рекомендация системы и выбор врача) уходит в журнал, гражданин видит его на маршруте")
             .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
@@ -129,7 +129,7 @@ public static class RouteEndpoints
         group.MapPost("/{patientRef}/keep", async (string patientRef, RouteKeepRequestDto body, HttpContext http, IWorklistRepository worklist,
                 IDecisionRepository decisions, QueueService queueService, CancellationToken ct) =>
             {
-                var (parsed, states, problem) = await ResolveAsync(patientRef, http, worklist, ct);
+                var (parsed, states, problem) = await ResolveAsync(patientRef, http, worklist, Permissions.ReferralConfirm, ct);
                 if (problem is not null)
                 {
                     return problem;
@@ -146,12 +146,21 @@ public static class RouteEndpoints
                 return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, reference,
                     MoJson(await RecommendedAsync(parsed, states!, queueService, ct)), MoJson(parsed.MoCode), body.Reason, _ => $"/api/v1/route/{reference}", ct);
             })
-            .RequireAuthorization(Policies.Doctor)
+            .RequireAuthorization(Permissions.Policy(Permissions.ReferralConfirm))
             .WithName("KeepRoute")
             .WithSummary("Оставить пациента в текущей организации с причиной — ответ на сигнал гражданина; решение уходит в журнал (Kind = keep)")
             .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+    }
+
+    /// <summary>Реф синтетического пациента гражданина — тот же, что на /route/me (для журнала «кто смотрел мой маршрут»);
+    /// null — в регионе нет очередей.</summary>
+    public static async Task<string?> CitizenPatientRefAsync(HttpContext http, IWorklistRepository worklist, IRefDataRepository refData,
+        QueuePredictions predictions, CancellationToken ct)
+    {
+        var (parsed, _, _) = await ResolveCitizenAsync(null, http, worklist, refData, predictions, ct);
+        return parsed?.Format();
     }
 
     /// <summary>Рекомендация системы для журнала — самая быстрая альтернатива по модели; без модели рекомендацией
@@ -191,9 +200,10 @@ public static class RouteEndpoints
         return (parsed, states, null);
     }
 
-    /// <summary>Разбор рефа, проверка региона врача (клейм region_kato сильнее рефа) и существования пациента в очереди.</summary>
+    /// <summary>Разбор рефа, проверка организации при scope own (реф содержит код организации), региона врача (клейм
+    /// region_kato сильнее рефа) и существования пациента в очереди.</summary>
     private static async Task<(RoutePatientRef? Parsed, IReadOnlyList<QueueStateRow>? States, IResult? Problem)> ResolveAsync(
-        string patientRef, HttpContext http, IWorklistRepository worklist, CancellationToken ct)
+        string patientRef, HttpContext http, IWorklistRepository worklist, string permission, CancellationToken ct)
     {
         if (!RoutePatientRef.TryParse(patientRef, out var parsed))
         {
@@ -201,8 +211,13 @@ public static class RouteEndpoints
                 detail: "ожидается реф вида SYN-регион-организация-профиль-NN"));
         }
 
+        if (await OrgAccess.CheckAsync(http, parsed!.MoCode, permission) is { } denied)
+        {
+            return (null, null, denied);
+        }
+
         var scope = RegionAccess.RegionScope(CurrentUser.From(http));
-        if (scope is not null && scope != parsed!.RegionKato)
+        if (scope is not null && scope != parsed.RegionKato)
         {
             return (null, null, Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Пациент другого региона",
                 detail: "врач видит маршруты пациентов только своего региона"));

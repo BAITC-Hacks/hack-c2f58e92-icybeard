@@ -1,6 +1,7 @@
-/* Базовые стили и общие классы страниц «Тихой клиники». Цвета — только через токены из tokens.css (обе темы).
- * Принцип: молочный фон, белые карточки без рамок (radius 16), линии только внутри списков и таблиц,
- * коралл — только сигнал (точки, стрелки «→», аномалии). Один шрифт — Manrope, табличные цифры в числах. */
+/* Базовые стили и общие классы страниц (Палитра C «Белый холст»). Цвета — только через токены из tokens.css (обе темы).
+ * Принцип: светло-серый холст, белые карточки без рамок (radius 16), линии только внутри списков и таблиц,
+ * фиолетовый — единственный brand-акцент (кнопки, навигация, стрелки «→», серия графика), аномалии и риск — янтарь.
+ * Один шрифт — Manrope, табличные цифры в числах. */
 :root {
   font-family: var(--dm-font-sans);
   font-size: var(--dm-text-base);
@@ -61,16 +62,18 @@ h2, h3 { letter-spacing: -0.01em; }
 .field .error { color: var(--dm-danger); font-size: 0.8rem; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--dm-space-2); margin-top: var(--dm-space-3); }
 .muted { color: var(--dm-muted); }
-.faint { color: var(--dm-faint); }
+.faint { color: var(--dm-muted); }
 .small { font-size: var(--dm-text-sm); }
-.caption { font-size: var(--dm-text-xs); letter-spacing: 0.02em; color: var(--dm-faint); }
+.caption { font-size: var(--dm-text-xs); letter-spacing: 0.02em; color: var(--dm-muted); }
+.text-link { color: var(--dm-accent-hover); text-decoration: none; font-weight: 500; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.text-link:hover { text-decoration: underline; }
 .synthetic { border-left: 3px solid var(--dm-accent); padding-left: var(--dm-space-2); }
 .select-wide { min-width: 280px; }
 .map { height: 520px; border-radius: var(--dm-radius-md); overflow: hidden; }
 .chart { height: 320px; }
-/* ссылка-действие: 15 / 500 ink + «→» coral-text */
+/* ссылка-действие: 15 / 500 ink + «→» фиолетовая */
 .link-arrow { display: inline-flex; align-items: center; gap: 6px; font-size: var(--dm-text-md); font-weight: 500; color: var(--dm-ink); text-decoration: none; background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer; }
-.link-arrow::after { content: '→'; color: var(--dm-danger); }
+.link-arrow::after { content: '→'; color: var(--dm-accent); }
 .link-arrow:hover { color: var(--dm-accent-hover); }
 .link-arrow.small { font-size: var(--dm-text-sm); }
 .factor { display: flex; justify-content: space-between; gap: var(--dm-space-2); padding: 10px 0; border-bottom: 1px solid var(--dm-hairline); }
@@ -97,14 +100,14 @@ mark.drug-hint { background: var(--dm-warn-soft); color: inherit; padding: 0 2px
 .row .row-sub { color: var(--dm-muted); font-size: var(--dm-text-sm); }
 .row .row-value { white-space: nowrap; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-/* пилюли-фильтры 36: белые, активная ink/белый */
+/* пилюли-фильтры 36: белые, активная фиолетовая с белым текстом */
 .chip-filter { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 16px; border-radius: var(--dm-radius-pill); border: 0; background: var(--dm-surface); color: var(--dm-ink); font: inherit; font-size: var(--dm-text-sm); font-weight: 500; cursor: pointer; }
 .chip-filter .count { font-variant-numeric: tabular-nums; color: var(--dm-muted); }
 .chip-filter:hover { background: var(--dm-neutral-soft); }
-.chip-filter.active { background: var(--dm-ink); color: var(--dm-surface); }
-.chip-filter.active .count { color: var(--dm-surface); opacity: 0.8; }
+.chip-filter.active { background: var(--dm-primary); color: var(--dm-primary-contrast); }
+.chip-filter.active .count { color: var(--dm-primary-contrast); opacity: 0.8; }
 .card .chip-filter { background: var(--dm-neutral-soft); }
-.card .chip-filter.active { background: var(--dm-ink); }
+.card .chip-filter.active { background: var(--dm-primary); }
 .toolbar { display: flex; flex-wrap: wrap; gap: var(--dm-space-2); align-items: center; }
 .toolbar .spacer { flex: 1; }
 /* таблицы: шапка 12 uppercase ink-2, строки 48 с hairline, числа табличные */
@@ -113,22 +116,23 @@ mark.drug-hint { background: var(--dm-warn-soft); color: inherit; padding: 0 2px
 .dense-table td { padding: 8px; height: 48px; box-sizing: border-box; border-bottom: 1px solid var(--dm-hairline); vertical-align: middle; font-variant-numeric: tabular-nums; }
 .dense-table tbody tr:last-child td { border-bottom: 0; }
 .dense-table tr.clickable { cursor: pointer; }
-.dense-table tr.clickable:hover { background: var(--dm-surface-2); }
-.dense-table tr.selected { background: var(--dm-surface-2); }
+.dense-table tr.clickable:hover { background: var(--dm-bg); }
+.dense-table tr.selected, .dense-table tr.selected:hover { background: var(--dm-accent-soft); }
 .dense-table tr.accent td:first-child { box-shadow: inset 3px 0 0 var(--dm-accent); }
-.dense-table tr.quarantine td:first-child { box-shadow: inset 3px 0 0 var(--dm-accent); }
+.dense-table tr.quarantine td:first-child { box-shadow: inset 3px 0 0 var(--dm-warn-strong); }
 .dense-table td.num, .dense-table th.num { text-align: right; white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
 /* липкая панель действий внизу страницы */
 .sticky-actions { position: sticky; bottom: 0; background: color-mix(in srgb, var(--dm-bg) 92%, transparent); backdrop-filter: blur(6px); border-top: 1px solid var(--dm-hairline); padding: var(--dm-space-3) 0; margin-top: var(--dm-space-4); display: flex; gap: var(--dm-space-2); flex-wrap: wrap; align-items: center; }
 
-/* PrimeVue поверх токенов: кнопки 44 / radius 12 / 15 500; поля 44 на soft без рамки; таблицы с приглушённой шапкой */
+/* PrimeVue поверх токенов: кнопки 44 / radius 12 / 15 500; поля 44 на inset без рамки; таблицы с приглушённой шапкой */
 .p-button { font-weight: 500; font-size: var(--dm-text-md); border-radius: var(--dm-radius-md); }
 .p-button:not(.p-button-sm):not(.p-button-lg):not(.p-button-icon-only) { min-height: 44px; }
 .p-button.p-button-sm { min-height: 36px; font-size: var(--dm-text-sm); border-radius: var(--dm-radius-pill); }
 .p-button.p-button-outlined { background: transparent; }
-/* secondary — soft-фон с чернильным текстом, не «выключенная» кнопка */
+/* secondary — inset-фон с чернильным текстом, не «выключенная» кнопка; опасное действие — inset с critical-текстом */
 .p-button.p-button-secondary:not(:disabled) { color: var(--dm-ink); }
+.p-button.p-button-danger:not(.p-button-text):not(:disabled) { color: var(--dm-danger); }
 .p-inputtext, .p-select, .p-textarea, .p-datepicker-input, .p-inputnumber-input { border-radius: var(--dm-radius-md); background: var(--dm-surface-2); border-color: transparent; font-size: var(--dm-text-md); }
 .p-inputtext:not(.p-inputtext-sm), .p-select:not(.p-select-sm) { min-height: 44px; }
 .p-select-label { display: flex; align-items: center; }
@@ -136,7 +140,7 @@ mark.drug-hint { background: var(--dm-warn-soft); color: inherit; padding: 0 2px
 .card .p-selectbutton { background: var(--dm-surface-2); }
 .p-selectbutton .p-togglebutton { background: transparent; border: 0; border-radius: var(--dm-radius-pill); font-size: var(--dm-text-xs); font-weight: 500; padding: 4px 10px; color: var(--dm-muted); }
 .p-selectbutton .p-togglebutton .p-togglebutton-content { background: transparent; box-shadow: none; }
-.p-selectbutton .p-togglebutton.p-togglebutton-checked { background: var(--dm-ink); color: var(--dm-surface); }
+.p-selectbutton .p-togglebutton.p-togglebutton-checked { background: var(--dm-primary); color: var(--dm-primary-contrast); }
 .p-selectbutton .p-togglebutton.p-togglebutton-checked .p-togglebutton-content { background: transparent; color: inherit; }
 .p-datatable .p-datatable-thead > tr > th { font-size: var(--dm-text-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dm-muted); }
 .p-datatable .p-datatable-tbody > tr > td { font-variant-numeric: tabular-nums; }

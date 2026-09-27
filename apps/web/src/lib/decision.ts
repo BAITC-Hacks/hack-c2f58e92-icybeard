@@ -13,7 +13,7 @@ export const SUBJECT_ANOMALY = 'anomaly'
 /** Решения по маршруту пациента (redirect / keep) пишутся с предметом route. */
 export const SUBJECT_ROUTE = 'route'
 
-const ROLE_IDS = ['doctor', 'chief', 'regulator', 'steward', 'admin', 'citizen']
+const ROLE_IDS = ['doctor', 'chief', 'org_admin', 'regulator', 'steward', 'auditor', 'admin', 'citizen']
 
 export interface DecisionNames {
   region: (kato: string) => string

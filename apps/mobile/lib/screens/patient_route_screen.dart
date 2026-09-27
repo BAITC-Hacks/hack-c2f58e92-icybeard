@@ -11,7 +11,7 @@ import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../widgets/doctor_route_view.dart';
 import '../widgets/empty_state.dart';
-import '../widgets/error_box.dart';
+import '../widgets/state_view.dart';
 import '../widgets/format.dart';
 import '../widgets/redirect_reason_dialog.dart';
 import '../widgets/section.dart';
@@ -21,7 +21,8 @@ import '../widgets/skeleton.dart';
 /// карточка «Рекомендация» с hero «≈ N дн.» лучшей альтернативы, риском отказа и запросом пациента, список
 /// альтернатив (тап — перенаправить с причиной), свёрнутые секции; внизу «Открыть направление» (ассистент) и
 /// «AI-скрайб». Перенаправление и «Оставить» пишутся одним Idempotency-Key на нажатие; после записи маршрут
-/// перечитывается. Риск отказа показывается только врачу.
+/// перечитывается. Риск отказа показывается только врачу. Кнопки — по разрешениям: ассистент `referral.assist`,
+/// скрайб `scribe.use`, перенаправление и ответ на сигнал `referral.confirm`; 403 — «Нет доступа».
 class PatientRouteScreen extends StatefulWidget {
   const PatientRouteScreen({super.key, required this.patientRef, this.preview});
 
@@ -115,18 +116,24 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
     final theme = Theme.of(context);
     final preview = widget.preview;
     final route = _route;
+    final session = context.watch<Session>();
+    final assist = session.can(Perm.referralAssist);
+    final scribe = session.can(Perm.scribeUse);
+    final confirm = session.can(Perm.referralConfirm);
     return PageScaffold(
       title: s.patientRouteTitle,
       onRefresh: _load,
-      bottom: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          FilledButton(onPressed: _busy ? null : _openAssistant, child: Text(s.openReferral)),
-          const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(onPressed: _openScribe, icon: const Icon(Icons.mic_none, size: 20), label: Text(s.scribeTitle)),
-        ],
-      ),
+      bottom: !assist && !scribe
+          ? null
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (assist) FilledButton(onPressed: _busy ? null : _openAssistant, child: Text(s.openReferral)),
+                if (assist && scribe) const SizedBox(height: AppSpacing.sm),
+                if (scribe) OutlinedButton.icon(onPressed: _openScribe, icon: const Icon(Icons.mic_none, size: 20), label: Text(s.scribeTitle)),
+              ],
+            ),
       children: [
         if (_busy) const LinearProgressIndicator(),
         switch (_state) {
@@ -142,11 +149,11 @@ class _PatientRouteScreenState extends State<PatientRouteScreen> {
               ],
             ),
           Failed<PatientRoute>(:final error) => switch (error) {
-              ApiException(status: 403) => EmptyState(icon: Icons.lock_outline, title: s.forbiddenRegion),
+              ApiException(status: 403) => ForbiddenState(error: error),
               ApiException(status: 404) => EmptyState(icon: Icons.person_off_outlined, title: s.patientNotFound, body: widget.patientRef),
-              _ => ErrorBox(error: error, onRetry: _load),
+              _ => ErrorState(error: error, onRetry: _load),
             },
-          Loaded<PatientRoute>(:final data) => DoctorRouteView(route: data, busy: _busy, onRedirect: _redirect, onKeep: _keep),
+          Loaded<PatientRoute>(:final data) => DoctorRouteView(route: data, busy: _busy, onRedirect: confirm ? _redirect : null, onKeep: confirm ? _keep : null),
         },
         if (route != null) Text(s.routeSynthetic(dateShort(route.asOf)), style: theme.textTheme.labelSmall?.merge(AppType.numeric)),
       ],

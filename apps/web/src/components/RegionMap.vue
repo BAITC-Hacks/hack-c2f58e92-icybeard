@@ -39,7 +39,7 @@ function render() {
     element.type = 'button'
     element.className = 'region-marker'
     element.classList.toggle('is-hover', props.highlight === region.regionKato)
-    element.classList.toggle('is-light', step > 0 && step <= 2)
+    element.classList.toggle('is-light', step > 0 && step <= 3)
     element.classList.toggle('has-anomaly', props.anomalies?.has(region.regionKato) ?? false)
     element.style.setProperty('--size', `${size}px`)
     element.style.setProperty('--color', step ? theme.value.scale[step - 1]! : theme.value.hairline)
@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
 .region-marker .dot { width: var(--size); height: var(--size); border-radius: 50%; background: var(--color); color: #fff; font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums; display: grid; place-items: center; border: 2px solid #fff; box-shadow: var(--dm-shadow); transition: transform 0.12s ease, box-shadow 0.12s ease; }
 .region-marker.is-light .dot { color: var(--dm-ink); }
 .region-marker .label { font-size: 11px; font-weight: 500; color: var(--dm-ink); background: color-mix(in srgb, var(--dm-surface) 88%, transparent); padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
-.region-marker.has-anomaly::after { content: ''; position: absolute; top: -2px; right: calc(50% - var(--size) / 2 - 4px); width: 12px; height: 12px; border-radius: 50%; background: var(--dm-accent); border: 2px solid #fff; box-sizing: border-box; }
+.region-marker.has-anomaly::after { content: ''; position: absolute; top: -2px; right: calc(50% - var(--size) / 2 - 4px); width: 12px; height: 12px; border-radius: 50%; background: var(--dm-warn-strong); border: 2px solid #fff; box-sizing: border-box; }
 .map--filtered-dark .maplibregl-canvas { filter: invert(0.92) hue-rotate(180deg) brightness(0.85) saturate(0.6); }
 .region-marker:hover .dot, .region-marker.is-hover .dot { transform: scale(1.15); box-shadow: 0 0 0 4px var(--dm-accent-soft), var(--dm-shadow); }
 .region-marker.is-hover .label { background: var(--dm-ink); color: var(--dm-surface); }

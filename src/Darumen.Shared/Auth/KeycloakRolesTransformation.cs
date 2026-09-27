@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Authentication;
 
 namespace Darumen.Shared.Auth;
 
-/// <summary>Keycloak кладёт роли реалма в realm_access.roles; разворачиваем их в стандартные role-claims.</summary>
+/// <summary>Keycloak кладёт роли реалма в realm_access.roles; разворачиваем их в стандартные role-claims. Legacy-роль
+/// chief трактуется как org_admin; роли, созданные в матрице (POST /admin/roles), проходят как есть; служебные роли
+/// Keycloak (default-roles-*, offline_access, uma_authorization) отбрасываются.</summary>
 public sealed class KeycloakRolesTransformation : IClaimsTransformation
 {
     public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
@@ -17,15 +19,13 @@ public sealed class KeycloakRolesTransformation : IClaimsTransformation
         }
 
         using var document = JsonDocument.Parse(realmAccess);
-        if (document.RootElement.TryGetProperty("roles", out var roles))
+        if (document.RootElement.TryGetProperty("roles", out var roles) && roles.ValueKind == JsonValueKind.Array)
         {
-            foreach (var role in roles.EnumerateArray())
+            var names = roles.EnumerateArray().Select(r => r.GetString()).OfType<string>()
+                .Where(Roles.IsApplicationRole).Select(Roles.Normalize).Distinct();
+            foreach (var name in names)
             {
-                var name = role.GetString();
-                if (name is not null && Roles.All.Contains(name))
-                {
-                    identity.AddClaim(new Claim(ClaimTypes.Role, name));
-                }
+                identity.AddClaim(new Claim(ClaimTypes.Role, name));
             }
         }
 

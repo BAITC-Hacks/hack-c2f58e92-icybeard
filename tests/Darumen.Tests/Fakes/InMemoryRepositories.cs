@@ -73,7 +73,7 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
             return Task.FromResult(AckOutcome.NotFound);
         }
 
-        if (command.RegionScope is not null && anomaly.RegionKato != command.RegionScope)
+        if ((command.RegionScope is not null && anomaly.RegionKato != command.RegionScope) || (command.MoScope is not null && anomaly.MoCode != command.MoScope))
         {
             return Task.FromResult(AckOutcome.OutOfScope);
         }
@@ -146,6 +146,7 @@ public sealed class InMemoryAnalytics : IAnalyticsRepository
 public sealed class InMemoryDecisions : IDecisionRepository
 {
     private readonly List<(DecisionDto Decision, string? Key)> _rows = [];
+    private readonly Dictionary<Guid, string?> _organizations = new();
 
     public List<object> Published { get; } = [];
 
@@ -163,6 +164,7 @@ public sealed class InMemoryDecisions : IDecisionRepository
         var dto = new DecisionDto(Guid.NewGuid(), decision.Actor, decision.Role, decision.Subject, decision.SubjectId,
             ParseJson(decision.RecommendedJson), ParseJson(decision.ChosenJson), decision.Reason, DateTimeOffset.UtcNow);
         _rows.Add((dto, decision.IdempotencyKey));
+        _organizations[dto.DecisionId] = decision.ActorMoCode;
         Published.Add(outboxEvent(dto));
         return Task.FromResult((dto, true));
     }
@@ -175,6 +177,18 @@ public sealed class InMemoryDecisions : IDecisionRepository
             .ToList();
         return Task.FromResult(new Paged<DecisionDto>(items, page, size, items.Count));
     }
+
+    /// <summary>Как DecisionRepository: решения актёров организации или с организацией в recommended/chosen.</summary>
+    public async Task<Paged<DecisionDto>> ListForOrganizationAsync(string moCode, string? actor, string? subject, string? subjectId, int page, int size,
+        CancellationToken cancellationToken)
+    {
+        var all = await ListAsync(actor, subject, subjectId, 1, int.MaxValue, cancellationToken);
+        var items = all.Items.Where(d => _organizations.GetValueOrDefault(d.DecisionId) == moCode || MoCode(d.Recommended) == moCode || MoCode(d.Chosen) == moCode).ToList();
+        return new Paged<DecisionDto>(items, page, size, items.Count);
+    }
+
+    private static string? MoCode(System.Text.Json.JsonElement? element) =>
+        element is { ValueKind: System.Text.Json.JsonValueKind.Object } value && value.TryGetProperty("moCode", out var mo) ? mo.GetString() : null;
 
     // как DecisionRepository: recommended/chosen хранятся JSON-текстом и отдаются JsonElement — маршрут читает из них moCode
     private static System.Text.Json.JsonElement? ParseJson(string? json) =>
@@ -191,7 +205,8 @@ public sealed class InMemoryRefData : IRefDataRepository
         {
             new("028B", "Казахский ордена институт глазных болезней", "75", "center", "L", null, null, "институт глазных болезней"),
             new("22GN", "Городская больница №2", "75", "hospital", "M", null, null, "городская больница 2"),
-        }.Where(o => (regionKato is null || o.RegionKato == regionKato) && (query is null || o.Name.Contains(query, StringComparison.OrdinalIgnoreCase))).Take(limit).ToList());
+        }.Where(o => (regionKato is null || o.RegionKato == regionKato)
+                     && (query is null || o.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || o.MoCode == query)).Take(limit).ToList());
 
     public Task<IReadOnlyList<ProfileDto>> ProfilesAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ProfileDto>>([new("381", "Офтальмологические для взрослых", false, 12000), new("DH", "Дневной стационар", true, 300000)]);

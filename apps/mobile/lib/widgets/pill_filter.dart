@@ -38,7 +38,7 @@ class Pill extends StatelessWidget {
       button: true,
       selected: selected,
       child: Material(
-        color: selected ? colors.ink : colors.card,
+        color: selected ? colors.accent : colors.card,
         shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -49,7 +49,7 @@ class Pill extends StatelessWidget {
             alignment: Alignment.center,
             child: Text(
               label,
-              style: theme.textTheme.labelMedium?.copyWith(fontSize: 14, letterSpacing: 0, color: selected ? theme.colorScheme.onPrimary : colors.ink),
+              style: theme.textTheme.labelMedium?.copyWith(fontSize: 14, letterSpacing: 0, color: selected ? colors.onAccent : colors.ink),
             ),
           ),
         ),

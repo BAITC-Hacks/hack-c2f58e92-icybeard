@@ -91,10 +91,27 @@ services:
       # issuer в токенах всегда localhost:8080 (браузер), а служебные адреса (JWKS) отдаются по хосту запроса (api → keycloak)
       KC_HOSTNAME: http://localhost:8080
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      # Плейсхолдеры ${VAR:по умолчанию} в darumen-realm.json подставляются при импорте realm (пересоздание контейнера).
+      # Письма в dev уходят в Mailpit (интерфейс http://localhost:8025).
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_FROM: noreply@darumen.kz
+      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-darumen-admin-dev-secret}
+      DARUMEN_WEB_URL: ${DARUMEN_WEB_URL:-http://localhost:5173/}
+      # Уведомления безопасности на почту пользователя: смена пароля/аутентификатора и временная блокировка
+      # (без LOGIN_ERROR, чтобы не слать письмо на каждую опечатку)
+      KC_SPI_EVENTS_LISTENER_EMAIL_INCLUDE_EVENTS: UPDATE_CREDENTIAL,REMOVE_CREDENTIAL,USER_DISABLED_BY_TEMPORARY_LOCKOUT
+      TZ: Asia/Almaty   # время в письмах безопасности
     ports: ["8080:8080"]
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
-      - ./keycloak/themes/darumen:/opt/keycloak/themes/darumen:ro   # тема входа «Тихая клиника» (realm loginTheme=darumen)
+      - ./keycloak/themes/darumen:/opt/keycloak/themes/darumen:ro   # темы входа и писем (loginTheme/emailTheme=darumen)
+    depends_on: [mailpit]
+
+  # Почтовый ящик для dev: SMTP :1025 (Keycloak, API), веб и REST API :8025 (http://localhost:8025/api/v1/messages)
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.22.0
@@ -227,6 +244,12 @@ services:
       ModelServices__Address: http://models:50051
       Auth__Mode: ${API_AUTH_MODE:-keycloak}
       Auth__Authority: http://keycloak:8080/realms/darumen
+      # Keycloak Admin API (клиент darumen-admin, client credentials): BaseUrl и Realm — из Auth__Authority
+      Keycloak__Admin__ClientSecret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-darumen-admin-dev-secret}   # dev-секрет локального realm
+      # письма приложения: Mailpit (SMTP :1025, интерфейс http://localhost:8025)
+      Mail__Smtp__Host: ${SMTP_HOST:-mailpit}
+      Mail__Smtp__Port: ${SMTP_PORT:-1025}
+      Web__PublicOrigin: ${WEB_PUBLIC_ORIGIN:-http://localhost:5173}
       ReverseProxy__Clusters__scribe__Destinations__local__Address: http://scribe:8010/
       ReverseProxy__Clusters__intake__Destinations__local__Address: http://intake:8020/
       Insight__Provider: ollama

@@ -8,7 +8,7 @@ import '../theme/typography.dart';
 import 'format.dart';
 import 'status_chip.dart';
 
-/// Пункт чек-листа обследований строкой списка: название 15, «до даты · срок» 13 ink-3, чип статуса по датам.
+/// Пункт чек-листа обследований строкой списка: название 15, «до даты · срок» 13 ink-2, чип статуса по датам.
 /// Никакой интерпретации результатов.
 class ChecklistTile extends StatelessWidget {
   const ChecklistTile(this.item, {super.key, this.last = false});
@@ -38,7 +38,7 @@ class ChecklistTile extends StatelessWidget {
                 Text(item.title, style: theme.textTheme.row),
                 Text(
                   '${s.checklistValidUntil(dateShort(item.validUntil))} · ${item.validityLabel}',
-                  style: theme.textTheme.rowDetail.copyWith(color: colors.faint).merge(AppType.numeric),
+                  style: theme.textTheme.rowDetail.copyWith(color: colors.muted).merge(AppType.numeric),
                 ),
               ],
             ),

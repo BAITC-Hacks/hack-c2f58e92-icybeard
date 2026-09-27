@@ -1,4 +1,4 @@
-// Прогон интерфейса в браузере: вход через Keycloak по ролям, скриншоты страниц (RU и KK, светлая и тёмная тема)
+// Прогон интерфейса в браузере: вход через Keycloak всеми семью ролями, скриншоты страниц (RU и KK, светлая и тёмная тема)
 // и ошибки консоли. Предпосылки: make serve (Keycloak :8080 + API :8000) и npm run dev (:5173).
 // node e2e/walk.mjs <outDir>; WEB_URL и WALK_PASSWORD — переопределение стенда и пароля realm.
 import { chromium } from '@playwright/test'
@@ -6,9 +6,11 @@ import { chromium } from '@playwright/test'
 const out = process.argv[2] ?? '/tmp'
 const base = process.env.WEB_URL ?? 'http://localhost:5173'
 const password = process.env.WALK_PASSWORD ?? 'darumen'
-const users = { citizen: 'citizen1', doctor: 'doctor1', chief: 'chief1', regulator: 'regulator1', steward: 'steward1' }
+// chief1 — администратор организации (роль org_admin, mo_code 028B), имя пользователя сохранено для документации
+const users = { citizen: 'citizen1', doctor: 'doctor1', chief: 'chief1', regulator: 'regulator1', steward: 'steward1', auditor: 'auditor1', admin: 'admin1' }
 const pages = [
   { role: null, path: '/', wait: 'Войти через eGov mobile', variants: true },
+  { role: null, path: '/signup', wait: 'Регистрация организации', variants: true },
   { role: 'citizen', path: '/wait', wait: 'Выберите регион' },   // до ссылки с параметрами: выбор запоминается в localStorage
   { role: 'citizen', path: '/wait?region=75&profile=381', wait: 'Где быстрее в регионе', variants: true },
   { role: 'citizen', path: '/medicines', wait: 'Другие МНН при этой нозологии' },
@@ -28,6 +30,20 @@ const pages = [
   { role: 'doctor', path: '/doctor/decisions', wait: 'Журнал решений' },
   { role: 'doctor', path: '/doctor/scribe', wait: 'AI-скрайб приёма' },
   { role: 'steward', path: '/steward', wait: 'Конвейер публикации' },
+  { role: 'doctor', path: '/welcome', wait: 'Что умеет кабинет' },
+  { role: 'doctor', path: '/account/profile', wait: 'Личные данные', variants: true },
+  { role: 'doctor', path: '/account/security', wait: 'Двухфакторная аутентификация' },
+  { role: 'doctor', path: '/account/notifications', wait: 'События и каналы' },
+  { role: 'doctor', path: '/account/consents', wait: 'Журнал доступа к моим данным' },
+  { role: 'doctor', path: '/gov', wait: 'Нет доступа к разделу' },
+  { role: 'chief', path: '/admin/users', wait: 'Пригласить пользователя' },
+  { role: 'admin', path: '/admin/users', wait: 'Пригласить пользователя', variants: true },
+  { role: 'admin', path: '/admin/roles', wait: 'частично — только своя организация' },
+  { role: 'admin', path: '/admin/orgs', wait: 'Заявки на регистрацию', variants: true },
+  { role: 'admin', path: '/admin/doctors', wait: 'Верификация' },
+  { role: 'auditor', path: '/gov/audit', wait: 'Журнал аудита' },
+  { role: 'auditor', path: '/admin/users', wait: 'Пригласить пользователя' },
+  { role: 'auditor', path: '/doctor/decisions', wait: 'Журнал решений' },
 ]
 // Дополнительные проходы для страниц с variants: казахский и тёмная тема (ключи localStorage приложения)
 const variants = [
@@ -77,7 +93,7 @@ for (const step of pages) {
     await page.waitForTimeout(1500)
     const name = (step.path.replace(/\W+/g, '_').replace(/^_/, '') || 'home') + variant.suffix
     await page.screenshot({ path: `${out}/${name}.png`, fullPage: false })
-    const problem = await page.locator('.p-message-error').allTextContents()
+    const problem = [...(await page.locator('.p-message-error').allTextContents()), ...(await page.locator('[data-testid="state-error"]').allTextContents())]
     console.log(`${ok ? 'OK ' : 'MISS'} ${step.role ?? 'anonymous'} ${step.path}${variant.suffix} ${problem.length ? 'problem: ' + problem.join(' | ').slice(0, 160) : ''}`)
   }
 }

@@ -17,5 +17,5 @@ const width = computed(() => `${Math.max(4, Math.min(100, (props.value / (props.
 .priority { display: inline-flex; align-items: center; gap: 8px; }
 .number { min-width: 3ch; text-align: right; font-weight: 500; }
 .track { width: 56px; height: 6px; border-radius: 3px; background: var(--dm-neutral-soft); overflow: hidden; }
-.fill { display: block; height: 100%; background: var(--dm-ink); border-radius: 3px; }
+.fill { display: block; height: 100%; background: var(--dm-primary); border-radius: 3px; }
 </style>

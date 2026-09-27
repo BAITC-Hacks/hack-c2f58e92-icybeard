@@ -146,7 +146,7 @@ onMounted(async () => {
 .strong { font-weight: 500; }
 .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
 .step { display: flex; gap: 14px; }
-.step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--dm-ink); color: var(--dm-surface); display: grid; place-items: center; font-size: var(--dm-text-sm); font-weight: 500; flex: none; }
+.step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--dm-primary); color: var(--dm-primary-contrast); display: grid; place-items: center; font-size: var(--dm-text-sm); font-weight: 500; flex: none; }
 .step-body { display: flex; flex-direction: column; gap: 4px; }
 .step-title { font-weight: 500; }
 .step-text { white-space: pre-wrap; }

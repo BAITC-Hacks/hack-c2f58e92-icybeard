@@ -274,7 +274,7 @@ watch(vaccinationPlan, () => {
           <p v-else class="muted">{{ t('gov.region.noQueueSeries') }}</p>
           <div class="links">
             <RouterLink v-if="moCode" class="link-arrow small" :to="{ name: 'organization', params: { moCode }, query: { kato, profile } }">{{ t('gov.region.toOrganization') }}</RouterLink>
-            <RouterLink v-if="auth.hasRole('regulator')" class="link-arrow small" :to="{ name: 'simulator', query: { region: kato, profile } }">{{ t('nav.simulator') }}</RouterLink>
+            <RouterLink v-if="auth.can('gov.simulator')" class="link-arrow small" :to="{ name: 'simulator', query: { region: kato, profile } }">{{ t('nav.simulator') }}</RouterLink>
           </div>
         </AppCard>
 
@@ -334,7 +334,7 @@ watch(vaccinationPlan, () => {
 
         <AppCard :title="t('gov.region.signals')" origin="ml">
           <template #header><span class="caption">{{ anomalies.length }}</span></template>
-          <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
+          <AnomalyFeed :items="anomalies" :can-ack="auth.canAny(['gov.map', 'org.cabinet'])" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
         </AppCard>
       </div>
     </div>

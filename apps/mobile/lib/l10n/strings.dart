@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+part 'strings_account.dart';
+
 /// Ручной словарь статических подписей интерфейса (ru/kk). API-контент (объяснения,
 /// названия регионов/организаций) уже локализуется через Accept-Language в ApiClient —
 /// здесь только текст, зашитый в виджеты. Казахский текст длиннее русского на ~15 %:
@@ -77,20 +79,7 @@ class S {
       );
 
   // ---------- вход ----------
-  String get loginWelcome => _t('Добро пожаловать в', 'Қош келдіңіз:');
-  String get loginSlideStage => _t('Видите, на каком этапе ваше направление', 'Жолдамаңыздың қай кезеңде екенін көресіз');
-  String get loginSlideForecast => _t('Знаете, сколько обычно ждут такие пациенты', 'Мұндай пациенттер әдетте қанша күтетінін білесіз');
-  String get loginSlideChecklist => _t('Помните, какие анализы ещё действуют', 'Қай талдаулардың әлі жарамды екенін білесіз');
-  String get loginCardWaitlisted => _t('В листе ожидания', 'Күту парағында');
-  String get loginCardNineOfTen => _t('9 из 10 — до 21 дня', '10-нан 9-ы — 21 күнге дейін');
-  String get loginCardHalf => _t('половина — 2 дня', 'жартысы — 2 күн');
-  String get loginCardExpired => _t('истёк', 'мерзімі өтті');
-  String get loginCardValid => _t('действует', 'жарамды');
   String get loginTitle => _t('Вход', 'Кіру');
-  String get loginTagline => _t('Госпитализация без неизвестности', 'Белгісіздіксіз емдеуге жатқызу');
-  String get loginValueStage => _t('Стадия направления', 'Жолдама кезеңі');
-  String get loginValueChecklist => _t('Сроки анализов', 'Талдау мерзімдері');
-  String get loginValueForecast => _t('Прогноз ожидания', 'Күту болжамы');
   String get loginWithEgov => _t('Войти через eGov mobile', 'eGov mobile арқылы кіру');
   String get loginWithPassword => _t('Войти по логину', 'Логинмен кіру');
   String get loginFailed => _t('Неверный логин или пароль', 'Логин немесе құпия сөз қате');
@@ -336,7 +325,6 @@ class S {
   String get journalShort => _t('Журнал', 'Журнал');
 
   // ---------- учётная запись ----------
-  String get usernameLabel => _t('Пользователь', 'Пайдаланушы');
   String get passwordLabel => _t('Пароль', 'Құпия сөз');
   String get loggingInButton => _t('Вход…', 'Кіру…');
   String get loginButton => _t('Войти', 'Кіру');
@@ -522,7 +510,7 @@ class S {
     return map[name] ?? name;
   }
 
-  // ---------- «Тихая клиника»: шапка, hero и карточки ----------
+  // ---------- шапка, hero и карточки ----------
   String get back => _t('Назад', 'Артқа');
   String switchLanguage(String code) => code == 'kk' ? 'Қазақ тіліне ауысу' : 'Переключить на русский';
 

@@ -317,7 +317,7 @@ onBeforeUnmount(() => recorder.dispose())
 .what { margin: 8px 0 0; padding-left: 20px; }
 .rec-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dm-dot-idle); flex: none; }
-.rec-dot.live { background: var(--dm-accent); }
+.rec-dot.live { background: var(--dm-danger); }
 .rec-label { font-size: var(--dm-text-md); font-weight: 500; }
 .timer { font-size: var(--dm-text-kpi); font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
 .timer.live { color: var(--dm-danger); }
@@ -325,9 +325,9 @@ onBeforeUnmount(() => recorder.dispose())
 .upload { cursor: pointer; }
 .wave { display: flex; align-items: center; gap: 3px; height: 40px; padding: 0 4px; margin-top: 12px; border-radius: var(--dm-radius-md); background: var(--dm-surface-2); }
 .wave .bar { flex: 1; background: var(--dm-dot-idle); border-radius: 2px; transition: height 0.08s linear; }
-.wave.live .bar { background: var(--dm-ink); }
+.wave.live .bar { background: var(--dm-primary); }
 .segment { display: flex; gap: 12px; align-items: flex-start; justify-content: flex-start; margin: 0; min-height: 44px; }
-.stamp { flex: none; width: 72px; font-size: var(--dm-text-xs); color: var(--dm-faint); letter-spacing: 0.02em; padding-top: 3px; }
+.stamp { flex: none; width: 72px; font-size: var(--dm-text-xs); color: var(--dm-muted); letter-spacing: 0.02em; padding-top: 3px; }
 .segment-text { font-size: var(--dm-text-md); }
 .section { margin-bottom: 8px; }
 .approve-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }

@@ -263,15 +263,16 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
         Assert.Equal(RouteSignals.StillWaiting, after.Signals[0].Kind);
         Assert.Null(after.Signals[0].ToMoCode);
 
+        // без route.own (стюард) сигнал по «своему маршруту» не отправить
         Assert.Equal(HttpStatusCode.Forbidden,
-            (await app.CreateClient("doctor", "doctor1", "75").PostAsJsonAsync("/api/v1/route/me/signals", new RouteSignalRequestDto(RouteSignals.StillWaiting, null, null))).StatusCode);
+            (await app.CreateClient("steward", "steward1").PostAsJsonAsync("/api/v1/route/me/signals", new RouteSignalRequestDto(RouteSignals.StillWaiting, null, null))).StatusCode);
     }
 
     [Fact]
-    public async Task Route_me_is_for_citizens_only()
+    public async Task Route_me_needs_route_own()
     {
         Assert.Equal(HttpStatusCode.Unauthorized, (await app.CreateClient().GetAsync("/api/v1/route/me")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("doctor", "doctor1", "75").GetAsync("/api/v1/route/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("regulator", "regulator1").GetAsync("/api/v1/route/me")).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await app.CreateClient("admin", "admin1").GetAsync("/api/v1/route/me")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await app.CreateClient("citizen", "c-10").GetAsync("/api/v1/route/me?regionKato=10")).StatusCode);
     }

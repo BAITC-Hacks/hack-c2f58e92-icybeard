@@ -11,8 +11,9 @@ import { useRouter } from 'vue-router'
 import { journal, route as routeApi } from '@/api/endpoints'
 import type { PatientRoute, WorklistItem } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import AsyncState from '@/components/states/AsyncState.vue'
+import StateStale from '@/components/states/StateStale.vue'
 import AppCard from '@/components/ui/AppCard.vue'
-import EmptyState from '@/components/ui/EmptyState.vue'
 import KpiRow from '@/components/ui/KpiRow.vue'
 import KpiTile from '@/components/ui/KpiTile.vue'
 import PageShell from '@/components/ui/PageShell.vue'
@@ -21,6 +22,7 @@ import SidePanel from '@/components/ui/SidePanel.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { days, pct, refusalWords, shortOrgName } from '@/lib/format'
+import { isStale } from '@/lib/freshness'
 import { dateShort, nextActionKey } from '@/lib/route'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
@@ -43,6 +45,8 @@ const items = ref<WorklistItem[]>([])
 const modelBacked = ref(false)
 const asOf = ref('')
 const error = ref<unknown>(null)
+/** Ошибка ответа на запрос пациента — не заменяет список. */
+const actionError = ref<unknown>(null)
 const busy = ref(true)
 const flag = ref<Flag | null>(null)
 const search = ref('')
@@ -106,7 +110,7 @@ async function sendAnswer(item: WorklistItem) {
     answering.value = null
     await load()
   } catch (e) {
-    error.value = e
+    actionError.value = e
   } finally {
     sending.value = null
   }
@@ -134,8 +138,14 @@ async function openPanel(item: WorklistItem) {
   }
 }
 
+function resetFilters() {
+  flag.value = null
+  search.value = ''
+}
+
 async function load() {
   error.value = null
+  actionError.value = null
   busy.value = true
   try {
     const response = await journal.worklist({ regionKato: auth.region ?? undefined })
@@ -167,13 +177,14 @@ onMounted(async () => {
       </IconField>
       <Select v-model="sortBy" :options="sortOptions" option-label="label" option-value="value" size="small" />
     </template>
-    <p v-if="!busy && !modelBacked" class="lead synthetic">{{ t('doctor.worklist.noteFallback') }}</p>
+    <p v-if="!busy && !error && !modelBacked" class="lead synthetic">{{ t('doctor.worklist.noteFallback') }}</p>
 
     <div class="chips" role="group" :aria-label="t('doctor.worklist.flags')">
       <button type="button" class="chip-filter" :class="{ active: flag === null }" @click="flag = null">{{ t('common.allShort') }} · {{ items.length }}</button>
       <button v-for="f in FLAGS" :key="f" type="button" class="chip-filter" :class="{ active: flag === f }" :data-testid="`flag-${f}`" @click="flag = flag === f ? null : f">{{ flagLabel(f) }} · {{ counts[f] }}</button>
     </div>
-    <ErrorBox :error="error" />
+    <StateStale v-if="!busy && !error && isStale(asOf)" :as-of="asOf" @refresh="load" />
+    <ErrorBox :error="actionError" />
 
     <KpiRow>
       <KpiTile :value="items.length" :label="t('doctor.worklist.kpiTotal')" :loading="busy && items.length === 0" />
@@ -184,9 +195,10 @@ onMounted(async () => {
 
     <AppCard :title="t('doctor.worklist.title')" :origin="modelBacked ? 'ml' : 'formula'" :origin-note="modelBacked ? t('doctor.worklist.note') : t('doctor.worklist.noteFallback')">
       <template #header><span class="caption">{{ t('doctor.worklist.shown', { shown: visible.length, total: items.length }) }}</span></template>
-      <Skeleton v-if="busy && items.length === 0" kind="table" :lines="8" />
-      <EmptyState v-else-if="visible.length === 0" :title="t('doctor.worklist.empty')" :text="flag || search ? t('doctor.worklist.emptyFilter') : undefined" />
-      <div v-else class="table-wrap">
+      <AsyncState :loading="busy" :error="error" :empty="visible.length === 0" :filtered="items.length > 0 && !!(flag || search)" :lines="8"
+        :empty-title="t('doctor.worklist.empty')" :empty-text="t('doctor.worklist.emptyText')" :filter-hint="t('doctor.worklist.emptyFilter')" empty-icon="pi pi-user-plus" @retry="load" @reset="resetFilters">
+        <template v-if="auth.can('referral.assist')" #empty-actions><Button :label="t('doctor.worklist.createReferral')" size="small" @click="router.push({ name: 'referral' })" /></template>
+      <div class="table-wrap">
         <table class="dense-table" data-testid="worklist-table">
           <thead>
             <tr>
@@ -232,6 +244,7 @@ onMounted(async () => {
           </tbody>
         </table>
       </div>
+      </AsyncState>
     </AppCard>
 
     <SidePanel v-model:visible="panelOpen" :title="selected?.patientRef ?? ''" :subtitle="selected ? `${refdata.profileName(selected.profileCode)} · ${shortOrgName(selected.moName)}` : ''">

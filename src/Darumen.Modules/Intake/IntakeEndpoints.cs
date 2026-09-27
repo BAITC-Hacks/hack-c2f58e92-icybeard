@@ -12,7 +12,7 @@ public static class IntakeEndpoints
                 var (p, s) = Paging.Normalize(page, size);
                 return Results.Ok(await repository.BatchesAsync(status, dataset, p, s, ct));
             })
-            .RequireAuthorization(Policies.Steward)
+            .RequireAuthorization(Permissions.Policy(Permissions.DataSteward))
             .WithTags("Intake").WithName("IntakeBatches").WithSummary("Партии загрузки данных, пришедшие событиями из Data Intake Fabric")
             .Produces<Paged<BatchDto>>();
     }

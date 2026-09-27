@@ -80,14 +80,15 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
         await using (var connection = await db.OpenAsync(cancellationToken))
         {
             var signal = await connection.QueryFirstOrDefaultAsync<SignalScopeRow>(new CommandDefinition(
-                "SELECT region_kato AS RegionKato FROM gold.anomalies WHERE id = @anomalyId",
+                "SELECT region_kato AS RegionKato, mo_code AS MoCode FROM gold.anomalies WHERE id = @anomalyId",
                 new { anomalyId = command.AnomalyId }, cancellationToken: cancellationToken));
             if (signal is null)
             {
                 return AckOutcome.NotFound;
             }
 
-            if (command.RegionScope is not null && signal.RegionKato != command.RegionScope)
+            if ((command.RegionScope is not null && signal.RegionKato != command.RegionScope)
+                || (command.MoScope is not null && signal.MoCode != command.MoScope))
             {
                 return AckOutcome.OutOfScope;
             }
@@ -314,7 +315,7 @@ public sealed class AnalyticsRepository(IDbConnectionFactory db, IDbContextOutbo
         }
     }
 
-    private sealed record SignalScopeRow(string? RegionKato);
+    private sealed record SignalScopeRow(string? RegionKato, string? MoCode);
 
     private sealed record StreamRow(string StreamId, string Title, string Grain, string EntityKeys, string Horizons);
 

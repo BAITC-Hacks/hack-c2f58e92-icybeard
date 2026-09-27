@@ -4,8 +4,9 @@ import '../api/client.dart';
 import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import 'state_view.dart';
 
-/// Ошибка запроса прямо на экране (coral-wash, radius 16): problem+json как есть, остальное — «сервер недоступен»;
+/// Ошибка запроса прямо на экране (critical-заливка, radius 16; ответ 403 — состояние «Нет доступа»): problem+json как есть, остальное — «сервер недоступен»;
 /// кнопка «Повторить». Никогда не показывает выдуманных чисел вместо данных.
 class ErrorBox extends StatelessWidget {
   const ErrorBox({super.key, required this.error, this.onRetry});
@@ -17,6 +18,9 @@ class ErrorBox extends StatelessWidget {
   Widget build(BuildContext context) {
     if (error == null) {
       return const SizedBox.shrink();
+    }
+    if (isForbidden(error)) {
+      return ForbiddenState(error: error);
     }
     final s = S.at(context);
     final tone = AppTones.of(context).danger;

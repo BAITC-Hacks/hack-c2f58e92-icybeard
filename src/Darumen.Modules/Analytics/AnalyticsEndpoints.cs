@@ -35,16 +35,18 @@ public static class AnalyticsEndpoints
         "Число единиц активной медицинской техники по регионам (gold.equipment_by_region): сумма quantity (пустое значение " +
         "считается за одну единицу) по строкам без даты списания. Регионы отсортированы по убыванию числа единиц.";
 
+    private static readonly string[] AnomalyPermissions = [Permissions.GovMap, Permissions.OrgCabinet];
+
     public static void Map(IEndpointRouteBuilder api)
     {
         api.MapGet("/streams", async (IAnalyticsRepository repository, CancellationToken ct) =>
                 Results.Ok(new { items = await repository.StreamsAsync(ct) }))
-            .RequireAuthorization(Policies.Authenticated)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovMap))
             .WithTags("Forecast").WithName("Streams").WithSummary("Каталог зарегистрированных потоков");
 
         api.MapGet("/forecast/{streamId}", async (string streamId, int? horizon, HttpRequest http, ForecastService service, CancellationToken ct) =>
             {
-                // главврач прогнозирует только свой регион: клейм region_kato сильнее entity[regionKato] в запросе,
+                // роль, привязанная к региону, прогнозирует только свой регион: клейм region_kato сильнее entity[regionKato] в запросе,
                 // если сущность вообще ключуется по региону (у некоторых потоков ключ — localization/mo_key, не регион)
                 var entity = new Dictionary<string, string>(ParseEntity(http.Query));
                 var scope = RegionScope(CurrentUser.From(http.HttpContext));
@@ -55,19 +57,25 @@ public static class AnalyticsEndpoints
 
                 return await service.ForecastAsync(streamId, entity, horizon ?? 0, ct);
             })
-            .RequireAuthorization(Policies.ChiefOrRegulator)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovMap))
             .WithTags("Forecast").WithName("Forecast").WithSummary("Прогноз потока для сущности: entity[regionKato]=75&entity[profileCode]=381")
             .Produces<ForecastResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity).ProducesProblem(StatusCodes.Status404NotFound);
 
-        var anomalies = api.MapGroup("/anomalies").WithTags("Anomalies").RequireAuthorization(Policies.ChiefOrRegulator);
+        // карта (gov.map) видит все сигналы; кабинет организации (org.cabinet) при scope own — только сигналы своей организации
+        var anomalies = api.MapGroup("/anomalies").WithTags("Anomalies").RequireAuthorization(Permissions.Policy(AnomalyPermissions));
         anomalies.MapGet("/", async (string? regionKato, string? streamId, string? severity, string? status, string? moCode, int? page, int? size,
                 HttpContext http, IAnalyticsRepository repository, CancellationToken ct) =>
             {
-                // главврач видит сигналы только своего региона: клейм region_kato сильнее параметра запроса
-                regionKato = RegionScope(CurrentUser.From(http)) ?? regionKato;
+                var scope = await OrgAccess.ResolveAsync(http, moCode, AnomalyPermissions);
+                if (scope.Problem is not null)
+                {
+                    return scope.Problem;
+                }
 
+                // роль, привязанная к региону, видит сигналы только своего региона: клейм region_kato сильнее параметра запроса
+                regionKato = RegionScope(CurrentUser.From(http)) ?? regionKato;
                 var (p, s) = Paging.Normalize(page, size);
-                return Results.Ok(await repository.AnomaliesAsync(new AnomalyFilter(regionKato, streamId, severity, status ?? "open", moCode), p, s, ct));
+                return Results.Ok(await repository.AnomaliesAsync(new AnomalyFilter(regionKato, streamId, severity, status ?? "open", scope.MoCode), p, s, ct));
             })
             .WithName("Anomalies").WithSummary("Сигналы аномалий, по умолчанию открытые, отсортированы по силе")
             .Produces<Paged<AnomalyDto>>();
@@ -80,8 +88,14 @@ public static class AnalyticsEndpoints
                     return new ValidationErrors().Add("status", $"допустимые значения: {string.Join(", ", AnomalyStatuses.Closing)}").Problem();
                 }
 
+                var scope = await OrgAccess.ResolveAsync(http, null, AnomalyPermissions);
+                if (scope.Problem is not null)
+                {
+                    return scope.Problem;
+                }
+
                 var user = CurrentUser.From(http);
-                var command = new AnomalyAckCommand(id, status, body?.Comment, user.Actor, user.Role, RegionScope(user));
+                var command = new AnomalyAckCommand(id, status, body?.Comment, user.Actor, user.Role, RegionScope(user), scope.IsOwn ? scope.MoCode : null);
                 var outcome = await repository.AcknowledgeAsync(command,
                     () => new DecisionRecorded
                     {
@@ -97,8 +111,7 @@ public static class AnalyticsEndpoints
                 return outcome switch
                 {
                     AckOutcome.Acknowledged => Results.NoContent(),
-                    AckOutcome.OutOfScope => Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Сигнал другого региона",
-                        detail: "главврач закрывает сигналы только своего региона"),
+                    AckOutcome.OutOfScope => AccessProblems.Forbidden(AccessProblems.OtherOrganization),
                     _ => Results.NotFound(),
                 };
             })
@@ -106,21 +119,22 @@ public static class AnalyticsEndpoints
             .Produces(StatusCodes.Status204NoContent).Produces(StatusCodes.Status404NotFound)
             .ProducesProblem(StatusCodes.Status403Forbidden).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
+        // качество моделей — на карте и в пояснении ассистента направления (качество модели ожидания)
         api.MapGet("/quality", async (QualityService quality, CancellationToken ct) => await quality.ReportAsync(ct))
-            .RequireAuthorization(Policies.Authenticated)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovMap, Permissions.ReferralAssist))
             .WithTags("Quality").WithName("ModelQuality")
             .WithSummary("Качество моделей: отчёты обучения против baseline, разбор по регионам и профилям, доля плоских прогнозов");
 
         api.MapGet("/los", async (string? regionKato, string? profileCode, IAnalyticsRepository repository, CancellationToken ct) =>
                 Results.Ok(new LosResponseDto(await repository.LosAsync(regionKato, profileCode, ct), LosMethod)))
-            .RequireAuthorization(Policies.Authenticated)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovMap))
             .WithTags("Quality").WithName("LengthOfStay")
             .WithSummary("Длительность лечения по ячейкам регион×профиль: факт-медиана за 12 месяцев и p50 модели")
             .Produces<LosResponseDto>();
 
         api.MapGet("/staffing", async (IAnalyticsRepository repository, CancellationToken ct) =>
                 Results.Ok(new StaffingResponseDto(await repository.StaffingByRegionAsync(ct), StaffingMethod)))
-            .RequireAuthorization(Policies.Authenticated)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovMap))
             .WithTags("Quality").WithName("StaffingByRegion")
             .WithSummary("Ставки медперсонала на 10 тыс. населения и на 1 000 госпитализаций по регионам")
             .Produces<StaffingResponseDto>();
@@ -151,28 +165,30 @@ public static class AnalyticsEndpoints
                 var data = await repository.VaccinationRefusalsAsync(ct);
                 return Results.Ok(new VaccinationRefusalsResponseDto(data.ByReason, data.ByContraindication, VacRefusalsMethod));
             })
-            .RequireAuthorization(Policies.Authenticated)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovMap))
             .WithTags("Quality").WithName("VaccinationRefusals")
             .WithSummary("Отказы от вакцинации по причине и по противопоказанию, общенационально")
             .Produces<VaccinationRefusalsResponseDto>();
 
         api.MapGet("/oncology-late-stage", async (IAnalyticsRepository repository, CancellationToken ct) =>
                 Results.Ok(new OncologyLateStageResponseDto(await repository.OncologyLateStageAsync(ct), OncoLateMethod)))
-            .RequireAuthorization(Policies.Authenticated)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovMap))
             .WithTags("Quality").WithName("OncologyLateStage")
             .WithSummary("Доля запущенных случаев (III/IV стадии) по локализациям, общенационально")
             .Produces<OncologyLateStageResponseDto>();
 
         api.MapGet("/equipment", async (IAnalyticsRepository repository, CancellationToken ct) =>
                 Results.Ok(new EquipmentResponseDto(await repository.EquipmentByRegionAsync(ct), EquipmentMethod)))
-            .RequireAuthorization(Policies.Authenticated)
+            .RequireAuthorization(Permissions.Policy(Permissions.GovMap))
             .WithTags("Quality").WithName("EquipmentByRegion")
             .WithSummary("Число единиц активной медтехники по регионам, для сравнения на /gov")
             .Produces<EquipmentResponseDto>();
 
-        api.MapGet("/equipment/organizations/{moCode}", async (string moCode, IAnalyticsRepository repository, CancellationToken ct) =>
-                Results.Ok(new EquipmentOrganizationDto(moCode, await repository.EquipmentForOrganizationAsync(moCode, ct))))
-            .RequireAuthorization(Policies.ChiefOrRegulator)
+        api.MapGet("/equipment/organizations/{moCode}", async (string moCode, HttpContext http, IAnalyticsRepository repository, CancellationToken ct) =>
+                await OrgAccess.CheckAsync(http, moCode, Permissions.OrgCabinet) is { } denied
+                    ? denied
+                    : Results.Ok(new EquipmentOrganizationDto(moCode, await repository.EquipmentForOrganizationAsync(moCode, ct))))
+            .RequireAuthorization(Permissions.Policy(Permissions.OrgCabinet))
             .WithTags("Quality").WithName("EquipmentByOrganization")
             .WithSummary("Число единиц активной медтехники организации, для кабинета организации")
             .Produces<EquipmentOrganizationDto>();

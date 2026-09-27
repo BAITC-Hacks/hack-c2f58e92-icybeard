@@ -19,11 +19,12 @@ import '../widgets/origin_tag.dart';
 import '../widgets/pill_filter.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/state_view.dart';
 import '../widgets/status_chip.dart';
 
 /// «Пациенты» врача по доске M-Worklist: пилюли «Сегодня» (есть флаги или сигнал пациента) / «Все», регион справа,
 /// круглая кнопка поиска по номеру пациента, строки «реф 17/500 · ждёт N дн. · организация» с чипом статуса
-/// справа (риск отказа — coral, есть быстрее — sage, запрос пациента — coral-wash, иначе «ожидает решения»).
+/// справа (риск отказа и запрос пациента — янтарные, есть быстрее — зелёный, иначе «ожидает решения»).
 /// Сортировка по приоритету модели; ответ на запрос пациента — на экране маршрута.
 class WorklistScreen extends StatefulWidget {
   const WorklistScreen({super.key});
@@ -130,14 +131,21 @@ class _WorklistScreenState extends State<WorklistScreen> {
           skeleton: const CardSkeleton(height: 320),
           builder: (_, page) {
             final visible = _visible(page.items);
+            final stale = StaleDataBanner.isStale(page.asOf);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (visible.isEmpty)
-                  EmptyState(
-                    icon: Icons.people_outline,
-                    title: _today ? s.worklistTodayEmpty : s.worklistEmpty,
-                    action: _today ? OutlinedButton(onPressed: () => setState(() => _today = false), child: Text(s.showAll)) : null,
+                if (stale) ...[StaleDataBanner(asOf: page.asOf, onRefresh: _load), const SizedBox(height: AppSpacing.md)],
+                if (page.items.isEmpty)
+                  EmptyState(icon: Icons.people_outline, title: s.worklistNoPatients, body: s.worklistNoPatientsBody)
+                else if (visible.isEmpty)
+                  FilteredEmptyState(
+                    body: _today && _query.text.isEmpty ? s.worklistTodayEmpty : s.stateFilterBody,
+                    resetLabel: _today && _query.text.isEmpty ? s.showAll : s.resetFilters,
+                    onReset: () => setState(() {
+                      _today = false;
+                      _query.clear();
+                    }),
                   )
                 else
                   AppCard(
@@ -158,7 +166,7 @@ class _WorklistScreenState extends State<WorklistScreen> {
                   children: [
                     OriginTag(page.modelBacked ? Origin.ml : Origin.formula),
                     const SizedBox(width: 10),
-                    Expanded(child: Text(s.asOfLabel(dateShort(page.asOf)), style: theme.textTheme.labelSmall?.merge(AppType.numeric))),
+                    if (!stale) Expanded(child: Text(s.asOfLabel(dateShort(page.asOf)), style: theme.textTheme.labelSmall?.merge(AppType.numeric))),
                   ],
                 ),
                 if (!page.modelBacked) ...[const SizedBox(height: AppSpacing.xs), Text(s.modelUnavailableNote, style: theme.textTheme.labelSmall)],
@@ -171,7 +179,7 @@ class _WorklistScreenState extends State<WorklistScreen> {
   }
 }
 
-/// Строка пациента: реф 17/500 табличными цифрами, «ждёт N дн. · организация» 14 ink-3, чип статуса справа.
+/// Строка пациента: реф 17/500 табличными цифрами, «ждёт N дн. · организация» 14 ink-2, чип статуса справа.
 class _PatientRow extends StatelessWidget {
   const _PatientRow({required this.item, required this.last, required this.onOpen});
 
@@ -184,7 +192,7 @@ class _PatientRow extends StatelessWidget {
       return (s.statusSignal, StatusTone.warn);
     }
     if (item.riskFlags.contains('refusal_risk')) {
-      return (s.statusRisk, StatusTone.danger);
+      return (s.statusRisk, StatusTone.warn);
     }
     if (item.riskFlags.contains('faster_alternative')) {
       return (s.statusFaster, StatusTone.ok);
@@ -217,7 +225,7 @@ class _PatientRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${s.waitingFor(item.daysWaiting)} · ${shortOrgName(item.moName)}',
-                      style: theme.textTheme.bodySmall?.copyWith(color: colors.faint).merge(AppType.numeric),
+                      style: theme.textTheme.bodySmall?.copyWith(color: colors.muted).merge(AppType.numeric),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),

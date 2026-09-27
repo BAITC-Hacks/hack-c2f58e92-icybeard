@@ -4,6 +4,9 @@ import type {
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
   DailyResponse, LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, RouteStandard, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistResponse, SignalKind,
+  AccessLogEntry, AdminDoctor, ApplicationDecision, CodeResent, InviteAccepted, AdminOrg, AdminOrgDetailResponse, AdminUserDetail, AdminUsersResponse, AdminUserUpdate, ApplicationStatus, ConsentsResponse, InviteInfo,
+  InviteRequest, InviteResponse, LoginExamples, MeResponse, NotificationSettings, OrgApplication, OrgApplicationCreated, OrgApplicationRequest,
+  OrgApplicationStatus, PagedList, ProfileResponse, ProfileUpdate, RoleChange, RoleCreate, RolePermissionsUpdate, RolesResponse, SecurityResponse, Verification,
 } from './types'
 
 export const queue = {
@@ -121,4 +124,62 @@ export const intake = {
 
 export const pub = {
   daily: (regionKato?: string) => api<DailyResponse>('/api/v1/public/daily', { query: { regionKato } }),
+  /** Пример-карточки страницы входа (анонимно, кэш 1 ч). */
+  loginExamples: () => api<LoginExamples>('/api/v1/public/login-examples'),
+  /** Заявка на регистрацию организации: код подтверждения уходит на почту, statusToken — ключ к статусу без входа. */
+  apply: (body: OrgApplicationRequest) => api<OrgApplicationCreated>('/api/v1/public/org-applications', { body }),
+  application: (id: string, statusToken: string) =>
+    api<OrgApplicationStatus>(`/api/v1/public/org-applications/${encodeURIComponent(id)}`, { query: { statusToken } }),
+  verifyEmail: (id: string, code: string, statusToken: string) =>
+    api<void>(`/api/v1/public/org-applications/${encodeURIComponent(id)}/verify-email`, { body: { code, statusToken } }),
+  resendCode: (id: string, statusToken: string) =>
+    api<CodeResent>(`/api/v1/public/org-applications/${encodeURIComponent(id)}/resend-code`, { body: { statusToken } }),
+  invite: (token: string) => api<InviteInfo>(`/api/v1/public/invites/${encodeURIComponent(token)}`),
+  acceptInvite: (token: string, password: string) =>
+    api<InviteAccepted>(`/api/v1/public/invites/${encodeURIComponent(token)}/accept`, { body: { password, acceptedRules: true } }),
+  declineInvite: (token: string) => api<void>(`/api/v1/public/invites/${encodeURIComponent(token)}/decline`, { method: 'POST', body: {} }),
+}
+
+/** Я и мой аккаунт: любой вошедший. */
+export const account = {
+  me: () => api<MeResponse>('/api/v1/me'),
+  requestAccess: (body: { permission: string; path: string; comment?: string }) => api<void>('/api/v1/me/access-requests', { body }),
+  profile: () => api<ProfileResponse>('/api/v1/me/profile'),
+  saveProfile: (body: ProfileUpdate) => api<ProfileResponse>('/api/v1/me/profile', { method: 'PUT', body }),
+  security: () => api<SecurityResponse>('/api/v1/me/security'),
+  endSession: (id: string) => api<void>(`/api/v1/me/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  endOtherSessions: () => api<void>('/api/v1/me/sessions', { method: 'DELETE', query: { keepCurrent: true } }),
+  notifications: () => api<NotificationSettings>('/api/v1/me/notifications'),
+  saveNotifications: (body: NotificationSettings) => api<NotificationSettings>('/api/v1/me/notifications', { method: 'PUT', body }),
+  consents: () => api<ConsentsResponse>('/api/v1/me/consents'),
+  setConsent: (code: string, granted: boolean) => api<void>(`/api/v1/me/consents/${encodeURIComponent(code)}`, { method: 'PUT', body: { granted } }),
+  accessLog: () => api<{ items: AccessLogEntry[] }>('/api/v1/me/access-log'),
+  exportCsv: () => apiDownload('/api/v1/me/export'),
+  requestDeletion: () => api<void>('/api/v1/me/deletion-request', { method: 'POST', body: {} }),
+}
+
+export interface UserFilter { role?: string; moCode?: string; status?: string; q?: string; page?: number; size?: number }
+export interface DoctorFilter { regionKato?: string; moCode?: string; specialty?: string; verification?: string; page?: number; size?: number }
+export interface OrgFilter { regionKato?: string; type?: string; status?: string; page?: number; size?: number }
+
+/** Администрирование: пользователи и врачи — admin.users (own — своя организация), роли — admin.roles, организации — admin.orgs. */
+export const admin = {
+  users: (filter: UserFilter) => api<AdminUsersResponse>('/api/v1/admin/users', { query: { ...filter } }),
+  user: (id: string) => api<AdminUserDetail>(`/api/v1/admin/users/${encodeURIComponent(id)}`),
+  updateUser: (id: string, body: AdminUserUpdate) => api<unknown>(`/api/v1/admin/users/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  block: (id: string) => api<void>(`/api/v1/admin/users/${encodeURIComponent(id)}/block`, { method: 'POST', body: {} }),
+  unblock: (id: string) => api<void>(`/api/v1/admin/users/${encodeURIComponent(id)}/unblock`, { method: 'POST', body: {} }),
+  invite: (body: InviteRequest) => api<InviteResponse>('/api/v1/admin/users/invite', { body }),
+  doctors: (filter: DoctorFilter) => api<PagedList<AdminDoctor>>('/api/v1/admin/doctors', { query: { ...filter } }),
+  verifyDoctor: (id: string, status: Verification, comment?: string) =>
+    api<void>(`/api/v1/admin/doctors/${encodeURIComponent(id)}/verification`, { body: { status, comment } }),
+  roles: () => api<RolesResponse>('/api/v1/admin/roles'),
+  saveRole: (key: string, body: RolePermissionsUpdate) => api<void>(`/api/v1/admin/roles/${encodeURIComponent(key)}/permissions`, { method: 'PUT', body }),
+  createRole: (body: RoleCreate) => api<void>('/api/v1/admin/roles', { body }),
+  roleHistory: (role?: string) => api<{ items: RoleChange[] }>('/api/v1/admin/roles/history', { query: { role } }),
+  orgs: (filter: OrgFilter) => api<PagedList<AdminOrg>>('/api/v1/admin/orgs', { query: { ...filter } }),
+  org: (moCode: string) => api<AdminOrgDetailResponse>(`/api/v1/admin/orgs/${encodeURIComponent(moCode)}`),
+  applications: (status?: ApplicationStatus) => api<{ items: OrgApplication[] }>('/api/v1/admin/org-applications', { query: { status } }),
+  approveApplication: (id: string) => api<ApplicationDecision>(`/api/v1/admin/org-applications/${encodeURIComponent(id)}/approve`, { method: 'POST', body: {} }),
+  rejectApplication: (id: string, reason: string) => api<void>(`/api/v1/admin/org-applications/${encodeURIComponent(id)}/reject`, { body: { reason } }),
 }

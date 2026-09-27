@@ -1,17 +1,28 @@
 import { computed } from 'vue'
 import { useTheme } from './useTheme'
 
+/** Цвета графиков Палитры C: серия — фиолетовый accent, прогноз и интервал — светлые фиолетовые, аномалии и
+ * риск — янтарь (никогда не фиолетовые), лучший вариант — good. */
 export interface ChartTheme {
   ink: string
   muted: string
   hairline: string
-  /** коралл — единственный сигнал: выделенный столбец, прогноз, аномалия */
+  /** фиолетовый brand-акцент (= series) */
   accent: string
+  /** основная серия: факт, очередь, «после» в сценарии */
+  series: string
+  /** линия прогноза (пунктир) — светлый фиолетовый */
+  forecast: string
+  /** аномалия, риск, перегрузка, отказы — янтарь */
+  anomaly: string
+  /** лучший вариант — good */
+  ok: string
   surface: string
-  /** ряды графиков: ink, coral, два синих из шкалы карты */
+  /** ряды графиков: фиолетовый, янтарь, good, светлый фиолетовый */
   palette: string[]
-  /** шкала карты и индекса: пять синих от «ниже 60» к «87 и выше» */
+  /** рамп карты и индекса: пять фиолетовых от «ниже 60» к «87 и выше» (выше = хуже) */
   scale: string[]
+  /** полоса интервала прогноза */
   band: string
   font: string
 }
@@ -32,6 +43,10 @@ export function useChartTheme() {
       muted: cssVar('--dm-muted'),
       hairline: cssVar('--dm-hairline'),
       accent: cssVar('--dm-accent'),
+      series: cssVar('--dm-chart-1'),
+      forecast: cssVar('--dm-chart-forecast'),
+      anomaly: cssVar('--dm-warn-strong'),
+      ok: cssVar('--dm-ok'),
       surface: cssVar('--dm-surface'),
       palette: ['--dm-chart-1', '--dm-chart-2', '--dm-chart-3', '--dm-chart-4'].map(cssVar),
       scale: ['--dm-map-1', '--dm-map-2', '--dm-map-3', '--dm-map-4', '--dm-map-5'].map(cssVar),

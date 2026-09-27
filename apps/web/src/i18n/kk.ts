@@ -1,4 +1,11 @@
+import { kkAccount } from './kk-account'
+import { kkAdmin } from './kk-admin'
+import { kkRbac } from './kk-rbac'
+
 export const kk = {
+  ...kkRbac,
+  ...kkAccount,
+  ...kkAdmin,
   nav: {
     group: {
       patients: 'Пациенттер',
@@ -8,6 +15,8 @@ export const kk = {
       common: 'Жалпы',
       data: 'Деректер',
       citizen: 'Азаматқа',
+      admin: 'Әкімшілендіру',
+      account: 'Аккаунт',
     },
     short: {
       home: 'Басты',
@@ -23,12 +32,15 @@ export const kk = {
       region: 'Өңір',
       orgOverview: 'Шолу',
       orgReferrals: 'Жолдамалар мен бас тартулар',
+      data: 'Деректер',
     },
-    affiliation: { regulator: 'ҚР ДСМ', doctor: 'МСАК дәрігері', steward: 'деректер стюарды', admin: 'әкімші', citizen: 'азамат', chief: 'бас дәрігер' },
+    affiliation: { regulator: 'ҚР ДСМ', doctor: 'МСАК дәрігері', steward: 'деректер стюарды', admin: 'жүйе әкімшісі', citizen: 'азамат', org_admin: 'ұйым әкімшісі', auditor: 'аудитор' },
     region: 'Өңір', organization: 'Аурухана · шолу', orgReferrals: 'Аурухана · жолдамалар мен бас тартулар',
     home: 'Басты бет', gov: 'Өңірлер картасы', simulator: 'Симулятор', insight: 'Деректерге сұрақтар', quality: 'Модельдер сапасы', referral: 'Жолдама көмекшісі',
     worklist: 'Жұмыс тізімі', medicines: 'Рецепт тексеру', decisions: 'Шешімдер журналы', scribe: 'AI-скрайб', steward: 'Стюард консолі', wait: 'Азаматтар үшін күту', audit: 'Аудит журналы',
     route: 'Менің жолым',
+    adminUsers: 'Пайдаланушылар', adminDoctors: 'Дәрігерлер', adminRoles: 'Рөлдер мен қолжетімділік', adminOrgs: 'Ұйымдар',
+    welcome: 'Алғашқы кіру', accountProfile: 'Профиль', accountSecurity: 'Қауіпсіздік', accountNotifications: 'Хабарламалар', accountConsents: 'Деректер мен келісімдер',
   },
   route: {
     stagesTitle: 'Маршрут кезеңдері', stagesCount: '{total} кезең · {done} өтілді', whatNext: 'Әрі қарай не',
@@ -108,6 +120,7 @@ export const kk = {
   },
   common: {
     cancel: 'Болдырмау',
+    close: 'Жабу',
     allShort: 'Барлығы',
     loading: 'Жүктелуде…', error: 'Қате', retry: 'Қайталау', month: 'Ай', profile: 'Төсек бейіні', region: 'Өңір',
     organization: 'Ұйым', apply: 'Есептеу', days: 'күн', empty: 'Деректер жоқ', all: 'Барлық бейіндер', model: 'Модель',
@@ -116,7 +129,7 @@ export const kk = {
   },
   decision: {
     subjectReferral: 'жолдама', subjectAnomaly: 'сигнал', subjectRoute: 'маршрут',
-    role: { doctor: 'дәрігер', chief: 'бас дәрігер', regulator: 'реттеуші', steward: 'стюард', admin: 'әкімші', citizen: 'азамат' },
+    role: { doctor: 'дәрігер', chief: 'бас дәрігер', org_admin: 'ұйым әкімшісі', regulator: 'реттеуші', steward: 'стюард', auditor: 'аудитор', admin: 'әкімші', citizen: 'азамат' },
     anomalyShort: 'сигнал {id}',
   },
   anomalyFeed: {
@@ -350,6 +363,7 @@ export const kk = {
       patient: 'Науқас', stage: 'Кезең', daysWaiting: 'Күтуде, күн', expectedDate: 'Күтілетін күн', flags: 'Жалаушалар',
       priority: 'Басымдық', nextStep: 'Келесі қадам', openReferral: 'жолдаманы ашу',
       asOf: 'деректер {date} жағдайы бойынша', empty: 'Тізімде науқастар жоқ',
+      emptyText: 'Пациенттер өңірдің күту парағындағы алғашқы жолдамадан кейін пайда болады.', createReferral: 'Жолдама жасау',
       stageCode: { registered: 'тіркелді', waiting: 'күтуде', called: 'емдеуге жатқызуға шақыру' },
       action: {
         redirect_faster: 'күту мерзімі қысқарақ ұйымға бағыттауды ұсыну',
@@ -367,6 +381,7 @@ export const kk = {
       keyNote: 'Сол идемпотенттілік кілтімен қайта жіберу жаңа жазба жасамайды.',
       key: 'Шешім идентификаторы',
       empty: 'Шешімдер әзірге жоқ',
+      emptyText: 'Шешімдер алғашқы расталған жолдамадан немесе сигналға жауаптан кейін пайда болады.',
       title: 'Шешімдер журналы',
       leadRegulator: 'Дәрігерлердің шешімдері мен сигналдарды растау: жүйе ұсынымы және адамның таңдауы.',
       leadSelf: 'Сіздің шешімдеріңіз: жүйе ұсынымы және сіздің таңдауыңыз.',
@@ -677,12 +692,10 @@ export const kk = {
     factReferrals: 'ИС БГ жолдамалары',
     factPeriodValue: '2025 ж. I тоқсан',
     factPeriod: 'деректер кезеңі',
-    deniedRoleNamed: '{page} беті мына рөлдерге ашық: {roles}.',
-    deniedGuestRole: '{page} беті мына рөлдерге ашық: {roles}. Кіріңіз.',
     title: 'Darumen Health', lead: 'Денсаулық сақтау деректерінің экожүйесі: жоспарлы емдеуге жатқызу кезектері, жүктеме болжамы, ауытқулар және адамдардың шешімдері.',
     deniedGuest: '{page} беті кіргеннен кейін қолжетімді.',
-    deniedRole: '{page} беті үшін басқа рөл керек.',
-    goHome: 'Өз экраныма өту',
+    signupLead: 'Ұйым әлі қосылмаған ба?',
+    signup: 'Ұйымды тіркеу',
   },
   hero: {
     half: 'жартысы одан ұзақ күтпейді',

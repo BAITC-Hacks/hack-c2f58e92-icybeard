@@ -186,22 +186,28 @@ class _RouteCard extends StatelessWidget {
   }
 }
 
-/// Три плитки: «Сколько ждут», «Лекарства», «Вакцинация» — белые, radius 16, иконка 24 и подпись 13/500.
+/// Три плитки: «Сколько ждут», «Лекарства» (при `medicines.check`), «Вакцинация» — белые, radius 16, иконка 24
+/// и подпись 13/500.
 class _Tiles extends StatelessWidget {
   const _Tiles();
 
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
+    final medicines = context.select<Session, bool>((x) => x.can(Perm.medicinesCheck));
+    final tiles = [
+      _Tile(icon: Icons.schedule_outlined, label: s.homeTileWait, onTap: () => context.go('/home/wait')),
+      if (medicines) _Tile(icon: Icons.medication_outlined, label: s.homeTileMedicines, onTap: () => context.go('/home/medicines')),
+      _Tile(icon: Icons.vaccines_outlined, label: s.homeTileVaccination, onTap: () => context.go('/home/vaccination')),
+    ];
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: _Tile(icon: Icons.schedule_outlined, label: s.homeTileWait, onTap: () => context.go('/home/wait'))),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(child: _Tile(icon: Icons.medication_outlined, label: s.homeTileMedicines, onTap: () => context.go('/home/medicines'))),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(child: _Tile(icon: Icons.vaccines_outlined, label: s.homeTileVaccination, onTap: () => context.go('/home/vaccination'))),
+          for (final (i, tile) in tiles.indexed) ...[
+            if (i > 0) const SizedBox(width: AppSpacing.md),
+            Expanded(child: tile),
+          ],
         ],
       ),
     );

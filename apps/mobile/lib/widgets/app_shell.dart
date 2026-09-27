@@ -4,17 +4,19 @@ import 'package:go_router/go_router.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
-/// Вкладка плавающей нижней навигации: подпись, иконка и корневой путь ветки.
+/// Вкладка плавающей нижней навигации: подпись, иконка, корневой путь и индекс ветки StatefulShellRoute (вкладки
+/// без разрешения скрываются, поэтому позиция в пилюле и номер ветки могут не совпадать).
 class ShellDestination {
-  const ShellDestination({required this.label, required this.icon, required this.path});
+  const ShellDestination({required this.label, required this.icon, required this.path, required this.branch});
 
   final String label;
   final IconData icon;
   final String path;
+  final int branch;
 }
 
 /// Плавающая пилюля навигации поверх StatefulShellRoute: `margin 12 20 20`, высота 64, белая, тень; три пункта —
-/// иконка 22, подпись 12/500, точка 6 px coral под активным. Показывается только на корневых экранах веток: на
+/// иконка 22, подпись 12/500, точка 6 px accent под активным (активный пункт ink, остальные ink-2 — доска M-Home). Показывается только на корневых экранах веток: на
 /// вложенных («Мой путь», «Сколько ждут», маршрут пациента) вместо неё нижняя кнопка экрана. Повторное нажатие
 /// на активную вкладку возвращает её в корень.
 class AppShell extends StatelessWidget {
@@ -31,9 +33,12 @@ class AppShell extends StatelessWidget {
       body: shell,
       bottomNavigationBar: atRoot
           ? FloatingNav(
-              selectedIndex: shell.currentIndex,
+              selectedIndex: destinations.indexWhere((d) => d.branch == shell.currentIndex),
               destinations: destinations,
-              onSelected: (index) => shell.goBranch(index, initialLocation: index == shell.currentIndex),
+              onSelected: (index) {
+                final branch = destinations[index].branch;
+                shell.goBranch(branch, initialLocation: branch == shell.currentIndex);
+              },
             )
           : null,
     );
@@ -101,7 +106,7 @@ class _NavItem extends StatelessWidget {
             Container(
               width: AppSizes.dot,
               height: AppSizes.dot,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: selected ? colors.accent : AppColors.transparent),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: selected ? colors.accent : ColorTokens.transparent),
             ),
           ],
         ),

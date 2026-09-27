@@ -34,8 +34,9 @@ public static class AnomalyStatuses
     public static readonly IReadOnlyList<string> Closing = [Acknowledged, Dismissed];
 }
 
-/// <summary>Решение человека по сигналу. RegionScope — регион, которым ограничен пользователь (главврач), иначе null.</summary>
-public sealed record AnomalyAckCommand(string AnomalyId, string Status, string? Comment, string Actor, string Role, string? RegionScope);
+/// <summary>Решение человека по сигналу. RegionScope — регион, которым ограничен пользователь (роль, привязанная к региону),
+/// MoScope — организация при scope own (кабинет организации); null — без ограничения.</summary>
+public sealed record AnomalyAckCommand(string AnomalyId, string Status, string? Comment, string Actor, string Role, string? RegionScope, string? MoScope = null);
 
 public enum AckOutcome
 {

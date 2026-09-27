@@ -245,7 +245,7 @@ class _Result extends StatelessWidget {
         RowValue(
           data.shortage.flag ? s.shortageSigns(data.shortage.score.toStringAsFixed(1)) : s.shortageNoSigns,
           size: 15,
-          color: data.shortage.flag ? tones.danger.fg : tones.ok.fg,
+          color: data.shortage.flag ? tones.warn.fg : tones.ok.fg,
         ),
       ),
     ];
@@ -287,7 +287,7 @@ class _Result extends StatelessWidget {
                   if (data.basis.isNotEmpty) data.basis,
                   s.pharmacyShort,
                 ].join(' · '),
-                style: theme.textTheme.labelSmall?.copyWith(color: AppPalette.of(context).faint),
+                style: theme.textTheme.labelSmall?.copyWith(color: AppPalette.of(context).muted),
               ),
             ],
           ),

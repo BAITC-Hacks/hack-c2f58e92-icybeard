@@ -190,7 +190,7 @@ onMounted(r.load)
 <style scoped>
 .top-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
-.signal-card { background: var(--dm-danger-soft); display: flex; flex-direction: column; gap: 10px; color: var(--dm-ink); }
+.signal-card { background: var(--dm-accent-soft); display: flex; flex-direction: column; gap: 10px; color: var(--dm-ink); }
 .signal-head { display: flex; align-items: center; gap: 12px; }
 .signal-head i { font-size: 1.3rem; }
 .signal-title { font-size: var(--dm-text-lg); font-weight: 500; letter-spacing: -0.01em; }

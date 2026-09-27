@@ -17,10 +17,11 @@ import '../widgets/load_state_view.dart';
 import '../widgets/pill_filter.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
+import '../widgets/state_view.dart';
 import '../widgets/status_chip.dart';
 
 /// Журнал решений по доске M-Decisions: пилюли Все · Маршрут · Направление, группы по дням (label + карточка-список),
-/// строка «реф 15/500 · Военный госпиталь → Достар Мед · время · «причина»» с чипом «совпало» (sage), если выбрана
+/// строка «реф 15/500 · Военный госпиталь → Достар Мед · время · «причина»» с чипом «совпало» (good), если выбрана
 /// рекомендованная, иначе «иначе»; тап — лист с полными именами, кодами и ключом записи. Имена организаций — из
 /// справочника региона (журнал отдаёт только коды).
 class DecisionsScreen extends StatefulWidget {
@@ -146,7 +147,9 @@ class _DecisionsScreenState extends State<DecisionsScreen> {
           onRetry: _load,
           skeleton: const CardSkeleton(height: 300),
           isEmpty: (items) => !items.any((d) => _subject == null || d.subject == _subject),
-          empty: EmptyState(icon: Icons.history, title: s.emptyDecisions),
+          empty: _subject == null
+              ? EmptyState(icon: Icons.history, title: s.emptyDecisions)
+              : FilteredEmptyState(onReset: () => setState(() => _subject = null)),
           builder: (_, items) {
             final groups = groupByDay([for (final d in items) if (_subject == null || d.subject == _subject) d], (d) => d.recordedAt, s);
             return Column(
@@ -214,7 +217,7 @@ class _DecisionRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(line, style: theme.textTheme.bodySmall?.copyWith(color: colors.ink, height: 1.35), maxLines: 2, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text(detail, style: theme.textTheme.rowDetail.copyWith(color: colors.faint).merge(AppType.numeric), maxLines: 2, overflow: TextOverflow.ellipsis),
+                    Text(detail, style: theme.textTheme.rowDetail.copyWith(color: colors.muted).merge(AppType.numeric), maxLines: 2, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),

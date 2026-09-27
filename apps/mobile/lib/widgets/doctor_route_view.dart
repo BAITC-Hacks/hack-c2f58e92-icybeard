@@ -111,7 +111,7 @@ class _RecommendationCard extends StatelessWidget {
           if (risk != null) ...[
             const SizedBox(height: AppSpacing.md),
             Text(s.riskRefusalLine(risk), style: theme.textTheme.bodySmall?.copyWith(fontSize: 17).merge(AppType.numeric)),
-            if (!doctor!.refusalOrgInTraining) Text(s.refusalOrgUnknownNote, style: theme.textTheme.labelSmall?.copyWith(color: colors.faint)),
+            if (!doctor!.refusalOrgInTraining) Text(s.refusalOrgUnknownNote, style: theme.textTheme.labelSmall?.copyWith(color: colors.muted)),
           ],
           if (doctor != null) ...[
             const SizedBox(height: AppSpacing.sm),
@@ -170,7 +170,7 @@ class _AlternativesCard extends StatelessWidget {
               onTap: onRedirect == null ? null : () => onRedirect!(a),
             ),
           if (route.alternatives.isEmpty)
-            Padding(padding: const EdgeInsets.only(bottom: AppSpacing.sm), child: Text(s.noQueuesInRegion, style: theme.textTheme.bodySmall?.copyWith(color: colors.faint))),
+            Padding(padding: const EdgeInsets.only(bottom: AppSpacing.sm), child: Text(s.noQueuesInRegion, style: theme.textTheme.bodySmall?.copyWith(color: colors.muted))),
         ],
       ),
     );
@@ -178,7 +178,7 @@ class _AlternativesCard extends StatelessWidget {
 }
 
 /// Открытый сигнал пациента: «Пациент просит Достар Мед», комментарий, поле причины и два действия — оба пишут
-/// решение в журнал и закрывают сигнал.
+/// решение в журнал и закрывают сигнал. Без `referral.confirm` (нет обработчиков) — только сам сигнал.
 class _SignalCard extends StatefulWidget {
   const _SignalCard({required this.route, required this.busy, this.onRedirect, this.onKeep});
 
@@ -220,31 +220,33 @@ class _SignalCardState extends State<_SignalCard> {
             [dateTimeShort(signal.recordedAt), if (signal.comment != null && signal.comment!.isNotEmpty) '«${signal.comment}»'].join(' · '),
             style: theme.textTheme.bodySmall?.merge(AppType.numeric),
           ),
-          const SizedBox(height: AppSpacing.md),
-          FieldLabel(s.keepReasonLabel),
-          ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _reason,
-            builder: (_, value, _) {
-              final canAct = !widget.busy && value.text.trim().isNotEmpty;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(controller: _reason, maxLines: 2, decoration: InputDecoration(hintText: s.reasonHint)),
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      if (requested != null && widget.onRedirect != null) ...[
-                        Expanded(child: FilledButton(onPressed: canAct ? () => widget.onRedirect!(requested, reason: value.text.trim()) : null, child: Text(s.redirectHere))),
-                        const SizedBox(width: AppSpacing.sm),
+          if (widget.onRedirect != null || widget.onKeep != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            FieldLabel(s.keepReasonLabel),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _reason,
+              builder: (_, value, _) {
+                final canAct = !widget.busy && value.text.trim().isNotEmpty;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(controller: _reason, maxLines: 2, decoration: InputDecoration(hintText: s.reasonHint)),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        if (requested != null && widget.onRedirect != null) ...[
+                          Expanded(child: FilledButton(onPressed: canAct ? () => widget.onRedirect!(requested, reason: value.text.trim()) : null, child: Text(s.redirectHere))),
+                          const SizedBox(width: AppSpacing.sm),
+                        ],
+                        if (widget.onKeep != null)
+                          Expanded(child: OutlinedButton(onPressed: canAct ? () => widget.onKeep!(value.text.trim()) : null, child: Text(s.keepHere))),
                       ],
-                      if (widget.onKeep != null)
-                        Expanded(child: OutlinedButton(onPressed: canAct ? () => widget.onKeep!(value.text.trim()) : null, child: Text(s.keepHere))),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
         ],
       ),
     );

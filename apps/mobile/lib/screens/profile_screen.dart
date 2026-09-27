@@ -19,7 +19,7 @@ import '../widgets/status_chip.dart';
 
 /// Профиль по доске M-Profile: аватар-круг, имя, «ИИН •••• 4321 · из eGov» (только маской, никогда полностью), чип
 /// роли; строки Язык, Регион, Уведомления (лист «Push через eGov mobile — после интеграции»), Данные и согласия
-/// (как считаются прогнозы + подпись о данных), «Выйти» coral-text; внизу версия и подпись данных.
+/// (как считаются прогнозы + подпись о данных), «Безопасность» (M-Account-Security), «Выйти» critical-текстом; внизу версия и подпись данных.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -150,7 +150,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
     final regionName = _regions.where((r) => r.kato == session.region).map((r) => r.name).firstOrNull ?? session.region;
-    final role = session.isDoctor ? s.roleDoctor : s.roleCitizen;
+    final roleKey = session.primaryRoleKey;
+    final role = roleKey == null ? (session.isDoctor ? s.roleDoctor : s.roleCitizen) : s.roleTitle(roleKey);
+    final securityPath = session.isDoctor ? '/doctor/profile/security' : '/profile/security';
     final identity = session.iin != null ? '${s.iinLabel} ${maskIin(session.iin)} · ${s.fromEgov}' : regionName;
     return PageScaffold(
       title: s.profileTitle,
@@ -196,6 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               ListRow(title: s.notificationsRow, onTap: _showNotifications),
               ListRow(title: s.dataConsents, onTap: _showConsents),
+              ListRow(title: s.securityTitle, onTap: () => context.go(securityPath)),
               ListRow(
                 title: s.logout,
                 strong: true,

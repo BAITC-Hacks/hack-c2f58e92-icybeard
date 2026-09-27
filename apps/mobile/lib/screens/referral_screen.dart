@@ -383,7 +383,7 @@ class _Options extends StatelessWidget {
             child: AppCard(
               padding: AppCard.plain,
               onTap: locked ? null : () => onSelect(o.moCode),
-              border: o.moCode == chosen ? Border.all(color: colors.ink, width: 2) : null,
+              border: o.moCode == chosen ? Border.all(color: colors.accent, width: 2) : null,
               semanticsLabel: '${shortOrgName(o.name)}, ${s.altLine(days(o.p50Days), o.risk)}',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,7 +395,7 @@ class _Options extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(s.altLine(days(o.p50Days), o.risk), style: theme.textTheme.bodySmall?.copyWith(color: colors.faint).merge(AppType.numeric)),
+                  Text(s.altLine(days(o.p50Days), o.risk), style: theme.textTheme.bodySmall?.copyWith(color: colors.muted).merge(AppType.numeric)),
                 ],
               ),
             ),

@@ -288,3 +288,160 @@ export interface DailyResponse {
   tips: WeatherTip[]
   news: { available: boolean; source: string; items: NewsItem[] }
 }
+
+// ── Роли, разрешения, аккаунт и администрирование (docs/rbac.md) ─────────────────────────────────────────────
+export type PermissionScope = 'all' | 'own'
+export interface PermissionGrant { code: string; scope: PermissionScope }
+export interface OnboardingState { emailVerified: boolean; otpConfigured: boolean; profileChecked: boolean; colleaguesInvited: boolean }
+/** GET /me — кто вошёл и что ему можно. iinMasked — только маской (ТЗ). */
+export interface MeResponse {
+  actor: string
+  userId: string
+  displayName: string | null
+  email: string | null
+  emailVerified: boolean
+  roles: string[]
+  permissions: PermissionGrant[]
+  moCode: string | null
+  moName: string | null
+  regionKato: string | null
+  iinMasked: string | null
+  onboarding: OnboardingState
+}
+/** Списки администрирования: { items, total, page, size } + сводка там, где она есть. */
+export interface PagedList<T> { items: T[]; total: number; page: number; size: number }
+
+export interface ProfileResponse {
+  displayName: string | null
+  position: string | null
+  specialty: string | null
+  phone: string | null
+  email: string | null
+  /** в /me/profile может отсутствовать — тогда берётся из /me */
+  emailVerified?: boolean
+  language: 'ru' | 'kk'
+  timeZone: string
+  moCode: string | null
+  moName: string | null
+  regionKato: string | null
+  iinMasked?: string | null
+  via?: 'egov' | 'password' | null
+  /** поля, которые меняет только администратор */
+  readOnlyFields?: string[]
+}
+export interface ProfileUpdate { phone?: string | null; language: 'ru' | 'kk'; timeZone: string }
+
+export interface LoginRecord { at: string; method: string; success: boolean; ip: string | null }
+export interface SessionRecord { id: string; device: string | null; browser: string | null; ip: string | null; start?: string | null; lastAccess: string; current: boolean }
+export interface SecurityResponse {
+  passwordChangedAt: string | null
+  otpConfigured: boolean
+  smsAvailable: boolean
+  /** резервных кодов в системе входа нет — API отдаёт null */
+  recoveryCodes: string[] | null
+  recentLogins: LoginRecord[]
+  sessions: SessionRecord[]
+}
+
+export interface NotificationEvent { code: string; titleRu?: string; titleKk?: string; inApp: boolean; email: boolean; sms: boolean; push: boolean; locked?: boolean }
+export interface NotificationSettings { events: NotificationEvent[]; quietFrom: string | null; quietTo: string | null; quietExceptRegulator: boolean; digest: 'off' | 'daily' | 'weekly' }
+
+export interface Consent { code: string; titleRu?: string; titleKk?: string; granted: boolean; required: boolean; updatedAt: string | null }
+export interface ConsentsResponse { items: Consent[] }
+/** Кто обращался к моим данным — из журнала аудита. */
+export interface AccessLogEntry { at: string; actor: string; role: string; method: string; path: string; status: number }
+
+export type UserStatus = 'active' | 'invited' | 'blocked'
+export interface AdminUser {
+  id: string
+  username: string
+  displayName: string | null
+  email: string | null
+  roles: string[]
+  moCode: string | null
+  moName: string | null
+  regionKato: string | null
+  lastActivity: string | null
+  status: UserStatus
+  via: 'egov' | 'password' | null
+  createdAt?: string | null
+}
+/** GET /admin/users/{id}: пользователь и данные карточки. */
+export interface AdminUserDetail { user: AdminUser; emailVerified?: boolean; createdAt?: string | null; position?: string | null; specialty?: string | null; invitedAt?: string | null; inviteExpiresAt?: string | null }
+export interface AdminUsersSummary { active: number; invited?: number; invitedStale: number; blocked: number }
+export interface AdminUsersResponse extends PagedList<AdminUser> { summary?: AdminUsersSummary }
+export interface AdminUserUpdate { role: string; moCode?: string | null; regionKato?: string | null }
+export interface InviteRequest { email: string; displayName: string; role: string; moCode?: string | null; regionKato?: string | null }
+export interface InviteResponse { userId?: string; invitationId?: string; emailSent: boolean; inviteUrl?: string | null; expiresAt?: string | null }
+/** Решение по заявке организации: при одобрении создаётся приглашение администратору. */
+export interface ApplicationDecision { status: ApplicationStatus; emailSent: boolean; inviteUrl: string | null; invitationId: string | null }
+
+export type Verification = 'pending' | 'verified' | 'rejected'
+export interface AdminDoctor {
+  id: string
+  displayName: string | null
+  specialty: string | null
+  moCode: string | null
+  moName: string | null
+  regionKato: string | null
+  referrals: number | null
+  matchRate: number | null
+  verification: Verification
+  requestedAt?: string | null
+}
+
+export interface RoleInfo { key: string; titleRu: string; titleKk: string; descriptionRu: string | null; descriptionKk: string | null; builtin: boolean; editable?: boolean }
+export interface PermissionInfo { code: string; titleRu: string; titleKk: string; system?: boolean; editable?: boolean }
+export interface MatrixCell { role: string; permission: string; scope: PermissionScope }
+export interface RolesResponse { roles: RoleInfo[]; permissions: PermissionInfo[]; matrix: MatrixCell[]; usersByRole: Record<string, number>; identityAvailable?: boolean }
+export interface RoleChange { id: string | number; at: string; actor: string; role: string; permission: string; oldScope: PermissionScope | null; newScope: PermissionScope | null; comment: string | null }
+export interface RolePermissionsUpdate { changes: { permission: string; scope: PermissionScope | null }[]; comment?: string }
+export interface RoleCreate { key: string; titleRu: string; titleKk: string; descriptionRu?: string; copyFrom?: string }
+
+/** Свежесть набора данных организации: последняя загруженная партия стюарда. */
+export interface DatasetFreshness { dataset: string; lastLoadedAt: string | null; status: string | null; rowsLoaded: number | null }
+export interface OrgAdminRef { id: string; displayName: string | null; email: string | null; status: UserStatus | string }
+export type OrgStatus = 'connected' | 'setup' | 'no_data'
+export interface AdminOrg {
+  moCode: string
+  name: string
+  regionKato: string | null
+  type: string | null
+  users: number | null
+  status: OrgStatus
+  /** число профилей коек с данными — если API его отдаёт */
+  profiles?: number | null
+  lastLoadAt?: string | null
+  admins?: OrgAdminRef[]
+  freshness?: DatasetFreshness[]
+}
+/** GET /admin/orgs/{moCode}: организация и её заявки на регистрацию. */
+export interface AdminOrgDetailResponse { organization: AdminOrg; applications: OrgApplication[] }
+export type ApplicationStatus = 'pending_email' | 'pending_review' | 'approved' | 'rejected'
+export interface OrgApplication {
+  id: string
+  number: string
+  orgName: string
+  bin: string
+  type: string
+  regionKato: string
+  moCode: string | null
+  adminName: string
+  email: string
+  phone: string
+  status: ApplicationStatus
+  submittedAt: string
+}
+
+export interface OrgApplicationRequest {
+  orgName: string; bin: string; type: string; regionKato: string; moCode?: string | null; adminName: string; email: string; phone: string; consent: boolean
+}
+export interface OrgApplicationCreated { id: string; number: string; statusToken: string; emailSent?: boolean; resendAfterSeconds?: number }
+export interface CodeResent { emailSent: boolean; resendAfterSeconds: number }
+export interface OrgApplicationStatus { number: string; orgName: string; email: string; status: ApplicationStatus; submittedAt: string }
+export interface InviteInfo { displayName: string; email: string; orgName: string | null; moCode: string | null; role: string; roleTitleRu?: string; roleTitleKk?: string; invitedBy: string; invitedAt: string; expiresAt: string }
+export interface InviteAccepted { username: string; accepted: boolean }
+export interface LoginExamples {
+  wait: { regionName: string; profileName: string; p50Days: number; p90Days: number; within30: number } | null
+  rx: { mnn: string; covered: boolean; fillP50: number | null; fillP90: number | null } | null
+}

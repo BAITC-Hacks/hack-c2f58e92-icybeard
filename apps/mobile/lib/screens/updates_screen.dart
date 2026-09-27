@@ -20,7 +20,7 @@ import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 
 /// Уведомления по доске M-Updates — только события маршрута (как Messages в NHS App) внутри одной карточки,
-/// группами по дням: label «Сегодня · Вчера · 22 сентября», строки 56 px с coral-точкой у нового, заголовком 15,
+/// группами по дням: label «Сегодня · Вчера · 22 сентября», строки 56 px с фиолетовой точкой у нового, заголовком 15,
 /// подстрокой 13 и временем справа; предложение врача открывает маршрут. Push через eGov mobile — после интеграции.
 class UpdatesScreen extends StatefulWidget {
   const UpdatesScreen({super.key});
@@ -90,7 +90,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
                         title: event.title,
                         subtitle: event.detail,
                         last: g == groups.length - 1 && i == group.items.length - 1,
-                        trailing: Text(timeShort(event.at), style: theme.textTheme.labelSmall?.copyWith(color: colors.faint).merge(AppType.numeric)),
+                        trailing: Text(timeShort(event.at), style: theme.textTheme.labelSmall?.copyWith(color: colors.muted).merge(AppType.numeric)),
                         onTap: event.opensRoute ? () => context.go('/home/route') : null,
                       ),
                   ],

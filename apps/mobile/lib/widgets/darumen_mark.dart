@@ -2,15 +2,10 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Цвета знака Darumen в интерфейсе «Тихой клиники» (docs/design-system.md): блок — ink, дуга и сектор — coral;
-/// на тёмном фоне заставки блок светлый (ink тёмной темы). Фон заставки — surface тёмной темы. Иконки приложения
-/// и системный сплэш остаются в бренд-палитре darumen-assets/ (Navy/Sky) — их перерисовка отдельная задача.
-abstract final class DarumenBrand {
-  static const ink = Color(0xFF0F2C59);
-  static const coral = Color(0xFFFF7F50);
-  static const mist = Color(0xFFEEF2F7);
-  static const night = Color(0xFF0B1E3D);
-}
+import '../theme/tones.dart';
+
+/// Цвета знака Darumen берутся из палитры темы (Палитра C, docs/design-system.md): блок — ink (#333333), дуга и
+/// сектор — фиолетовый accent (#5B5BD6); в тёмной теме — те же роли тёмной палитры, чтобы знак не пропадал на фоне.
 
 /// Знак «D»: блок со скруглёнными левыми углами, дуга и сектор — геометрия из svg/mark.svg (viewBox 20 20 63 60).
 /// Три прогресса 0…1 рисуют части по очереди: блок вырастает, дуга прорисовывается, сектор раскрывается.
@@ -19,13 +14,15 @@ class DarumenMarkPainter extends CustomPainter {
     required this.block,
     required this.arc,
     required this.fill,
-    this.onDark = false,
+    required this.blockColor,
+    required this.accentColor,
   });
 
   final double block;
   final double arc;
   final double fill;
-  final bool onDark;
+  final Color blockColor;
+  final Color accentColor;
 
   static const _viewW = 63.0;
   static const _viewH = 60.0;
@@ -58,9 +55,7 @@ class DarumenMarkPainter extends CustomPainter {
       canvas.drawRRect(
         rect,
         Paint()
-          ..color = (onDark ? DarumenBrand.mist : DarumenBrand.ink).withValues(
-            alpha: block.clamp(0, 1),
-          ),
+          ..color = blockColor.withValues(alpha: block.clamp(0, 1)),
       );
       canvas.restore();
     }
@@ -68,7 +63,7 @@ class DarumenMarkPainter extends CustomPainter {
     if (arc > 0) {
       final sweep = math.pi / 2 * Curves.easeInOut.transform(arc.clamp(0, 1));
       final paint = Paint()
-        ..color = DarumenBrand.coral
+        ..color = accentColor
         ..style = PaintingStyle.stroke
         ..strokeWidth = 6
         ..strokeCap = StrokeCap.round;
@@ -95,7 +90,7 @@ class DarumenMarkPainter extends CustomPainter {
         ..close();
       canvas.save();
       canvas.clipRect(Rect.fromLTWH(48, 50, 40 * t, 32));
-      canvas.drawPath(path, Paint()..color = DarumenBrand.coral);
+      canvas.drawPath(path, Paint()..color = accentColor);
       canvas.restore();
     }
     canvas.restore();
@@ -106,21 +101,24 @@ class DarumenMarkPainter extends CustomPainter {
       old.block != block ||
       old.arc != arc ||
       old.fill != fill ||
-      old.onDark != onDark;
+      old.blockColor != blockColor ||
+      old.accentColor != accentColor;
 }
 
 /// Статичный знак для шапок и экрана входа.
 class DarumenMark extends StatelessWidget {
-  const DarumenMark({super.key, this.size = 40, this.onDark = false});
+  const DarumenMark({super.key, this.size = 40});
 
   final double size;
-  final bool onDark;
 
   @override
-  Widget build(BuildContext context) => CustomPaint(
-    size: Size(size, size * 60 / 63),
-    painter: DarumenMarkPainter(block: 1, arc: 1, fill: 1, onDark: onDark),
-  );
+  Widget build(BuildContext context) {
+    final colors = AppPalette.of(context);
+    return CustomPaint(
+      size: Size(size, size * 60 / 63),
+      painter: DarumenMarkPainter(block: 1, arc: 1, fill: 1, blockColor: colors.ink, accentColor: colors.accent),
+    );
+  }
 }
 
 /// Знак в шапке главной: сюда прилетает знак из заставки. Пока заставка идёт, якорь невидим (его место занимает
@@ -144,9 +142,10 @@ class HomeMarkAnchor extends StatelessWidget {
   );
 }
 
-/// Заставка при открытии: знак собирается по центру тёмного фона (блок → дуга → сектор), под ним появляется слово,
-/// затем фон и слово растворяются, а знак улетает в шапку главной (в [HomeMarkAnchor]) — плавный переход в приложение.
-/// Если якоря на экране нет (вход, другой маршрут), знак просто растворяется. При отключённых анимациях — сразу приложение.
+/// Заставка при открытии: знак собирается по центру светлого холста (#F5F6F8, как системный сплэш; в тёмной теме —
+/// #16171D) — блок → дуга → сектор, под ним появляется слово, затем фон и слово растворяются, а знак улетает в шапку
+/// главной (в [HomeMarkAnchor]) — плавный переход в приложение. Если якоря на экране нет (вход, другой маршрут), знак
+/// просто растворяется. При отключённых анимациях — сразу приложение.
 class DarumenIntro extends StatefulWidget {
   const DarumenIntro({
     super.key,
@@ -230,9 +229,10 @@ class _DarumenIntroState extends State<DarumenIntro>
               double seg(double from, double to) =>
                   ((t - from) / (to - from)).clamp(0, 1);
               final fly = Curves.easeInOutCubic.transform(seg(0.78, 1));
+              final colors = AppPalette.of(context);
               final textStyle = Theme.of(context).textTheme.headlineMedium
                   ?.copyWith(
-                    color: DarumenBrand.mist,
+                    color: colors.ink,
                     fontSize: 40,
                     fontWeight: FontWeight.w600,
                     letterSpacing: -1.4,
@@ -258,7 +258,7 @@ class _DarumenIntroState extends State<DarumenIntro>
                         Positioned.fill(
                           child: Opacity(
                             opacity: 1 - fly,
-                            child: const Material(color: DarumenBrand.night),
+                            child: Material(color: colors.surface),
                           ),
                         ),
                         Positioned(
@@ -286,7 +286,8 @@ class _DarumenIntroState extends State<DarumenIntro>
                                 block: seg(0, 0.2),
                                 arc: seg(0.15, 0.4),
                                 fill: seg(0.35, 0.55),
-                                onDark: fly < 0.5,
+                                blockColor: colors.ink,
+                                accentColor: colors.accent,
                               ),
                             ),
                           ),

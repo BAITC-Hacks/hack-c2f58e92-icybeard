@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Токены «Тихая клиника» (docs/design-system.md) — те же значения, что в `design/tokens.json`, паритет проверяет
-/// `test/theme_test.dart`. Молочный фон, тёмно-синие чернила, коралл — единственный сигнал (точки, маркеры,
-/// предупреждения); карточки белые без рамок, линии только внутри списков. Тёмная тема — производная от той же
-/// палитры, контраст ink/surface ≥ 4.5:1 в обеих.
-class AppColors {
-  const AppColors({
+/// Токены Палитры C «Белый холст» (доска C-Tokens, docs/design-system.md) — те же значения, что в
+/// `design/tokens.json`, паритет проверяет `test/theme_test.dart`. Белые карточки на светло-сером холсте, текст #333,
+/// фиолетовый — единственный brand-акцент (primary-кнопки, навигация, серия графика); аномалии и риск — только
+/// янтарные. Тёмная тема — производная от той же палитры, контраст ink/surface ≥ 4.5:1 в обеих.
+class ColorTokens {
+  const ColorTokens({
     required this.surface,
     required this.card,
     required this.ink,
@@ -13,110 +13,164 @@ class AppColors {
     required this.faint,
     required this.hairline,
     required this.accent,
+    required this.accentHover,
     required this.accentSoft,
+    required this.neutralSoft,
     required this.ok,
     required this.okSoft,
     required this.warn,
     required this.warnSoft,
+    required this.warnStrong,
     required this.danger,
     required this.dangerSoft,
-    required this.neutralSoft,
+    required this.info,
+    required this.infoSoft,
+    required this.ai,
+    required this.aiSoft,
     required this.benchSoft,
-    required this.dotIdle,
+    required this.map1,
+    required this.map2,
+    required this.map3,
+    required this.map4,
+    required this.map5,
+    required this.onAccent,
     required this.navShadow,
   });
 
-  /// ground — фон экрана.
+  /// ground — светло-серый холст экрана.
   final Color surface;
 
-  /// card — карточки и поля выбора.
+  /// card — белые карточки и поля выбора.
   final Color card;
 
-  /// ink — основной текст, primary-кнопки, активные пилюли.
+  /// ink — основной текст.
   final Color ink;
 
-  /// ink-2 — вторичный текст, подписи, неактивные вкладки.
+  /// ink-2 — вторичный текст, подписи, неактивные вкладки. Единственный вторичный цвет текста.
   final Color muted;
 
-  /// ink-3 — подписи на белом (caption).
+  /// dot-off — неактивная точка, столбики тишины в волне скрайба, скелетоны. Не для текста: контраст на белом < 3:1.
   final Color faint;
 
-  /// Линии между строками списков.
+  /// Разделители строк списков.
   final Color hairline;
 
-  /// coral — сигнал: точка активной вкладки, маркер этапа, бар «предложил врач».
+  /// Brand primary — primary-кнопки, активная пилюля, точка навигации, полосы прогресса и серия графика.
   final Color accent;
 
-  /// heal-wash — фон чипа «ML-модель» и «рекомендация» (текст ink).
+  /// Наведение и ссылки: TextButton, стрелка «→» у ссылок-действий, текст чипов «AI» и «текущая».
+  final Color accentHover;
+
+  /// selected — активный пункт, выбранная строка, чип «текущая», карточка-сигнал, круглые кнопки шапки.
   final Color accentSoft;
 
-  /// sage — ok-текст и его фон («покрыт», «совпало»).
+  /// inset — поле ввода, вторичная и «опасная» кнопки, нейтральные чипы.
+  final Color neutralSoft;
+
+  /// good — текст и заливка («покрыт», «совпало», «подтверждено»).
   final Color ok;
   final Color okSoft;
 
-  /// coral-text / coral-wash — предупреждения; в этой системе warn и danger совпадают.
+  /// attention — риск и аномалии (всегда янтарные, никогда не фиолетовые); warnStrong — янтарные точки и полосы.
   final Color warn;
   final Color warnSoft;
+  final Color warnStrong;
+
+  /// critical — отказ, «Выйти», опасное действие.
   final Color danger;
   final Color dangerSoft;
 
-  /// soft — вставки, нейтральные чипы, вторичные кнопки, круглые иконки-кнопки.
-  final Color neutralSoft;
+  /// info / ML — фон чипа «ML-модель» (текст чипа — ink) и состояния «данные устарели».
+  final Color info;
+  final Color infoSoft;
 
-  /// bench-wash — чип внешнего ориентира («ВОЗ/ЮНИСЕФ · 2021»).
+  /// lavender — чип «AI» и маркер заголовка.
+  final Color ai;
+  final Color aiSoft;
+
+  /// Внешний ориентир («ВОЗ/ЮНИСЕФ · 2021»), совпадает с infoSoft.
   final Color benchSoft;
 
-  /// Неактивная точка в списках и столбики тишины в волне скрайба.
-  final Color dotIdle;
+  /// Рамп карты: выше — хуже.
+  final Color map1;
+  final Color map2;
+  final Color map3;
+  final Color map4;
+  final Color map5;
 
-  /// Тень плавающей навигации.
+  /// ink-inverse — текст и иконки на фиолетовом (белый в светлой теме, холст — в тёмной).
+  final Color onAccent;
+
+  /// Тень плавающей навигации `0 -4px 16px`.
   final Color navShadow;
 
-  /// Белый и прозрачный — единственные цвета вне палитры (текст на ink-кнопках, surfaceTint).
+  /// Белый и прозрачный — единственные цвета вне палитры (текст на primary, surfaceTint).
   static const white = Color(0xFFFFFFFF);
   static const transparent = Color(0x00000000);
   static const shadow = Color(0xFF000000);
   static const scrim = Color(0x8A000000);
 
-  static const light = AppColors(
-    surface: Color(0xFFF4F6F0),
+  static const light = ColorTokens(
+    surface: Color(0xFFF5F6F8),
     card: Color(0xFFFFFFFF),
-    ink: Color(0xFF0F2C59),
-    muted: Color(0xFF5B6577),
-    faint: Color(0xFF6B7486),
-    hairline: Color(0xFFE3E7DF),
-    accent: Color(0xFFFF7F50),
-    accentSoft: Color(0xFFDCE8E0),
-    ok: Color(0xFF4F6B56),
-    okSoft: Color(0xFFE3ECE4),
-    warn: Color(0xFFB8431A),
-    warnSoft: Color(0xFFFFE4D8),
-    danger: Color(0xFFB8431A),
-    dangerSoft: Color(0xFFFFE4D8),
-    neutralSoft: Color(0xFFEDF0E8),
-    benchSoft: Color(0xFFFFF6BF),
-    dotIdle: Color(0xFFC9D1DA),
-    navShadow: Color(0x0F0F2C59),
+    ink: Color(0xFF333333),
+    muted: Color(0xFF535768),
+    faint: Color(0xFFC4C9D8),
+    hairline: Color(0xFFE4E7EE),
+    accent: Color(0xFF5B5BD6),
+    accentHover: Color(0xFF4646B8),
+    accentSoft: Color(0xFFE7ECFF),
+    neutralSoft: Color(0xFFEAECF2),
+    ok: Color(0xFF2A5C4E),
+    okSoft: Color(0xFFDDF7C8),
+    warn: Color(0xFF9A5A00),
+    warnSoft: Color(0xFFFFE9C7),
+    warnStrong: Color(0xFFB45309),
+    danger: Color(0xFF9F1239),
+    dangerSoft: Color(0xFFFFE0E6),
+    info: Color(0xFF0E6F8A),
+    infoSoft: Color(0xFFD1FAFF),
+    ai: Color(0xFF4646B8),
+    aiSoft: Color(0xFFEDDFF7),
+    benchSoft: Color(0xFFD1FAFF),
+    map1: Color(0xFFEEF0FB),
+    map2: Color(0xFFDDE1FA),
+    map3: Color(0xFFB6BCF0),
+    map4: Color(0xFF8386E0),
+    map5: Color(0xFF5B5BD6),
+    onAccent: white,
+    navShadow: Color(0x0F333558),
   );
 
-  static const dark = AppColors(
-    surface: Color(0xFF0B1E3D),
-    card: Color(0xFF13294F),
-    ink: Color(0xFFEEF2F7),
-    muted: Color(0xFFA9B6C8),
-    faint: Color(0xFF8E9DB3),
-    hairline: Color(0xFF24406E),
-    accent: Color(0xFFFF7F50),
-    accentSoft: Color(0xFF1F3F3A),
-    ok: Color(0xFF9CC3A6),
-    okSoft: Color(0xFF1E3A2A),
-    warn: Color(0xFFFFA07A),
-    warnSoft: Color(0xFF4A2A1F),
-    danger: Color(0xFFFFA07A),
-    dangerSoft: Color(0xFF4A2A1F),
-    neutralSoft: Color(0xFF1B3560),
-    benchSoft: Color(0xFF4A4320),
-    dotIdle: Color(0xFF3A5078),
+  static const dark = ColorTokens(
+    surface: Color(0xFF16171D),
+    card: Color(0xFF1F2029),
+    ink: Color(0xFFE8E9F0),
+    muted: Color(0xFFA3A7B8),
+    faint: Color(0xFF4A4E5E),
+    hairline: Color(0xFF2C2E3A),
+    accent: Color(0xFF8B8BF0),
+    accentHover: Color(0xFFA5A5F5),
+    accentSoft: Color(0xFF2A2B52),
+    neutralSoft: Color(0xFF272936),
+    ok: Color(0xFF8FD3B8),
+    okSoft: Color(0xFF1E3A30),
+    warn: Color(0xFFF0B45A),
+    warnSoft: Color(0xFF3D2E14),
+    warnStrong: Color(0xFFF59E0B),
+    danger: Color(0xFFF48CA5),
+    dangerSoft: Color(0xFF40202A),
+    info: Color(0xFF6FD3EE),
+    infoSoft: Color(0xFF15343D),
+    ai: Color(0xFFB9A5F0),
+    aiSoft: Color(0xFF2E2440),
+    benchSoft: Color(0xFF15343D),
+    map1: Color(0xFF23253A),
+    map2: Color(0xFF2F3260),
+    map3: Color(0xFF4B4F9A),
+    map4: Color(0xFF6A6DC8),
+    map5: Color(0xFF8B8BF0),
+    onAccent: Color(0xFF16171D),
     navShadow: Color(0x66000000),
   );
 }
@@ -150,11 +204,14 @@ abstract final class AppSizes {
   /// Компактное поле и пилюля-фильтр.
   static const double compact = 44;
 
-  /// Кнопка-селектор (регион/профиль).
+  /// Кнопка-селектор (регион/профиль) и поле входа.
   static const double select = 48;
 
   /// Круглая кнопка-иконка в шапке.
   static const double iconButton = 40;
+
+  /// Малая кнопка в состояниях экрана и в строках («Завершить», «Повторить»).
+  static const double small = 36;
 
   /// Строка списка внутри карточки.
   static const double row = 56;
@@ -166,6 +223,9 @@ abstract final class AppSizes {
   static const double dot = 6;
   static const double marker = 14;
   static const double bar = 3;
+
+  /// Иконка в круге у состояний экрана (W-States).
+  static const double stateIcon = 48;
 }
 
 abstract final class AppDurations {

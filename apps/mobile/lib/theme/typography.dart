@@ -10,10 +10,10 @@ abstract final class AppType {
   /// Добавляется к стилю чисел: `style.merge(AppType.numeric)`.
   static const numeric = TextStyle(fontFeatures: [FontFeature.tabularFigures()]);
 
-  static TextStyle _style(AppColors c, double size, FontWeight weight, {double height = 1.3, double? tracking, Color? color}) =>
+  static TextStyle _style(ColorTokens c, double size, FontWeight weight, {double height = 1.3, double? tracking, Color? color}) =>
       TextStyle(fontFamily: family, fontSize: size, fontWeight: weight, height: height, letterSpacing: tracking, color: color ?? c.ink);
 
-  static TextTheme textTheme(AppColors c) => TextTheme(
+  static TextTheme textTheme(ColorTokens c) => TextTheme(
         // hero-число 50/600 −0.02em
         displayLarge: _style(c, 50, FontWeight.w600, height: 1.0, tracking: -1.0),
         // hero в карточке врача и таймер скрайба 42/600
@@ -44,7 +44,7 @@ abstract final class AppType {
 }
 
 /// Стили, которых нет в Material-шкале: строка списка 15, label над блоком (uppercase 12/500 +0.06em),
-/// подпись на белом (ink-3) и ссылка-действие.
+/// подпись на белом (ink-2) и ссылка-действие.
 extension AppTextStyles on TextTheme {
   /// Строка списка 15/400.
   TextStyle get row => bodyMedium!.copyWith(fontSize: 15, height: 1.35);
@@ -52,12 +52,12 @@ extension AppTextStyles on TextTheme {
   /// Акцентная строка списка 15/500.
   TextStyle get rowStrong => titleSmall!;
 
-  /// Подстрока в списке 13/400 ink-3 — цвет задаёт вызывающий (`copyWith(color: faint)`).
+  /// Подстрока в списке 13/400 ink-2 — цвет задаёт вызывающий (`copyWith(color: muted)`).
   TextStyle get rowDetail => bodyMedium!.copyWith(fontSize: 13, height: 1.4);
 
   /// Label над блоком: текст передаётся в верхнем регистре.
   TextStyle get overline => labelMedium!.copyWith(letterSpacing: 0.72);
 
-  /// Caption на белом 12/400 +0.02em (цвет ink-3 задаёт вызывающий).
+  /// Caption на белом 12/400 +0.02em ink-2.
   TextStyle get caption => labelSmall!;
 }

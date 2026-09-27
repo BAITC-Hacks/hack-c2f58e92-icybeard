@@ -4,5 +4,6 @@ namespace Darumen.Modules.Journal;
 
 public interface IAuditRepository
 {
-    Task<Paged<AuditEntryDto>> ListAsync(string? actor, int page, int size, CancellationToken cancellationToken);
+    /// <summary>moCode — только записи актёров этой организации (scope own у admin.users).</summary>
+    Task<Paged<AuditEntryDto>> ListAsync(string? actor, string? moCode, int page, int size, CancellationToken cancellationToken);
 }

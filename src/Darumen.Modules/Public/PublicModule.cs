@@ -21,6 +21,8 @@ public sealed class PublicModule : IDarumenModule
             c.DefaultRequestHeaders.TryAddWithoutValidation(HeaderNames.UserAgent, "Darumen/1.0 (+https://dc.jurek.kz)"); // без UA ленты отвечают 403
         });
         services.AddScoped<DailyService>();
+        services.Configure<LoginExamplesOptions>(configuration.GetSection(LoginExamplesOptions.Section));
+        services.AddScoped<LoginExamplesService>();
     }
 
     public void MapEndpoints(IEndpointRouteBuilder api) => PublicEndpoints.Map(api);

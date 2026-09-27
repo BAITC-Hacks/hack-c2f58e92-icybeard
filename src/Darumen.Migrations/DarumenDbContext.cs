@@ -2,8 +2,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Darumen.Migrations;
 
-/// <summary>Схема, которой владеет приложение: журнал решений и подтверждения сигналов.
-/// Витрины gold и refdata создаёт публикация из lakehouse, они здесь не описаны.</summary>
+/// <summary>Схемы, которыми владеет приложение: журнал решений и подтверждения сигналов (journal), роли, разрешения и
+/// аккаунты (auth, <see cref="AuthModel"/>). Витрины gold и refdata создаёт публикация из lakehouse, они здесь не описаны.</summary>
 public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options) : DbContext(options)
 {
     public const string Schema = "journal";
@@ -15,6 +15,10 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
     public DbSet<IntakeBatch> IntakeBatches => Set<IntakeBatch>();
 
     public DbSet<AuditRecord> Audit => Set<AuditRecord>();
+
+    public DbSet<AuthRole> AuthRoles => Set<AuthRole>();
+
+    public DbSet<AuthRolePermission> AuthRolePermissions => Set<AuthRolePermission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -34,7 +38,9 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
             e.Property(x => x.Reason).HasColumnName("reason");
             e.Property(x => x.IdempotencyKey).HasColumnName("idempotency_key").HasMaxLength(200);
             e.Property(x => x.RecordedAt).HasColumnName("recorded_at").HasColumnType("timestamptz");
+            e.Property(x => x.ActorMoCode).HasColumnName("actor_mo_code").HasMaxLength(20);
             e.HasIndex(x => x.IdempotencyKey).IsUnique();
+            e.HasIndex(x => new { x.ActorMoCode, x.RecordedAt });
             e.HasIndex(x => new { x.Actor, x.RecordedAt });
             e.HasIndex(x => new { x.Subject, x.SubjectId });
         });
@@ -80,9 +86,14 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
             e.Property(x => x.Status).HasColumnName("status");
             e.Property(x => x.DurationMs).HasColumnName("duration_ms");
             e.Property(x => x.TraceId).HasColumnName("trace_id").HasMaxLength(64);
+            e.Property(x => x.MoCode).HasColumnName("mo_code").HasMaxLength(20);
+            e.Property(x => x.Detail).HasColumnName("detail");
             e.HasIndex(x => new { x.Actor, x.At });
             e.HasIndex(x => x.At);
+            e.HasIndex(x => new { x.MoCode, x.At });
         });
+
+        AuthModel.Configure(modelBuilder);
     }
 }
 
@@ -107,6 +118,9 @@ public sealed class Decision
     public string? IdempotencyKey { get; set; }
 
     public DateTime RecordedAt { get; set; }
+
+    /// <summary>Организация актора в момент решения (клейм mo_code): журнал «все решения» при scope own.</summary>
+    public string? ActorMoCode { get; set; }
 }
 
 public sealed class AnomalyAck
@@ -166,4 +180,10 @@ public sealed class AuditRecord
     public int DurationMs { get; set; }
 
     public string TraceId { get; set; } = string.Empty;
+
+    /// <summary>Организация актора (клейм mo_code): журнал аудита при scope own.</summary>
+    public string? MoCode { get; set; }
+
+    /// <summary>Пояснение записи, которую пишет само приложение (запрос доступа, изменение матрицы, действие администратора).</summary>
+    public string? Detail { get; set; }
 }

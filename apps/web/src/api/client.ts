@@ -6,19 +6,25 @@ export class ApiError extends Error {
   readonly title: string
   readonly detail?: string
   readonly errors?: Record<string, string[]>
+  /** Коды разрешений из 403 `permission_required` (docs/rbac.md): каких разрешений не хватило. */
+  readonly permissions?: string[]
 
-  constructor(status: number, title: string, detail?: string, errors?: Record<string, string[]>) {
+  constructor(status: number, title: string, detail?: string, errors?: Record<string, string[]>, permissions?: string[]) {
     super(detail ? `${title}: ${detail}` : title)
     this.name = 'ApiError'
     this.status = status
     this.title = title
     this.detail = detail
     this.errors = errors
+    this.permissions = permissions
   }
 
-  /** Сообщение для поля формы из problem+json (422). */
+  /** Сообщение для поля формы из problem+json (422): имя без учёта регистра и префикса JSON-пути (`$.bin`, `Bin`). */
   field(name: string): string | undefined {
-    return this.errors?.[name]?.[0]
+    if (!this.errors) return undefined
+    const wanted = name.toLowerCase()
+    const key = Object.keys(this.errors).find((k) => k.replace(/^\$\./, '').toLowerCase() === wanted)
+    return key ? this.errors[key]?.[0] : undefined
   }
 }
 
@@ -84,8 +90,9 @@ async function handle<T>(response: Response): Promise<T> {
   const text = await response.text()
   const body = text ? safeJson(text) : null
   if (!response.ok) {
-    const problem = (typeof body === 'object' && body !== null ? body : {}) as { title?: string; detail?: string; errors?: Record<string, string[]> }
-    throw new ApiError(response.status, problem.title ?? (response.statusText || `HTTP ${response.status}`), problem.detail, problem.errors)
+    const problem = (typeof body === 'object' && body !== null ? body : {}) as { title?: string; detail?: string; errors?: Record<string, string[]>; permissions?: unknown }
+    const permissions = Array.isArray(problem.permissions) ? problem.permissions.filter((p): p is string => typeof p === 'string') : undefined
+    throw new ApiError(response.status, problem.title ?? (response.statusText || `HTTP ${response.status}`), problem.detail, problem.errors, permissions)
   }
   return body as T
 }

@@ -1,4 +1,11 @@
+import { ruAccount } from './ru-account'
+import { ruAdmin } from './ru-admin'
+import { ruRbac } from './ru-rbac'
+
 export const ru = {
+  ...ruRbac,
+  ...ruAccount,
+  ...ruAdmin,
   nav: {
     group: {
       patients: 'Пациенты',
@@ -8,6 +15,8 @@ export const ru = {
       common: 'Общее',
       data: 'Данные',
       citizen: 'Гражданину',
+      admin: 'Администрирование',
+      account: 'Аккаунт',
     },
     short: {
       home: 'Главная',
@@ -23,12 +32,15 @@ export const ru = {
       region: 'Регион',
       orgOverview: 'Обзор',
       orgReferrals: 'Направления и отказы',
+      data: 'Данные',
     },
-    affiliation: { regulator: 'Минздрав РК', doctor: 'врач ПМСП', steward: 'стюард данных', admin: 'администратор', citizen: 'гражданин', chief: 'главврач' },
+    affiliation: { regulator: 'Минздрав РК', doctor: 'врач ПМСП', steward: 'стюард данных', admin: 'администратор системы', citizen: 'гражданин', org_admin: 'администратор организации', auditor: 'аудитор' },
     region: 'Регион', organization: 'Больница · обзор', orgReferrals: 'Больница · направления и отказы',
     home: 'Главная', gov: 'Карта регионов', simulator: 'Симулятор', insight: 'Вопросы к данным', quality: 'Качество моделей', referral: 'Ассистент направления',
     worklist: 'Рабочий список', medicines: 'Проверка рецепта', decisions: 'Журнал решений', scribe: 'AI-скрайб', steward: 'Консоль стюарда', wait: 'Ожидание для граждан', audit: 'Журнал аудита',
     route: 'Мой путь',
+    adminUsers: 'Пользователи', adminDoctors: 'Врачи', adminRoles: 'Роли и доступ', adminOrgs: 'Организации',
+    welcome: 'Первый вход', accountProfile: 'Профиль', accountSecurity: 'Безопасность', accountNotifications: 'Уведомления', accountConsents: 'Данные и согласия',
   },
   route: {
     stagesTitle: 'Этапы маршрута', stagesCount: '{total} этапов · {done} пройдено', whatNext: 'Что дальше',
@@ -108,6 +120,7 @@ export const ru = {
   },
   common: {
     cancel: 'Отмена',
+    close: 'Закрыть',
     allShort: 'Все',
     loading: 'Загрузка…', error: 'Ошибка', retry: 'Повторить', month: 'Месяц', profile: 'Профиль койки', region: 'Регион',
     organization: 'Организация', apply: 'Рассчитать', days: 'дн.', empty: 'Данных нет', all: 'Все профили', model: 'Модель',
@@ -116,7 +129,7 @@ export const ru = {
   },
   decision: {
     subjectReferral: 'направление', subjectAnomaly: 'сигнал', subjectRoute: 'маршрут',
-    role: { doctor: 'врач', chief: 'главврач', regulator: 'регулятор', steward: 'стюард', admin: 'администратор', citizen: 'гражданин' },
+    role: { doctor: 'врач', chief: 'главврач', org_admin: 'админ. организации', regulator: 'регулятор', steward: 'стюард', auditor: 'аудитор', admin: 'администратор', citizen: 'гражданин' },
     anomalyShort: 'сигнал {id}',
   },
   anomalyFeed: {
@@ -350,6 +363,7 @@ export const ru = {
       patient: 'Пациент', stage: 'Этап', daysWaiting: 'Ждёт, дн.', expectedDate: 'Ожидаемая дата', flags: 'Флаги',
       priority: 'Приоритет', nextStep: 'Следующий шаг', openReferral: 'открыть направление',
       asOf: 'данные на {date}', empty: 'В списке нет пациентов',
+      emptyText: 'Пациенты появятся после первого направления в листе ожидания региона.', createReferral: 'Создать направление',
       stageCode: { registered: 'зарегистрирован', waiting: 'ожидает', called: 'вызов на госпитализацию' },
       action: {
         redirect_faster: 'предложить перенаправление в организацию с меньшим ожиданием',
@@ -367,6 +381,7 @@ export const ru = {
       keyNote: 'Повторная отправка с тем же ключом идемпотентности не создаёт новую запись.',
       key: 'Идентификатор решения',
       empty: 'Решений пока нет',
+      emptyText: 'Решения появятся после первого подтверждённого направления или ответа на сигнал.',
       title: 'Журнал решений',
       leadRegulator: 'Решения врачей и подтверждения сигналов: рекомендация системы и выбор человека.',
       leadSelf: 'Ваши решения: рекомендация системы и ваш выбор.',
@@ -677,12 +692,10 @@ export const ru = {
     factReferrals: 'направлений в ИС БГ',
     factPeriodValue: 'I кв. 2025',
     factPeriod: 'период данных',
-    deniedRoleNamed: 'Страница {page} открыта ролям: {roles}.',
-    deniedGuestRole: 'Страница {page} открыта ролям: {roles}. Войдите.',
     title: 'Darumen Health', lead: 'Экосистема данных здравоохранения: очереди на плановую госпитализацию, прогноз нагрузки, аномалии и решения людей.',
     deniedGuest: 'Страница {page} доступна после входа.',
-    deniedRole: 'Для страницы {page} нужна другая роль.',
-    goHome: 'Перейти на свой экран',
+    signupLead: 'Организация ещё не подключена?',
+    signup: 'Зарегистрировать организацию',
   },
   hero: {
     half: 'половина ждёт не дольше',

@@ -39,7 +39,7 @@ class Section extends StatelessWidget {
       );
 }
 
-/// Каркас экрана «Тихой клиники»: без AppBar — шапка `padding 0 20 12` с круглой кнопкой назад (если есть куда
+/// Каркас экрана: без AppBar — шапка `padding 0 20 12` с круглой кнопкой назад (если есть куда
 /// вернуться) или знаком слева, H1 29/500 и круглыми кнопками справа; контент — ListView `padding 4 20`, gap 12
 /// между детьми; нижняя зона `padding 12 20 24` для primary-кнопки. Pull-to-refresh при наличии onRefresh.
 class PageScaffold extends StatelessWidget {
@@ -53,6 +53,7 @@ class PageScaffold extends StatelessWidget {
     this.bottom,
     this.showBack,
     this.gap = AppSpacing.md,
+    this.neutralBack = false,
   });
 
   final String title;
@@ -71,6 +72,9 @@ class PageScaffold extends StatelessWidget {
 
   /// Расстояние между детьми контента.
   final double gap;
+
+  /// Кнопка «назад» на inset-фоне (экраны входа и аккаунта) вместо selected.
+  final bool neutralBack;
 
   static bool _canPop(BuildContext context) {
     final router = GoRouter.maybeOf(context);
@@ -106,7 +110,7 @@ class PageScaffold extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.md),
               child: Row(
                 children: [
-                  if (back) CircleIconButton(icon: Icons.arrow_back, label: s.back, onTap: () => _pop(context)) else ?leading,
+                  if (back) CircleIconButton(icon: Icons.arrow_back, label: s.back, neutral: neutralBack, onTap: () => _pop(context)) else ?leading,
                   if (back || leading != null) const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Text(title, style: theme.textTheme.headlineMedium, maxLines: 2, overflow: TextOverflow.ellipsis),

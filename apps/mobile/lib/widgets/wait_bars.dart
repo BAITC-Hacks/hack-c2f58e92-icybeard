@@ -7,8 +7,8 @@ import '../theme/tones.dart';
 import '../theme/typography.dart';
 import 'format.dart';
 
-/// Бары «Где быстрее»: имя 13 (500 — предложенная врачом), полоса 12 px radius 4 шириной пропорционально p50
-/// (ink; coral — у организации, которую предложил врач), «≈ N дн.» 12/500 и подпись «· предложил врач».
+/// Бары «Где быстрее» по доске M-Wait: имя 13 (500 — предложенная врачом), полоса 12 px radius 4 шириной
+/// пропорционально p50 (accent — серия графика), «≈ N дн.» 12/500 и подпись «· предложил врач».
 class WaitBars extends StatelessWidget {
   const WaitBars({super.key, required this.alternatives, this.proposedMoCode, this.onTap});
 
@@ -52,7 +52,7 @@ class WaitBars extends StatelessWidget {
                               width: constraints.maxWidth * 0.62 * share,
                               height: 12,
                               decoration: BoxDecoration(
-                                color: a.moCode == proposedMoCode ? colors.accent : colors.ink,
+                                color: colors.accent,
                                 borderRadius: BorderRadius.circular(AppRadius.xs),
                               ),
                             ),
@@ -60,7 +60,7 @@ class WaitBars extends StatelessWidget {
                             Text('≈ ${days(a.p50Days)} ${s.daysUnit}', style: theme.textTheme.labelMedium?.merge(AppType.numeric)),
                             if (a.moCode == proposedMoCode) ...[
                               const SizedBox(width: AppSpacing.xs),
-                              Flexible(child: Text(s.proposedByDoctor, style: theme.textTheme.labelSmall?.copyWith(color: colors.faint), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                              Flexible(child: Text(s.proposedByDoctor, style: theme.textTheme.labelSmall?.copyWith(color: colors.muted), maxLines: 1, overflow: TextOverflow.ellipsis)),
                             ],
                           ],
                         );

@@ -3,17 +3,17 @@ import { computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import BrandMark from '@/components/app/BrandMark.vue'
+import { shortOrgName } from '@/lib/format'
+import { sidebarNav } from '@/lib/nav'
+import { useAuthStore } from '@/stores/auth'
+import { useRefdataStore } from '@/stores/refdata'
 import LocaleSwitch from './LocaleSwitch.vue'
 import ThemeToggle from './ThemeToggle.vue'
-import { NAV_GROUPS, type NavGroup } from '@/router/roles'
-import { useAuthStore } from '@/stores/auth'
-import { shortOrgName } from '@/lib/format'
-import { useRefdataStore } from '@/stores/refdata'
 
-/** Содержимое боковой навигации персонала (W-Gov): знак + «Darumen Health», группы с label uppercase, пункты 40 px
- * radius 999 (активный — soft-фон и коралловая точка, остальные с отступом 28), внизу «пользователь · ведомство»,
- * пилюля RU/KK, тема и «Выйти». Пункты — из meta маршрутов (group / groupByRole / navRoles / nav / navTitle);
- * маршруты с параметрами добавляются здесь: «Регион» (свой или последний открытый) и кабинет организации главврача. */
+/** Содержимое боковой навигации персонала: знак + «Darumen Health», группы с label uppercase, пункты 40 px radius 999
+ * (активный — selected #E7ECFF, фиолетовая точка и ink-текст, остальные с отступом 28), внизу «пользователь ·
+ * организация/роль» (ссылка на профиль), пилюля RU/KK, тема и «Выйти». Меню строится только из разрешений (lib/nav.ts):
+ * пункты маршрутов с meta.nav плюс кабинет своей организации и «Регион». Группа «Аккаунт» — у всех вошедших. */
 const emit = defineEmits<{ navigate: [] }>()
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -21,46 +21,23 @@ const refdata = useRefdataStore()
 const router = useRouter()
 const route = useRoute()
 
-interface NavItem { to: string; label: string; icon: string; nav: number }
-interface NavGroupItems { group: NavGroup; label: string; items: NavItem[] }
-
-/** Последний открытый регион (страницы региона и организации) — цель пункта «Регион» у регулятора. */
+/** Последний открытый регион (страницы региона и организации) — цель пункта «Регион»; иначе свой регион. */
 const lastRegion = computed(() => {
   const fromRoute = route.name === 'region' ? String(route.params.kato ?? '') : route.name === 'organization' || route.name === 'organization-referrals' ? String(route.query.kato ?? '') : ''
   return fromRoute || auth.region || null
 })
 
-const groups = computed<NavGroupItems[]>(() => {
-  const role = auth.role
-  const routes = router
-    .getRoutes()
-    .filter((r) => r.meta.nav !== undefined && r.meta.title && r.meta.group && !r.path.includes(':'))
-    .filter((r) => (!r.meta.roles || auth.hasRole(...r.meta.roles)) && (!r.meta.navRoles || (role !== null && (r.meta.navRoles.includes(role) || role === 'admin'))))
-  const byGroup = new Map<NavGroup, NavItem[]>()
-  const push = (group: NavGroup, item: NavItem) => byGroup.set(group, [...(byGroup.get(group) ?? []), item])
-  for (const r of routes) {
-    const group = (role && r.meta.groupByRole?.[role]) ?? r.meta.group!
-    push(group, { to: r.path, label: t(r.meta.navTitle ?? r.meta.title ?? ''), icon: r.meta.icon ?? 'pi pi-circle', nav: r.meta.nav ?? 0 })
-  }
-  // главврач: кабинет своей организации («Больница»), без mo_code — свой регион
-  if (role === 'chief') {
-    if (auth.moCode) {
-      push('hospital', { to: `/gov/organizations/${auth.moCode}`, label: t('nav.short.orgOverview'), icon: 'pi pi-building', nav: 10 })
-      push('hospital', { to: `/gov/organizations/${auth.moCode}/referrals`, label: t('nav.short.orgReferrals'), icon: 'pi pi-inbox', nav: 20 })
-    } else if (auth.region) {
-      push('region', { to: `/gov/regions/${auth.region}`, label: t('nav.short.myRegion'), icon: 'pi pi-building', nav: 10 })
-    }
-  }
-  // регулятор: «Регион» вторым пунктом министерства — последний открытый регион
-  if ((role === 'regulator' || role === 'admin') && lastRegion.value) {
-    push('ministry', { to: `/gov/regions/${lastRegion.value}`, label: t('nav.short.region'), icon: 'pi pi-building', nav: 20 })
-  }
-  return NAV_GROUPS.map((group) => ({ group, label: t(`nav.group.${group}`), items: (byGroup.get(group) ?? []).sort((a, b) => a.nav - b.nav) })).filter((g) => g.items.length > 0)
-})
+const groups = computed(() =>
+  sidebarNav(router.getRoutes(), { can: auth.can, moCode: auth.moCode, region: lastRegion.value }).map((section) => ({
+    ...section,
+    label: t(`nav.group.${section.group}`),
+    items: section.items.map((item) => ({ ...item, label: t(item.labelKey) })),
+  })),
+)
 
-/** «пользователь · ведомство»: regulator1 · Минздрав РК, doctor1 · врач ПМСП, org028B · НИИ глазных болезней. */
+/** «пользователь · организация» у ролей с организацией, иначе «пользователь · роль». */
 const affiliation = computed(() => {
-  if (auth.role === 'chief') return auth.moCode ? shortOrgName(refdata.organizationName(auth.moCode)) : refdata.regionName(auth.region)
+  if (auth.moCode && (auth.role === 'org_admin' || auth.role === 'doctor')) return shortOrgName(refdata.organizationName(auth.moCode))
   return auth.role ? t('nav.affiliation.' + auth.role) : ''
 })
 
@@ -73,12 +50,11 @@ function isActive(to: string): boolean {
 }
 
 async function resolveOrganization() {
-  if (auth.role === 'chief' && auth.moCode) {
-    try {
-      await refdata.resolveOrganizations([auth.moCode])
-    } catch {
-      // без справочника в подписи остаётся код организации
-    }
+  if (!auth.moCode) return
+  try {
+    await refdata.resolveOrganizations([auth.moCode])
+  } catch {
+    // без справочника в подписи остаётся код организации
   }
 }
 onMounted(resolveOrganization)
@@ -91,7 +67,7 @@ watch(() => auth.moCode, resolveOrganization)
       <BrandMark :size="28" /><span class="label">Darumen Health</span>
     </RouterLink>
     <nav class="groups" :aria-label="t('shell.menu')">
-      <div v-for="g in groups" :key="g.group" class="group">
+      <div v-for="g in groups" :key="g.group" class="group" :data-testid="`nav-group-${g.group}`">
         <div class="group-title eyebrow">{{ g.label }}</div>
         <RouterLink v-for="item in g.items" :key="item.to" :to="item.to" class="item" :class="{ active: isActive(item.to) }" :title="item.label" @click="emit('navigate')">
           <span class="dot" aria-hidden="true" /><i :class="item.icon" class="icon" aria-hidden="true" /><span class="label">{{ item.label }}</span>
@@ -99,9 +75,9 @@ watch(() => auth.moCode, resolveOrganization)
       </div>
     </nav>
     <div class="foot">
-      <div class="user" :title="`${auth.actor} · ${affiliation}`" data-testid="user-chip">
+      <RouterLink class="user" to="/account/profile" :title="`${auth.actor} · ${affiliation}`" data-testid="user-chip" @click="emit('navigate')">
         <i class="pi pi-user icon" aria-hidden="true" /><span class="label">{{ auth.actor }} · {{ affiliation }}</span>
-      </div>
+      </RouterLink>
       <div class="controls">
         <span class="wide"><LocaleSwitch surface="soft" /></span>
         <span class="narrow"><LocaleSwitch mode="toggle" /></span>
@@ -121,14 +97,16 @@ watch(() => auth.moCode, resolveOrganization)
 .group { display: flex; flex-direction: column; gap: 4px; }
 .group + .group { margin-top: 12px; }
 .group-title { padding: 8px 12px 6px; }
-.item { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px 0 28px; border-radius: var(--dm-radius-pill); text-decoration: none; color: var(--dm-muted); font-size: var(--dm-text-md); font-weight: 500; white-space: nowrap; overflow: hidden; box-sizing: border-box; }
+.item { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px 0 28px; border-radius: var(--dm-radius-pill); text-decoration: none; color: var(--dm-muted); font-size: var(--dm-text-md); font-weight: 500; white-space: nowrap; overflow: hidden; box-sizing: border-box; flex: none; }
 .item .icon { display: none; }
 .item .dot { display: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dm-accent); flex: none; }
-.item:hover { background: var(--dm-surface-2); color: var(--dm-ink); }
-.item.active { background: var(--dm-surface-2); color: var(--dm-ink); padding-left: 12px; }
+.item:hover { background: var(--dm-bg); color: var(--dm-ink); }
+.item.active { background: var(--dm-accent-soft); color: var(--dm-ink); padding-left: 12px; }
 .item.active .dot { display: block; }
 .foot { display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 0; font-size: 13px; color: var(--dm-muted); }
-.user { display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.user { display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--dm-muted); text-decoration: none; }
+.user:hover { color: var(--dm-accent-hover); }
+.user .label { overflow: hidden; text-overflow: ellipsis; }
 .user .icon { display: none; }
 .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .narrow { display: none; }

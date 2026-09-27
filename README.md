@@ -34,6 +34,7 @@
 | [docs/tz.md](docs/tz.md) | Техническое задание программы (текст организаторов) |
 | [docs/demo-pages.md](docs/demo-pages.md) | Что есть на каждой странице стенда и что показывать |
 | [docs/criteria-map.md](docs/criteria-map.md) | Соответствие страниц и моделей критериям ТЗ и жюри, что закрыть до защиты |
+| [docs/rbac.md](docs/rbac.md) | Роли, 14 разрешений, scope «своя организация», эндпоинты администрирования и аккаунта |
 | [docs/deploy.md](docs/deploy.md) | Публичный стенд dc.jurek.kz: продовый compose, скрипт деплоя, что не поднимаем и почему |
 
 ## Данные
@@ -72,18 +73,18 @@ python3 scripts/profile_datasets.py DataSets
 ```bash
 cp .env.example .env               # адреса и режимы, значения по умолчанию подходят для ноутбука
 ollama pull qwen3.8:27b && make ollama-model   # локальная модель с контекстом 16k (один раз)
-make serve                         # инфраструктура: Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, MLflow
+make serve                         # инфраструктура: Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, Mailpit, MLflow
 make pipeline                      # данные в контейнере: intake → refdata → gold → train → publish (DataSets и lakehouse монтируются с хоста)
 make up                            # API :8000, сервис моделей :50051, скрайб :8010, веб :3000
 ```
 
-Веб на `http://localhost:3000`: кнопка «Войти» ведёт в Keycloak, демо-пользователи с паролем `darumen`: `regulator1`, `chief1`, `doctor1`, `steward1`, `citizen1`, `admin1`; без входа открыта только страница входа (и памятка пациенту по QR). API без Keycloak (заголовки `X-Actor`/`X-Role`/`X-Region`, только для тестов и отладки через `/scalar`): `API_AUTH_MODE=headers` в `.env`, затем `make up`; веб и мобильное приложение входят только через Keycloak. API за nginx веба и напрямую на `:8000` (`/scalar`). Логи: `make logs`, остановка: `make down`. Образы: `infra/api.Dockerfile`, `infra/models.Dockerfile` (модели, скрайб, конвейер), `infra/web.Dockerfile`.
+Веб на `http://localhost:3000`: кнопка «Войти» ведёт в Keycloak, демо-пользователи с паролем `darumen`: `regulator1`, `chief1` (администратор организации), `doctor1`, `steward1`, `auditor1`, `citizen1`, `admin1`; без входа открыта только страница входа (и памятка пациенту по QR). Письма Keycloak (сброс пароля, уведомления безопасности) в dev ловит Mailpit — http://localhost:8025; тема входа и писем, SMTP и служебный клиент `darumen-admin` — [docs/deploy.md](docs/deploy.md#keycloak). API без Keycloak (заголовки `X-Actor`/`X-Role`/`X-Region`, только для тестов и отладки через `/scalar`): `API_AUTH_MODE=headers` в `.env`, затем `make up`; веб и мобильное приложение входят только через Keycloak. API за nginx веба и напрямую на `:8000` (`/scalar`). Логи: `make logs`, остановка: `make down`. Образы: `infra/api.Dockerfile`, `infra/models.Dockerfile` (модели, скрайб, конвейер), `infra/web.Dockerfile`.
 
 ## Запуск для разработки (без Docker для приложения)
 
 ```bash
 make venv     # Python-окружение для ml/
-make serve    # инфраструктура: Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, MLflow
+make serve    # инфраструктура: Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, Mailpit, MLflow
 make build    # .NET и веб
 make test     # тесты .NET, Python и веб
 ```

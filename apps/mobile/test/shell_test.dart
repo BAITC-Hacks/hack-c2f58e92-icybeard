@@ -11,8 +11,8 @@ import 'screens_test.dart' show apiSession;
 
 /// Роутер целиком поверх мок-сессии: экраны получают 404 от мок-API и показывают ErrorBox, что для проверки
 /// навигации достаточно. Скелетоны пульсируют бесконечно, поэтому вместо pumpAndSettle — фиксированные кадры.
-Future<GoRouter> pumpApp(WidgetTester tester, {required List<String> roles, String? region}) async {
-  final session = await apiSession(roles: roles, api: {}, region: region);
+Future<GoRouter> pumpApp(WidgetTester tester, {required List<String> roles, String? region, Map<String, Object?> claims = const {}, Map<String, Object> api = const {}}) async {
+  final session = await apiSession(roles: roles, api: api, region: region, claims: claims);
   final router = buildRouter(session);
   await tester.pumpWidget(ChangeNotifierProvider.value(
     value: session,
@@ -88,6 +88,56 @@ void main() {
     expect(find.byType(FloatingNav), findsNothing);
     expect(find.text('Подтвердить направление'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('regulator, steward and auditor see «Кабинет доступен в веб-версии» with «Открыть веб» and «Выйти», no tabs', (tester) async {
+    for (final (role, title) in [('regulator', 'Регулятор (Минздрав)'), ('steward', 'Стюард данных'), ('auditor', 'Аудитор')]) {
+      final router = await pumpApp(tester, roles: [role]);
+      expect(router.routerDelegate.currentConfiguration.uri.path, '/web', reason: role);
+      expect(find.text('Кабинет доступен в веб-версии'), findsOneWidget);
+      expect(find.textContaining('«$title»'), findsOneWidget, reason: role);
+      expect(find.text('Открыть веб'), findsOneWidget);
+      expect(find.text('Выйти'), findsOneWidget);
+      expect(find.byType(FloatingNav), findsNothing);
+      router.go('/doctor/patients');
+      await settle(tester);
+      expect(router.routerDelegate.currentConfiguration.uri.path, '/web', reason: 'guard не пускает в чужой кабинет');
+    }
+    await tester.tap(find.text('Выйти'));
+    await settle(tester);
+    expect(find.text('Войти через eGov mobile'), findsOneWidget);
+  });
+
+  testWidgets('org_admin (legacy chief with mo_code) gets the doctor shell with the journal tab', (tester) async {
+    final router = await pumpApp(tester, roles: ['chief'], claims: {'mo_code': '028B', 'region_kato': '75'});
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/patients');
+    expect(find.text('Решения'), findsOneWidget);
+    router.go('/doctor/scribe');
+    await settle(tester);
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/patients', reason: 'без scribe.use скрайб закрыт');
+  });
+
+  testWidgets('/me without decisions permissions hides the «Решения» tab, the other tabs still switch branches', (tester) async {
+    final router = await pumpApp(tester, roles: ['doctor'], region: '75', api: {
+      '/api/v1/me': {
+        'userId': 'u',
+        'displayName': 'Врач',
+        'roles': ['doctor'],
+        'permissions': [
+          {'code': 'worklist.view', 'scope': 'all'},
+          {'code': 'referral.confirm', 'scope': 'all'},
+        ],
+      },
+    });
+    expect(find.text('Решения'), findsNothing);
+    expect(find.text('Профиль'), findsOneWidget);
+    await tester.tap(find.text('Профиль'));
+    await settle(tester);
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/profile');
+    expect(find.text('Безопасность'), findsOneWidget);
+    router.go('/doctor/decisions');
+    await settle(tester);
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/patients');
   });
 
   testWidgets('without a session the router lands on the login screen only', (tester) async {

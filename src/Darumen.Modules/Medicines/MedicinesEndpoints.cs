@@ -1,4 +1,5 @@
 using Darumen.Shared.Api;
+using Darumen.Shared.Auth;
 
 namespace Darumen.Modules.Medicines;
 
@@ -8,7 +9,8 @@ public static class MedicinesEndpoints
 
     public static void Map(IEndpointRouteBuilder api)
     {
-        var group = api.MapGroup("/medicines").WithTags("Medicines");
+        // проверка рецепта и списки МНН — разрешение medicines.check (гражданин, врач); пример на странице входа — GET /public/login-examples
+        var group = api.MapGroup("/medicines").WithTags("Medicines").RequireAuthorization(Permissions.Policy(Permissions.MedicinesCheck));
 
         group.MapPost("/check", async (CheckRequestDto body, MedicinesService service, CancellationToken ct) =>
             {

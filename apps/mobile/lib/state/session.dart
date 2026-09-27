@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -5,15 +6,19 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/client.dart';
+import '../api/models.dart';
 import '../config/env.dart';
+import 'permissions.dart';
 import 'token_store.dart';
 
-enum AuthRole { citizen, doctor }
+export 'permissions.dart' show Perm, ShellKind;
 
 /// Кто пользуется приложением. Единственный вход — Keycloak (клиент darumen-mobile, password grant с обновлением
-/// токена); без входа открыт только экран входа (роль null). Роль, регион и ИИН всегда выводятся из клеймов токена
-/// и не хранятся отдельно. Один ApiClient на всю сессию; уведомляет слушателей только при смене роли или языка, чтобы
-/// guard роутера не перезапускался на каждом тихом обновлении токена.
+/// токена; при настроенном TOTP — с параметром `totp`); без входа открыт только экран входа (shell null). После входа
+/// сессия читает `GET /api/v1/me` — роли и разрешения; пока `/me` недоступен (404, сеть), разрешения выводятся из
+/// ролей токена по матрице docs/rbac.md (permissions.dart). Регион и ИИН — из клеймов токена, не хранятся отдельно.
+/// «Запомнить на 30 дней» выключено — токены живут только в памяти до закрытия приложения. Один ApiClient на всю
+/// сессию; слушатели уведомляются при смене shell/разрешений или языка, но не на тихом обновлении токена.
 class Session extends ChangeNotifier {
   Session({TokenStore? tokens, http.Client? httpClient})
       : _tokens = tokens ?? TokenStore(),
@@ -22,13 +27,20 @@ class Session extends ChangeNotifier {
   }
 
   static const _refreshAhead = Duration(seconds: 30);
+  static const _meTimeout = Duration(seconds: 8);
 
   final TokenStore _tokens;
   final http.Client _http;
   late final ApiClient api;
 
-  AuthRole? _role;
+  ShellKind? _shell;
+  List<String> _tokenRoles = const [];
+  Grants _grants = Grants.none;
+  Me? _me;
   String? _username;
+  String? _name;
+  String? _email;
+  String? _moClaim;
   String? _regionClaim;
   String? _iin;
   String _locale = 'ru';
@@ -36,17 +48,44 @@ class Session extends ChangeNotifier {
   String? _lastProfile;
   String? _lastNosology;
   String? _seenDecisionId;
+  ShellKind? _lastShell;
+  Set<String> _otpUsers = const {};
+  bool _remember = true;
   String? _access;
   String? _refresh;
   DateTime? _expiresAt;
 
-  AuthRole? get role => _role;
-  bool get isAuthenticated => _role != null;
-  bool get isDoctor => _role == AuthRole.doctor;
-  bool get isCitizen => _role == AuthRole.citizen;
+  /// Набор вкладок: врач (`worklist.view`), гражданин (`route.own`), веб-версия (остальные роли); null — не вошёл.
+  ShellKind? get shell => _shell;
+  bool get isAuthenticated => _shell != null;
+  bool get isDoctor => _shell == ShellKind.doctor;
+  bool get isCitizen => _shell == ShellKind.citizen;
+  bool get isWebOnly => _shell == ShellKind.web;
+
+  /// Разрешение из `/me` (или фолбэка по ролям). Проверка только для интерфейса — API перепроверяет каждое действие.
+  bool can(String code) => _grants.can(code);
+  bool canAny(Iterable<String> codes) => _grants.canAny(codes);
+  Grants get grants => _grants;
+
+  /// true — разрешения пришли из `/me`, false — фолбэк по ролям токена.
+  bool get grantsFromApi => _me?.grants != null;
+  List<String> get roles => _me == null || _me!.roles.isEmpty ? _tokenRoles : _me!.roles;
+  String? get primaryRoleKey => primaryRole(roles);
+  Me? get me => _me;
+
   String? get username => _username;
+  String? get displayName => _me?.displayName.isNotEmpty == true ? _me!.displayName : _name;
+  String? get email => _me?.email ?? _email;
+  String? get organizationName => _me?.moName;
   String? get iin => _iin;
   String get locale => _locale;
+  bool get rememberMe => _remember;
+
+  /// Каким кабинетом пользовались на этом устройстве в прошлый раз — подпись «Кабинет врача» на входе.
+  ShellKind? get lastShell => _lastShell;
+
+  /// Для этого логина на устройстве уже вводили код из приложения-аутентификатора: вход сразу спросит код.
+  bool needsOtp(String username) => _otpUsers.contains(username.trim().toLowerCase());
 
   /// Регион из клейма учётной записи, иначе выбранный в профиле, иначе г. Алматы.
   String get region => _regionClaim ?? _preferredRegion;
@@ -57,8 +96,13 @@ class Session extends ChangeNotifier {
   /// Последнее решение врача, которое гражданин закрыл кнопкой «Понятно»: карточка «Ответ врача» не повторяется.
   String? get seenDecisionId => _seenDecisionId;
 
-  /// Стартовый маршрут по роли: врач — рабочий список, гражданин — главная, без входа — экран входа.
-  String get home => switch (_role) { AuthRole.doctor => '/doctor/patients', AuthRole.citizen => '/home', null => '/login' };
+  /// Стартовый маршрут: врач — рабочий список, гражданин — главная, прочие роли — «Кабинет в веб-версии».
+  String get home => switch (_shell) {
+        ShellKind.doctor => '/doctor/patients',
+        ShellKind.citizen => '/home',
+        ShellKind.web => '/web',
+        null => '/login',
+      };
 
   Future<void> load() async {
     try {
@@ -68,6 +112,8 @@ class Session extends ChangeNotifier {
       _lastProfile = prefs.getString('lastProfile');
       _lastNosology = prefs.getString('lastNosology');
       _seenDecisionId = prefs.getString('seenDecision');
+      _lastShell = ShellKind.values.where((k) => k.name == prefs.getString('lastShell')).firstOrNull;
+      _otpUsers = (prefs.getStringList('otpUsers') ?? const []).toSet();
     } catch (_) {
       // без хранилища — настройки по умолчанию
     }
@@ -76,28 +122,86 @@ class Session extends ChangeNotifier {
       _access = stored.access;
       _refresh = stored.refresh;
       _expiresAt = stored.expiresAt;
+      _remember = true;
       _applyClaims(stored.access);
+      _recompute();
     }
+    notifyListeners();
+    if (stored != null) {
+      await refreshMe();
+    }
+  }
+
+  /// Вход паролем (демо-пользователи realm darumen, пароль `darumen`); [otp] — 6 цифр из приложения-аутентификатора.
+  /// Keycloak отвечает одинаковым `invalid_grant` на неверный пароль, неверный и отсутствующий код — различить их
+  /// нельзя, поэтому экран входа предлагает войти с кодом. [remember] = false — токены не пишутся в хранилище.
+  Future<void> login(String username, String password, {String? otp, bool remember = true}) async {
+    final data = await _tokenRequest({
+      'grant_type': 'password',
+      'username': username,
+      'password': password,
+      if (otp != null && otp.isNotEmpty) 'totp': otp,
+    });
+    _remember = remember;
+    _me = null;
+    _applyTokens(data);
+    _recompute();
+    await _persistTokens();
+    if (otp != null && otp.isNotEmpty) {
+      await _markOtpUser(username, true);
+    }
+    await refreshMe(notify: false);
     notifyListeners();
   }
 
-  /// Вход паролем (демо-пользователи realm darumen: citizen1, doctor1). Роль, регион и ИИН — из клеймов токена.
-  Future<void> login(String username, String password) async {
-    _applyTokens(await _tokenRequest({'grant_type': 'password', 'username': username, 'password': password}));
-    await _tokens.write(StoredTokens(access: _access!, refresh: _refresh, expiresAt: _expiresAt));
-    notifyListeners();
+  /// Перечитывает `/me`: разрешения API заменяют фолбэк по ролям; при 404, ошибке или таймауте остаётся фолбэк.
+  Future<void> refreshMe({bool notify = true}) async {
+    if (_access == null) {
+      return;
+    }
+    final before = (_shell, _grants.codes.toSet());
+    try {
+      _me = await api.me().timeout(_meTimeout);
+      final otp = _me!.otpConfigured;
+      if (otp != null && _username != null) {
+        await _markOtpUser(_username!, otp);
+      }
+    } catch (_) {
+      _me = null; // /me ещё нет (бэкенд) или сеть — работаем по ролям токена
+    }
+    if (_access == null) {
+      return; // пока ждали /me, обновление токена не удалось и сессия вышла
+    }
+    _recompute();
+    if (_shell != null) {
+      _lastShell = _shell;
+      await _persist('lastShell', _shell!.name);
+    }
+    final after = (_shell, _grants.codes.toSet());
+    if (notify && (before.$1 != after.$1 || !setEquals(before.$2, after.$2))) {
+      notifyListeners();
+    }
   }
 
   Future<void> logout() async {
+    final refresh = _refresh;
     _access = null;
     _refresh = null;
     _expiresAt = null;
     _username = null;
+    _name = null;
+    _email = null;
+    _moClaim = null;
     _regionClaim = null;
     _iin = null;
-    _role = null;
+    _tokenRoles = const [];
+    _me = null;
+    _recompute();
     await _tokens.clear();
     notifyListeners();
+    if (refresh != null) {
+      unawaited(_endKeycloakSession(refresh));
+    }
   }
 
   Future<void> setLocale(String locale) async {
@@ -132,7 +236,7 @@ class Session extends ChangeNotifier {
   }
 
   /// Токен для запроса: обновляется за 30 секунд до истечения; если обновить нельзя — выход на экран входа.
-  /// На тихом успешном обновлении слушатели не уведомляются.
+  /// На тихом успешном обновлении слушатели не уведомляются (кроме смены shell, если роли поменялись).
   Future<String?> freshToken() async {
     if (_access == null) {
       return null;
@@ -140,8 +244,13 @@ class Session extends ChangeNotifier {
     final expiring = _expiresAt == null || DateTime.now().isAfter(_expiresAt!.subtract(_refreshAhead));
     if (expiring && _refresh != null) {
       try {
+        final shellBefore = _shell;
         _applyTokens(await _tokenRequest({'grant_type': 'refresh_token', 'refresh_token': _refresh!}));
-        await _tokens.write(StoredTokens(access: _access!, refresh: _refresh, expiresAt: _expiresAt));
+        _recompute();
+        await _persistTokens();
+        if (_shell != shellBefore) {
+          notifyListeners();
+        }
       } catch (_) {
         await logout();
         return null;
@@ -150,17 +259,33 @@ class Session extends ChangeNotifier {
     return _access;
   }
 
+  Uri get _openIdBase => Uri.parse('${Env.keycloakUrl}/realms/${Env.keycloakRealm}/protocol/openid-connect');
+
   Future<Map<String, dynamic>> _tokenRequest(Map<String, String> body) async {
     final response = await _http.post(
-      Uri.parse('${Env.keycloakUrl}/realms/${Env.keycloakRealm}/protocol/openid-connect/token'),
+      Uri.parse('$_openIdBase/token'),
       headers: {'Content-Type': 'application/x-www-form-urlencoded'},
       body: {'client_id': Env.keycloakClientId, ...body},
     );
-    final json = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+    final text = utf8.decode(response.bodyBytes);
+    final json = text.isEmpty ? const <String, dynamic>{} : jsonDecode(text) as Map<String, dynamic>;
     if (response.statusCode >= 400) {
       throw ApiException(response.statusCode, json['error'] as String? ?? 'HTTP ${response.statusCode}', detail: json['error_description'] as String?);
     }
     return json;
+  }
+
+  /// Завершает сеанс Keycloak по refresh-токену; без сети сеанс истечёт сам — ошибки не показываются.
+  Future<void> _endKeycloakSession(String refresh) async {
+    try {
+      await _http.post(
+        Uri.parse('$_openIdBase/logout'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: {'client_id': Env.keycloakClientId, 'refresh_token': refresh},
+      );
+    } catch (_) {
+      // сеанс истечёт по таймауту Keycloak
+    }
   }
 
   void _applyTokens(Map<String, dynamic> data) {
@@ -173,11 +298,47 @@ class Session extends ChangeNotifier {
   void _applyClaims(String token) {
     final claims = jwtClaims(token);
     _username = claims['preferred_username'] as String? ?? _username;
-    final roles = ((claims['realm_access'] as Map<String, dynamic>?)?['roles'] as List<dynamic>? ?? const []).cast<String>();
-    // admin считается врачом: политика Doctor в API включает роль admin (AuthSetup.cs)
-    _role = roles.contains('doctor') || roles.contains('admin') ? AuthRole.doctor : AuthRole.citizen;
+    _name = claims['name'] as String?;
+    _email = claims['email'] as String?;
+    _tokenRoles = ((claims['realm_access'] as Map<String, dynamic>?)?['roles'] as List<dynamic>? ?? const []).whereType<String>().toList();
+    _moClaim = claims['mo_code'] as String?;
     _regionClaim = claims['region_kato'] as String?;
     _iin = claims['iin'] as String?;
+  }
+
+  /// Разрешения: из `/me`, иначе по ролям токена; shell — из разрешений.
+  void _recompute() {
+    if (_access == null) {
+      _grants = Grants.none;
+      _shell = null;
+      return;
+    }
+    _grants = _me?.grants ?? Grants.fromRoles(_tokenRoles, hasOrganization: _moClaim != null);
+    _shell = _grants.shell;
+  }
+
+  Future<void> _persistTokens() async {
+    if (_remember) {
+      await _tokens.write(StoredTokens(access: _access!, refresh: _refresh, expiresAt: _expiresAt));
+    } else {
+      await _tokens.clear(); // «Запомнить» выключено: после закрытия приложения — снова вход
+    }
+  }
+
+  Future<void> _markOtpUser(String username, bool on) async {
+    final key = username.trim().toLowerCase();
+    final next = {..._otpUsers};
+    final changed = on ? next.add(key) : next.remove(key);
+    if (!changed) {
+      return;
+    }
+    _otpUsers = next;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('otpUsers', next.toList());
+    } catch (_) {
+      // подсказка живёт до перезапуска
+    }
   }
 
   @visibleForTesting
@@ -193,10 +354,14 @@ class Session extends ChangeNotifier {
     }
   }
 
-  Future<void> _persist(String key, String value) async {
+  Future<void> _persist(String key, String? value) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(key, value);
+      if (value == null) {
+        await prefs.remove(key);
+      } else {
+        await prefs.setString(key, value);
+      }
     } catch (_) {
       // хранилище недоступно: настройка живёт до перезапуска
     }

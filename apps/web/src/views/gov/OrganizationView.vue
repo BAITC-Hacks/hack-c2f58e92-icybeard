@@ -131,7 +131,7 @@ watch([moCode, profile], () => {
 </script>
 
 <template>
-  <PageShell :title="shortOrgName(fullName)" :back="kato ? { to: `/gov/regions/${kato}`, label: refdata.regionName(kato) } : undefined">
+  <PageShell :title="shortOrgName(fullName)" :back="kato && auth.can('gov.map') ? { to: `/gov/regions/${kato}`, label: refdata.regionName(kato) } : undefined">
     <template #title-extra><span class="code muted">· {{ moCode }}</span></template>
     <template #subtitle><span :title="fullName">{{ refdata.regionName(kato) }}</span> · {{ refdata.profileName(profile) }}<template v-if="asOf"> · {{ t('shell.asOf', { date: dateShort(asOf) }) }}</template></template>
     <template #actions>
@@ -155,14 +155,14 @@ watch([moCode, profile], () => {
         </AppCard>
         <div class="links">
           <RouterLink class="card link-card" :to="{ name: 'organization-referrals', params: { moCode }, query: { kato } }"><i class="pi pi-arrow-right" aria-hidden="true" /><span>{{ t('nav.short.orgReferrals') }}</span></RouterLink>
-          <RouterLink v-if="auth.hasRole('regulator')" class="card link-card" :to="{ name: 'simulator', query: { region: kato, profile } }"><i class="pi pi-chart-line" aria-hidden="true" /><span>{{ t('gov.org.toSimulator') }}</span></RouterLink>
+          <RouterLink v-if="auth.can('gov.simulator')" class="card link-card" :to="{ name: 'simulator', query: { region: kato, profile } }"><i class="pi pi-chart-line" aria-hidden="true" /><span>{{ t('gov.org.toSimulator') }}</span></RouterLink>
         </div>
       </div>
 
       <div class="col">
         <AppCard :title="t('gov.org.signals')" origin="ml">
           <template #header><span class="caption">{{ anomalies.length }}</span></template>
-          <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
+          <AnomalyFeed :items="anomalies" :can-ack="auth.canAny(['gov.map', 'org.cabinet'])" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
         </AppCard>
 
         <AppCard :title="t('gov.org.vsRegion')" origin="ml" :origin-note="t('gov.org.vsRegionNote')" data-testid="org-vs-region">

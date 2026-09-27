@@ -18,7 +18,7 @@ class AppCard extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? color;
 
-  /// Inset-обводка 2 px ink у выбранной опции-карточки.
+  /// Inset-обводка 2 px accent у выбранной опции-карточки.
   final BoxBorder? border;
   final String? semanticsLabel;
 
@@ -38,7 +38,7 @@ class AppCard extends StatelessWidget {
       button: true,
       label: semanticsLabel,
       child: Material(
-        color: AppColors.transparent,
+        color: ColorTokens.transparent,
         child: InkWell(borderRadius: radius, onTap: onTap, child: body),
       ),
     );
@@ -66,7 +66,7 @@ class CardLabel extends StatelessWidget {
 }
 
 /// Строка списка внутри карточки: min-height 56, `padding 12 0`, hairline снизу кроме последней; слева
-/// необязательная точка 6 px (coral — новое) или иконка, справа значение 12–14 ink-3 и шеврон при действии.
+/// необязательная точка 6 px (accent — новое) или иконка, справа значение 12–14 ink-2 и шеврон при действии.
 class ListRow extends StatelessWidget {
   const ListRow({
     super.key,
@@ -92,7 +92,7 @@ class ListRow extends StatelessWidget {
   /// Заголовок 15/500 вместо 15/400.
   final bool strong;
 
-  /// true — coral-точка (новое), false — пустое место под точку, null — без колонки.
+  /// true — фиолетовая точка (новое), false — пустое место под точку, null — без колонки.
   final bool? dot;
   final Color? titleColor;
 
@@ -113,7 +113,7 @@ class ListRow extends StatelessWidget {
             Container(
               width: AppSizes.dot,
               height: AppSizes.dot,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: dot! ? colors.accent : AppColors.transparent),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: dot! ? colors.accent : ColorTokens.transparent),
             ),
             const SizedBox(width: AppSpacing.md),
           ],
@@ -130,13 +130,13 @@ class ListRow extends StatelessWidget {
                 ),
                 if (subtitle != null && subtitle!.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(subtitle!, style: theme.textTheme.rowDetail.copyWith(color: colors.faint).merge(AppType.numeric), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  Text(subtitle!, style: theme.textTheme.rowDetail.copyWith(color: colors.muted).merge(AppType.numeric), maxLines: 2, overflow: TextOverflow.ellipsis),
                 ],
               ],
             ),
           ),
           if (trailing != null) ...[const SizedBox(width: AppSpacing.md), trailing!],
-          if (onTap != null && chevron) ...[const SizedBox(width: AppSpacing.xs), Icon(Icons.chevron_right, size: 20, color: colors.faint)],
+          if (onTap != null && chevron) ...[const SizedBox(width: AppSpacing.xs), Icon(Icons.chevron_right, size: 20, color: colors.muted)],
         ],
       ),
     );
@@ -171,7 +171,7 @@ class RowValue extends StatelessWidget {
   }
 }
 
-/// Ссылка-действие 15/500 ink со стрелкой «→» coral-text.
+/// Ссылка-действие 15/500 ink со стрелкой «→» accentHover (Ghost-ссылка доски C-Tokens).
 class ArrowLink extends StatelessWidget {
   const ArrowLink(this.text, {super.key, this.onTap});
 
@@ -187,7 +187,7 @@ class ArrowLink extends StatelessWidget {
       children: [
         Flexible(child: Text(text, style: theme.textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
         const SizedBox(width: 6),
-        Text('→', style: theme.textTheme.titleSmall?.copyWith(color: colors.danger)),
+        Text('→', style: theme.textTheme.titleSmall?.copyWith(color: colors.accentHover)),
       ],
     );
     if (onTap == null) {

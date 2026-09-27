@@ -12,9 +12,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 String fakeJwt(Map<String, dynamic> claims) =>
     'header.${base64Url.encode(utf8.encode(jsonEncode(claims))).replaceAll('=', '')}.signature';
 
-/// Keycloak-заглушка: password grant отдаёт токен с ролями, refresh — по флагу, остальное — 400 invalid_grant.
+/// Keycloak-заглушка: password grant отдаёт токен с ролями, refresh — по флагу, неверный пароль — 401 invalid_grant.
+/// Запросы не к `/token` (API `/me`, выход) — 404, как у API до появления `/me`.
 MockClient keycloak({required List<String> roles, String? region, String? iin, int expiresIn = 300, bool refreshOk = true}) =>
     MockClient((request) async {
+      if (!request.url.path.endsWith('/protocol/openid-connect/token')) {
+        return http.Response('{"title":"Not found"}', 404);
+      }
       final body = request.bodyFields;
       final grant = body['grant_type'];
       if (grant == 'refresh_token' && !refreshOk) {
@@ -50,10 +54,10 @@ void main() {
     expect(Session.jwtClaims('garbage'), isEmpty);
   });
 
-  test('fresh session has no role, the default region and the login screen as home', () async {
+  test('fresh session has no shell, the default region and the login screen as home', () async {
     final s = await session(roles: []);
     expect(s.isAuthenticated, isFalse);
-    expect(s.role, isNull);
+    expect(s.shell, isNull);
     expect(s.region, '75');
     expect(s.home, '/login');
     expect(await s.freshToken(), isNull);
@@ -94,7 +98,8 @@ void main() {
     await s.login('doctor1', 'darumen');
     await s.logout();
     expect(s.isAuthenticated, isFalse);
-    expect(s.role, isNull);
+    expect(s.shell, isNull);
+    expect(s.can('worklist.view'), isFalse);
     expect(s.home, '/login');
     expect(s.username, isNull);
     expect(s.regionFromAccount, isFalse);

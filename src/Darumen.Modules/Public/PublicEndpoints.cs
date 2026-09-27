@@ -16,5 +16,11 @@ public static class PublicEndpoints
             .WithName("PublicDaily")
             .WithSummary("Гостю на главной: погода на сегодня и завтра по столице региона (Open-Meteo), бытовые советы по погоде и новости о здравоохранении из RSS. Без входа, без персональных данных, без медицинских рекомендаций")
             .Produces<DailyDto>();
+
+        group.MapGet("/login-examples", async (HttpRequest http, LoginExamplesService service, CancellationToken ct) =>
+                Results.Ok(await service.GetAsync(Locale.From(http), ct)))
+            .WithName("LoginExamples")
+            .WithSummary("Пример-карточки страницы входа: ожидание (г. Алматы · офтальмология: p50, p90, доля за 30 дней) и одно МНН с покрытием и сроками обеспечения; без входа, кэш 1 ч")
+            .Produces<LoginExamplesDto>();
     }
 }

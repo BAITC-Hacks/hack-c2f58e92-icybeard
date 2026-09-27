@@ -37,7 +37,7 @@ defineProps<{ stages: RouteStage[]; chevrons?: boolean; norms?: boolean; vertica
 .bars, .labels { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
 .bar { display: flex; align-items: center; gap: 4px; height: 14px; }
 .bar .track { flex: 1; height: 3px; border-radius: 2px; background: var(--dm-hairline); }
-.bar.done .track { background: var(--dm-ink); }
+.bar.done .track { background: var(--dm-primary); }
 .bar .marker { width: 14px; height: 14px; border-radius: 50%; background: var(--dm-accent); border: 2px solid var(--dm-ink); box-sizing: border-box; flex: none; }
 .labels { font-size: var(--dm-text-xs); color: var(--dm-muted); letter-spacing: 0.02em; }
 .stage-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -49,11 +49,11 @@ defineProps<{ stages: RouteStage[]; chevrons?: boolean; norms?: boolean; vertica
 .rail { display: flex; flex-direction: column; align-items: center; width: 14px; flex: none; }
 .rail .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dm-hairline); flex: none; margin-top: 6px; box-sizing: border-box; }
 .rail .line { flex: 1; width: 3px; border-radius: 2px; background: var(--dm-hairline); margin-top: 4px; }
-li.done .rail .dot, li.done .rail .line { background: var(--dm-ink); }
+li.done .rail .dot, li.done .rail .line { background: var(--dm-primary); }
 li.current .rail .dot { width: 14px; height: 14px; background: var(--dm-accent); border: 2px solid var(--dm-ink); margin-top: 4px; }
 .text { display: flex; flex-direction: column; gap: 2px; padding-bottom: 16px; min-width: 0; }
 li:last-child .text { padding-bottom: 0; }
 .title { font-size: var(--dm-text-md); font-weight: 500; }
 li.upcoming .title { color: var(--dm-muted); }
-.date { font-size: 13px; color: var(--dm-faint); }
+.date { font-size: 13px; color: var(--dm-muted); }
 </style>

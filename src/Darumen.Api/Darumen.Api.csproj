@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Darumen.Modules\Medicines\Darumen.Modules.Medicines.csproj" />
     <ProjectReference Include="..\Darumen.Modules\Insight\Darumen.Modules.Insight.csproj" />
     <ProjectReference Include="..\Darumen.Modules\Public\Darumen.Modules.Public.csproj" />
+    <ProjectReference Include="..\Darumen.Modules\Access\Darumen.Modules.Access.csproj" />
   </ItemGroup>
 
 </Project>

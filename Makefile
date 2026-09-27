@@ -49,7 +49,7 @@ train: venv ## Обучить модели и зарегистрировать �
 eval: venv ## Оценить модели против baseline на отложенной выборке
 	$(PY) -m darumen.models.evaluate
 
-serve: ## Поднять только инфраструктуру (Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, MLflow)
+serve: ## Поднять только инфраструктуру (Postgres, ClickHouse, Cube, Kafka, Schema Registry, Valkey, MinIO, Keycloak, Mailpit, MLflow)
 	$(COMPOSE) up -d
 
 up: ## Поднять всё в Docker: инфраструктура, API, сервис моделей, скрайб, веб на :3000 (Ollama на хосте)

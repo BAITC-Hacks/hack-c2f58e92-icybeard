@@ -210,7 +210,7 @@ watch(signalStatus, loadSignals)
           {{ t('anomaly.status.' + s) }} <span v-if="s === 'open'" class="count">{{ openTotal }}</span>
         </button>
       </div>
-      <AnomalyFeed :items="anomalies" :can-ack="auth.hasRole('chief', 'regulator')" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
+      <AnomalyFeed :items="anomalies" :can-ack="auth.canAny(['gov.map', 'org.cabinet'])" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
     </CollapsibleSection>
 
     <div class="extras"><CountryExtras /></div>
@@ -224,10 +224,10 @@ watch(signalStatus, loadSignals)
 .legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-.swatch.dot { border-radius: 50%; background: var(--dm-accent); width: 10px; height: 10px; }
+.swatch.dot { border-radius: 50%; background: var(--dm-warn-strong); width: 10px; height: 10px; }
 .anomaly-row { text-decoration: none; color: inherit; justify-content: flex-start; align-items: flex-start; gap: 12px; }
 .anomaly-row:hover .anomaly-title { color: var(--dm-accent-hover); }
-.anomaly-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dm-accent); flex: none; margin-top: 7px; }
+.anomaly-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dm-warn-strong); flex: none; margin-top: 7px; }
 .anomaly-dot.idle { background: var(--dm-dot-idle); }
 .anomaly-title { font-size: var(--dm-text-md); line-height: 1.35; }
 .extras { display: flex; flex-direction: column; gap: var(--dm-space-3); }

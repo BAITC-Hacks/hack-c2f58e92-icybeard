@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Тёмная тема: surface тёмной палитры в design/tokens.json -->
+    <color name="darumen_canvas">#16171D</color>
+</resources>

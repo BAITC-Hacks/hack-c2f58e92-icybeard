@@ -11,7 +11,7 @@ import { useChartTheme } from '@/composables/useChartTheme'
 
 use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent])
 
-/** `bare` — без обёртки-карточки (график внутри AppCard). Цвета рядов — из useChartTheme: очередь ink, поток синие, отказы coral. */
+/** `bare` — без обёртки-карточки (график внутри AppCard). Цвета рядов — из useChartTheme: очередь — фиолетовая серия, поток — рамп карты, отказы — янтарь. */
 const props = defineProps<{ days: QueueDay[]; title?: string; bare?: boolean }>()
 const { t } = useI18n()
 const { theme, base, axis } = useChartTheme()
@@ -24,10 +24,10 @@ const option = computed(() => ({
   xAxis: { type: 'category', data: props.days.map((d) => d.day), ...axis.value },
   yAxis: [{ type: 'value', name: t('queueChart.queue'), ...axis.value }, { type: 'value', name: t('queueChart.perDay'), ...axis.value }],
   series: [
-    { name: t('queueChart.queue'), type: 'line', data: props.days.map((d) => d.queueLen), showSymbol: false, lineStyle: { width: 2, color: theme.value.ink }, itemStyle: { color: theme.value.ink } },
+    { name: t('queueChart.queue'), type: 'line', data: props.days.map((d) => d.queueLen), showSymbol: false, lineStyle: { width: 2, color: theme.value.series }, itemStyle: { color: theme.value.series } },
     { name: t('queueChart.registered'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => d.registered), stack: 'flow', itemStyle: { color: theme.value.scale[2] } },
     { name: t('queueChart.hospitalized'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.hospitalized), stack: 'flow', itemStyle: { color: theme.value.scale[3] } },
-    { name: t('queueChart.refused'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.refused), stack: 'flow', itemStyle: { color: theme.value.accent } },
+    { name: t('queueChart.refused'), type: 'bar', yAxisIndex: 1, data: props.days.map((d) => -d.refused), stack: 'flow', itemStyle: { color: theme.value.anomaly } },
   ],
 }))
 </script>

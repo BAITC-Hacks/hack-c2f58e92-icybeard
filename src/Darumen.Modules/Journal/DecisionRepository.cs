@@ -40,6 +40,7 @@ public sealed class DecisionRepository(IDbContextOutbox<DarumenDbContext> outbox
             Reason = decision.Reason,
             IdempotencyKey = decision.IdempotencyKey,
             RecordedAt = DateTime.UtcNow,
+            ActorMoCode = decision.ActorMoCode,
         };
         context.Decisions.Add(entity);
         var dto = ToDto(entity);
@@ -59,11 +60,20 @@ public sealed class DecisionRepository(IDbContextOutbox<DarumenDbContext> outbox
         return (dto, true);
     }
 
-    public async Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, string? subjectId, int page, int size, CancellationToken cancellationToken)
+    public Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, string? subjectId, int page, int size, CancellationToken cancellationToken) =>
+        QueryAsync(new { actor, subject, subjectId, moCode = (string?)null, size, offset = (page - 1) * size }, page, size, cancellationToken);
+
+    public Task<Paged<DecisionDto>> ListForOrganizationAsync(
+        string moCode, string? actor, string? subject, string? subjectId, int page, int size, CancellationToken cancellationToken) =>
+        QueryAsync(new { actor, subject, subjectId, moCode, size, offset = (page - 1) * size }, page, size, cancellationToken);
+
+    private async Task<Paged<DecisionDto>> QueryAsync(object parameters, int page, int size, CancellationToken cancellationToken)
     {
         await using var connection = await db.OpenAsync(cancellationToken);
-        const string where = "WHERE (@actor IS NULL OR actor = @actor) AND (@subject IS NULL OR subject = @subject) AND (@subjectId IS NULL OR subject_id = @subjectId)";
-        var parameters = new { actor, subject, subjectId, size, offset = (page - 1) * size };
+        const string where = """
+            WHERE (@actor IS NULL OR actor = @actor) AND (@subject IS NULL OR subject = @subject) AND (@subjectId IS NULL OR subject_id = @subjectId)
+              AND (@moCode IS NULL OR actor_mo_code = @moCode OR recommended->>'moCode' = @moCode OR chosen->>'moCode' = @moCode)
+            """;
         var total = await connection.ExecuteScalarAsync<long>(new CommandDefinition(
             $"SELECT count(*) FROM journal.decisions {where}", parameters, cancellationToken: cancellationToken));
         var rows = await connection.QueryAsync<Row>(new CommandDefinition(

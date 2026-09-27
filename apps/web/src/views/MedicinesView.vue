@@ -38,7 +38,7 @@ const region = ref<string | null>(auth.region ?? null)
 const result = ref<CheckResponse | null>(null)
 const error = ref<unknown>(null)
 const busy = ref(false)
-const canForecast = auth.hasRole('chief', 'regulator')
+const canForecast = auth.can('gov.map')
 
 const topMnns = ref<Mnn[]>([])
 const forecastMnnId = ref<string | null>(null)
@@ -224,7 +224,7 @@ watch(forecastMnnId, loadDemandForecast)
 .spacer { flex: 1; }
 .details { margin: 4px 0 8px; }
 .strong { font-weight: 500; font-size: var(--dm-text-base); }
-.how { border-top: 1px solid var(--dm-hairline); margin-top: 8px; padding-top: 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--dm-faint); }
+.how { border-top: 1px solid var(--dm-hairline); margin-top: 8px; padding-top: 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--dm-muted); }
 .how-title { font-weight: 500; color: var(--dm-ink); }
 .row-button { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--dm-hairline); font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 12px 0; }
 .row-button:last-child { border-bottom: 0; }

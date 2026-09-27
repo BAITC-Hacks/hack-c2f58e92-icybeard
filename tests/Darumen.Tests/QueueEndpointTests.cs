@@ -105,7 +105,8 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task Alternatives_are_sorted_by_p50()
     {
-        var response = await app.CreateClient().PostAsJsonAsync("/api/v1/queue/alternatives", new AlternativesRequestDto("75", "028B", "381", null, null, null, null, null, 3, null));
+        // «где быстрее» по региону и профилю — часть сроков ожидания (wait.public): любой вошедший
+        var response = await app.CreateClient("citizen").PostAsJsonAsync("/api/v1/queue/alternatives", new AlternativesRequestDto("75", "028B", "381", null, null, null, null, null, 3, null));
         var body = await response.Content.ReadFromJsonAsync<AlternativesResponseDto>();
         Assert.Equal(2, body!.Items.Count);
         Assert.Equal("22GN", body.Items[0].Mo.MoCode);
@@ -133,7 +134,7 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
         };
         try
         {
-            var response = await app.CreateClient().PostAsJsonAsync("/api/v1/queue/alternatives", new AlternativesRequestDto("75", "028B", "381", null, null, null, null, null, 3, null, IncludeNeighbors: true));
+            var response = await app.CreateClient("citizen").PostAsJsonAsync("/api/v1/queue/alternatives", new AlternativesRequestDto("75", "028B", "381", null, null, null, null, null, 3, null, IncludeNeighbors: true));
             var body = await response.Content.ReadFromJsonAsync<AlternativesResponseDto>();
             Assert.True(captured!.IncludeNeighbors);
             Assert.True(body!.Items[0].IsNeighborRegion);
@@ -148,11 +149,12 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task Organisation_series_is_served_or_404()
     {
-        var client = app.CreateClient("chief");
+        var client = app.CreateClient("org_admin", "chief1", "75", "028B");
         var ok = await client.GetFromJsonAsync<OrganizationSeriesDto>("/api/v1/queue/organizations/028B?profileCode=381");
         Assert.Single(ok!.Days);
         Assert.Equal(6.1, ok.Throughput!.ThroughputPerDay);
-        var missing = await client.GetAsync("/api/v1/queue/organizations/ZZZZ?profileCode=381");
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/queue/organizations/22GN?profileCode=381")).StatusCode);
+        var missing = await app.CreateClient("regulator").GetAsync("/api/v1/queue/organizations/ZZZZ?profileCode=381");
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
@@ -161,14 +163,14 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
     {
         Assert.Equal(HttpStatusCode.Unauthorized, (await app.CreateClient().GetAsync("/api/v1/queue/organizations/028B?profileCode=381")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("citizen").GetAsync("/api/v1/queue/organizations/028B?profileCode=381")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("chief").PostAsJsonAsync("/api/v1/simulate", new { regionKato = "75", profileCode = "381" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("org_admin", "chief1", "75", "028B").PostAsJsonAsync("/api/v1/simulate", new { regionKato = "75", profileCode = "381" })).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await app.CreateClient("admin").GetAsync("/api/v1/queue/organizations/028B?profileCode=381")).StatusCode);
     }
 
     [Fact]
     public async Task Overloaded_lists_organizations_by_region_and_profile_with_the_most_loaded_first()
     {
-        var client = app.CreateClient("chief", "chief-75", "75");
+        var client = app.CreateClient("regulator");
         var body = await client.GetFromJsonAsync<ItemsDto<OverloadedOrganizationDto>>("/api/v1/queue/overloaded?regionKato=75&profileCode=381");
         Assert.Equal(2, body!.Items.Count);
         Assert.Equal("028B", body.Items[0].MoCode);
@@ -176,15 +178,8 @@ public sealed class QueueEndpointTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
-    public async Task Chief_cannot_see_overloaded_organizations_of_another_region_via_query_param()
+    public async Task Regulator_sees_overloaded_organizations_of_any_region()
     {
-        // 5.3: клейм region_kato сильнее параметра запроса — главврач региона 75 не увидит организацию региона 10,
-        // даже прямо запросив её регион
-        var client = app.CreateClient("chief", "chief-75", "75");
-        var body = await client.GetFromJsonAsync<ItemsDto<OverloadedOrganizationDto>>("/api/v1/queue/overloaded?regionKato=10&profileCode=381");
-        Assert.Equal(2, body!.Items.Count);
-        Assert.All(body.Items, i => Assert.Equal("75", i.RegionKato));
-
         var regulator = app.CreateClient("regulator");
         var forOtherRegion = await regulator.GetFromJsonAsync<ItemsDto<OverloadedOrganizationDto>>("/api/v1/queue/overloaded?regionKato=10&profileCode=381");
         Assert.Single(forOtherRegion!.Items); // регулятор не ограничен регионом — видит запрошенный регион как есть

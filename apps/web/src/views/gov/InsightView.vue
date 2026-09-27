@@ -66,7 +66,7 @@ function chartOption(chart: Chart) {
     grid: { left: 48, right: 16, top: 36, bottom: chart.type === 'bar' ? 90 : 40 },
     xAxis: { type: 'category', data: chart.x, ...chartAxis.value, axisLabel: { ...chartAxis.value.axisLabel, rotate: chart.type === 'bar' ? 45 : 0, fontSize: 10 } },
     yAxis: { type: 'value', ...chartAxis.value },
-    series: chart.series.map((s, i) => ({ name: s.name, type: chart.type, data: s.data, showSymbol: false, itemStyle: { color: i === 0 ? theme.value.ink : theme.value.palette[i % theme.value.palette.length] }, lineStyle: ['прогноз', 'болжам'].includes(s.name) ? { type: 'dashed', color: theme.value.accent } : undefined })),
+    series: chart.series.map((s, i) => ({ name: s.name, type: chart.type, data: s.data, showSymbol: false, itemStyle: { color: i === 0 ? theme.value.series : theme.value.palette[i % theme.value.palette.length] }, lineStyle: ['прогноз', 'болжам'].includes(s.name) ? { type: 'dashed', color: theme.value.forecast } : undefined })),
   }
 }
 

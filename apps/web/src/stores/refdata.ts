@@ -38,6 +38,16 @@ export const useRefdataStore = defineStore('refdata', () => {
     return organizations.value[key]
   }
 
+  /** Весь справочник организаций (до 1000) — фильтры администрирования; загружается один раз. */
+  const allOrganizationsList = ref<OrganizationItem[] | null>(null)
+  async function allOrganizations(): Promise<OrganizationItem[]> {
+    if (!allOrganizationsList.value) {
+      allOrganizationsList.value = (await refdata.organizations(undefined, undefined, undefined, 1000)).items
+      remember(allOrganizationsList.value)
+    }
+    return allOrganizationsList.value
+  }
+
   /** Подгружает названия организаций, которых ещё нет в кэше (поиск реестра принимает точный код). */
   async function resolveOrganizations(moCodes: Iterable<string>): Promise<void> {
     const missing = [...new Set(moCodes)].filter((code) => code && !(code in organizationNames.value))
@@ -66,6 +76,6 @@ export const useRefdataStore = defineStore('refdata', () => {
   }
 
   return {
-    regions, profiles, referralsTotal, regionsCount, loaded, load, organizationsOf, resolveOrganizations, regionName, profileName, organizationName, topProfileCode,
+    regions, profiles, referralsTotal, regionsCount, loaded, load, organizationsOf, allOrganizations, resolveOrganizations, regionName, profileName, organizationName, topProfileCode,
   }
 })

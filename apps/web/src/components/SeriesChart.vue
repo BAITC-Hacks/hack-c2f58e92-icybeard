@@ -11,7 +11,7 @@ import { useChartTheme } from '@/composables/useChartTheme'
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent])
 
-/** `bare` — без обёртки-карточки (график внутри AppCard). История — ink, прогноз — coral пунктиром, полоса интервала — синий. */
+/** `bare` — без обёртки-карточки (график внутри AppCard). Факт — фиолетовая серия, прогноз — светлый фиолетовый пунктиром, полоса интервала — светлая фиолетовая. */
 const props = defineProps<{ history: HistoryPoint[]; points?: ForecastPoint[]; title?: string; unit?: string; bare?: boolean }>()
 const { t } = useI18n()
 const { theme, base, axis } = useChartTheme()
@@ -34,10 +34,10 @@ const option = computed(() => {
     yAxis: { type: 'value', name: props.unit ?? '', ...axis.value },
     dataZoom: periods.length > 40 ? [{ type: 'slider', start: Math.max(0, 100 - (40 / periods.length) * 100) }] : [],
     series: [
-      { name: t('seriesChart.fact'), type: 'line', data: history, showSymbol: false, lineStyle: { width: 2, color: theme.value.ink }, itemStyle: { color: theme.value.ink } },
+      { name: t('seriesChart.fact'), type: 'line', data: history, showSymbol: false, lineStyle: { width: 2, color: theme.value.series }, itemStyle: { color: theme.value.series } },
       { name: t('seriesChart.lower'), type: 'line', data: lo, stack: 'band', lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } },
       { name: t('seriesChart.interval80'), type: 'line', data: band, stack: 'band', lineStyle: { opacity: 0 }, areaStyle: { color: theme.value.band }, showSymbol: false, silent: true, tooltip: { show: false } },
-      { name: t('seriesChart.forecast'), type: 'line', data: yhat, showSymbol: false, lineStyle: { type: 'dashed', width: 2, color: theme.value.accent }, itemStyle: { color: theme.value.accent } },
+      { name: t('seriesChart.forecast'), type: 'line', data: yhat, showSymbol: false, lineStyle: { type: 'dashed', width: 2, color: theme.value.forecast }, itemStyle: { color: theme.value.forecast } },
     ],
   }
 })

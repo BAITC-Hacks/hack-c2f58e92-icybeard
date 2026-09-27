@@ -12,9 +12,10 @@ class Tone {
   static Tone lerp(Tone a, Tone b, double t) => Tone(Color.lerp(a.fg, b.fg, t)!, Color.lerp(a.bg, b.bg, t)!);
 }
 
-/// Единственный источник цвета для OriginTag (ml / formula / ai) и StatusChip (ok / warn / danger / neutral /
-/// accent / bench). Метки происхождения по системе: «ML-модель» — heal-wash/ink, «формула» — soft/ink-2,
-/// «AI» — coral-wash/ink; внешний ориентир — bench-wash/ink. Экраны не обращаются к `Colors.*` — это проверяет CI.
+/// Единственный источник цвета для OriginTag (ml / formula / ai), StatusChip (ok / warn / danger / neutral /
+/// accent / bench) и состояний экрана (info). Палитра C (доска C-Tokens): «ML-модель» — infoSoft/ink, «формула» —
+/// inset/ink-2, «AI» — lavender/#4646B8, «текущая» (accent) — selected/#4646B8, good — зелёный, attention (риск,
+/// аномалии) — янтарный, critical — красный; внешний ориентир — benchSoft/ink. Экраны не обращаются к `Colors.*`.
 class AppTones extends ThemeExtension<AppTones> {
   const AppTones({
     required this.ml,
@@ -26,18 +27,20 @@ class AppTones extends ThemeExtension<AppTones> {
     required this.neutral,
     required this.accent,
     required this.bench,
+    required this.info,
   });
 
-  factory AppTones.from(AppColors c) => AppTones(
-        ml: Tone(c.ink, c.accentSoft),
+  factory AppTones.from(ColorTokens c) => AppTones(
+        ml: Tone(c.ink, c.infoSoft),
         formula: Tone(c.muted, c.neutralSoft),
-        ai: Tone(c.ink, c.dangerSoft),
+        ai: Tone(c.ai, c.aiSoft),
         ok: Tone(c.ok, c.okSoft),
-        warn: Tone(c.danger, c.dangerSoft),
+        warn: Tone(c.warn, c.warnSoft),
         danger: Tone(c.danger, c.dangerSoft),
         neutral: Tone(c.muted, c.neutralSoft),
-        accent: Tone(c.accent, c.neutralSoft),
+        accent: Tone(c.accentHover, c.accentSoft),
         bench: Tone(c.ink, c.benchSoft),
+        info: Tone(c.info, c.infoSoft),
       );
 
   final Tone ml;
@@ -50,10 +53,13 @@ class AppTones extends ThemeExtension<AppTones> {
   final Tone accent;
   final Tone bench;
 
-  static AppTones of(BuildContext context) => Theme.of(context).extension<AppTones>() ?? AppTones.from(AppColors.light);
+  /// Сервисная информация: «данные устарели».
+  final Tone info;
+
+  static AppTones of(BuildContext context) => Theme.of(context).extension<AppTones>() ?? AppTones.from(ColorTokens.light);
 
   @override
-  AppTones copyWith({Tone? ml, Tone? formula, Tone? ai, Tone? ok, Tone? warn, Tone? danger, Tone? neutral, Tone? accent, Tone? bench}) => AppTones(
+  AppTones copyWith({Tone? ml, Tone? formula, Tone? ai, Tone? ok, Tone? warn, Tone? danger, Tone? neutral, Tone? accent, Tone? bench, Tone? info}) => AppTones(
         ml: ml ?? this.ml,
         formula: formula ?? this.formula,
         ai: ai ?? this.ai,
@@ -63,6 +69,7 @@ class AppTones extends ThemeExtension<AppTones> {
         neutral: neutral ?? this.neutral,
         accent: accent ?? this.accent,
         bench: bench ?? this.bench,
+        info: info ?? this.info,
       );
 
   @override
@@ -80,20 +87,21 @@ class AppTones extends ThemeExtension<AppTones> {
       neutral: Tone.lerp(neutral, other.neutral, t),
       accent: Tone.lerp(accent, other.accent, t),
       bench: Tone.lerp(bench, other.bench, t),
+      info: Tone.lerp(info, other.info, t),
     );
   }
 }
 
-/// Доступ к сырым токенам темы из виджетов (hairline для строк, neutralSoft для вставок, accent для точек).
+/// Доступ к сырым токенам темы из виджетов (hairline для строк, neutralSoft для вставок, accent для точек и полос).
 class AppPalette extends ThemeExtension<AppPalette> {
   const AppPalette(this.colors);
 
-  final AppColors colors;
+  final ColorTokens colors;
 
-  static AppColors of(BuildContext context) => Theme.of(context).extension<AppPalette>()?.colors ?? AppColors.light;
+  static ColorTokens of(BuildContext context) => Theme.of(context).extension<AppPalette>()?.colors ?? ColorTokens.light;
 
   @override
-  AppPalette copyWith({AppColors? colors}) => AppPalette(colors ?? this.colors);
+  AppPalette copyWith({ColorTokens? colors}) => AppPalette(colors ?? this.colors);
 
   @override
   AppPalette lerp(ThemeExtension<AppPalette>? other, double t) => other is AppPalette && t >= 0.5 ? other : this;

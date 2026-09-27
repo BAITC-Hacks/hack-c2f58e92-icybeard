@@ -24,8 +24,10 @@ app.use(i18n)
 // Сам модуль роутера импортируется тоже только теперь: createWebHistory() запоминает адрес в момент создания,
 // а keycloak-js убирает #state/#code/#error после редиректа проверки сессии уже внутри init() — иначе первая
 // навигация роутера возвращала бы в адрес устаревший фрагмент.
+// Разрешения (GET /api/v1/me) тоже нужны до первой навигации: без них защита маршрутов и домашний экран считались бы
+// по фолбэку из ролей токена. loadMe ждёт не дольше 5 с и при недоступном эндпоинте оставляет фолбэк (docs/rbac.md).
 const auth = useAuthStore()
-auth.init().finally(async () => {
+auth.init().then(() => auth.loadMe()).catch(() => false).finally(async () => {
   const { router } = await import('./router')
   app.use(router)
   app.mount('#app')

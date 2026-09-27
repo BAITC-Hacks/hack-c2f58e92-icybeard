@@ -1,48 +1,124 @@
 {
   "realm": "darumen",
   "displayName": "Darumen Health",
-  "loginTheme": "darumen",
-  "internationalizationEnabled": true,
-  "supportedLocales": ["ru", "kk"],
-  "defaultLocale": "ru",
   "enabled": true,
   "sslRequired": "none",
+  "loginTheme": "darumen",
+  "emailTheme": "darumen",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "ru",
+    "kk"
+  ],
+  "defaultLocale": "ru",
   "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "rememberMe": true,
+  "resetPasswordAllowed": true,
+  "verifyEmail": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 900,
+  "maxFailureWaitSeconds": 900,
+  "maxDeltaTimeSeconds": 43200,
+  "quickLoginCheckMilliSeconds": 1000,
+  "minimumQuickLoginWaitSeconds": 60,
+  "passwordPolicy": "length(12) and upperCase(1) and lowerCase(1) and digits(1) and notUsername(undefined) and passwordHistory(5)",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyCodeReusable": false,
   "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "ssoSessionIdleTimeoutRememberMe": 2592000,
+  "ssoSessionMaxLifespanRememberMe": 2592000,
+  "actionTokenGeneratedByUserLifespan": 3600,
+  "offlineSessionIdleTimeout": 2592000,
+  "offlineSessionMaxLifespanEnabled": true,
+  "offlineSessionMaxLifespan": 2592000,
+  "eventsEnabled": true,
+  "eventsExpiration": 2592000,
+  "eventsListeners": [
+    "jboss-logging",
+    "email"
+  ],
+  "enabledEventTypes": [
+    "LOGIN",
+    "LOGIN_ERROR",
+    "LOGOUT",
+    "UPDATE_PASSWORD",
+    "UPDATE_TOTP",
+    "REMOVE_TOTP",
+    "RESET_PASSWORD",
+    "SEND_RESET_PASSWORD",
+    "RESET_PASSWORD_ERROR",
+    "SEND_RESET_PASSWORD_ERROR",
+    "UPDATE_CREDENTIAL",
+    "REMOVE_CREDENTIAL",
+    "USER_DISABLED_BY_TEMPORARY_LOCKOUT"
+  ],
+  "adminEventsEnabled": false,
+  "smtpServer": {
+    "host": "${SMTP_HOST:mailpit}",
+    "port": "${SMTP_PORT:1025}",
+    "from": "${SMTP_FROM:noreply@darumen.kz}",
+    "fromDisplayName": "Darumen Health",
+    "replyTo": "help@darumen.kz",
+    "replyToDisplayName": "Поддержка Darumen",
+    "auth": "${SMTP_AUTH:false}",
+    "user": "${SMTP_USER:}",
+    "password": "${SMTP_PASSWORD:}",
+    "starttls": "${SMTP_STARTTLS:false}",
+    "ssl": "${SMTP_SSL:false}"
+  },
   "roles": {
     "realm": [
       {
         "name": "citizen",
-        "description": "Darumen role citizen"
+        "description": "Гражданин · Азамат — свой маршрут, клейм iin"
       },
       {
         "name": "doctor",
-        "description": "Darumen role doctor"
+        "description": "Врач ПМСП · МСАК дәрігері — клеймы region_kato, mo_code"
       },
       {
-        "name": "chief",
-        "description": "Darumen role chief"
+        "name": "org_admin",
+        "description": "Администратор организации · Ұйым әкімшісі — обязателен клейм mo_code (прежняя роль chief)"
       },
       {
         "name": "regulator",
-        "description": "Darumen role regulator"
+        "description": "Регулятор (Минздрав) · Реттеуші (ДСМ) — вся страна"
       },
       {
         "name": "steward",
-        "description": "Darumen role steward"
+        "description": "Стюард данных · Деректер стюарды — загрузки и качество данных"
+      },
+      {
+        "name": "auditor",
+        "description": "Аудитор · Аудитор — журналы и аудит"
       },
       {
         "name": "admin",
-        "description": "Darumen role admin"
+        "description": "Администратор системы · Жүйе әкімшісі — все разрешения"
       }
     ]
   },
   "clients": [
     {
       "clientId": "darumen-web",
+      "name": "Darumen · веб",
       "enabled": true,
       "publicClient": true,
       "protocol": "openid-connect",
+      "baseUrl": "${DARUMEN_WEB_URL:http://localhost:5173/}",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "implicitFlowEnabled": false,
@@ -54,10 +130,14 @@
         "http://localhost:8000/*",
         "http://localhost:3000/*",
         "http://web/*",
-        "https://dc.jurek.kz/*"
+        "https://dc.jurek.kz/*",
+        "http://10.0.2.2:3000/*",
+        "http://10.0.2.2:5173/*"
       ],
       "webOrigins": [
-        "+"
+        "+",
+        "http://10.0.2.2:3000",
+        "http://10.0.2.2:5173"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
@@ -121,9 +201,11 @@
     },
     {
       "clientId": "darumen-mobile",
+      "name": "Darumen · мобильное приложение",
       "enabled": true,
       "publicClient": true,
       "protocol": "openid-connect",
+      "baseUrl": "${DARUMEN_WEB_URL:http://localhost:5173/}",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "implicitFlowEnabled": false,
@@ -202,6 +284,25 @@
       "bearerOnly": true,
       "protocol": "openid-connect",
       "publicClient": false
+    },
+    {
+      "clientId": "darumen-admin",
+      "name": "Darumen · служебный клиент API (администрирование)",
+      "description": "Service account для API: пользователи, роли, события входа. Секрет — KEYCLOAK_ADMIN_CLIENT_SECRET.",
+      "enabled": true,
+      "publicClient": false,
+      "bearerOnly": false,
+      "protocol": "openid-connect",
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KEYCLOAK_ADMIN_CLIENT_SECRET:darumen-admin-dev-secret}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [],
+      "webOrigins": []
     }
   ],
   "users": [
@@ -210,17 +311,19 @@
       "enabled": true,
       "email": "citizen1@darumen.local",
       "emailVerified": true,
-      "firstName": "Citizen1",
-      "lastName": "Demo",
+      "firstName": "Ерлан",
+      "lastName": "Жумабеков",
       "credentials": [
         {
           "type": "password",
-          "value": "darumen",
-          "temporary": false
+          "userLabel": "Демо-пароль",
+          "secretData": "{\"value\":\"/gqurHTDiO7HIElvgRLw6qnDRx5e/7KbkfGLTGSo1U/iaDxDxowrTYJ+tRGv2bRkMmDNWTWsJ9pGI9bwZ0jBIA==\",\"salt\":\"Xa4W3aonc0rT22e4OBfU6A==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
       ],
       "realmRoles": [
-        "citizen"
+        "citizen",
+        "default-roles-darumen"
       ],
       "attributes": {
         "region_kato": [
@@ -228,6 +331,9 @@
         ],
         "iin": [
           "000000000001"
+        ],
+        "via": [
+          "password"
         ]
       }
     },
@@ -236,21 +342,35 @@
       "enabled": true,
       "email": "doctor1@darumen.local",
       "emailVerified": true,
-      "firstName": "Doctor1",
-      "lastName": "Demo",
+      "firstName": "Айгерим",
+      "lastName": "Сейткали",
       "credentials": [
         {
           "type": "password",
-          "value": "darumen",
-          "temporary": false
+          "userLabel": "Демо-пароль",
+          "secretData": "{\"value\":\"7SiC8rJ1hFSfF8vAzRwMbwqM220J2m7OPe1Xy225sEnbhxrNPshpicTSNnDFSdg+gXqAPhrOpp+AsCAAYIs2yA==\",\"salt\":\"C8yW8Q2Tw8nFbTBR+9hTxQ==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
       ],
       "realmRoles": [
-        "doctor"
+        "doctor",
+        "default-roles-darumen"
       ],
       "attributes": {
         "region_kato": [
           "75"
+        ],
+        "mo_code": [
+          "028B"
+        ],
+        "specialty": [
+          "Офтальмология"
+        ],
+        "position": [
+          "Врач ПМСП"
+        ],
+        "via": [
+          "password"
         ]
       }
     },
@@ -259,17 +379,19 @@
       "enabled": true,
       "email": "chief1@darumen.local",
       "emailVerified": true,
-      "firstName": "Chief1",
-      "lastName": "Demo",
+      "firstName": "Марат",
+      "lastName": "Касымов",
       "credentials": [
         {
           "type": "password",
-          "value": "darumen",
-          "temporary": false
+          "userLabel": "Демо-пароль",
+          "secretData": "{\"value\":\"P6BhojKItmY6Ahyb9xIa0qnikQ0yJ48kqGF/yNYBvRPKw1yVBMDxGq1ZmfW7C/ad1TdXHKM0N8D1Wtw8RL5hbg==\",\"salt\":\"tUeqZRMB/mwxhspe23n5tg==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
       ],
       "realmRoles": [
-        "chief"
+        "org_admin",
+        "default-roles-darumen"
       ],
       "attributes": {
         "region_kato": [
@@ -277,6 +399,12 @@
         ],
         "mo_code": [
           "028B"
+        ],
+        "position": [
+          "Главный врач"
+        ],
+        "via": [
+          "password"
         ]
       }
     },
@@ -285,54 +413,140 @@
       "enabled": true,
       "email": "regulator1@darumen.local",
       "emailVerified": true,
-      "firstName": "Regulator1",
-      "lastName": "Demo",
+      "firstName": "Динара",
+      "lastName": "Оспанова",
       "credentials": [
         {
           "type": "password",
-          "value": "darumen",
-          "temporary": false
+          "userLabel": "Демо-пароль",
+          "secretData": "{\"value\":\"AB0QtkW9yEveNTaD0L77sjNP3iDJsv3aEb20VdQDM842UQL90WqVT588xgBW1aNX3O1Zp53OTyYGr5YOcxisUA==\",\"salt\":\"N9Lri4Gqy9MagLZTx0tqNg==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
       ],
       "realmRoles": [
-        "regulator"
-      ]
+        "regulator",
+        "default-roles-darumen"
+      ],
+      "attributes": {
+        "position": [
+          "Главный эксперт Министерства здравоохранения"
+        ],
+        "via": [
+          "password"
+        ]
+      }
     },
     {
       "username": "steward1",
       "enabled": true,
       "email": "steward1@darumen.local",
       "emailVerified": true,
-      "firstName": "Steward1",
-      "lastName": "Demo",
+      "firstName": "Тимур",
+      "lastName": "Абенов",
       "credentials": [
         {
           "type": "password",
-          "value": "darumen",
-          "temporary": false
+          "userLabel": "Демо-пароль",
+          "secretData": "{\"value\":\"47oZ7nxcBwzAy2ik83U9CWPMWmMvzJiZ//Gl8VXkpyF3XyO/Lbl32GR14bncf0FbQQREkPpgtnKKKYilZyubnA==\",\"salt\":\"+iIgtqXs5dluS8GZHD+h2Q==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
       ],
       "realmRoles": [
-        "steward"
-      ]
+        "steward",
+        "default-roles-darumen"
+      ],
+      "attributes": {
+        "position": [
+          "Стюард данных"
+        ],
+        "via": [
+          "password"
+        ]
+      }
+    },
+    {
+      "username": "auditor1",
+      "enabled": true,
+      "email": "auditor1@darumen.local",
+      "emailVerified": true,
+      "firstName": "Гульнар",
+      "lastName": "Искакова",
+      "credentials": [
+        {
+          "type": "password",
+          "userLabel": "Демо-пароль",
+          "secretData": "{\"value\":\"o0HqAKHq9aM3cofurikXGVq/HLRu6Z5c6gOFErhKCPEzgVGFM3Xjx4kdgFHnNJZMfswWveLHHqzA5JHXQpu3bQ==\",\"salt\":\"tB/bECmsJQFRQJw2Lifj0w==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
+        }
+      ],
+      "realmRoles": [
+        "auditor",
+        "default-roles-darumen"
+      ],
+      "attributes": {
+        "position": [
+          "Аудитор информационной безопасности"
+        ],
+        "via": [
+          "password"
+        ]
+      }
     },
     {
       "username": "admin1",
       "enabled": true,
       "email": "admin1@darumen.local",
       "emailVerified": true,
-      "firstName": "Admin1",
-      "lastName": "Demo",
+      "firstName": "Асель",
+      "lastName": "Нурланова",
       "credentials": [
         {
           "type": "password",
-          "value": "darumen",
-          "temporary": false
+          "userLabel": "Демо-пароль",
+          "secretData": "{\"value\":\"/dnoHMsltFc+39oJhmtb+0SWy5kcc/8TE4cFnpZsnIuSTSJaYeybSbacGUH4tlx6jF0sLbeB7vKERPwNaCb7Eg==\",\"salt\":\"Y0ZX0OrHzbVKGIHG14f2Jg==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
       ],
       "realmRoles": [
-        "admin"
-      ]
+        "admin",
+        "default-roles-darumen"
+      ],
+      "attributes": {
+        "position": [
+          "Администратор системы"
+        ],
+        "via": [
+          "password"
+        ]
+      }
+    },
+    {
+      "username": "service-account-darumen-admin",
+      "enabled": true,
+      "serviceAccountClientId": "darumen-admin",
+      "clientRoles": {
+        "realm-management": [
+          "view-users",
+          "manage-users",
+          "query-users",
+          "view-events",
+          "view-realm",
+          "manage-realm"
+        ]
+      }
     }
-  ]
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"attributes\":[{\"name\":\"username\",\"displayName\":\"${username}\",\"validations\":{\"length\":{\"min\":3,\"max\":255},\"username-prohibited-characters\":{},\"up-username-not-idn-homograph\":{}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"email\",\"displayName\":\"${email}\",\"validations\":{\"email\":{},\"length\":{\"max\":255}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"firstName\",\"displayName\":\"${firstName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"lastName\",\"displayName\":\"${lastName}\",\"validations\":{\"length\":{\"max\":255},\"person-name-prohibited-characters\":{}},\"required\":{\"roles\":[\"user\"]},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\",\"user\"]},\"multivalued\":false},{\"name\":\"region_kato\",\"displayName\":\"Регион (КАТО)\",\"validations\":{\"length\":{\"max\":16}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"mo_code\",\"displayName\":\"Код организации (МО)\",\"validations\":{\"length\":{\"max\":32}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"iin\",\"displayName\":\"ИИН\",\"validations\":{\"length\":{\"max\":12}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"specialty\",\"displayName\":\"Специальность\",\"validations\":{\"length\":{\"max\":120}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"position\",\"displayName\":\"Должность\",\"validations\":{\"length\":{\"max\":120}},\"permissions\":{\"view\":[\"admin\",\"user\"],\"edit\":[\"admin\"]},\"multivalued\":false},{\"name\":\"via\",\"displayName\":\"Способ входа (egov | password)\",\"validations\":{\"length\":{\"max\":16}},\"permissions\":{\"view\":[\"admin\"],\"edit\":[\"admin\"]},\"multivalued\":false}],\"groups\":[{\"name\":\"user-metadata\",\"displayHeader\":\"User metadata\",\"displayDescription\":\"Attributes, which refer to user metadata\"}],\"unmanagedAttributePolicy\":\"ADMIN_EDIT\"}"
+          ]
+        }
+      }
+    ]
+  }
 }

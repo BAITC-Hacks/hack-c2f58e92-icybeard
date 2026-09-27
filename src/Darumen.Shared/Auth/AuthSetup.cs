@@ -1,15 +1,18 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Darumen.Shared.Auth;
 
 public static class AuthSetup
 {
-    /// <summary>Аутентификация Keycloak (JWT) или заголовками, и политики по ролям; admin входит во все политики.</summary>
+    /// <summary>Аутентификация Keycloak (JWT) или заголовками и политики разрешений `perm:код` (docs/rbac.md): роли → матрица
+    /// auth.role_permissions (кэш 30 с); admin проходит все политики.</summary>
     public static IServiceCollection AddDarumenAuth(this IServiceCollection services, IConfiguration configuration)
     {
         var options = configuration.GetSection(AuthOptions.Section).Get<AuthOptions>() ?? new AuthOptions();
@@ -38,16 +41,13 @@ public static class AuthSetup
             services.AddSingleton<IClaimsTransformation, KeycloakRolesTransformation>();
         }
 
-        services.AddAuthorization(policies =>
-        {
-            policies.AddPolicy(Policies.Authenticated, p => p.RequireAuthenticatedUser());
-            policies.AddPolicy(Policies.Citizen, p => p.RequireRole(Roles.Citizen, Roles.Admin));
-            policies.AddPolicy(Policies.Doctor, p => p.RequireRole(Roles.Doctor, Roles.Admin));
-            policies.AddPolicy(Policies.Regulator, p => p.RequireRole(Roles.Regulator, Roles.Admin));
-            policies.AddPolicy(Policies.Steward, p => p.RequireRole(Roles.Steward, Roles.Admin));
-            policies.AddPolicy(Policies.ChiefOrRegulator, p => p.RequireRole(Roles.Chief, Roles.Regulator, Roles.Admin));
-            policies.AddPolicy(Policies.DoctorOrRegulator, p => p.RequireRole(Roles.Doctor, Roles.Regulator, Roles.Admin));
-        });
+        services.AddAuthorization(policies => policies.AddPolicy(Policies.Authenticated, p => p.RequireAuthenticatedUser()));
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<IPermissionStore, PostgresPermissionStore>();
+        services.AddSingleton<IPermissionService, PermissionService>();
+        services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemAuthorizationResultHandler>();
         return services;
     }
 }

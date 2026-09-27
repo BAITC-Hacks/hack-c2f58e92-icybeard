@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
-/// Карточка-сигнал на coral-wash («Врач предложил …», «Пациент просит …»): radius 16, `padding 14 16`, иконка 22,
-/// две строки (15/500 и 13 ink-2) и стрелка «→» coral-text, если есть действие.
+/// Карточка-сигнал на selected-фоне по доскам M-Home/M-Route («Врач предложил …», «Пациент просит …»): radius 16,
+/// `padding 14 16`, иконка 22, две строки (15/500 и 13 ink-2) и янтарная стрелка «→», если есть действие.
 class SignalCard extends StatelessWidget {
   const SignalCard({super.key, required this.title, this.subtitle, this.icon = Icons.verified_user_outlined, this.onTap});
 
@@ -20,7 +20,7 @@ class SignalCard extends StatelessWidget {
     final radius = BorderRadius.circular(AppRadius.lg);
     final body = Container(
       padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 14, AppSpacing.lg, 14),
-      decoration: BoxDecoration(color: colors.dangerSoft, borderRadius: radius),
+      decoration: BoxDecoration(color: colors.accentSoft, borderRadius: radius),
       child: Row(
         children: [
           Icon(icon, size: 22, color: colors.ink),
@@ -37,7 +37,7 @@ class SignalCard extends StatelessWidget {
           ),
           if (onTap != null) ...[
             const SizedBox(width: AppSpacing.md),
-            Text('→', style: theme.textTheme.titleSmall?.copyWith(color: colors.danger)),
+            Text('→', style: theme.textTheme.titleSmall?.copyWith(color: colors.warn)),
           ],
         ],
       ),
@@ -47,7 +47,7 @@ class SignalCard extends StatelessWidget {
     }
     return Semantics(
       button: true,
-      child: Material(color: AppColors.transparent, child: InkWell(borderRadius: radius, onTap: onTap, child: body)),
+      child: Material(color: ColorTokens.transparent, child: InkWell(borderRadius: radius, onTap: onTap, child: body)),
     );
   }
 }
