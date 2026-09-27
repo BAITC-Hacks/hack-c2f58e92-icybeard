@@ -1,0 +1,41 @@
+/* «Тихая клиника» — страница входа Keycloak. Токены как в design/tokens.json. */
+:root{--dm-ground:#F4F6F0;--dm-card:#FFFFFF;--dm-soft:#EDF0E8;--dm-hair:#E3E7DF;--dm-ink:#0F2C59;--dm-ink2:#5B6577;--dm-ink3:#6B7486;--dm-coral:#FF7F50;--dm-coral-text:#B8431A;--dm-coral-wash:#FFE4D8;--dm-sage-text:#4F6B56;--dm-sage-wash:#E3ECE4}
+html.dm,body.dm{margin:0;min-height:100%;background:var(--dm-ground)}
+body.dm{color:var(--dm-ink);font-family:Manrope,'Segoe UI',system-ui,sans-serif;font-size:17px;line-height:1.45;display:flex;flex-direction:column;min-height:100vh}
+.dm-top{height:72px;display:flex;align-items:center;gap:16px;padding:0 24px;width:100%;max-width:1200px;margin:0 auto;box-sizing:border-box}
+.dm-brand{display:inline-flex;align-items:center;gap:10px;color:var(--dm-ink);text-decoration:none;font-weight:600;font-size:20px;letter-spacing:-.02em}
+.dm-brand svg{display:block}
+.dm-locale{margin-left:auto;display:flex;background:var(--dm-card);border-radius:999px;padding:3px;font-size:12px;font-weight:500}
+.dm-locale a{padding:4px 10px;border-radius:999px;color:var(--dm-ink2);text-decoration:none}
+.dm-locale a.on{background:var(--dm-ink);color:#fff}
+.dm-main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px 48px}
+.dm-card{width:100%;max-width:440px;background:var(--dm-card);border-radius:16px;padding:28px 24px 24px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+.dm-welcome{margin:0;font-size:14px;color:var(--dm-ink2)}
+.dm-title{margin:0;font-size:29px;font-weight:500;letter-spacing:-.02em;line-height:1.05}
+.dm-lead{margin:0;color:var(--dm-ink2);font-size:14px}
+.dm-form{display:flex;flex-direction:column;gap:14px;margin:0}
+.dm-field{display:flex;flex-direction:column;gap:6px}
+.dm-label{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--dm-ink2)}
+.dm-input{height:52px;width:100%;box-sizing:border-box;background:var(--dm-soft);border:0;border-radius:12px;padding:0 16px;font:400 17px Manrope,'Segoe UI',system-ui,sans-serif;color:var(--dm-ink);outline:none;appearance:none}
+.dm-input::placeholder{color:var(--dm-ink3)}
+.dm-input:focus{box-shadow:inset 0 0 0 2px var(--dm-ink)}
+.dm-input[aria-invalid=true]{box-shadow:inset 0 0 0 2px var(--dm-coral)}
+.dm-pass{position:relative}
+.dm-pass .dm-input{padding-right:56px}
+.dm-eye{position:absolute;right:8px;top:8px;width:36px;height:36px;border:0;border-radius:999px;background:transparent;color:var(--dm-ink2);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.dm-eye:hover{background:var(--dm-hair)}
+.dm-error{color:var(--dm-coral-text);font-size:14px;margin:0}
+.dm-alert{padding:12px 14px;border-radius:12px;background:var(--dm-coral-wash);color:var(--dm-ink);font-size:14px}
+.dm-alert.success{background:var(--dm-sage-wash);color:var(--dm-sage-text)}
+.dm-alert.info,.dm-alert.warning{background:var(--dm-soft)}
+.dm-btn{height:52px;border:0;border-radius:12px;background:var(--dm-ink);color:#fff;font:500 17px Manrope,'Segoe UI',system-ui,sans-serif;cursor:pointer;width:100%;margin-top:4px}
+.dm-btn:disabled{opacity:.6;cursor:default}
+.dm-note{margin:2px 0 0;font-size:12px;color:var(--dm-ink2);letter-spacing:.02em}
+.dm-links{display:flex;flex-wrap:wrap;gap:16px;font-size:14px}
+.dm-links a{color:var(--dm-ink);text-decoration:none;font-weight:500}
+.dm-links a::after{content:" \2192";color:var(--dm-coral-text)}
+.dm-foot{text-align:center;font-size:12px;color:var(--dm-ink2);padding:16px;letter-spacing:.02em}
+/* содержимое страниц родительской темы (ошибки, выход) внутри карточки — приглушить PatternFly */
+.dm-card .pf-v5-c-button.pf-m-primary{background:var(--dm-ink);border-radius:12px}
+.dm-card .pf-v5-c-form__label{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--dm-ink2)}
+.dm-card a{color:var(--dm-ink)}

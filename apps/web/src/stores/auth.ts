@@ -1,6 +1,7 @@
 import Keycloak from 'keycloak-js'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { i18n } from '@/i18n'
 import { isRole, roleHome as homeOf, type Role } from '@/router/roles'
 
 export type { Role } from '@/router/roles'
@@ -122,7 +123,8 @@ export const useAuthStore = defineStore('auth', () => {
   /** Вход через Keycloak (PKCE). idpHint — брокер realm (например eGov), когда он настроен: docs/egov-auth.md. */
   async function login(options: { idpHint?: string } = {}) {
     markRedirect()
-    await keycloak?.login({ redirectUri: window.location.origin + returnPath(), ...options })
+    // страница входа Keycloak (тема darumen) открывается на языке интерфейса
+    await keycloak?.login({ redirectUri: window.location.origin + returnPath(), locale: String(i18n.global.locale.value), ...options })
   }
 
   async function logout() {

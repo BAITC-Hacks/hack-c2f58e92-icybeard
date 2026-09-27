@@ -1,6 +1,10 @@
 {
   "realm": "darumen",
   "displayName": "Darumen Health",
+  "loginTheme": "darumen",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ru", "kk"],
+  "defaultLocale": "ru",
   "enabled": true,
   "sslRequired": "none",
   "registrationAllowed": false,

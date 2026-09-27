@@ -94,6 +94,7 @@ services:
     ports: ["8080:8080"]
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
+      - ./keycloak/themes/darumen:/opt/keycloak/themes/darumen:ro   # тема входа «Тихая клиника» (realm loginTheme=darumen)
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.22.0

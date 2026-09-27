@@ -152,12 +152,12 @@ describe('auth store (Keycloak)', () => {
     await auth.init()
     window.history.replaceState(null, '', '/?denied=/gov/regions/19')
     await auth.login()
-    expect(kc.login).toHaveBeenLastCalledWith({ redirectUri: `${window.location.origin}/gov/regions/19` })
+    expect(kc.login).toHaveBeenLastCalledWith({ redirectUri: `${window.location.origin}/gov/regions/19`, locale: 'ru' })
     window.history.replaceState(null, '', '/?denied=//evil.example')
     await auth.login()
-    expect(kc.login).toHaveBeenLastCalledWith({ redirectUri: `${window.location.origin}/` })
+    expect(kc.login).toHaveBeenLastCalledWith({ redirectUri: `${window.location.origin}/`, locale: 'ru' })
     await auth.login({ idpHint: 'egov' })
-    expect(kc.login).toHaveBeenLastCalledWith({ redirectUri: `${window.location.origin}/`, idpHint: 'egov' })
+    expect(kc.login).toHaveBeenLastCalledWith({ redirectUri: `${window.location.origin}/`, locale: 'ru', idpHint: 'egov' })
   })
 
   it('a failed token refresh sends no headers instead of a stale token', async () => {

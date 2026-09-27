@@ -11,7 +11,7 @@
 | postgres | postgis 17 | журнал, intake, витрины gold/refdata из lakehouse |
 | models | `infra/models.Dockerfile` | gRPC Queue Intelligence / Load Forecasting, читает `/lakehouse` (gold, models, refdata) |
 | scribe | тот же образ, `SCRIBE_EXTRAS=1` | FastAPI-скрайб: faster-whisper (веса скачиваются при первом запросе) + черновики через DeepSeek |
-| keycloak | `quay.io/keycloak/keycloak:26.0` | вход веба (PKCE) и мобильного приложения (password grant); realm `darumen` импортируется из `infra/keycloak` при старте; снаружи — только через nginx веба под `/auth` |
+| keycloak | `quay.io/keycloak/keycloak:26.0` | вход веба (PKCE) и мобильного приложения (password grant); realm `darumen` импортируется из `infra/keycloak` (стратегия OVERWRITE_EXISTING — после правки realm или темы нужен `up -d --force-recreate keycloak`); тема входа «Тихая клиника» — `infra/keycloak/themes/darumen` (login: свои template.ftl/login.ftl, RU/KK), монтируется в `/opt/keycloak/themes/darumen` при старте; снаружи — только через nginx веба под `/auth` |
 | api | `infra/api.Dockerfile` | .NET API: `Auth__Mode=keycloak` (issuer `https://dc.jurek.kz/auth/realms/darumen`, JWKS по внутреннему адресу `keycloak:8080`), `Messaging__Mode=local`, Insight через DeepSeek |
 | web | `infra/web/Dockerfile` | Vite-сборка за nginx, `/api`, `/openapi`, `/scalar`, `/health` проксируются в api, `/auth` — в keycloak |
 

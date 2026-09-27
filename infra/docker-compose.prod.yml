@@ -100,6 +100,7 @@ services:
       JAVA_OPTS_KC_HEAP: "-Xms64m -Xmx512m"   # 8 ГБ VM делится с POS: не даём JVM взять 70 % памяти по умолчанию
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
+      - ./keycloak/themes/darumen:/opt/keycloak/themes/darumen:ro   # тема входа «Тихая клиника» (realm loginTheme=darumen)
     restart: unless-stopped
 
   api:
