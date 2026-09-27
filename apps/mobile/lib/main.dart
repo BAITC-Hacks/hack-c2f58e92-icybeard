@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,8 +8,11 @@ import 'state/session.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // сессия загружается до первого кадра: роутер сразу знает роль и не мигает экраном входа
+  // Первый кадр — сразу: заставка DarumenIntro закрывает экран на 4 с, а сессия (prefs и secure storage) читается
+  // параллельно; когда она загрузится, роутер сам перейдёт на домашний экран роли ещё под заставкой.
   final session = Session();
-  await session.load();
-  runApp(ChangeNotifierProvider.value(value: session, child: const DarumenApp()));
+  runApp(
+    ChangeNotifierProvider.value(value: session, child: const DarumenApp()),
+  );
+  unawaited(session.load());
 }
