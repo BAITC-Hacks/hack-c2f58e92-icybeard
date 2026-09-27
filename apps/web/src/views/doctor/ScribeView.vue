@@ -4,11 +4,6 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import SelectButton from 'primevue/selectbutton'
-import Tab from 'primevue/tab'
-import TabList from 'primevue/tablist'
-import TabPanel from 'primevue/tabpanel'
-import TabPanels from 'primevue/tabpanels'
-import Tabs from 'primevue/tabs'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -26,6 +21,10 @@ import StatusTag from '@/components/ui/StatusTag.vue'
 import { pickRecordingFormat } from '@/lib/audio'
 import { useRecorder } from '@/composables/useRecorder'
 
+/** AI-скрайб приёма (W-Scribe): подпись «пациент · согласие · аудио удаляется при утверждении», язык пилюлей и чип
+ * статуса; слева согласие / карточка записи (точка, «Запись», таймер 42, «Стоп», «Вставить текст») и стенограмма
+ * построчно «время · язык · текст»; справа черновик (чип AI-черновик, вкладка «Памятка»), «Утвердить все разделы»;
+ * внизу строка моделей. Сессия анонимна — реф пациента в сервис не передаётся. */
 // Простая эвристика для подсветки вероятных упоминаний препаратов в разделе «Назначения»:
 // слово с заглавной буквы рядом с дозировкой (мг/мл/мкг/ЕД) или после характерных глаголов назначения.
 // Это подсказка врачу для беглого просмотра, а не структурированное извлечение данных.
@@ -43,6 +42,10 @@ function highlightDrugMentions(text: string): string {
 function segmentLang(text: string): 'kk' | 'ru' {
   return KK_LETTERS.test(text) ? 'kk' : 'ru'
 }
+function stamp(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds))
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
 
 const { t } = useI18n()
 const toast = useToast()
@@ -53,7 +56,6 @@ const languageOptions = computed(() => [
   { value: 'ru' as const, label: t('doctor.scribe.langRu') },
   { value: 'kk' as const, label: t('doctor.scribe.langKk') },
 ])
-// реф пациента — подпись сессии на экране врача; в сервис скрайба не передаётся (сессия анонимна)
 const patientRef = ref('')
 const sessionId = ref<string | null>(null)
 const health = ref<ScribeHealth | null>(null)
@@ -70,7 +72,7 @@ const hoveredSpans = ref<{ t0: number; t1: number }[] | null>(null)
 const error = ref<unknown>(null)
 const busy = ref(false)
 const approved = ref(false)
-const tab = ref('draft')
+const tab = ref<'draft' | 'leaflet'>('draft')
 
 const recordingFormat = typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices ? pickRecordingFormat((type) => MediaRecorder.isTypeSupported(type)) : null
 const recorder = useRecorder(recordingFormat, (blob, name) => upload(blob, name))
@@ -84,10 +86,7 @@ const status = computed(() => {
   if (sessionId.value) return { key: 'ready', tone: 'neutral' as const }
   return { key: 'none', tone: 'neutral' as const }
 })
-const timer = computed(() => {
-  const s = recorder.elapsed.value
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-})
+const timer = computed(() => stamp(recorder.elapsed.value))
 
 async function start() {
   error.value = null
@@ -207,21 +206,20 @@ onBeforeUnmount(() => recorder.dispose())
 </script>
 
 <template>
-  <PageShell :title="t('doctor.scribe.title')" :lead="t('doctor.scribe.lead')">
-    <AppCard dense class="session-row" data-testid="scribe-session">
-      <div class="session">
-        <div class="field"><label>{{ t('doctor.scribe.patientRef') }}</label><InputText v-model="patientRef" size="small" placeholder="SYN-…" :disabled="approved" /></div>
-        <div class="field"><label>{{ t('doctor.scribe.language') }}</label><SelectButton v-model="language" :options="languageOptions" option-label="label" option-value="value" size="small" :allow-empty="false" :disabled="!!sessionId" /></div>
-        <div class="field"><label>{{ t('doctor.scribe.timer') }}</label><span class="mono timer" :class="{ live: recorder.recording.value }">{{ timer }}</span></div>
-        <div class="field"><label>{{ t('doctor.scribe.status') }}</label><StatusTag :value="t('doctor.scribe.state.' + status.key)" :tone="status.tone" /></div>
-        <span v-if="sessionId" class="muted small session-id">{{ t('doctor.scribe.session') }} <span class="mono">{{ sessionId }}</span></span>
-      </div>
-    </AppCard>
+  <PageShell :title="t('doctor.scribe.title')">
+    <template #subtitle>
+      {{ patientRef ? t('doctor.scribe.subtitlePatient', { ref: patientRef }) : t('doctor.scribe.subtitleNoPatient') }} · {{ consent ? t('doctor.scribe.consentGiven') : t('doctor.scribe.consentNeeded') }} · {{ t('doctor.scribe.audioDeletedOnApprove') }}
+    </template>
+    <template #actions>
+      <SelectButton v-model="language" :options="languageOptions" option-label="label" option-value="value" size="small" :allow-empty="false" :disabled="!!sessionId" />
+      <StatusTag :value="t('doctor.scribe.state.' + status.key)" :tone="status.tone" />
+    </template>
     <ErrorBox :error="error" />
 
-    <div class="grid cols-2">
+    <div class="main-grid">
       <div class="col">
-        <AppCard v-if="!sessionId" :title="t('doctor.scribe.consentTitle')">
+        <AppCard v-if="!sessionId" :title="t('doctor.scribe.consentTitle')" data-testid="scribe-session">
+          <div class="field" style="max-width: 320px"><label>{{ t('doctor.scribe.patientRef') }}</label><InputText v-model="patientRef" placeholder="SYN-…" /></div>
           <label class="consent-row"><Checkbox v-model="consent" binary input-id="consent" /> <span>{{ t('doctor.scribe.consent') }}</span></label>
           <ul class="muted small what">
             <li>{{ t('doctor.scribe.what1') }}</li>
@@ -232,15 +230,19 @@ onBeforeUnmount(() => recorder.dispose())
           <div class="actions"><Button :label="t('doctor.scribe.startSession')" icon="pi pi-play" :disabled="!consent || !health" data-testid="scribe-start" @click="start" /></div>
         </AppCard>
 
-        <AppCard v-else :title="t('doctor.scribe.recording')">
+        <AppCard v-else data-testid="scribe-session">
+          <div class="rec-row">
+            <span class="rec-dot" :class="{ live: recorder.recording.value }" aria-hidden="true" />
+            <span class="rec-label">{{ t('doctor.scribe.recordingLabel') }}</span>
+            <span class="timer tabular" :class="{ live: recorder.recording.value }">{{ timer }}</span>
+            <span class="spacer" />
+            <Button v-if="recorder.canRecord && !recorder.recording.value" :label="t('doctor.scribe.recordMic')" icon="pi pi-microphone" size="small" :disabled="approved || busy" @click="record" />
+            <Button v-if="recorder.recording.value" :label="t('doctor.scribe.stop')" icon="pi pi-stop" size="small" @click="recorder.stop()" />
+            <label v-if="!approved" class="p-button p-button-secondary p-button-sm upload">{{ t('doctor.scribe.uploadFile') }}<input type="file" accept="audio/*" hidden @change="onFile" /></label>
+            <Button :label="t('doctor.scribe.pasteText')" size="small" severity="secondary" :disabled="approved" @click="showTyped = !showTyped" />
+          </div>
           <div class="wave" :class="{ live: recorder.recording.value }" aria-hidden="true">
             <span v-for="(level, i) in recorder.levels.value" :key="i" class="bar" :style="{ height: `${Math.max(8, level * 100)}%` }" />
-          </div>
-          <div class="actions rec-actions">
-            <Button v-if="recorder.canRecord && !recorder.recording.value" :label="t('doctor.scribe.recordMic')" icon="pi pi-microphone" :disabled="approved || busy" @click="record" />
-            <Button v-if="recorder.recording.value" :label="t('doctor.scribe.stop')" icon="pi pi-stop" @click="recorder.stop()" />
-            <label v-if="!approved" class="p-button p-button-secondary p-button-sm upload">{{ t('doctor.scribe.uploadFile') }}<input type="file" accept="audio/*" hidden @change="onFile" /></label>
-            <Button :label="t('doctor.scribe.pasteText')" size="small" text severity="secondary" :disabled="approved" @click="showTyped = !showTyped" />
           </div>
           <div v-if="showTyped" class="field" style="margin-top: 12px">
             <label>{{ t('doctor.scribe.orType') }}</label>
@@ -253,11 +255,11 @@ onBeforeUnmount(() => recorder.dispose())
         </AppCard>
 
         <AppCard v-if="sessionId" :title="t('doctor.scribe.transcript')">
-          <div v-if="segments.length" class="transcript-segments">
-            <p v-for="(segment, i) in segments" :key="i" class="segment" :class="{ 'segment-highlight': isSegmentHighlighted(segment) }">
-              <span class="mono muted">[{{ segment.t0.toFixed(0) }}–{{ segment.t1.toFixed(0) }}]</span>
-              <StatusTag :value="segmentLang(segment.text).toUpperCase()" tone="neutral" class="lang" />
-              {{ segment.text }}
+          <template #header><span class="caption">РУС · ҚАЗ</span></template>
+          <div v-if="segments.length" class="rows">
+            <p v-for="(segment, i) in segments" :key="i" class="row segment" :class="{ 'segment-highlight': isSegmentHighlighted(segment) }">
+              <span class="stamp tabular">{{ stamp(segment.t0) }} {{ segmentLang(segment.text).toUpperCase() }}</span>
+              <span class="segment-text">{{ segment.text }}</span>
             </p>
           </div>
           <p v-else-if="transcript" style="white-space: pre-wrap">{{ transcript }}</p>
@@ -266,53 +268,42 @@ onBeforeUnmount(() => recorder.dispose())
         </AppCard>
       </div>
 
-      <div class="col">
-        <AppCard>
-          <Tabs v-model:value="tab">
-            <TabList>
-              <Tab value="draft">{{ t('doctor.scribe.draftTitle') }} <OriginTag kind="ai" :note="t('doctor.scribe.draftNote')" /></Tab>
-              <Tab value="leaflet">{{ t('doctor.scribe.leafletLabel') }}</Tab>
-            </TabList>
-            <TabPanels>
-              <TabPanel value="draft">
-                <p v-if="!draft" class="muted">{{ t('doctor.scribe.noDraft') }}</p>
-                <template v-else>
-                  <div v-for="section in draft.sections" :key="section.name" class="field section" @mouseover="hoverSection(section.spans)" @mouseleave="hoverSection(undefined)">
-                    <label>{{ section.name }}</label>
-                    <Textarea v-model="section.text" rows="2" auto-resize :disabled="approved" />
-                    <template v-if="prescriptionSections.includes(section.name) && section.text">
-                      <p class="muted small drug-hints" v-html="highlightDrugMentions(section.text)"></p>
-                      <p class="muted small">{{ t('doctor.scribe.drugHintNote') }}</p>
-                      <Button :label="t('doctor.scribe.checkPrescription')" icon="pi pi-search" size="small" severity="secondary" text @click="router.push({ name: 'medicines' })" />
-                    </template>
-                  </div>
-                  <p class="muted small">{{ t('common.model') }}: {{ draft.model }}</p>
-                </template>
-              </TabPanel>
-              <TabPanel value="leaflet">
-                <p v-if="!draft" class="muted">{{ t('doctor.scribe.noDraft') }}</p>
-                <div v-else class="field"><label>{{ t('doctor.scribe.leafletLabel') }}</label><Textarea v-model="leaflet" rows="8" auto-resize :disabled="approved" /></div>
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
-          <div class="actions">
-            <Button :label="t('doctor.scribe.approveAll')" icon="pi pi-check" :disabled="!draft || approved" data-testid="scribe-approve" @click="approve" />
+      <AppCard :title="tab === 'draft' ? t('doctor.scribe.draftTitle') : t('doctor.scribe.leafletLabel')" :origin="tab === 'draft' ? 'ai' : undefined" :origin-note="t('doctor.scribe.draftNote')">
+        <template #header>
+          <button type="button" class="link-arrow small" @click="tab = tab === 'draft' ? 'leaflet' : 'draft'">{{ tab === 'draft' ? t('doctor.scribe.leafletLabel') : t('doctor.scribe.draftTitle') }}</button>
+        </template>
+        <p v-if="!draft" class="muted">{{ t('doctor.scribe.noDraft') }}</p>
+        <template v-else-if="tab === 'draft'">
+          <div v-for="section in draft.sections" :key="section.name" class="field section" @mouseover="hoverSection(section.spans)" @mouseleave="hoverSection(undefined)">
+            <label>{{ section.name }}</label>
+            <Textarea v-model="section.text" rows="2" auto-resize :disabled="approved" />
+            <template v-if="prescriptionSections.includes(section.name) && section.text">
+              <p class="muted small drug-hints" v-html="highlightDrugMentions(section.text)"></p>
+              <p class="caption">{{ t('doctor.scribe.drugHintNote') }}</p>
+              <Button :label="t('doctor.scribe.checkPrescription')" icon="pi pi-search" size="small" severity="secondary" text @click="router.push({ name: 'medicines' })" />
+            </template>
           </div>
-          <div v-if="approved" class="result" data-testid="scribe-result">
-            <StatusTag :value="t('doctor.scribe.audioDeleted')" tone="ok" icon="pi pi-trash" />
-            <div class="link-row">
-              <a v-if="leafletUrl" :href="leafletUrl" target="_blank" class="mono">{{ leafletUrl }}</a>
-              <Button :label="t('shell.copyLink')" icon="pi pi-copy" size="small" severity="secondary" @click="copyLink" />
-            </div>
-            <div v-if="qrDataUrl" class="qr-block">
-              <img :src="qrDataUrl" :alt="t('doctor.scribe.qrAlt')" width="200" height="200" />
-              <p class="muted small">{{ t('doctor.scribe.qrHint') }}</p>
-            </div>
+          <p class="caption">{{ t('common.model') }}: {{ draft.model }} <OriginTag kind="ai" /></p>
+        </template>
+        <div v-else class="field"><label>{{ t('doctor.scribe.leafletLabel') }}</label><Textarea v-model="leaflet" rows="8" auto-resize :disabled="approved" /></div>
+        <div class="approve-row">
+          <Button :label="t('doctor.scribe.approveAll')" icon="pi pi-check" :disabled="!draft || approved" data-testid="scribe-approve" @click="approve" />
+          <span class="caption">{{ t('doctor.scribe.draftNoteApprove') }}</span>
+        </div>
+        <div v-if="approved" class="result" data-testid="scribe-result">
+          <StatusTag :value="t('doctor.scribe.audioDeleted')" tone="ok" icon="pi pi-trash" />
+          <div class="link-row">
+            <a v-if="leafletUrl" :href="leafletUrl" target="_blank" class="mono">{{ leafletUrl }}</a>
+            <Button :label="t('shell.copyLink')" icon="pi pi-copy" size="small" severity="secondary" @click="copyLink" />
           </div>
-        </AppCard>
-      </div>
+          <div v-if="qrDataUrl" class="qr-block">
+            <img :src="qrDataUrl" :alt="t('doctor.scribe.qrAlt')" width="200" height="200" />
+            <p class="caption">{{ t('doctor.scribe.qrHint') }}</p>
+          </div>
+        </div>
+      </AppCard>
     </div>
-    <p class="muted small models">
+    <p class="caption">
       <template v-if="health">{{ t('doctor.scribe.transcriber') }}: {{ health.transcriber }} · {{ t('doctor.scribe.drafter') }}: {{ health.drafter }}</template>
       <template v-else>{{ t('doctor.scribe.serviceDown') }}</template>
     </p>
@@ -320,22 +311,27 @@ onBeforeUnmount(() => recorder.dispose())
 </template>
 
 <style scoped>
-.session { display: flex; gap: var(--dm-space-4); align-items: flex-end; flex-wrap: wrap; }
-.session .field { min-width: 120px; }
-.timer { font-size: var(--dm-text-kpi); font-weight: 600; letter-spacing: -0.02em; font-family: inherit; line-height: 1; }
-.timer.live { color: var(--dm-danger); }
-.session-id { margin-left: auto; }
-.consent-row { display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
+.consent-row { display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; margin-top: 12px; }
 .what { margin: 8px 0 0; padding-left: 20px; }
-.wave { display: flex; align-items: center; gap: 3px; height: 56px; padding: 0 4px; border-radius: var(--dm-radius-md); background: var(--dm-surface-2); }
+.rec-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dm-dot-idle); flex: none; }
+.rec-dot.live { background: var(--dm-accent); }
+.rec-label { font-size: var(--dm-text-md); font-weight: 500; }
+.timer { font-size: var(--dm-text-kpi); font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+.timer.live { color: var(--dm-danger); }
+.spacer { flex: 1; }
+.upload { cursor: pointer; }
+.wave { display: flex; align-items: center; gap: 3px; height: 40px; padding: 0 4px; margin-top: 12px; border-radius: var(--dm-radius-md); background: var(--dm-surface-2); }
 .wave .bar { flex: 1; background: var(--dm-dot-idle); border-radius: 2px; transition: height 0.08s linear; }
 .wave.live .bar { background: var(--dm-ink); }
-.rec-actions { align-items: center; }
-.upload { cursor: pointer; }
-.segment { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.lang { font-size: 0.65rem; padding: 3px 6px; }
+.segment { display: flex; gap: 12px; align-items: flex-start; justify-content: flex-start; margin: 0; min-height: 44px; }
+.stamp { flex: none; width: 72px; font-size: var(--dm-text-xs); color: var(--dm-faint); letter-spacing: 0.02em; padding-top: 3px; }
+.segment-text { font-size: var(--dm-text-md); }
 .section { margin-bottom: 8px; }
+.approve-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
 .result { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .link-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; word-break: break-all; }
-.models { margin: 0; }
+@media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
 </style>

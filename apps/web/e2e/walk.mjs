@@ -16,18 +16,18 @@ const pages = [
   { role: 'doctor', path: '/doctor/patients/SYN-75-028B-381-01', wait: 'Прогноз для текущей организации' },
   { role: 'regulator', path: '/gov', wait: 'Индекс доступности по регионам', variants: true },
   { role: 'regulator', path: '/gov/regions/75', wait: 'Сигналы региона' },
-  { role: 'regulator', path: '/gov/simulator?region=75&profile=381', wait: 'Результат для' },
-  { role: 'regulator', path: '/gov/insight', wait: 'Вопрос' },
+  { role: 'regulator', path: '/gov/simulator?region=75&profile=381', wait: 'До и после' },
+  { role: 'regulator', path: '/gov/insight', wait: 'Предыдущие вопросы' },
   { role: 'regulator', path: '/gov/organizations/028B?kato=75&profile=381', wait: 'Сравнение с регионом' },
   { role: 'chief', path: '/gov/organizations/028B/referrals?kato=75', wait: 'Причины отказов' },
-  { role: 'regulator', path: '/quality', wait: 'Качество' },
+  { role: 'regulator', path: '/quality', wait: 'Модели в продукте' },
   { role: 'regulator', path: '/doctor/decisions', wait: 'Журнал решений' },
   { role: 'doctor', path: '/doctor/referral?moCode=028B&profileCode=381', wait: 'Прогноз для выбранной', variants: true },
   { role: 'doctor', path: '/doctor/referral', wait: 'Выберите регион' },
   { role: 'doctor', path: '/doctor/worklist', wait: 'Рабочий список' },
   { role: 'doctor', path: '/doctor/decisions', wait: 'Журнал решений' },
   { role: 'doctor', path: '/doctor/scribe', wait: 'AI-скрайб приёма' },
-  { role: 'steward', path: '/steward', wait: 'Партии' },
+  { role: 'steward', path: '/steward', wait: 'Конвейер публикации' },
 ]
 // Дополнительные проходы для страниц с variants: казахский и тёмная тема (ключи localStorage приложения)
 const variants = [
