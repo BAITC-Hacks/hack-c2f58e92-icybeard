@@ -76,6 +76,15 @@ class S {
       );
 
   // ---------- вход ----------
+  String get loginWelcome => _t('Добро пожаловать в', 'Қош келдіңіз:');
+  String get loginSlideStage => _t('Видите, на каком этапе ваше направление', 'Жолдамаңыздың қай кезеңде екенін көресіз');
+  String get loginSlideForecast => _t('Знаете, сколько обычно ждут такие пациенты', 'Мұндай пациенттер әдетте қанша күтетінін білесіз');
+  String get loginSlideChecklist => _t('Помните, какие анализы ещё действуют', 'Қай талдаулардың әлі жарамды екенін білесіз');
+  String get loginCardWaitlisted => _t('В листе ожидания', 'Күту парағында');
+  String get loginCardNineOfTen => _t('9 из 10 — до 21 дня', '10-нан 9-ы — 21 күнге дейін');
+  String get loginCardHalf => _t('половина — 2 дня', 'жартысы — 2 күн');
+  String get loginCardExpired => _t('истёк', 'мерзімі өтті');
+  String get loginCardValid => _t('действует', 'жарамды');
   String get loginTitle => _t('Вход', 'Кіру');
   String get loginTagline => _t('Госпитализация без неизвестности', 'Белгісіздіксіз емдеуге жатқызу');
   String get loginValueStage => _t('Стадия направления', 'Жолдама кезеңі');

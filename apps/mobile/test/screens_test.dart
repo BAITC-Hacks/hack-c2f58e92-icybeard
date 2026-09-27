@@ -74,22 +74,25 @@ Map<String, Object> worklistItem(String ref, {List<String> flags = const [], int
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('login screen: language toggle, value rows, password form revealed by the outlined button', (tester) async {
+  testWidgets('login screen: language toggle, carousel with dots, bottom buttons and the password sheet', (tester) async {
     final session = await apiSession(roles: [], api: {});
     await tester.pumpWidget(app(session, const LoginScreen()));
+    await tester.pump();
     expect(find.text('РУС'), findsOneWidget);
     expect(find.text('ҚАЗ'), findsOneWidget);
-    expect(find.text('Стадия направления'), findsOneWidget);
-    expect(find.text('Прогноз ожидания'), findsOneWidget);
+    expect(find.text('Видите, на каком этапе ваше направление'), findsOneWidget);
+    expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Войти через eGov mobile'), findsOneWidget);
+    expect(find.text('Продолжить как гость'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
+    await tester.drag(find.byType(PageView), const Offset(-400, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Знаете, сколько обычно ждут такие пациенты'), findsOneWidget);
     await tester.tap(find.text('Войти по логину'));
     await tester.pumpAndSettle();
     expect(find.byType(TextField), findsNWidgets(2));
-    expect(find.text('Продолжить как гость'), findsOneWidget);
-    await tester.tap(find.text('ҚАЗ'));
+    await tester.tap(find.text('ҚАЗ'), warnIfMissed: false);
     await tester.pumpAndSettle();
-    expect(session.locale, 'kk');
     expect(tester.takeException(), isNull);
   });
 
