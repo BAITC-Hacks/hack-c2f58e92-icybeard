@@ -50,12 +50,12 @@ void main() {
     expect(Session.jwtClaims('garbage'), isEmpty);
   });
 
-  test('fresh session is a guest with the default region and home', () async {
+  test('fresh session has no role, the default region and the login screen as home', () async {
     final s = await session(roles: []);
     expect(s.isAuthenticated, isFalse);
-    expect(s.role, AuthRole.guest);
+    expect(s.role, isNull);
     expect(s.region, '75');
-    expect(s.home, '/home');
+    expect(s.home, '/login');
     expect(await s.freshToken(), isNull);
   });
 
@@ -83,7 +83,7 @@ void main() {
     expect(admin.isDoctor, isTrue);
   });
 
-  test('wrong password surfaces invalid_grant and leaves the session a guest', () async {
+  test('wrong password surfaces invalid_grant and leaves the session signed out', () async {
     final s = await session(roles: ['citizen']);
     await expectLater(s.login('citizen1', 'wrong'), throwsA(isA<ApiException>().having((e) => e.title, 'title', 'invalid_grant')));
     expect(s.isAuthenticated, isFalse);
@@ -94,11 +94,13 @@ void main() {
     await s.login('doctor1', 'darumen');
     await s.logout();
     expect(s.isAuthenticated, isFalse);
+    expect(s.role, isNull);
+    expect(s.home, '/login');
     expect(s.username, isNull);
     expect(s.regionFromAccount, isFalse);
   });
 
-  test('an expired token is refreshed silently, a failed refresh drops to guest', () async {
+  test('an expired token is refreshed silently, a failed refresh signs out', () async {
     final refreshed = await session(roles: ['doctor'], expiresIn: 0);
     await refreshed.login('doctor1', 'darumen');
     expect(await refreshed.freshToken(), isNotNull);

@@ -83,7 +83,7 @@ void main() {
     expect(find.text('Видите, на каком этапе ваше направление'), findsOneWidget);
     expect(find.byType(PageView), findsOneWidget);
     expect(find.text('Войти через eGov mobile'), findsOneWidget);
-    expect(find.text('Продолжить как гость'), findsOneWidget);
+    expect(find.text('Продолжить как гость'), findsNothing);
     expect(find.byType(TextField), findsNothing);
     await tester.drag(find.byType(PageView), const Offset(-400, 0));
     await tester.pumpAndSettle();
@@ -96,14 +96,40 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('home screen for a guest shows the invitation and three equal tiles', (tester) async {
-    final session = await apiSession(roles: [], api: {});
+  testWidgets('home screen for a citizen: route card, three equal tiles, then weather and news', (tester) async {
+    final session = await apiSession(roles: ['citizen'], api: {
+      '/route/me': {
+        'patientRef': 'SYN-75-028B-381-01',
+        'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
+        'forecast': {'p50Days': 47, 'p90Days': 106, 'fromModel': true},
+        'timeline': [
+          {'code': 'waitlisted', 'order': 3, 'title': 'Внесено в лист ожидания', 'date': '2025-02-17', 'status': 'current'},
+        ],
+      },
+      '/public/daily': {
+        'regionKato': '75', 'regionName': 'г. Алматы', 'capital': 'Алматы',
+        'weather': {'available': true, 'source': 'Open-Meteo', 'days': [
+          {'date': '2026-09-27', 'tMin': 12, 'tMax': 31, 'precipitationProbability': 10, 'windMax': 20, 'uvIndex': 7, 'code': 'clear'},
+          {'date': '2026-09-28', 'tMin': 10, 'tMax': 24, 'precipitationProbability': 70, 'windMax': 55, 'uvIndex': 3, 'code': 'rain'},
+        ]},
+        'tips': [{'code': 'heat', 'day': 0, 'text': 'Жара до 31°: пейте воду и избегайте солнца днём.'}],
+        'news': {'available': true, 'source': 'Tengrinews', 'items': [
+          {'title': 'В Алматы открыли новую поликлинику', 'url': 'https://example.kz/n1', 'publishedAt': '2026-09-27T08:00:00+00:00', 'source': 'Tengrinews'},
+        ]},
+      },
+    });
     await tester.pumpWidget(app(session, const HomeScreen()));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Войдите через eGov mobile'), findsOneWidget);
+    expect(find.text('Моя госпитализация'), findsOneWidget);
+    expect(find.textContaining('Войдите'), findsNothing);
     expect(find.text('Сколько ждут'), findsOneWidget);
     expect(find.text('Лекарства'), findsOneWidget);
     expect(find.text('Вакцинация'), findsOneWidget);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -900));
+    await tester.pumpAndSettle();
+    expect(find.text('Погода · Алматы'), findsOneWidget);
+    expect(find.textContaining('пейте воду'), findsOneWidget);
+    expect(find.text('В Алматы открыли новую поликлинику'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

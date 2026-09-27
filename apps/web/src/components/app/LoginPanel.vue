@@ -5,7 +5,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 
-/** Вход: eGov mobile — единственная заливная кнопка, вход по логину — контурная, гость — текстом.
+/** Вход: eGov mobile — единственная заливная кнопка, вход по логину — контурная. Без входа приложение не открывается.
  * `hint` — подсказка над кнопкой входа (например, какая роль нужна для страницы из ?denied). */
 defineProps<{ hint?: string }>()
 const { t } = useI18n()
@@ -42,7 +42,6 @@ function loginFromRoadmap() {
         data-testid="login-primary"
         @click="auth.login()"
       />
-      <RouterLink class="guest" to="/wait" data-testid="continue-guest">{{ t('auth.continueGuest') }}</RouterLink>
     </div>
     <p class="muted note">{{ auth.keycloakUnavailable ? t('auth.unavailable') : t('auth.syntheticNote') }}</p>
     <Dialog v-model:visible="roadmap" modal :header="t('auth.roadmapTitle')" :style="{ width: 'min(480px, 92vw)' }" data-testid="egov-roadmap">
@@ -59,7 +58,6 @@ function loginFromRoadmap() {
 .hint { margin: 8px 0 0; padding: 8px 10px; border-radius: var(--dm-radius-sm); background: var(--dm-warn-soft); color: var(--dm-warn); font-size: 0.9rem; }
 .buttons { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .buttons :deep(.p-button) { justify-content: center; }
-.guest { text-align: center; font-size: 0.9rem; padding: 6px; }
 .note { font-size: 0.85rem; margin: 12px 0 0; }
 .roadmap { margin: 0; line-height: 1.5; }
 </style>

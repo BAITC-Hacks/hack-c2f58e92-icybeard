@@ -30,7 +30,7 @@ class ApiClient {
   final http.Client _http;
   final String Function() _locale;
 
-  /// Свежий Bearer-токен на каждый запрос (Keycloak с обновлением); null — гость.
+  /// Свежий Bearer-токен на каждый запрос (Keycloak с обновлением); null — до входа (публичные эндпоинты).
   final Future<String?> Function()? tokenProvider;
 
   String get locale => _locale();
@@ -140,7 +140,7 @@ class ApiClient {
   Future<CheckResponse> checkMedicine({String? mnnId, String? nosologyId, String? regionKato}) async =>
       CheckResponse.fromJson(await post('/api/v1/medicines/check', {'mnnId': mnnId, 'nosologyId': nosologyId, 'regionKato': regionKato}) as Map<String, dynamic>);
 
-  /// Гостю на главной: погода на сегодня и завтра, советы и новости; публичный эндпоинт без токена.
+  /// На главной гражданина: погода на сегодня и завтра, советы и новости; публичный эндпоинт без токена.
   Future<Daily> daily({String? regionKato}) async =>
       Daily.fromJson(await get('/api/v1/public/daily', {'regionKato': ?regionKato}) as Map<String, dynamic>);
 

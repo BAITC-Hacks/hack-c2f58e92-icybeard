@@ -1,11 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { i18n } from '@/i18n'
-import { roleHome } from '@/router/roles'
+import { resolveEntry } from '@/router/guard'
 import { useAuthStore } from '@/stores/auth'
 
 // meta.title — ключ i18n заголовка страницы и вкладки; meta.nav — позиция в меню (без него — не в меню);
 // meta.group — группа сайдбара персонала (patients / region / data) или верхняя полоса гражданина (citizen);
-// meta.navTitle — короткая подпись пункта, meta.icon — иконка; meta.roles — кому открыт маршрут (без поля — публичный).
+// meta.navTitle — короткая подпись пункта, meta.icon — иконка; meta.roles — кому открыт маршрут (без поля — любому вошедшему; без сессии открыты только `/` и meta.bare).
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -31,18 +31,7 @@ export const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
-  const auth = useAuthStore()
-  if (to.meta.roles && !auth.hasRole(...to.meta.roles)) {
-    return { name: 'home', query: { denied: to.path } }
-  }
-  // Вошедший на общей главной попадает на домашний экран роли; возврат с отказом в доступе (?denied=) остаётся на главной.
-  if (to.name === 'home' && auth.isAuthenticated && !to.query.denied) {
-    const home = roleHome(auth.role, auth.region)
-    if (home !== '/') return home
-  }
-  return true
-})
+router.beforeEach((to) => resolveEntry(to, useAuthStore()))
 
 router.afterEach((to) => {
   document.title = to.meta.title ? `${i18n.global.t(to.meta.title)} · Darumen Health` : 'Darumen Health'

@@ -6,7 +6,7 @@ export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value)
 }
 
-/** Домашний экран роли: гражданин → свой маршрут, врач → рабочий список, главврач → свой регион, регулятор → карта, стюард → консоль. */
+/** Домашний экран роли: гражданин → свой маршрут, врач → рабочий список, главврач → свой регион, регулятор → карта, стюард → консоль; без роли — страница входа. */
 export function roleHome(role: Role | null, region: string | null = null): string {
   switch (role) {
     case 'citizen':
@@ -25,18 +25,18 @@ export function roleHome(role: Role | null, region: string | null = null): strin
   }
 }
 
-/** Группы боковой навигации персонала (doctor, chief, regulator, steward, admin); citizen — верхняя полоса гражданина и гостя. */
+/** Группы боковой навигации персонала (doctor, chief, regulator, steward, admin); citizen — верхняя полоса гражданина. */
 export type NavGroup = 'patients' | 'region' | 'data' | 'citizen'
 export const NAV_GROUPS: readonly NavGroup[] = ['patients', 'region', 'data']
 
-/** Роли, которым показывается боковой каркас; гражданин и гость видят верхнюю полосу из трёх пунктов. */
+/** Роли, которым показывается боковой каркас; гражданин (и страница входа) видят верхнюю полосу. */
 export function usesSidebar(role: Role | null): boolean {
   return role !== null && role !== 'citizen'
 }
 
 declare module 'vue-router' {
   interface RouteMeta {
-    /** Роли, которым открыт маршрут; без поля — публичный. */
+    /** Роли, которым открыт маршрут; без поля — любому вошедшему (без сессии открыты только `/` и bare). */
     roles?: Role[]
     /** Ключ i18n заголовка страницы (вкладка браузера и заголовок). */
     title?: string

@@ -7,26 +7,26 @@ import 'session_test.dart' show session;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late Session guest;
+  late Session anonymous;
   late Session citizen;
   late Session doctor;
 
   setUpAll(() async {
-    guest = await session(roles: []);
+    anonymous = await session(roles: []);
     citizen = await session(roles: ['citizen'], iin: '000000000001');
     await citizen.login('citizen1', 'darumen');
     doctor = await session(roles: ['doctor'], region: '75');
     await doctor.login('doctor1', 'darumen');
   });
 
-  test('guest: public shell open, doctor shell and root redirect', () {
-    expect(guard(guest, '/'), '/home');
-    expect(guard(guest, '/login'), isNull);
-    expect(guard(guest, '/home'), isNull);
-    expect(guard(guest, '/home/wait'), isNull);
-    expect(guard(guest, '/home/route'), isNull, reason: 'экран сам показывает приглашение войти');
-    expect(guard(guest, '/updates'), isNull);
-    expect(guard(guest, '/doctor/patients'), '/login?from=%2Fdoctor%2Fpatients');
+  test('without a session only the login screen is reachable, the target is kept in ?from', () {
+    expect(guard(anonymous, '/'), '/login');
+    expect(guard(anonymous, '/login'), isNull);
+    expect(guard(anonymous, '/home'), '/login?from=%2Fhome');
+    expect(guard(anonymous, '/home/wait'), '/login?from=%2Fhome%2Fwait');
+    expect(guard(anonymous, '/home/route'), '/login?from=%2Fhome%2Froute');
+    expect(guard(anonymous, '/updates'), '/login?from=%2Fupdates');
+    expect(guard(anonymous, '/doctor/patients'), '/login?from=%2Fdoctor%2Fpatients');
   });
 
   test('citizen: never enters the doctor shell, login bounces home', () {

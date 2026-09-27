@@ -16,7 +16,7 @@ export const useAuthStore = defineStore('auth', () => {
   const actor = ref<string | null>(null)
   const roles = ref<Role[]>([])
   const region = ref<string | null>(null)
-  /** Keycloak не ответил при старте: вместо кнопки входа — подпись, публичные страницы работают. */
+  /** Keycloak не ответил при старте: вместо кнопки входа — подпись на странице входа. */
   const keycloakUnavailable = ref(false)
   let keycloak: Keycloak | null = null
 
@@ -73,8 +73,8 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // проверка сессии полным редиректом (prompt=none) без iframe: тихая проверка через iframe и проверка
       // 3p-cookies не переживают X-Frame-Options: DENY / CSP frame-ancestors на прокси стенда. Редирект
-      // делаем только тем, кто уже входил в этом браузере, или при возврате из Keycloak; гость остаётся гостем
-      // без перехода. #error=login_required keycloak-js убирает из адреса сам
+      // делаем только тем, кто уже входил в этом браузере, или при возврате из Keycloak; кто не входил, остаётся на
+      // странице входа без перехода. #error=login_required keycloak-js убирает из адреса сам
       const checkSession = returning || hadSession
       if (checkSession && !returning) markRedirect()
       const authenticated = await keycloak.init({
@@ -130,7 +130,7 @@ export const useAuthStore = defineStore('auth', () => {
     await keycloak?.logout({ redirectUri: window.location.origin })
   }
 
-  /** Заголовки для API: Bearer из Keycloak с обновлением токена; без сессии — пусто (публичные эндпоинты). */
+  /** Заголовки для API: Bearer из Keycloak с обновлением токена; без сессии — пусто (публичные эндпоинты страницы входа). */
   async function authHeaders(): Promise<Record<string, string>> {
     if (!keycloak?.token) return {}
     try {

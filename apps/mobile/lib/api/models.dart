@@ -755,7 +755,7 @@ class PatientRoute {
       );
 }
 
-/// Справочник Стандарта (`/refdata/route-standard`): для гостя — ориентир МЗ РК и сроки давности анализов.
+/// Справочник Стандарта (`/refdata/route-standard`): на главной — ориентир МЗ РК и сроки давности анализов.
 class RouteStandard {
   const RouteStandard({required this.available, required this.source, required this.sourceDate, required this.checklist, required this.benchmarks});
   final bool available;
@@ -790,7 +790,7 @@ class ChecklistDefinition {
       );
 }
 
-/// Витрина гостя «сегодня и завтра»: погода по столице региона, бытовые советы по погоде и новости о здравоохранении.
+/// Витрина «сегодня и завтра» на главной: погода по столице региона, бытовые советы по погоде и новости о здравоохранении.
 class WeatherDay {
   const WeatherDay({required this.date, required this.tMin, required this.tMax, required this.precipitationProbability, required this.windMax, required this.uvIndex, required this.code});
 

@@ -36,9 +36,6 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
 
   Future<void> _load() async {
     final session = context.read<Session>();
-    if (!session.isAuthenticated) {
-      return;
-    }
     setState(() => _state = const Loading());
     try {
       final route = await session.api.myRoute(regionKato: session.regionFromAccount ? null : session.region);
@@ -55,22 +52,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
-    final session = context.watch<Session>();
     final theme = Theme.of(context);
-    if (!session.isAuthenticated) {
-      return PageScaffold(
-        title: s.updatesTitle,
-        children: [
-          EmptyState(
-            icon: Icons.notifications_none,
-            title: s.updatesEmptyTitle,
-            body: s.updatesEmptyBody,
-            action: FilledButton(onPressed: () => context.go('/login?from=%2Fupdates'), child: Text(s.loginButton)),
-          ),
-          Text(s.updatesPushRoadmap, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
-        ],
-      );
-    }
     return PageScaffold(
       title: s.updatesTitle,
       onRefresh: _load,

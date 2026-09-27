@@ -9,7 +9,7 @@ describe('roles', () => {
     expect(isRole(null)).toBe(false)
   })
 
-  it('sends each role to its home and a guest to the landing page', () => {
+  it('sends each role to its home and no role to the login page', () => {
     expect(roleHome('citizen')).toBe('/me/route')
     expect(roleHome('doctor')).toBe('/doctor/worklist')
     expect(roleHome('chief', '75')).toBe('/gov/regions/75')

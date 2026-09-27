@@ -21,7 +21,7 @@ class Env {
 
   static String get keycloakUrl => _keycloakUrl.isNotEmpty ? _keycloakUrl : _localhost(8080);
 
-  /// Регион по умолчанию для гостя и учётной записи без клейма region_kato: г. Алматы, как у демо-пользователей.
+  /// Регион по умолчанию для учётной записи без клейма region_kato: г. Алматы, как у демо-пользователей.
   static String get defaultRegion => _defaultRegion;
 
   static String _localhost(int port) {

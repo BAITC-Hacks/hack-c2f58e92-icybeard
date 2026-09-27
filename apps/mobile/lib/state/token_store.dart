@@ -33,7 +33,7 @@ class TokenStore {
         expiresAt: expires == null ? null : DateTime.tryParse(expires),
       );
     } catch (_) {
-      return null; // хранилище недоступно (например, после переустановки эмулятора) — начинаем как гость
+      return null; // хранилище недоступно (например, после переустановки эмулятора) — начинаем с экрана входа
     }
   }
 

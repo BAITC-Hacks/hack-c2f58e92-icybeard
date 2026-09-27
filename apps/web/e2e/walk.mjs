@@ -9,9 +9,9 @@ const password = process.env.WALK_PASSWORD ?? 'darumen'
 const users = { citizen: 'citizen1', doctor: 'doctor1', chief: 'chief1', regulator: 'regulator1', steward: 'steward1' }
 const pages = [
   { role: null, path: '/', wait: 'Войти через eGov mobile', variants: true },
-  { role: null, path: '/wait', wait: 'Выберите регион' },   // до ссылки с параметрами: выбор запоминается в localStorage
-  { role: null, path: '/wait?region=75&profile=381', wait: 'Где быстрее', variants: true },
-  { role: null, path: '/medicines', wait: 'Сроки обеспечения' },
+  { role: 'citizen', path: '/wait', wait: 'Выберите регион' },   // до ссылки с параметрами: выбор запоминается в localStorage
+  { role: 'citizen', path: '/wait?region=75&profile=381', wait: 'Где быстрее', variants: true },
+  { role: 'citizen', path: '/medicines', wait: 'Сроки обеспечения' },
   { role: 'citizen', path: '/me/route', wait: 'Мой путь', variants: true },
   { role: 'doctor', path: '/doctor/patients/SYN-75-028B-381-01', wait: 'Маршрут пациента' },
   { role: 'regulator', path: '/gov', wait: 'Индекс за', variants: true },
@@ -77,7 +77,7 @@ for (const step of pages) {
     const name = (step.path.replace(/\W+/g, '_').replace(/^_/, '') || 'home') + variant.suffix
     await page.screenshot({ path: `${out}/${name}.png`, fullPage: false })
     const problem = await page.locator('.p-message-error').allTextContents()
-    console.log(`${ok ? 'OK ' : 'MISS'} ${step.role ?? 'guest'} ${step.path}${variant.suffix} ${problem.length ? 'problem: ' + problem.join(' | ').slice(0, 160) : ''}`)
+    console.log(`${ok ? 'OK ' : 'MISS'} ${step.role ?? 'anonymous'} ${step.path}${variant.suffix} ${problem.length ? 'problem: ' + problem.join(' | ').slice(0, 160) : ''}`)
   }
 }
 console.log(errors.length ? 'console errors:\n' + [...new Set(errors)].slice(0, 12).join('\n') : 'no console errors')

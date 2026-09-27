@@ -1,21 +1,21 @@
 import '../state/session.dart';
 
-/// Чистая функция редиректа для GoRouter: роль выбирает shell целиком. Гость и гражданин живут в citizen-shell
-/// (`/home`, `/updates`, `/profile`), врач — в doctor-shell (`/doctor/*`). Экраны маршрута и уведомлений гостю
-/// показывают приглашение войти, а не редирект. Возвращает null, если переход разрешён.
+/// Чистая функция редиректа для GoRouter. Без входа открыт только `/login` (исходный адрес уносится в `?from=`).
+/// Роль выбирает shell целиком: гражданин живёт в citizen-shell (`/home`, `/updates`, `/profile`), врач — в
+/// doctor-shell (`/doctor/*`). Возвращает null, если переход разрешён.
 String? guard(Session session, String location) {
   final home = session.home;
-  if (location == '/' || location.isEmpty) {
-    return home;
-  }
-  if (location == '/login') {
-    return session.isAuthenticated ? home : null;
-  }
-  if (location.startsWith('/doctor')) {
-    if (session.isDoctor) {
+  if (!session.isAuthenticated) {
+    if (location == '/login') {
       return null;
     }
-    return session.isAuthenticated ? home : '/login?from=${Uri.encodeComponent(location)}';
+    return location == '/' || location.isEmpty ? '/login' : '/login?from=${Uri.encodeComponent(location)}';
+  }
+  if (location == '/' || location.isEmpty || location == '/login') {
+    return home;
+  }
+  if (location.startsWith('/doctor')) {
+    return session.isDoctor ? null : home;
   }
   // citizen-shell: врач сюда не попадает, у него свой набор вкладок
   return session.isDoctor ? home : null;

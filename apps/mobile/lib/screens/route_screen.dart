@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../api/client.dart';
@@ -8,7 +7,6 @@ import '../l10n/strings.dart';
 import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
-import '../widgets/empty_state.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/redirect_reason_dialog.dart';
 import '../widgets/route_view.dart';
@@ -17,7 +15,7 @@ import '../widgets/skeleton.dart';
 
 /// «Мой путь» гражданина: стадия и прогноз в шапке, степпер, «Что сейчас», свёрнутые секции. Двусторонний
 /// маршрут: варианты «Вы ещё ждёте?» и «Попросить» у альтернатив шлют сигнал врачу (один Idempotency-Key на
-/// нажатие); «Понятно» под ответом врача запоминается в сессии. Гость видит приглашение войти, а не редирект.
+/// нажатие); «Понятно» под ответом врача запоминается в сессии. Экран открыт только после входа.
 class RouteScreen extends StatefulWidget {
   const RouteScreen({super.key});
 
@@ -36,9 +34,6 @@ class _RouteScreenState extends State<RouteScreen> {
 
   Future<void> _load() async {
     final session = context.read<Session>();
-    if (!session.isAuthenticated) {
-      return;
-    }
     setState(() => _state = const Loading());
     try {
       final route = await session.api.myRoute(regionKato: session.regionFromAccount ? null : session.region);
@@ -94,19 +89,6 @@ class _RouteScreenState extends State<RouteScreen> {
   Widget build(BuildContext context) {
     final s = S.at(context);
     final session = context.watch<Session>();
-    if (!session.isAuthenticated) {
-      return PageScaffold(
-        title: s.routeTitle,
-        children: [
-          EmptyState(
-            icon: Icons.lock_outline,
-            title: s.loginRequiredTitle,
-            body: s.loginRequiredBody,
-            action: FilledButton(onPressed: () => context.go('/login?from=%2Fhome%2Froute'), child: Text(s.loginButton)),
-          ),
-        ],
-      );
-    }
     return PageScaffold(
       title: s.routeTitle,
       onRefresh: _load,

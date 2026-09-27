@@ -16,7 +16,7 @@ import '../widgets/status_chip.dart';
 
 /// Профиль: имя или логин с чипом роли и регионом, строки-значения (ИИН маской — никогда полностью, язык, регион),
 /// «Справочно» (как считаются прогнозы, вакцинация, журнал решений для врача), «Выйти» внизу, версия и подпись
-/// данных. Гость: «Войти» вместо «Выйти», ИИН не показывается. Адреса API — только сборкой (config/env.dart).
+/// данных. ИИН показывается только маской. Адреса API — только сборкой (config/env.dart).
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -113,7 +113,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final session = context.read<Session>();
     await session.logout();
     if (mounted) {
-      context.go('/home');
+      context.go('/login');
     }
   }
 
@@ -123,15 +123,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final s = S.at(context);
     final theme = Theme.of(context);
     final regionName = _regions.where((r) => r.kato == session.region).map((r) => r.name).firstOrNull ?? session.region;
-    final role = switch (session.role) { AuthRole.doctor => s.roleDoctor, AuthRole.citizen => s.roleCitizen, AuthRole.guest => s.guest };
+    final role = session.isDoctor ? s.roleDoctor : s.roleCitizen;
     return PageScaffold(
       title: s.profileTitle,
       children: [
         Row(
           children: [
-            Expanded(child: Text(session.username ?? s.guest, style: theme.textTheme.headlineSmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
+            Expanded(child: Text(session.username ?? '', style: theme.textTheme.headlineSmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
             const SizedBox(width: AppSpacing.sm),
-            StatusChip(role, tone: session.isAuthenticated ? StatusTone.accent : StatusTone.neutral),
+            StatusChip(role, tone: StatusTone.accent),
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -169,10 +169,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        if (session.isAuthenticated)
-          OutlinedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout), label: Text(s.logout))
-        else
-          FilledButton(onPressed: () => context.go('/login'), child: Text(s.loginButton)),
+        OutlinedButton.icon(onPressed: _logout, icon: const Icon(Icons.logout), label: Text(s.logout)),
         const SizedBox(height: AppSpacing.lg),
         FutureBuilder<PackageInfo>(
           future: PackageInfo.fromPlatform(),

@@ -62,7 +62,7 @@ describe('auth store (Keycloak)', () => {
 
   it('checks the session by redirect only after a previous login in this browser', async () => {
     await useAuthStore().init()
-    expect(kc.initOptions).not.toHaveProperty('onLoad') // гость первый раз: без перехода в Keycloak и второй загрузки
+    expect(kc.initOptions).not.toHaveProperty('onLoad') // первый заход без сессии: без перехода в Keycloak и второй загрузки
     expect(window.sessionStorage.getItem('darumen.boot.skip')).toBeNull()
 
     setActivePinia(createPinia())
@@ -79,7 +79,7 @@ describe('auth store (Keycloak)', () => {
     expect(window.localStorage.getItem('darumen.session')).toBeNull()
   })
 
-  it('stays a guest without a session and sends no auth headers', async () => {
+  it('stays signed out without a session and sends no auth headers', async () => {
     const auth = useAuthStore()
     await auth.init()
     expect(auth.isAuthenticated).toBe(false)
@@ -111,7 +111,7 @@ describe('auth store (Keycloak)', () => {
     expect(auth.roleHome()).toBe('/gov')
   })
 
-  it('marks Keycloak unavailable when init fails and the realm does not answer, staying usable as a guest', async () => {
+  it('marks Keycloak unavailable when init fails and the realm does not answer, keeping the login page usable', async () => {
     kc.fail = true
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED') }))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})

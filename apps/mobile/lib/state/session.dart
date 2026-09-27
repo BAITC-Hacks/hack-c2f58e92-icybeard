@@ -8,11 +8,11 @@ import '../api/client.dart';
 import '../config/env.dart';
 import 'token_store.dart';
 
-enum AuthRole { guest, citizen, doctor }
+enum AuthRole { citizen, doctor }
 
 /// Кто пользуется приложением. Единственный вход — Keycloak (клиент darumen-mobile, password grant с обновлением
-/// токена); без входа — гость с публичными экранами. Роль, регион и ИИН всегда выводятся из клеймов токена и не
-/// хранятся отдельно. Один ApiClient на всю сессию; уведомляет слушателей только при смене роли или языка, чтобы
+/// токена); без входа открыт только экран входа (роль null). Роль, регион и ИИН всегда выводятся из клеймов токена
+/// и не хранятся отдельно. Один ApiClient на всю сессию; уведомляет слушателей только при смене роли или языка, чтобы
 /// guard роутера не перезапускался на каждом тихом обновлении токена.
 class Session extends ChangeNotifier {
   Session({TokenStore? tokens, http.Client? httpClient})
@@ -27,7 +27,7 @@ class Session extends ChangeNotifier {
   final http.Client _http;
   late final ApiClient api;
 
-  AuthRole _role = AuthRole.guest;
+  AuthRole? _role;
   String? _username;
   String? _regionClaim;
   String? _iin;
@@ -40,15 +40,15 @@ class Session extends ChangeNotifier {
   String? _refresh;
   DateTime? _expiresAt;
 
-  AuthRole get role => _role;
-  bool get isAuthenticated => _role != AuthRole.guest;
+  AuthRole? get role => _role;
+  bool get isAuthenticated => _role != null;
   bool get isDoctor => _role == AuthRole.doctor;
   bool get isCitizen => _role == AuthRole.citizen;
   String? get username => _username;
   String? get iin => _iin;
   String get locale => _locale;
 
-  /// Регион из клейма учётной записи, иначе выбранный гостем, иначе г. Алматы.
+  /// Регион из клейма учётной записи, иначе выбранный в профиле, иначе г. Алматы.
   String get region => _regionClaim ?? _preferredRegion;
   bool get regionFromAccount => _regionClaim != null;
   String? get lastProfile => _lastProfile;
@@ -57,8 +57,8 @@ class Session extends ChangeNotifier {
   /// Последнее решение врача, которое гражданин закрыл кнопкой «Понятно»: карточка «Ответ врача» не повторяется.
   String? get seenDecisionId => _seenDecisionId;
 
-  /// Стартовый маршрут по роли: врач — рабочий список, остальные — главная.
-  String get home => _role == AuthRole.doctor ? '/doctor/patients' : '/home';
+  /// Стартовый маршрут по роли: врач — рабочий список, гражданин — главная, без входа — экран входа.
+  String get home => switch (_role) { AuthRole.doctor => '/doctor/patients', AuthRole.citizen => '/home', null => '/login' };
 
   Future<void> load() async {
     try {
@@ -95,7 +95,7 @@ class Session extends ChangeNotifier {
     _username = null;
     _regionClaim = null;
     _iin = null;
-    _role = AuthRole.guest;
+    _role = null;
     await _tokens.clear();
     notifyListeners();
   }
@@ -109,7 +109,7 @@ class Session extends ChangeNotifier {
     await _persist('locale', locale);
   }
 
-  /// Регион гостя и учётной записи без клейма region_kato; при клейме выбор не переопределяет учётную запись.
+  /// Регион учётной записи без клейма region_kato; при клейме выбор не переопределяет учётную запись.
   Future<void> setRegion(String regionKato) async {
     _preferredRegion = regionKato;
     await _persist('region', regionKato);
@@ -131,7 +131,7 @@ class Session extends ChangeNotifier {
     await _persist('seenDecision', decisionId);
   }
 
-  /// Токен для запроса: обновляется за 30 секунд до истечения; если обновить нельзя — выход в гости.
+  /// Токен для запроса: обновляется за 30 секунд до истечения; если обновить нельзя — выход на экран входа.
   /// На тихом успешном обновлении слушатели не уведомляются.
   Future<String?> freshToken() async {
     if (_access == null) {

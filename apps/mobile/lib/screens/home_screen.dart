@@ -23,7 +23,8 @@ import '../widgets/status_chip.dart';
 
 /// Главная гражданина по образцу NHS App: карточка «Моя госпитализация» (профиль · короткое имя организации, чип
 /// стадии и мини-степпер, главная строка «9 из 10 — до N дн.», строка «что сейчас» с «Да, жду» прямо в карточке),
-/// над ней — ответ врача, если он есть; ниже три равные плитки. Никаких новостей и баннеров.
+/// над ней — ответ врача, если он есть; ниже три равные плитки, под ними — погода на сегодня и завтра с бытовыми
+/// советами и новости о здравоохранении. Экран открыт только после входа (guard роутера).
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -33,23 +34,36 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   LoadState<PatientRoute> _state = const Loading();
-  bool? _loadedFor;
+  /// Погода и новости живут в состоянии экрана, а не элемента списка: ListView выгружает ушедшие за экран
+  /// элементы, и виджет с собственной загрузкой перезапрашивал бы витрину на каждой прокрутке.
+  LoadState<Daily> _daily = const Loading();
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final authenticated = context.watch<Session>().isAuthenticated;
-    if (authenticated != _loadedFor) {
-      _loadedFor = authenticated;
-      _load();
+  void initState() {
+    super.initState();
+    _load();
+    _loadDaily();
+  }
+
+  Future<void> _loadDaily() async {
+    final session = context.read<Session>();
+    setState(() => _daily = const Loading());
+    try {
+      final daily = await session.api.daily(regionKato: session.region);
+      if (mounted) {
+        setState(() => _daily = Loaded(daily));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _daily = Failed(e));
+      }
     }
   }
 
+  Future<void> _refresh() => Future.wait([_load(), _loadDaily()]);
+
   Future<void> _load() async {
     final session = context.read<Session>();
-    if (!session.isAuthenticated) {
-      return;
-    }
     setState(() => _state = const Loading());
     try {
       final route = await session.api.myRoute(regionKato: session.regionFromAccount ? null : session.region);
@@ -97,16 +111,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return PageScaffold(
       title: s.navHome,
       leading: const HomeMarkAnchor(),
-      onRefresh: session.isAuthenticated ? _load : null,
+      onRefresh: _refresh,
       children: [
-        if (!session.isAuthenticated) ...[
-          _GuestCard(s: s),
-          const SizedBox(height: AppSpacing.md),
-          _DailyCards(regionKato: session.region),
-        ] else ...[
-          if (answer != null) ...[_AnswerCard(decision: answer), const SizedBox(height: AppSpacing.md)],
-          _RouteCard(state: _state, onRetry: _load, onStillWaiting: _stillWaiting),
-        ],
+        if (answer != null) ...[_AnswerCard(decision: answer), const SizedBox(height: AppSpacing.md)],
+        _RouteCard(state: _state, onRetry: _load, onStillWaiting: _stillWaiting),
         const SizedBox(height: AppSpacing.lg),
         // IntrinsicHeight: плитки одной высоты внутри ListView (stretch без него даёт бесконечную высоту)
         IntrinsicHeight(
@@ -121,34 +129,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
+        const SizedBox(height: AppSpacing.lg),
+        _DailyCards(state: _daily),
         const SizedBox(height: AppSpacing.xl),
         Text(s.dataNote, style: theme.textTheme.labelSmall),
       ],
     );
   }
-}
-
-class _GuestCard extends StatelessWidget {
-  const _GuestCard({required this.s});
-
-  final S s;
-
-  @override
-  Widget build(BuildContext context) => Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(s.homeGuestCardTitle, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.sm),
-              Text(s.loginRequiredBody, style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton(onPressed: () => context.go('/login?from=%2Fhome%2Froute'), child: Text(s.loginButton)),
-            ],
-          ),
-        ),
-      );
 }
 
 /// Ответ врача сверху: «Врач предложил Достар Мед» с «Посмотреть» — ведёт в «Мой путь», где есть «Понятно».
@@ -311,53 +298,18 @@ class _Tile extends StatelessWidget {
   }
 }
 
-/// Гостю: погода на сегодня и завтра по столице региона с бытовыми советами и новости о здравоохранении.
-/// Вошедшему этот блок не показывается — у него на главной маршрут. Любой сбой источника — подпись, не ошибка.
-class _DailyCards extends StatefulWidget {
-  const _DailyCards({required this.regionKato});
+/// Погода на сегодня и завтра по столице региона с бытовыми советами и новости о здравоохранении — под плитками,
+/// после маршрута. Публичный эндпоинт; любой сбой источника — подпись, не ошибка.
+class _DailyCards extends StatelessWidget {
+  const _DailyCards({required this.state});
 
-  final String regionKato;
-
-  @override
-  State<_DailyCards> createState() => _DailyCardsState();
-}
-
-class _DailyCardsState extends State<_DailyCards> {
-  LoadState<Daily> _state = const Loading();
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  @override
-  void didUpdateWidget(covariant _DailyCards oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.regionKato != widget.regionKato) {
-      _load();
-    }
-  }
-
-  Future<void> _load() async {
-    setState(() => _state = const Loading());
-    try {
-      final daily = await context.read<Session>().api.daily(regionKato: widget.regionKato);
-      if (mounted) {
-        setState(() => _state = Loaded(daily));
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _state = Failed(e));
-      }
-    }
-  }
+  final LoadState<Daily> state;
 
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
     final theme = Theme.of(context);
-    return switch (_state) {
+    return switch (state) {
       Loading() => const ListSkeleton(count: 2, itemHeight: 140),
       Failed() => Card(child: Padding(padding: const EdgeInsets.all(AppSpacing.lg), child: Text(s.weatherUnavailable, style: theme.textTheme.bodySmall))),
       Loaded<Daily>(data: final d) => Column(

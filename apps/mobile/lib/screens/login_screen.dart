@@ -19,7 +19,7 @@ import '../widgets/error_box.dart';
 /// карусель из трёх карточек о том, что даёт приложение (стадия направления, прогноз ожидания, сроки анализов),
 /// заголовок и точки под ней, а кнопки прижаты к низу — под большой палец: единственная заливная — eGov mobile
 /// (до доступа от НИТ ведёт на лист «Скоро», ничего не имитирует), «Войти по логину» открывает нижний лист
-/// с логином и паролем Keycloak, гость — текстом. Никаких предзаполненных учёток.
+/// с логином и паролем Keycloak. Никаких предзаполненных учёток.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.from});
 
@@ -253,11 +253,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextButton(
                     onPressed: _passwordSheet,
                     child: Text(s.loginWithPassword),
-                  ),
-                  TextButton(
-                    onPressed: () => context.go('/home'),
-                    style: TextButton.styleFrom(foregroundColor: colors.muted),
-                    child: Text(s.continueAsGuest),
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(

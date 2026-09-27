@@ -92,7 +92,6 @@ class S {
   String get loginValueForecast => _t('Прогноз ожидания', 'Күту болжамы');
   String get loginWithEgov => _t('Войти через eGov mobile', 'eGov mobile арқылы кіру');
   String get loginWithPassword => _t('Войти по логину', 'Логинмен кіру');
-  String get continueAsGuest => _t('Продолжить как гость', 'Қонақ ретінде жалғастыру');
   String get loginFailed => _t('Неверный логин или пароль', 'Логин немесе құпия сөз қате');
   String get loginPrivacyNote => _t('Данные синтетические, стенд не хранит персональные данные.', 'Деректер синтетикалық, стенд дербес деректерді сақтамайды.');
   String get egovSoonTitle => _t('Скоро: вход через eGov mobile', 'Жақында: eGov mobile арқылы кіру');
@@ -100,13 +99,7 @@ class S {
         'Вход через eGov mobile даст ИИН, регион и прикрепление без ввода вручную. Интеграция через Smart Bridge запрошена у АО «НИТ»; пока используйте вход по логину.',
         'eGov mobile арқылы кіру ЖСН, аймақ пен тіркелуді қолмен енгізбей береді. Smart Bridge арқылы интеграция «ҰАТ» АҚ-дан сұратылды; әзірге логинмен кіріңіз.',
       );
-  String get guest => _t('Гость', 'Қонақ');
   String get logout => _t('Выйти', 'Шығу');
-  String get loginRequiredTitle => _t('Войдите, чтобы видеть свой маршрут', 'Маршрутыңызды көру үшін кіріңіз');
-  String get loginRequiredBody => _t(
-        'Стадия направления, сроки анализов, прогноз ожидания и решения врача — после входа.',
-        'Жолдама кезеңі, талдау мерзімдері, күту болжамы және дәрігер шешімдері — кіргеннен кейін.',
-      );
 
   // ---------- профиль ----------
   String get profileTitle => _t('Профиль', 'Профиль');
@@ -141,7 +134,6 @@ class S {
         'thunder' => _t('гроза', 'найзағай'),
         _ => code,
       };
-  String get homeGuestCardTitle => _t('Войдите через eGov mobile, чтобы видеть своё направление', 'Жолдамаңызды көру үшін eGov mobile арқылы кіріңіз');
   String get homeTileWait => _t('Сколько ждут', 'Қанша күтеді');
   String get homeTileMedicines => _t('Лекарства', 'Дәрілер');
   String get homeTileVaccination => _t('Вакцинация', 'Вакцинация');

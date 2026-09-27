@@ -77,7 +77,7 @@ make pipeline                      # данные в контейнере: intak
 make up                            # API :8000, сервис моделей :50051, скрайб :8010, веб :3000
 ```
 
-Веб на `http://localhost:3000`: кнопка «Войти» ведёт в Keycloak, демо-пользователи с паролем `darumen`: `regulator1`, `chief1`, `doctor1`, `steward1`, `citizen1`, `admin1`; страницы для граждан открыты без входа. API без Keycloak (заголовки `X-Actor`/`X-Role`/`X-Region`, только для тестов и отладки через `/scalar`): `API_AUTH_MODE=headers` в `.env`, затем `make up`; веб и мобильное приложение входят только через Keycloak. API за nginx веба и напрямую на `:8000` (`/scalar`). Логи: `make logs`, остановка: `make down`. Образы: `infra/api.Dockerfile`, `infra/models.Dockerfile` (модели, скрайб, конвейер), `infra/web.Dockerfile`.
+Веб на `http://localhost:3000`: кнопка «Войти» ведёт в Keycloak, демо-пользователи с паролем `darumen`: `regulator1`, `chief1`, `doctor1`, `steward1`, `citizen1`, `admin1`; без входа открыта только страница входа (и памятка пациенту по QR). API без Keycloak (заголовки `X-Actor`/`X-Role`/`X-Region`, только для тестов и отладки через `/scalar`): `API_AUTH_MODE=headers` в `.env`, затем `make up`; веб и мобильное приложение входят только через Keycloak. API за nginx веба и напрямую на `:8000` (`/scalar`). Логи: `make logs`, остановка: `make down`. Образы: `infra/api.Dockerfile`, `infra/models.Dockerfile` (модели, скрайб, конвейер), `infra/web.Dockerfile`.
 
 ## Запуск для разработки (без Docker для приложения)
 
