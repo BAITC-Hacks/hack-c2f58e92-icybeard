@@ -29,7 +29,7 @@ fi
 while IFS='=' read -r key value; do
   case "$key" in
     '' | '#'*) continue ;;
-    DEPLOY_HOST | DEPLOY_PATH | DEPLOY_ENV_FILE | PUBLIC_URL | DEPLOY_PRUNE | DEPLOY_SEQUENTIAL_BUILD) ;;
+    DEPLOY_HOST | DEPLOY_PATH | DEPLOY_ENV_FILE | PUBLIC_URL | DEPLOY_PRUNE | DEPLOY_SEQUENTIAL_BUILD | DEPLOY_MODE) ;;
     *) echo "$TARGET_FILE: неизвестный ключ $key" >&2; exit 2 ;;
   esac
   if [ -z "${!key:-}" ]; then printf -v "$key" '%s' "$value"; fi
@@ -40,8 +40,48 @@ ENV_FILE="${DEPLOY_ENV_FILE:?в цели $TARGET нет DEPLOY_ENV_FILE}"
 URL="${PUBLIC_URL:?в цели $TARGET нет PUBLIC_URL}"
 PRUNE="${DEPLOY_PRUNE:-0}"
 SEQUENTIAL_BUILD="${DEPLOY_SEQUENTIAL_BUILD:-0}"
+# build — образы собираются на VM; ci — образы собирает CI (GHCR), а выкатывает release.sh на VM, как при релизе по тегу
+MODE="${DEPLOY_MODE:-build}"
+case "$MODE" in build | ci) ;; *) echo "DEPLOY_MODE: build или ci, а не '$MODE'" >&2; exit 2 ;; esac
 OLD_STACK="${OLD_STACK_PATH:-/srv/govtech-camp}"
-echo "цель $TARGET: $HOST:$DEST → $URL"
+echo "цель $TARGET: $HOST:$DEST → $URL (образы: $([ "$MODE" = ci ] && echo "собирает CI" || echo "сборка на VM"))"
+
+# Режим ci: сборки на VM нет — квота и память VPS хакатона её не выдерживают. CI собирает образы из запушенного коммита,
+# release.yml выкатывает их через release.sh (секреты DEPLOY_* в Actions, docs/deploy.md). Нужен gh с доступом к репозиторию.
+deploy_via_ci() {
+  local branch sha repo run_url run_id deploy_result
+  command -v gh >/dev/null || { echo "✗ нужен gh (GitHub CLI): режим ci запускает release.yml" >&2; return 1; }
+  branch="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD)"
+  sha="$(git -C "$ROOT" rev-parse HEAD)"
+  if ! git -C "$ROOT" diff --quiet HEAD --; then
+    echo "✗ есть незакоммиченные изменения: CI собирает то, что лежит на GitHub" >&2
+    return 1
+  fi
+  git -C "$ROOT" fetch -q origin "$branch" || true
+  if [ "$(git -C "$ROOT" rev-parse "origin/$branch" 2>/dev/null)" != "$sha" ]; then
+    echo "✗ $branch (${sha:0:7}) не совпадает с origin/$branch — сначала git push origin $branch" >&2
+    return 1
+  fi
+  repo="$(gh repo view --json nameWithOwner --jq .nameWithOwner)"
+  echo "→ ставлю шаблон релиза на VM (compose, SQL, release.sh) из ${sha:0:7}"
+  DEPLOY_HOST="$HOST" VM_DIR="$DEST" "$ROOT/infra/deploy/vm-install.sh"
+  echo "→ запускаю release.yml ($repo, $branch): CI собирает образы в GHCR и выкатывает их через release.sh"
+  run_url="$(gh workflow run release.yml -R "$repo" --ref "$branch" -f deploy=true -f ios=false 2>&1 \
+    | grep -Eo 'https://github\.com/[^ ]+/actions/runs/[0-9]+' | tail -n 1 || true)"
+  run_id="${run_url##*/}"
+  [ -n "$run_id" ] || { echo "✗ release.yml не запустился (gh workflow run)" >&2; return 1; }
+  echo "   $run_url — жду, сборка образов занимает 10–20 минут"
+  if ! gh run watch "$run_id" -R "$repo" --exit-status --interval 30 >/dev/null; then
+    echo "✗ release.yml не прошёл: $run_url" >&2
+    return 1
+  fi
+  deploy_result="$(gh run view "$run_id" -R "$repo" --json jobs --jq '.jobs[] | select(.name == "deploy") | .conclusion')"
+  if [ "$deploy_result" != success ]; then
+    echo "✗ образы собраны в CI, но выкатки не было (deploy: ${deploy_result:-нет}): нужны секреты DEPLOY_* (docs/deploy.md, «Секреты»)" >&2
+    return 1
+  fi
+  echo "✓ CI выкатил ${sha:0:7}: $run_url"
+}
 
 REPLACE_DC=0; PUBLISH=1; DATA_ONLY=0
 for arg in "$@"; do
@@ -84,7 +124,7 @@ ssh "$HOST" "mkdir -p '$DEST/lakehouse' '$DEST/backups' 2>/dev/null || (sudo -n 
 ssh "$HOST" "chmod 700 '$DEST/backups' && chmod -R go-rwx '$DEST/backups'" \
   || echo "⚠ не удалось закрыть $DEST/backups от других пользователей VM — проверьте владельца файлов" >&2
 
-if [ "$DATA_ONLY" = 0 ]; then
+if [ "$DATA_ONLY" = 0 ] && [ "$MODE" = build ]; then
   echo "→ синхронизирую код"
   "${RSYNC[@]}" "$ROOT/" "$HOST:$DEST/"
 fi
@@ -107,14 +147,21 @@ fi
 ROOTLESS="docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless"
 REMOTE_ENV="LAKEHOUSE_DIR=$DEST/lakehouse BACKUP_DIR=$DEST/backups BACKUP_UID=\$($ROOTLESS && echo 0 || id -u) BACKUP_GID=\$($ROOTLESS && echo 0 || id -g)"
 COMPOSE="$REMOTE_ENV IMAGE_TAG=local docker compose -p darumen -f $DEST/infra/docker-compose.prod.yml --env-file $DEST/.env"
+# compose текущего CD-релиза (и его тег образов), без релизов — ручного деплоя
+CURRENT_COMPOSE="if [ -f $DEST/current/IMAGE_TAG ]; then F=$DEST/current/infra/docker-compose.prod.yml; T=\$(cat $DEST/current/IMAGE_TAG); else F=$DEST/infra/docker-compose.prod.yml; T=local; fi; $REMOTE_ENV IMAGE_TAG=\$T docker compose -p darumen -f \$F --env-file $DEST/.env"
 if [ "$DATA_ONLY" = 1 ]; then
-  COMPOSE="if [ -f $DEST/current/IMAGE_TAG ]; then F=$DEST/current/infra/docker-compose.prod.yml; T=\$(cat $DEST/current/IMAGE_TAG); else F=$DEST/infra/docker-compose.prod.yml; T=local; fi; $REMOTE_ENV IMAGE_TAG=\$T docker compose -p darumen -f \$F --env-file $DEST/.env"
+  COMPOSE="$CURRENT_COMPOSE"
   echo "→ публикую gold и refdata в Postgres (образы и контейнеры не трогаю)"
   ssh "$HOST" "cd '$DEST' && $COMPOSE --profile tools run --rm publish"
   echo "✓ данные обновлены; сервис моделей перечитает витрины после перезапуска: ssh $HOST 'docker restart darumen-models-1'"
   exit 0
 fi
 
+if [ "$MODE" = ci ]; then
+  # сборку, up, realm-sync и smoke с автооткатом сделали CI и release.sh; дальше — данные и проверка снаружи
+  deploy_via_ci || exit 1
+  COMPOSE="$CURRENT_COMPOSE"
+else
 if [ "$REPLACE_DC" = 1 ]; then
   echo "→ останавливаю старый стек GovTech Camp в $OLD_STACK (тома не трогаю)"
   ssh "$HOST" "if [ -f '$OLD_STACK/docker-compose.prod.yml' ]; then cd '$OLD_STACK' && docker compose -f docker-compose.prod.yml down; else echo '   старого стека нет, пропускаю'; fi"
@@ -133,6 +180,7 @@ ssh "$HOST" "printf 'manual %s %s\n' '$(git -C "$ROOT" rev-parse --short HEAD 2>
 echo "→ жду realm-sync (keycloak-config-cli приводит realm к infra/keycloak/darumen-realm.json)"
 # shellcheck disable=SC2016 # $cid и $code раскрываются на VM
 ssh "$HOST" 'cid=$(docker ps -aq --filter label=com.docker.compose.project=darumen --filter label=com.docker.compose.service=realm-sync | head -n1); [ -n "$cid" ] || { echo "✗ контейнер realm-sync не найден" >&2; exit 1; }; code=$(docker wait "$cid"); if [ "$code" != 0 ]; then docker logs --tail 60 "$cid" >&2; echo "✗ realm-sync завершился с кодом $code" >&2; exit 1; fi; echo "✓ realm-sync: realm применён"'
+fi
 
 if [ "$PUBLISH" = 1 ]; then
   echo "→ публикую gold и refdata в Postgres"
