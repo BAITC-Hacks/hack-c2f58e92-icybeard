@@ -146,19 +146,13 @@ public sealed class InsightService(IInsightChatClientFactory factory, InsightToo
 
         var answer = StripThinking(response.Text).Trim();
         var used = tools.Used.Distinct().ToList();
-        return new AskResponseDto(answer, ExtractValue(answer), null, tools.Chart, used, used.Select(u => $"tool:{u}").ToList(), $"{options.Value.Provider}/{options.Value.Model}");
+        // Value не заполняется: первое число свободного текста — часто год, процент из вопроса или код КАТО, а не ответ.
+        return new AskResponseDto(answer, null, null, tools.Chart, used, used.Select(u => $"tool:{u}").ToList(), $"{options.Value.Provider}/{options.Value.Model}");
     }
 
     /// <summary>Qwen3 и похожие модели оборачивают размышления в теги think; в ответ они не попадают.</summary>
     public static string StripThinking(string text) =>
         System.Text.RegularExpressions.Regex.Replace(text ?? string.Empty, @"<think>.*?</think>", string.Empty, System.Text.RegularExpressions.RegexOptions.Singleline);
-
-    /// <summary>Первое число в ответе, если оно есть: удобно для карточки с цифрой.</summary>
-    public static double? ExtractValue(string answer)
-    {
-        var token = System.Text.RegularExpressions.Regex.Match(answer, @"-?\d+(?:[.,]\d+)?");
-        return token.Success && double.TryParse(token.Value.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var value) ? value : null;
-    }
 }
 
 /// <summary>Модель не отвечает или отказала: API отдаёт 503, а не 500.</summary>

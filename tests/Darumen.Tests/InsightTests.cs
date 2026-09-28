@@ -14,7 +14,7 @@ public sealed class InsightTests(TestApp app) : IClassFixture<TestApp>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<AskResponseDto>();
         Assert.Contains("95.2", body!.Answer);
-        Assert.Equal(95.2, body.Value);
+        Assert.Null(body.Value);
         Assert.Equal(["access_index"], body.ToolsUsed);
         Assert.NotNull(body.Chart);
         Assert.Equal("bar", body.Chart!.Type);
@@ -38,13 +38,5 @@ public sealed class InsightTests(TestApp app) : IClassFixture<TestApp>
 
         Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("doctor").PostAsJsonAsync("/api/v1/insight/ask", new AskRequestDto("вопрос", null))).StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await app.CreateClient("regulator").PostAsJsonAsync("/api/v1/insight/ask", new AskRequestDto("", null))).StatusCode);
-    }
-
-    [Fact]
-    public void Extract_value_reads_the_first_number()
-    {
-        Assert.Equal(126, InsightService.ExtractValue("Самая длинная очередь 126 дней."));
-        Assert.Equal(-9.4, InsightService.ExtractValue("Изменение −9,4 дня".Replace("−", "-")));
-        Assert.Null(InsightService.ExtractValue("Данных нет"));
     }
 }
