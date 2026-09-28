@@ -29,7 +29,7 @@ fi
 while IFS='=' read -r key value; do
   case "$key" in
     '' | '#'*) continue ;;
-    DEPLOY_HOST | DEPLOY_PATH | DEPLOY_ENV_FILE | PUBLIC_URL | DEPLOY_PRUNE) ;;
+    DEPLOY_HOST | DEPLOY_PATH | DEPLOY_ENV_FILE | PUBLIC_URL | DEPLOY_PRUNE | DEPLOY_SEQUENTIAL_BUILD) ;;
     *) echo "$TARGET_FILE: неизвестный ключ $key" >&2; exit 2 ;;
   esac
   if [ -z "${!key:-}" ]; then printf -v "$key" '%s' "$value"; fi
@@ -39,6 +39,7 @@ DEST="${DEPLOY_PATH:?в цели $TARGET нет DEPLOY_PATH}"
 ENV_FILE="${DEPLOY_ENV_FILE:?в цели $TARGET нет DEPLOY_ENV_FILE}"
 URL="${PUBLIC_URL:?в цели $TARGET нет PUBLIC_URL}"
 PRUNE="${DEPLOY_PRUNE:-0}"
+SEQUENTIAL_BUILD="${DEPLOY_SEQUENTIAL_BUILD:-0}"
 OLD_STACK="${OLD_STACK_PATH:-/srv/govtech-camp}"
 echo "цель $TARGET: $HOST:$DEST → $URL"
 
@@ -101,8 +102,10 @@ fi
 
 # Пути и образы задаём явно: переменные окружения главнее .env. Ручной деплой собирает образы на VM с тегом local;
 # для --data-only берём compose-файл текущего CD-релиза, если он есть (тег — из releases/<тег>/IMAGE_TAG).
-# BACKUP_UID/GID — владелец каталога стенда на VM (deploy на Hetzner, icybeard на VPS хакатона), раскрываются на VM
-REMOTE_ENV="LAKEHOUSE_DIR=$DEST/lakehouse BACKUP_DIR=$DEST/backups BACKUP_UID=\$(id -u) BACKUP_GID=\$(id -g)"
+# BACKUP_UID/GID — чтобы дампы на хосте принадлежали пользователю стенда; раскрываются на VM. В rootless Docker (VPS
+# хакатона) на пользователя хоста отображается только root контейнера (0:0), в обычном — его собственные uid:gid.
+ROOTLESS="docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless"
+REMOTE_ENV="LAKEHOUSE_DIR=$DEST/lakehouse BACKUP_DIR=$DEST/backups BACKUP_UID=\$($ROOTLESS && echo 0 || id -u) BACKUP_GID=\$($ROOTLESS && echo 0 || id -g)"
 COMPOSE="$REMOTE_ENV IMAGE_TAG=local docker compose -p darumen -f $DEST/infra/docker-compose.prod.yml --env-file $DEST/.env"
 if [ "$DATA_ONLY" = 1 ]; then
   COMPOSE="if [ -f $DEST/current/IMAGE_TAG ]; then F=$DEST/current/infra/docker-compose.prod.yml; T=\$(cat $DEST/current/IMAGE_TAG); else F=$DEST/infra/docker-compose.prod.yml; T=local; fi; $REMOTE_ENV IMAGE_TAG=\$T docker compose -p darumen -f \$F --env-file $DEST/.env"
@@ -118,7 +121,13 @@ if [ "$REPLACE_DC" = 1 ]; then
 fi
 
 echo "→ сборка и запуск"
-ssh "$HOST" "cd '$DEST' && $COMPOSE build --pull && $COMPOSE up -d --remove-orphans"
+if [ "$SEQUENTIAL_BUILD" = 1 ]; then
+  # по одному сервису: на маленькой общей VM параллельная сборка .NET, Vite, Python и Keycloak уводит её в swap
+  # shellcheck disable=SC2016 # $s раскрывается на VM
+  ssh "$HOST" "cd '$DEST' && for s in \$($COMPOSE config --services); do $COMPOSE build --pull \"\$s\" || exit 1; done && $COMPOSE up -d --remove-orphans"
+else
+  ssh "$HOST" "cd '$DEST' && $COMPOSE build --pull && $COMPOSE up -d --remove-orphans"
+fi
 ssh "$HOST" "printf 'manual %s %s\n' '$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)' \"\$(date -u +%FT%TZ)\" > '$DEST/MANUAL_DEPLOY'"
 
 echo "→ жду realm-sync (keycloak-config-cli приводит realm к infra/keycloak/darumen-realm.json)"

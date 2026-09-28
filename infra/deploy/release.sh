@@ -84,9 +84,16 @@ EOF
 dc() {
   local dir="$1" tag="$2"
   shift 2
-  # бэкапы пишет владелец каталога стенда (deploy на Hetzner, icybeard на VPS хакатона) — не 1000 по умолчанию
+  # бэкапы на хосте принадлежат пользователю стенда: в rootless Docker (VPS хакатона) на него отображается root
+  # контейнера (0:0), в обычном Docker (Hetzner) — его собственные uid:gid
+  local owner_uid owner_gid
+  if docker info --format '{{.SecurityOptions}}' 2>/dev/null | grep -q rootless; then
+    owner_uid=0; owner_gid=0
+  else
+    owner_uid="$(id -u)"; owner_gid="$(id -g)"
+  fi
   REGISTRY="$REGISTRY" IMAGE_TAG="$tag" LAKEHOUSE_DIR="$LAKEHOUSE_DIR" BACKUP_DIR="$BACKUP_DIR" \
-    BACKUP_UID="$(id -u)" BACKUP_GID="$(id -g)" \
+    BACKUP_UID="$owner_uid" BACKUP_GID="$owner_gid" \
     docker compose -p "$PROJECT" -f "$dir/infra/docker-compose.prod.yml" --env-file "$ENV_FILE" "$@"
 }
 
