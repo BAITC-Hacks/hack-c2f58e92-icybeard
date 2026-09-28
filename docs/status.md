@@ -1,6 +1,6 @@
 # Состояние проекта Darumen Health
 
-Обновлено 13 сентября 2026. Ветка `main`, репозиторий `icybeard/gov-tech-camp-case`. План работ: [implementation-plan.md](implementation-plan.md).
+Обновлено 13 сентября 2026. Ветка `main`, репозиторий `icybeard/gov-tech-camp-case` (с 28.09.2026 код живёт в `BAITC-Hacks/hack-c2f58e92-icybeard`). План работ: [implementation-plan.md](implementation-plan.md).
 
 ## Что работает сквозь стек
 

@@ -19,7 +19,7 @@
 | Артефакт | Статус |
 |---|---|
 | Рабочий прототип / deployment | https://dc.jurek.kz, плюс локальный `make up` |
-| GitHub-репозиторий | icybeard/gov-tech-camp-case, приватный: до защиты уточнить у организаторов, нужен ли публичный доступ |
+| GitHub-репозиторий | BAITC-Hacks/hack-c2f58e92-icybeard (командный репозиторий хакатона, приватный; с 28.09.2026 вместо icybeard/gov-tech-camp-case) |
 | README с архитектурой, запуском, данными, ограничениями | есть, ограничения в [status.md](status.md) |
 | Demo-видео или live demo | live demo по [demo-script.md](demo-script.md); видео пока нет |
 | Презентация | [presentation.md](presentation.md) |
