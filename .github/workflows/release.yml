@@ -102,7 +102,9 @@ jobs:
       contents: read
       packages: write
     strategy:
-      fail-fast: true
+      # сетевой сбой одного образа (pypi, npm, Docker Hub) не отменяет остальные: их слои попадут в кэш,
+      # а перезапуск (gh run rerun --failed) соберёт только упавший; выкатка всё равно ждёт все образы
+      fail-fast: false
       matrix:
         include:
           - image: api
