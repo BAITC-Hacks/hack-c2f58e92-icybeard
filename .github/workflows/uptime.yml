@@ -1,0 +1,44 @@
+name: uptime
+
+# Раз в час проверяет публичный стенд; упавший прогон GitHub присылает письмом тем, кто следит за Actions
+# репозитория (Settings → Notifications → Actions). Стоимость: 1 оплачиваемая минута за прогон ≈ 720 минут
+# в месяц из ~2000 бесплатных приватного репозитория — если минут не хватает, реже (cron "17 */3 * * *")
+# или внешний бесплатный монитор (docs/deploy.md, «Мониторинг»). Расписание работает только из ветки по умолчанию.
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PUBLIC_URL: https://dc.jurek.kz
+    steps:
+      - name: /health, Keycloak, статус каналов
+        run: |
+          fail=0
+          for path in /health /auth/realms/darumen /api/v1/public/service-status; do
+            ok=0
+            code=000
+            for _ in 1 2 3; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$PUBLIC_URL$path" || true)
+              if [ "$code" = 200 ]; then ok=1; break; fi
+              sleep 10
+            done
+            if [ "$ok" = 1 ]; then
+              echo "✓ $PUBLIC_URL$path"
+            else
+              echo "::error title=Стенд недоступен::$PUBLIC_URL$path ответил ${code:-000} после 3 попыток"
+              fail=1
+            fi
+          done
+          exit "$fail"

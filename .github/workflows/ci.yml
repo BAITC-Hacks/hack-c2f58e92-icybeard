@@ -1,13 +1,28 @@
 name: ci
 
+# Проверки на push в main и в PR; release.yml вызывает этот же workflow (workflow_call) перед сборкой образов.
+# Приватный репозиторий: ~2000 минут Actions в месяц, прогон ≈ 10 минут — правки только документации CI не гоняют.
 on:
   push:
     branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
   pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
+  workflow_call:
+
+permissions:
+  contents: read
+
+# Новый push в PR отменяет устаревший прогон; main и релизы не отменяются.
+# При вызове из release.yml github.workflow — имя вызывающего workflow, группа не пересекается с его собственной.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   dotnet:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -19,9 +34,13 @@ jobs:
 
   python:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: ml/pyproject.toml
       - run: uv venv ml/.venv --python 3.12
       - run: uv pip install --python ml/.venv/bin/python -e "ml[dev]"
       - run: make proto
@@ -30,6 +49,7 @@ jobs:
 
   web:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: apps/web
@@ -41,20 +61,23 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - run: npm ci
+      - run: npm run lint
       - run: npm run build
       - run: npm run test -- --run
 
   flutter:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
           flutter-version: 3.41.7 # та же версия, что на машине разработчика: pubspec `sdk: ^3.11.5` и go_router 17 проверены на ней
+          cache: true
       - run: flutter pub get
       - run: flutter analyze
       # цвета только из токенов темы (lib/theme): прямые Colors.red/green/orange на экранах запрещены
@@ -63,6 +86,7 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17-alpine
@@ -105,7 +129,7 @@ jobs:
       - run: make proto
       - run: dotnet build Darumen.slnx -c Release --nologo
       - name: Wait for Schema Registry
-        run: for i in $(seq 1 45); do curl -sf http://localhost:8081/subjects && exit 0; sleep 2; done; echo "registry not ready"; exit 1
+        run: for _ in $(seq 1 45); do curl -sf http://localhost:8081/subjects && exit 0; sleep 2; done; echo "registry not ready"; exit 1
       - run: dotnet test Darumen.slnx -c Release --no-build --nologo --filter "FullyQualifiedName~KafkaIntegrationTests"
         env:
           DARUMEN_KAFKA_TEST: "1"

@@ -1,20 +1,38 @@
-# Продовый деплой Darumen на VM (dc.jurek.kz, Hetzner 195.201.7.56) — самостоятельный файл, НЕ оверлей
-# над docker-compose.yml (compose мерджит списки ports, оверлеем порт не убрать).
+# Продовый стек Darumen на VM (dc.jurek.kz, Hetzner 195.201.7.56) — самостоятельный файл, НЕ оверлей
+# над docker-compose.yml (compose мерджит списки ports, оверлеем порт не убрать). Подробно — docs/deploy.md.
 #
 # Что отличается от dev-стека:
-#   - только то, без чего продукт не работает: postgres, models (gRPC), scribe, intake, keycloak, api, web;
+#   - только то, без чего продукт не работает: postgres, models (gRPC), scribe, intake, keycloak, api, web + бэкапы;
 #     ClickHouse/Cube/Kafka/MinIO/MLflow/Valkey не поднимаем — Messaging в режиме local (outbox в Postgres,
 #     без Kafka), ClickHouse в C# не используется;
 #   - наружу смотрит только web на 127.0.0.1:5173 — TLS терминирует хостовый Caddy
 #     (блок dc.jurek.kz → reverse_proxy 127.0.0.1:5173, см. pos-server/deploy/caddy/Caddyfile.host);
 #     Keycloak доступен через nginx веба под /auth (тот же origin: вход веба по PKCE, токены мобильного приложения);
-#   - lakehouse монтируется с хоста (/srv/darumen/lakehouse: gold, models, refdata — ~60 МБ);
-#   - секреты — из /srv/darumen/.env (образец: infra/deploy/.env.prod.example).
+#   - Keycloak в prod-режиме (`start --optimized`) на Postgres (БД keycloak, своя роль): пользователи, пароли, TOTP
+#     и сессии переживают пересоздание контейнера; realm приводит к файлу одноразовый realm-sync (keycloak-config-cli),
+#     ничего не удаляя;
+#   - lakehouse (gold, models, refdata — данные не в git) монтируется с хоста: /srv/darumen/lakehouse;
+#   - секреты — только из /srv/darumen/.env на VM (образец: infra/deploy/.env.prod.example); CD их не пишет.
 #
-# Запуск на VM (делает scripts/deploy.sh):
-#   docker compose -f infra/docker-compose.prod.yml --env-file .env up -d --build
-#   docker compose -f infra/docker-compose.prod.yml --env-file .env --profile tools run --rm publish
+# Образы: ${REGISTRY}/<имя>:${IMAGE_TAG}; публичные (postgis, backup) закреплены по digest мультиархитектурного индекса.
+# Два пути:
+#   - CD (тег vX.Y.Z → .github/workflows/release.yml): образы собираются в CI, на VM только pull, IMAGE_TAG=vX.Y.Z.
+#     Сам этот файл CI на VM не передаёт: он входит в шаблон релиза (infra/deploy/template-files.txt), который
+#     ставит человек `make vm-install-release` в /srv/darumen/bin/template; release.sh копирует шаблон в
+#     /srv/darumen/releases/<тег>/ и сверяет его хэш с хэшем тега. Правка этого файла → vm-install-release до тега;
+#   - ручной `make deploy` (scripts/deploy.sh): сборка на VM из исходников, IMAGE_TAG=local.
+#
+# Запуск руками на VM (release.sh и deploy.sh делают то же самое):
+#   docker compose -f infra/docker-compose.prod.yml --env-file /srv/darumen/.env up -d
+#   docker compose -f infra/docker-compose.prod.yml --env-file /srv/darumen/.env --profile tools run --rm publish
 name: darumen
+
+# Ротация логов для всех сервисов: без неё json-file растёт бесконечно (диск VM уже забивался)
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 x-models-build: &models-build
   context: ..
@@ -22,33 +40,168 @@ x-models-build: &models-build
   args:
     SCRIBE_EXTRAS: "1"
 
+# Переменные, которые подставляются в плейсхолдеры ${VAR:по умолчанию} realm-файла: их читает и Keycloak (импорт
+# realm на пустую БД), и realm-sync (keycloak-config-cli, после перевода в $(env:VAR:-...) — infra/keycloak/render-realm.sh).
+# Без SMTP_HOST письма (сброс пароля, уведомления) не уйдут — Keycloak покажет «Не удалось отправить письмо».
+x-realm-env: &realm-env
+  KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?set KEYCLOAK_ADMIN_CLIENT_SECRET in .env}
+  DARUMEN_WEB_URL: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}/
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-noreply@darumen.kz}
+  SMTP_AUTH: ${SMTP_AUTH:-true}
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+  SMTP_SSL: ${SMTP_SSL:-false}
+
+# Лимиты памяти — потолки против утечки одного сервиса на 8 ГБ VM без swap, которую стенд делит с POS
+# (в покое стенд занимает ~1,5 ГБ). Это не резерв: сумма потолков больше, чем реально занято.
 services:
   postgres:
-    image: imresamu/postgis:17-3.5
+    # multi-arch (официальный postgis/postgis без arm64); digest — тот же образ, что уже работает на VM (Postgres 17.6)
+    image: imresamu/postgis:17-3.5@sha256:35fe7dceda62bfe7d2965b0ba78d915ff9f901b5e0466d633ecc58421b5b5210
     environment:
       POSTGRES_USER: darumen
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: darumen
+    # init.sql не монтируем: схемы, расширения и БД keycloak идемпотентно создаёт db-init (он же работает на
+    # существующем томе, где docker-entrypoint-initdb.d больше не запускается)
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U darumen"]
-      interval: 5s
-      retries: 20
+      test: ["CMD-SHELL", "pg_isready -U darumen -d darumen"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits: { memory: 1g }
+    logging: *logging
+
+  # Одноразовый: схемы darumen, роль и БД keycloak (пароль KEYCLOAK_DB_PASSWORD). Выполняется при каждом `up`.
+  db-init:
+    image: imresamu/postgis:17-3.5@sha256:35fe7dceda62bfe7d2965b0ba78d915ff9f901b5e0466d633ecc58421b5b5210   # тот же образ, что у postgres
+    entrypoint: ["psql", "-v", "ON_ERROR_STOP=1", "-q", "-f", "/db-init.sql"]
+    environment:
+      PGHOST: postgres
+      PGUSER: darumen
+      PGDATABASE: darumen
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}
+    volumes:
+      - ./postgres/db-init.sql:/db-init.sql:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+    deploy:
+      resources:
+        limits: { memory: 128m }
+    logging: *logging
+
+  # Вход веба и мобильного приложения. Образ infra/keycloak/Dockerfile: prod-режим на Postgres, темы darumen внутри,
+  # realm импортируется только на пустую БД (существующий realm и его пользователи не трогаются).
+  # issuer в токенах — публичный адрес за Caddy и nginx (KC_HOSTNAME), служебные адреса для api (JWKS) отдаются
+  # по хосту запроса (keycloak:8080, KC_HOSTNAME_BACKCHANNEL_DYNAMIC), как в dev-стеке.
+  keycloak:
+    image: ${REGISTRY:-ghcr.io/baitc-hacks/hack-c2f58e92-icybeard}/keycloak:${IMAGE_TAG:-local}
+    build:
+      context: ./keycloak
+      dockerfile: Dockerfile
+    environment:
+      <<: *realm-env
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin   # создаётся только на пустой БД; потом пароль меняют в консоли и в .env
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env}
+      KC_DB_POOL_MAX_SIZE: "20"   # max_connections Postgres (100) делят Keycloak, api, intake и publish
+      KC_HOSTNAME: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}/auth
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      JAVA_OPTS_KC_HEAP: "-Xms64m -Xmx512m"   # 8 ГБ VM делится с POS: не даём JVM взять 70 % памяти по умолчанию
+      KC_SPI_EVENTS_LISTENER_EMAIL_INCLUDE_EVENTS: UPDATE_CREDENTIAL,REMOVE_CREDENTIAL,USER_DISABLED_BY_TEMPORARY_LOCKOUT
+      TZ: Asia/Almaty   # время в письмах безопасности
+    depends_on:
+      postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
+    restart: unless-stopped
+    # curl в образе нет: bash /dev/tcp к management-порту 9000 (health включён при сборке образа)
+    healthcheck:
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/9000 &&
+          printf 'GET /auth/health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 &&
+          while IFS= read -r line; do [[ $$line == *'"UP"'* ]] && exit 0; done <&3; exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 90s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits: { memory: 1g }
+    logging: *logging
+
+  # Одноразовый: приводит realm darumen к infra/keycloak/darumen-realm.json через keycloak-config-cli
+  # (образ infra/keycloak/config-cli.Dockerfile). Создаёт и обновляет, но ничего не удаляет: пользователи, пароли,
+  # TOTP, группы и роли, появившиеся на стенде, остаются. Код выхода проверяют release.sh и deploy.sh.
+  realm-sync:
+    image: ${REGISTRY:-ghcr.io/baitc-hacks/hack-c2f58e92-icybeard}/keycloak-config:${IMAGE_TAG:-local}
+    build:
+      context: ./keycloak
+      dockerfile: config-cli.Dockerfile
+    environment:
+      <<: *realm-env
+      KEYCLOAK_URL: http://keycloak:8080/auth
+      KEYCLOAK_USER: admin
+      KEYCLOAK_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
+    depends_on:
+      keycloak: { condition: service_healthy }
+    restart: "no"
+    deploy:
+      resources:
+        limits: { memory: 512m }
+    logging: *logging
 
   models:
+    image: ${REGISTRY:-ghcr.io/baitc-hacks/hack-c2f58e92-icybeard}/models:${IMAGE_TAG:-local}
     build: *models-build
-    image: darumen-models
     environment:
       DARUMEN_LAKEHOUSE: /lakehouse
     volumes:
-      - ${LAKEHOUSE_DIR:-../lakehouse}:/lakehouse:ro
+      - ${LAKEHOUSE_DIR:-/srv/darumen/lakehouse}:/lakehouse:ro
     restart: unless-stopped
+    healthcheck:
+      # стандартный gRPC health (grpc_health.v1): пустое имя — состояние сервера целиком
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import grpc; from grpc_health.v1 import health_pb2 as h, health_pb2_grpc as g;
+          r = g.HealthStub(grpc.insecure_channel('127.0.0.1:50051')).Check(h.HealthCheckRequest(), timeout=3);
+          raise SystemExit(r.status != h.HealthCheckResponse.SERVING)
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits: { memory: 1g }
+    logging: *logging
 
   scribe:
-    image: darumen-models
+    image: ${REGISTRY:-ghcr.io/baitc-hacks/hack-c2f58e92-icybeard}/models:${IMAGE_TAG:-local}   # образ сервиса models
     entrypoint: ["python", "-m", "darumen.scribe", "--host", "0.0.0.0", "--port", "8010"]
     environment:
       DARUMEN_SCRIBE_DIR: /scribe
@@ -60,65 +213,59 @@ services:
       - whispercache:/root/.cache   # веса faster-whisper скачиваются один раз
     restart: unless-stopped
     depends_on:
-      - models
+      models: { condition: service_started }   # при сборке на VM образ собирает сервис models
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/scribe/health', timeout=3)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits: { memory: 2g }   # faster-whisper small (int8) при расшифровке
+    logging: *logging
 
   # 4.1: консоль загрузки данных. lakehouse — на запись (в отличие от api/scribe :ro), сборка
   # витрин без Kafka здесь не публикуется в ClickHouse (его нет в прод-стеке, см. заголовок файла).
+  # Контракты данных (contracts/) зашиты в образ models (/app/contracts); одобренные на стенде контракты пишутся в
+  # том intakecontracts. При старте контракты из образа копируются в том поверх одноимённых (репозиторий главнее),
+  # новые контракты стенда сохраняются между релизами.
   intake:
-    image: darumen-models   # уже собран сервисом models (SCRIBE_EXTRAS в x-models-build ставит и openai, нужный 4.6)
-    entrypoint: ["python", "-m", "darumen.intake.app", "--host", "0.0.0.0", "--port", "8020"]
+    image: ${REGISTRY:-ghcr.io/baitc-hacks/hack-c2f58e92-icybeard}/models:${IMAGE_TAG:-local}   # SCRIBE_EXTRAS ставит и openai (4.6)
+    entrypoint:
+      - sh
+      - -c
+      - mkdir -p /data/contracts && cp -R /app/contracts/. /data/contracts/ && exec python -m darumen.intake.app --host 0.0.0.0 --port 8020
     environment:
       DARUMEN_LAKEHOUSE: /lakehouse
-      DARUMEN_CONTRACTS_DIR: /app/contracts
+      DARUMEN_CONTRACTS_DIR: /data/contracts
       DARUMEN_LLM_PROVIDER: ${LLM_PROVIDER:-deepseek}
       DARUMEN_INTAKE_MODEL: ${INTAKE_MODEL:-deepseek-chat}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       POSTGRES_DSN: host=postgres port=5432 dbname=darumen user=darumen password=${POSTGRES_PASSWORD}
     volumes:
-      - ${LAKEHOUSE_DIR:-../lakehouse}:/lakehouse
-      - ../contracts:/app/contracts
+      - ${LAKEHOUSE_DIR:-/srv/darumen/lakehouse}:/lakehouse
+      - intakecontracts:/data/contracts
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
       models: { condition: service_started }
-
-  # Вход веба и мобильного приложения. Realm darumen (роли, демо-пользователи, мапперы region_kato/iin) импортируется
-  # из infra/keycloak при каждом старте; БД dev-file внутри контейнера — сессии живут до пересоздания контейнера.
-  # issuer в токенах — публичный адрес за Caddy и nginx (KC_HOSTNAME), служебные адреса для api (JWKS) отдаются
-  # по хосту запроса (keycloak:8080, KC_HOSTNAME_BACKCHANNEL_DYNAMIC), как в dev-стеке.
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.0
-    command: start-dev --import-realm
-    environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: admin
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?set KEYCLOAK_ADMIN_PASSWORD in .env}
-      KC_HTTP_RELATIVE_PATH: /auth
-      KC_HOSTNAME: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}/auth
-      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
-      KC_HTTP_ENABLED: "true"
-      KC_PROXY_HEADERS: xforwarded
-      JAVA_OPTS_KC_HEAP: "-Xms64m -Xmx512m"   # 8 ГБ VM делится с POS: не даём JVM взять 70 % памяти по умолчанию
-      # Плейсхолдеры ${VAR:по умолчанию} в darumen-realm.json подставляются при импорте realm (каждое пересоздание
-      # контейнера). Mailpit в проде нет: без SMTP_HOST письма (сброс пароля, уведомления) не уйдут — Keycloak
-      # покажет «Не удалось отправить письмо».
-      KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:?set KEYCLOAK_ADMIN_CLIENT_SECRET in .env}
-      DARUMEN_WEB_URL: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}/
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-noreply@darumen.kz}
-      SMTP_AUTH: ${SMTP_AUTH:-true}
-      SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
-      SMTP_SSL: ${SMTP_SSL:-false}
-      KC_SPI_EVENTS_LISTENER_EMAIL_INCLUDE_EVENTS: UPDATE_CREDENTIAL,REMOVE_CREDENTIAL,USER_DISABLED_BY_TEMPORARY_LOCKOUT
-      TZ: Asia/Almaty   # время в письмах безопасности
-    volumes:
-      - ./keycloak:/opt/keycloak/data/import:ro
-      - ./keycloak/themes/darumen:/opt/keycloak/themes/darumen:ro   # темы входа и писем (loginTheme/emailTheme=darumen)
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8020/intake/health', timeout=3)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits: { memory: 1g }
+    logging: *logging
 
   api:
+    image: ${REGISTRY:-ghcr.io/baitc-hacks/hack-c2f58e92-icybeard}/api:${IMAGE_TAG:-local}
     build:
       context: ..
       dockerfile: infra/api.Dockerfile
@@ -148,42 +295,114 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       Quality__LakehouseDir: /lakehouse
     volumes:
-      - ${LAKEHOUSE_DIR:-../lakehouse}:/lakehouse:ro   # отчёты моделей для /analytics/quality
+      - ${LAKEHOUSE_DIR:-/srv/darumen/lakehouse}:/lakehouse:ro   # отчёты моделей для /analytics/quality
     restart: unless-stopped
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
+      keycloak: { condition: service_healthy }
       models: { condition: service_started }
       scribe: { condition: service_started }
       intake: { condition: service_started }
-      keycloak: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8000/health"]   # curl ставит infra/api.Dockerfile
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits: { memory: 768m }
+    logging: *logging
 
   web:
+    image: ${REGISTRY:-ghcr.io/baitc-hacks/hack-c2f58e92-icybeard}/web:${IMAGE_TAG:-local}
     build:
       context: ..
       dockerfile: infra/web/Dockerfile
       args:
         VITE_KEYCLOAK_URL: ${PUBLIC_ORIGIN:-https://dc.jurek.kz}/auth
     ports:
-      - "127.0.0.1:5173:80"
+      - "127.0.0.1:${WEB_PORT:-5173}:80"
     restart: unless-stopped
+    # nginx резолвит api и keycloak при старте: без их контейнеров он не поднимется
     depends_on:
-      - api
-      - keycloak
+      api: { condition: service_started }
+      keycloak: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]   # только сам nginx, без api
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits: { memory: 128m }
+    logging: *logging
+
+  # Ежедневные дампы darumen и keycloak (pg_dump, gzip) в ${BACKUP_DIR}: daily/weekly/monthly с ротацией,
+  # last/ — каждый запуск (release.sh делает дамп перед каждым релизом). Восстановление — infra/deploy/restore.sh.
+  # Копии вне VM (Hetzner Storage Box через rclone) — следующий шаг, см. docs/deploy.md.
+  backup:
+    image: prodrigestivill/postgres-backup-local:17-debian-d257e5d@sha256:e803bd9eb4bfb42e9b3e74ba411227f3d55da292905800395659cc579b6641e8   # pg_dump 17
+    user: "${BACKUP_UID:-1000}:${BACKUP_GID:-1000}"   # владелец BACKUP_DIR на хосте (deploy на VM = 1000:1000)
+    # VM общая: дампы (хэши паролей, секреты клиентов Keycloak) читает только владелец (deploy) — каталоги 0700,
+    # файлы 0600 (umask наследуют go-cron и /backup.sh; ручной и предрелизный `docker exec` задают его сами)
+    command: ["bash", "-c", "umask 0077 && exec /init.sh"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: darumen,keycloak
+      POSTGRES_USER: darumen
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_EXTRA_OPTS: -Z6   # все схемы (gold, refdata, journal, intake, wolverine, public), сжатие gzip
+      SCHEDULE: ${BACKUP_SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-4}
+      BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-6}
+      BACKUP_KEEP_MINS: ${BACKUP_KEEP_MINS:-10080}   # last/: неделя дампов «перед релизом» и ручных
+      HEALTHCHECK_PORT: "8080"
+      TZ: Asia/Almaty   # @daily — полночь по Алматы
+    volumes:
+      - ${BACKUP_DIR:-/srv/darumen/backups}:/backups
+    depends_on:
+      postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
+    restart: unless-stopped
+    # тот же curl, что во встроенном healthcheck образа, но без его interval 5m (иначе «healthy» только через 5 минут)
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://localhost:8080/"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
+    deploy:
+      resources:
+        limits: { memory: 256m }
+    logging: *logging
 
   # Одноразовая публикация gold и refdata из lakehouse в Postgres (после первого up и после каждого обновления данных):
   #   docker compose -f infra/docker-compose.prod.yml --env-file .env --profile tools run --rm publish
   publish:
-    image: darumen-models
+    image: ${REGISTRY:-ghcr.io/baitc-hacks/hack-c2f58e92-icybeard}/models:${IMAGE_TAG:-local}
     entrypoint: ["python", "-m", "darumen.lakehouse", "publish", "--lakehouse", "/lakehouse", "--only", "postgres"]
     environment:
       POSTGRES_DSN: postgresql://darumen:${POSTGRES_PASSWORD}@postgres:5432/darumen
     volumes:
-      - ${LAKEHOUSE_DIR:-../lakehouse}:/lakehouse:ro
+      - ${LAKEHOUSE_DIR:-/srv/darumen/lakehouse}:/lakehouse:ro
     depends_on:
       postgres: { condition: service_healthy }
+      db-init: { condition: service_completed_successfully }
     profiles: [tools]
+    deploy:
+      resources:
+        limits: { memory: 1536m }
+    logging: *logging
 
 volumes:
   pgdata:
   scribedata:
   whispercache:
+  intakecontracts:

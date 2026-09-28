@@ -1,0 +1,6 @@
+infra/deploy/release.sh
+infra/deploy/restore.sh
+infra/deploy/template-files.txt
+infra/deploy/template-hash.sh
+infra/docker-compose.prod.yml
+infra/postgres/db-init.sql

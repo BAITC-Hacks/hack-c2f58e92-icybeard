@@ -1,0 +1,376 @@
+name: release
+
+# CD Darumen: тег vX.Y.Z (или ручной запуск) → проверки CI → образы в GHCR → выкатка на VM через forced command
+# /srv/darumen/bin/release.sh → внешний smoke с автооткатом → Android (AAB/APK) → GitHub Release (только для тегов).
+# CI выбирает только тег образов: compose-файл и скрипты релиза на VM ставит человек (make vm-install-release),
+# а release.sh сверяет их хэш с хэшем шаблона этого тега (infra/deploy/template-hash.sh) — не совпал, отказ.
+# Секреты (задаёт админ организации, Settings → Secrets and variables → Actions) — docs/deploy.md, «Секреты».
+# Без DEPLOY_* выкатка пропускается с notice, без ANDROID_* собирается демо-APK с debug-подписью — workflow не падает.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Выкатить на dc.jurek.kz (нужны секреты DEPLOY_*)
+        type: boolean
+        default: true
+      ios:
+        description: Собрать iOS без подписи (macOS-раннер, минуты ×10)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Один релиз за раз: VM одна, release.sh и так держит блокировку; очередной тег ждёт, а не отменяет текущий
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Имена образов GHCR — только в нижнем регистре; тот же реестр зашит в infra/deploy/release.sh на VM
+  REGISTRY: ghcr.io/baitc-hacks/hack-c2f58e92-icybeard
+  PUBLIC_URL: https://dc.jurek.kz
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  meta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build_name: ${{ steps.v.outputs.build_name }}
+      deploy: ${{ steps.v.outputs.deploy }}
+      android_signed: ${{ steps.v.outputs.android_signed }}
+    steps:
+      - id: v
+        name: Версия и доступные секреты
+        env:
+          WANT_DEPLOY: ${{ github.event_name == 'push' || inputs.deploy }}
+          HAS_DEPLOY: ${{ secrets.DEPLOY_SSH_KEY != '' && secrets.DEPLOY_HOST != '' && secrets.DEPLOY_KNOWN_HOSTS != '' }}
+          HAS_ANDROID: >-
+            ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && secrets.ANDROID_KEYSTORE_PASSWORD != ''
+            && secrets.ANDROID_KEY_ALIAS != '' && secrets.ANDROID_KEY_PASSWORD != '' }}
+        run: |
+          expected="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if [ "$expected" != "$REGISTRY" ]; then
+            echo "::error::Репозиторий переехал: образы пойдут в $REGISTRY, а ожидается $expected — поправьте REGISTRY здесь и в infra/deploy/release.sh"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="$GITHUB_REF_NAME"
+            if ! [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]{0,30})?$ ]]; then
+              echo "::error::Тег $version не vX.Y.Z[-pre] — release.sh на VM его не примет"
+              exit 1
+            fi
+            build_name="${version#v}"
+          else
+            version="sha-${GITHUB_SHA::7}"
+            build_name=""   # версия приложения из pubspec.yaml
+          fi
+          deploy=false
+          if [ "$WANT_DEPLOY" = true ]; then
+            if [ "$HAS_DEPLOY" = true ]; then
+              deploy=true
+            else
+              echo "::notice title=Выкатка пропущена::Нет секретов DEPLOY_SSH_KEY / DEPLOY_HOST / DEPLOY_KNOWN_HOSTS — образы и мобильные сборки будут, выкатки на VM не будет (docs/deploy.md)"
+            fi
+          fi
+          if [ "$HAS_ANDROID" != true ]; then
+            echo "::notice title=Android без ключа релиза::Нет секретов ANDROID_* — соберётся демо-APK с debug-подписью (не для Google Play)"
+          fi
+          {
+            echo "version=$version"
+            echo "build_name=$build_name"
+            echo "deploy=$deploy"
+            echo "android_signed=$HAS_ANDROID"
+          } >> "$GITHUB_OUTPUT"
+          echo "### $version" >> "$GITHUB_STEP_SUMMARY"
+          echo "выкатка: $deploy, подпись Android: $HAS_ANDROID" >> "$GITHUB_STEP_SUMMARY"
+
+  images:
+    needs: [ci, meta]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: api
+            context: .
+            file: infra/api.Dockerfile
+            build-args: ""
+          - image: web
+            context: .
+            file: infra/web/Dockerfile
+            build-args: ""
+          - image: models
+            context: .
+            file: infra/models.Dockerfile
+            build-args: SCRIBE_EXTRAS=1
+          - image: keycloak
+            context: infra/keycloak
+            file: infra/keycloak/Dockerfile
+            build-args: ""
+          - image: keycloak-config
+            context: infra/keycloak
+            file: infra/keycloak/config-cli.Dockerfile
+            build-args: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ matrix.image }}
+          # тег релиза (vX.Y.Z или sha-xxxxxxx) и sha коммита; org.opencontainers.image.source связывает пакет с репозиторием
+          tags: |
+            type=raw,value=${{ needs.meta.outputs.version }}
+            type=sha,prefix=sha-,format=short
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          build-args: ${{ matrix.build-args }}
+          platforms: linux/amd64   # VM Hetzner — x86_64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    needs: [meta, images]
+    if: needs.meta.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read   # GITHUB_TOKEN уходит на VM первой строкой stdin только для docker pull
+    steps:
+      - uses: actions/checkout@v4
+      - name: SSH-ключ деплоя
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Выкатка (release.sh на VM, автооткат при сбое)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: |
+          # Хэш шаблона инфраструктуры этого тега: release.sh сверит его с шаблоном, который человек поставил на VM
+          # (make vm-install-release), и при расхождении откажет до любых изменений
+          template_sha="$(sh infra/deploy/template-hash.sh .)"
+          echo "шаблон $template_sha"
+          # Ключ CI на VM — forced command: запускается только release.sh, команда приходит в SSH_ORIGINAL_COMMAND.
+          # В stdin — одна строка с токеном GHCR для docker pull, никаких файлов
+          printf '%s\n' "$GHCR_TOKEN" \
+            | ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+                -o ServerAliveInterval=30 -o ServerAliveCountMax=10 \
+                "$DEPLOY_HOST" "release $VERSION $GITHUB_ACTOR $template_sha"
+      - name: Удалить ключ деплоя с раннера
+        if: always()
+        run: rm -f ~/.ssh/deploy_key ~/.ssh/known_hosts
+
+  smoke:
+    needs: [meta, deploy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - id: smoke
+        name: Smoke через Caddy и TLS
+        run: |
+          fail=0
+          for path in /health /auth/realms/darumen /api/v1/public/service-status; do
+            ok=0
+            for _ in $(seq 1 10); do
+              if curl -fsS --max-time 10 -o /dev/null "$PUBLIC_URL$path"; then ok=1; break; fi
+              sleep 6
+            done
+            if [ "$ok" = 1 ]; then echo "✓ $PUBLIC_URL$path"; else echo "::error::$PUBLIC_URL$path не отвечает"; fail=1; fi
+          done
+          exit "$fail"
+      - name: SSH-ключ деплоя (для отката)
+        if: failure() && steps.smoke.outcome == 'failure'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Откат на предыдущий релиз
+        if: failure() && steps.smoke.outcome == 'failure'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_HOST" rollback < /dev/null
+          echo "::error::Внешний smoke не прошёл — стенд откатен на предыдущий релиз"
+      - name: Удалить ключ деплоя с раннера
+        if: always()
+        run: rm -f ~/.ssh/deploy_key ~/.ssh/known_hosts
+
+  android:
+    needs: [ci, meta]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      BUILD_NAME: ${{ needs.meta.outputs.build_name }}
+      SIGNED: ${{ needs.meta.outputs.android_signed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.41.7
+          cache: true
+      - run: flutter pub get
+      - name: Ключ подписи из секретов
+        if: env.SIGNED == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/upload-keystore.jks" >> "$GITHUB_ENV"
+      - name: Сборка (прод-адреса стенда)
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          # имена флагов — lib/config/env.dart; версия — из тега, номер сборки — номер запуска workflow
+          args=(--release --build-number "$BUILD_NUMBER"
+            --dart-define=API_BASE="$PUBLIC_URL"
+            --dart-define=KEYCLOAK_URL="$PUBLIC_URL/auth"
+            --dart-define=WEB_BASE="$PUBLIC_URL")
+          if [ -n "$BUILD_NAME" ]; then args+=(--build-name "$BUILD_NAME"); fi
+          mkdir -p dist
+          if [ "$SIGNED" = true ]; then
+            flutter build appbundle "${args[@]}"
+            flutter build apk "${args[@]}"
+            cp build/app/outputs/bundle/release/app-release.aab "dist/darumen-$VERSION.aab"
+            cp build/app/outputs/flutter-apk/app-release.apk "dist/darumen-$VERSION.apk"
+          else
+            # build.gradle.kts без ключа падает на debug-подпись с предупреждением: ставится на устройства,
+            # но не принимается Google Play и не обновляется поверх сборки с ключом релиза
+            unset ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD
+            flutter build apk "${args[@]}"
+            cp build/app/outputs/flutter-apk/app-release.apk "dist/darumen-$VERSION-demo-debug-signed.apk"
+            echo "::warning title=Демо-сборка::APK подписан debug-ключом — только для демонстрации"
+          fi
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: apps/mobile/dist/*
+          retention-days: 14
+          if-no-files-found: error
+      - name: Удалить ключ подписи с раннера
+        if: always()
+        run: rm -f "$RUNNER_TEMP/upload-keystore.jks"
+
+  ios:
+    needs: [ci, meta]
+    if: github.event_name == 'workflow_dispatch' && inputs.ios
+    runs-on: macos-latest   # минута macOS = 10 минут квоты: только по явному запросу
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      VERSION: ${{ needs.meta.outputs.version }}
+      BUILD_NAME: ${{ needs.meta.outputs.build_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: 3.41.7
+          cache: true
+      - run: flutter pub get
+      - name: Сборка без подписи (проверка, что iOS собирается)
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          args=(--release --no-codesign --build-number "$BUILD_NUMBER"
+            --dart-define=API_BASE="$PUBLIC_URL"
+            --dart-define=KEYCLOAK_URL="$PUBLIC_URL/auth"
+            --dart-define=WEB_BASE="$PUBLIC_URL")
+          # CFBundleShortVersionString — только цифры и точки: суффикс -rc.1 отбрасываем
+          if [ -n "$BUILD_NAME" ]; then args+=(--build-name "${BUILD_NAME%%-*}"); fi
+          flutter build ios "${args[@]}"
+          mkdir -p dist
+          (cd build/ios/iphoneos && zip -qry "../../../dist/darumen-$VERSION-ios-unsigned.zip" Runner.app)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-unsigned
+          path: apps/mobile/dist/*
+          retention-days: 7
+          if-no-files-found: error
+
+  github-release:
+    needs: [meta, images, android, deploy, smoke]
+    # только для тегов; выкатка и smoke либо прошли, либо пропущены (нет секретов / deploy=false)
+    if: >-
+      always() && github.ref_type == 'tag'
+      && needs.images.result == 'success' && needs.android.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.deploy.result)
+      && contains(fromJSON('["success", "skipped"]'), needs.smoke.result)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android
+          path: dist
+      - name: Описание релиза
+        env:
+          VERSION: ${{ needs.meta.outputs.version }}
+          DEPLOYED: ${{ needs.deploy.result }}
+          SIGNED: ${{ needs.meta.outputs.android_signed }}
+        run: |
+          {
+            echo "Образы: \`$REGISTRY/{api,web,models,keycloak,keycloak-config}:$VERSION\`."
+            if [ "$DEPLOYED" = success ]; then echo "Выкачен на $PUBLIC_URL."; else echo "На стенд не выкатывался (нет секретов деплоя)."; fi
+            if [ "$SIGNED" != true ]; then echo "Android: демо-APK с debug-подписью (ключ релиза не настроен)."; fi
+          } > "$RUNNER_TEMP/notes.md"
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          body_path: ${{ runner.temp }}/notes.md
+          generate_release_notes: true
+          prerelease: ${{ contains(needs.meta.outputs.version, '-') }}
+          files: dist/*
+          fail_on_unmatched_files: true

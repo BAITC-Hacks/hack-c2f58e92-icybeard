@@ -44,3 +44,12 @@ infra/deploy/.env.prod
 
 # личные учебные материалы — не публикуются
 /learn/
+
+# Секреты стенда (PDF с доступами) — только локально, никогда не коммитить
+docs/IcyBeard-secrets.pdf
+*[Ss]ecrets*.pdf
+
+# Ключи подписи Android (release.yml берёт ключ из секретов ANDROID_*, локально — android/key.properties)
+key.properties
+*.jks
+*.keystore

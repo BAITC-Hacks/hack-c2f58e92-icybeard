@@ -307,6 +307,7 @@
   ],
   "users": [
     {
+      "id": "e8a3ba08-418a-5fb2-a633-bef9401f933e",
       "username": "citizen1",
       "enabled": true,
       "email": "citizen1@darumen.local",
@@ -316,7 +317,7 @@
       "credentials": [
         {
           "type": "password",
-          "userLabel": "Демо-пароль",
+          "userLabel": "initial",
           "secretData": "{\"value\":\"/gqurHTDiO7HIElvgRLw6qnDRx5e/7KbkfGLTGSo1U/iaDxDxowrTYJ+tRGv2bRkMmDNWTWsJ9pGI9bwZ0jBIA==\",\"salt\":\"Xa4W3aonc0rT22e4OBfU6A==\",\"additionalParameters\":{}}",
           "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
@@ -338,6 +339,7 @@
       }
     },
     {
+      "id": "050f136c-333f-5e5c-9d90-dcf431c6cfc0",
       "username": "doctor1",
       "enabled": true,
       "email": "doctor1@darumen.local",
@@ -347,7 +349,7 @@
       "credentials": [
         {
           "type": "password",
-          "userLabel": "Демо-пароль",
+          "userLabel": "initial",
           "secretData": "{\"value\":\"7SiC8rJ1hFSfF8vAzRwMbwqM220J2m7OPe1Xy225sEnbhxrNPshpicTSNnDFSdg+gXqAPhrOpp+AsCAAYIs2yA==\",\"salt\":\"C8yW8Q2Tw8nFbTBR+9hTxQ==\",\"additionalParameters\":{}}",
           "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
@@ -375,6 +377,7 @@
       }
     },
     {
+      "id": "6debe9c0-ac9d-5749-a674-31b67aa50177",
       "username": "chief1",
       "enabled": true,
       "email": "chief1@darumen.local",
@@ -384,7 +387,7 @@
       "credentials": [
         {
           "type": "password",
-          "userLabel": "Демо-пароль",
+          "userLabel": "initial",
           "secretData": "{\"value\":\"P6BhojKItmY6Ahyb9xIa0qnikQ0yJ48kqGF/yNYBvRPKw1yVBMDxGq1ZmfW7C/ad1TdXHKM0N8D1Wtw8RL5hbg==\",\"salt\":\"tUeqZRMB/mwxhspe23n5tg==\",\"additionalParameters\":{}}",
           "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
@@ -409,6 +412,7 @@
       }
     },
     {
+      "id": "a280bb65-98f7-5465-8f24-3fb341408032",
       "username": "regulator1",
       "enabled": true,
       "email": "regulator1@darumen.local",
@@ -418,7 +422,7 @@
       "credentials": [
         {
           "type": "password",
-          "userLabel": "Демо-пароль",
+          "userLabel": "initial",
           "secretData": "{\"value\":\"AB0QtkW9yEveNTaD0L77sjNP3iDJsv3aEb20VdQDM842UQL90WqVT588xgBW1aNX3O1Zp53OTyYGr5YOcxisUA==\",\"salt\":\"N9Lri4Gqy9MagLZTx0tqNg==\",\"additionalParameters\":{}}",
           "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
@@ -437,6 +441,7 @@
       }
     },
     {
+      "id": "a00572e0-7f94-59d8-92b6-3509d483f921",
       "username": "steward1",
       "enabled": true,
       "email": "steward1@darumen.local",
@@ -446,7 +451,7 @@
       "credentials": [
         {
           "type": "password",
-          "userLabel": "Демо-пароль",
+          "userLabel": "initial",
           "secretData": "{\"value\":\"47oZ7nxcBwzAy2ik83U9CWPMWmMvzJiZ//Gl8VXkpyF3XyO/Lbl32GR14bncf0FbQQREkPpgtnKKKYilZyubnA==\",\"salt\":\"+iIgtqXs5dluS8GZHD+h2Q==\",\"additionalParameters\":{}}",
           "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
@@ -465,6 +470,7 @@
       }
     },
     {
+      "id": "99feed88-2257-5adc-b9de-3124468e5e9f",
       "username": "auditor1",
       "enabled": true,
       "email": "auditor1@darumen.local",
@@ -474,7 +480,7 @@
       "credentials": [
         {
           "type": "password",
-          "userLabel": "Демо-пароль",
+          "userLabel": "initial",
           "secretData": "{\"value\":\"o0HqAKHq9aM3cofurikXGVq/HLRu6Z5c6gOFErhKCPEzgVGFM3Xjx4kdgFHnNJZMfswWveLHHqzA5JHXQpu3bQ==\",\"salt\":\"tB/bECmsJQFRQJw2Lifj0w==\",\"additionalParameters\":{}}",
           "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
@@ -493,6 +499,7 @@
       }
     },
     {
+      "id": "319fc4e6-d2a8-50d9-9f03-69e63460f8d9",
       "username": "admin1",
       "enabled": true,
       "email": "admin1@darumen.local",
@@ -502,7 +509,7 @@
       "credentials": [
         {
           "type": "password",
-          "userLabel": "Демо-пароль",
+          "userLabel": "initial",
           "secretData": "{\"value\":\"/dnoHMsltFc+39oJhmtb+0SWy5kcc/8TE4cFnpZsnIuSTSJaYeybSbacGUH4tlx6jF0sLbeB7vKERPwNaCb7Eg==\",\"salt\":\"Y0ZX0OrHzbVKGIHG14f2Jg==\",\"additionalParameters\":{}}",
           "credentialData": "{\"hashIterations\":210000,\"algorithm\":\"pbkdf2-sha512\",\"additionalParameters\":{}}"
         }
@@ -521,6 +528,7 @@
       }
     },
     {
+      "id": "5e87f43f-083c-5f94-b2cd-73d46c343013",
       "username": "service-account-darumen-admin",
       "enabled": true,
       "serviceAccountClientId": "darumen-admin",

@@ -67,8 +67,32 @@ pipeline: ## Конвейер данных в контейнере: intake → r
 pitch: ## Обновить копию презентации в веб-приложении из darumen-pitch.html
 	cp darumen-pitch.html apps/web/public/pitch.html
 
-deploy: pitch ## Задеплоить на dc.jurek.kz (rsync + docker compose на VM); первый раз: make deploy ARGS=--replace-dc
+deploy: pitch ## Ручной деплой на dc.jurek.kz: rsync кода и витрин, сборка на VM (основной путь — тег vX.Y.Z, docs/deploy.md)
 	scripts/deploy.sh $(ARGS)
+
+DEPLOY_HOST ?= deploy@195.201.7.56
+VM_DIR ?= /srv/darumen
+# docker exec не наследует umask контейнера backup — задаём тот же 0077, что в compose (дампы читает только владелец)
+VM_BACKUP = docker exec $$(docker ps -q --filter label=com.docker.compose.project=darumen --filter label=com.docker.compose.service=backup) bash -c "umask 0077 && exec /backup.sh"
+
+deploy-data: ## Только данные: витрины lakehouse на VM + publish в Postgres (код и образы не трогает)
+	scripts/deploy.sh --data-only
+
+release-status: ## Что запущено на VM: текущий и прошлый релиз, хэш шаблона, контейнеры, диск, свежие бэкапы
+	ssh $(DEPLOY_HOST) $(VM_DIR)/bin/release.sh status
+
+rollback: ## Откатить стенд на предыдущий CD-релиз
+	ssh $(DEPLOY_HOST) $(VM_DIR)/bin/release.sh rollback
+
+backup-now: ## Дамп darumen и keycloak на VM прямо сейчас (backups/last)
+	ssh $(DEPLOY_HOST) '$(VM_BACKUP) && ls -lt $(VM_DIR)/backups/last | head -5'
+
+restore: ## Восстановить БД на VM из дампа: make restore DB=keycloak [DUMP=daily/keycloak-20261001.sql.gz]
+	@test -n "$(DB)" || { echo "укажите DB=darumen или DB=keycloak" >&2; exit 2; }
+	ssh -t $(DEPLOY_HOST) $(VM_DIR)/bin/restore.sh $(DB) $(DUMP)
+
+vm-install-release: ## Шаблон релиза (compose, SQL, release.sh, restore.sh) на VM — разово и после каждой правки файлов из infra/deploy/template-files.txt, до тега
+	DEPLOY_HOST=$(DEPLOY_HOST) VM_DIR=$(VM_DIR) infra/deploy/vm-install.sh
 
 build: ## Собрать .NET и веб
 	dotnet build Darumen.slnx -c Release --nologo -v q
@@ -102,4 +126,4 @@ lint: venv ## Линтеры
 	$(PY) -m ruff check ml
 	dotnet format Darumen.slnx --verify-no-changes
 
-.PHONY: help venv data intake-status refdata gold publish train eval serve up down logs pipeline build test proto models-serve scribe-serve venv-scribe dagster ollama-model lint
+.PHONY: help venv data intake-status refdata gold publish train eval serve up down logs pipeline build test proto models-serve scribe-serve venv-scribe dagster ollama-model lint deploy deploy-data release-status rollback backup-now restore vm-install-release
