@@ -1,11 +1,13 @@
 import { ruAccount } from './ru-account'
 import { ruAdmin } from './ru-admin'
 import { ruRbac } from './ru-rbac'
+import { ruServices } from './ru-services'
 
 export const ru = {
   ...ruRbac,
   ...ruAccount,
   ...ruAdmin,
+  ...ruServices,
   nav: {
     group: {
       patients: 'Пациенты',
@@ -113,8 +115,10 @@ export const ru = {
     login: 'Войти', logout: 'Выйти',
     loginTitle: 'Вход', loginLead: 'Гражданину — маршрут госпитализации, врачу — рабочий список и ассистент направления.',
     loginEgov: 'Войти через eGov mobile',
-    roadmapTitle: 'Скоро: вход через eGov mobile',
-    roadmap: 'Вход через eGov mobile даст ИИН, регион и прикрепление из государственных систем. Интеграция запрошена у АО «НИТ» (Smart Bridge); до её появления стенд использует вход по логину.',
+    loginPassword: 'Войти по логину и паролю',
+    egovOffCaption: 'Недоступно: адрес сервиса eGov mobile не предоставлен',
+    egovOffTitle: 'Вход через eGov mobile недоступен',
+    egovOffText: 'Адрес сервиса eGov mobile (Smart Bridge) не предоставлен, поэтому вход через eGov недоступен. Войдите по логину и паролю.',
     unavailable: 'Вход временно недоступен: сервер входа не отвечает.',
     syntheticNote: 'Данные — синтетические, стенд не хранит персональные данные.',
   },

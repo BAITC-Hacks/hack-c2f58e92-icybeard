@@ -8,10 +8,10 @@ COPY apps/web/ ./
 ARG VITE_KEYCLOAK_URL=https://dc.jurek.kz/auth
 ARG VITE_KEYCLOAK_REALM=darumen
 ARG VITE_KEYCLOAK_CLIENT=darumen-web
-ARG VITE_EGOV_ENABLED=false
 ARG VITE_API_BASE=
+# доступность входа через eGov приходит из API (GET /api/v1/public/service-status), флага сборки для неё нет
 ENV VITE_KEYCLOAK_URL=$VITE_KEYCLOAK_URL VITE_KEYCLOAK_REALM=$VITE_KEYCLOAK_REALM VITE_KEYCLOAK_CLIENT=$VITE_KEYCLOAK_CLIENT \
-    VITE_EGOV_ENABLED=$VITE_EGOV_ENABLED VITE_API_BASE=$VITE_API_BASE
+    VITE_API_BASE=$VITE_API_BASE
 RUN npm run build
 
 FROM nginx:1.27-alpine

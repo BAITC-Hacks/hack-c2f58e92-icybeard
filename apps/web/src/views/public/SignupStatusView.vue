@@ -7,21 +7,25 @@ import { pub } from '@/api/endpoints'
 import type { OrgApplicationStatus } from '@/api/types'
 import CodeInput from '@/components/public/CodeInput.vue'
 import StateBlock from '@/components/states/StateBlock.vue'
+import StateEmailOff from '@/components/states/StateEmailOff.vue'
 import StateError from '@/components/states/StateError.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
 import { readApplication } from '@/lib/signupStore'
 import { CODE_LENGTH, isCode } from '@/lib/validation'
 import { useAuthStore } from '@/stores/auth'
+import { useServiceStatusStore } from '@/stores/serviceStatus'
 
 /** Статус заявки (W-Auth-Verify + W-Auth-Pending), без входа: statusToken берётся из localStorage этого браузера.
  * pending_email — ввод 6-значного кода из письма (автопереход, вставка целиком, «Отправить код повторно» с таймером);
- * pending_review — «Заявка на модерации» с этапами; approved / rejected — итог. */
+ * pending_review — «Заявка на модерации» с этапами; approved / rejected — итог. Пока почтовый сервер недоступен
+ * (GET /public/service-status), страница не обещает писем: код может не прийти, решение смотрят здесь. */
 const RESEND_SECONDS = 60
 const props = defineProps<{ id: string }>()
 const { t } = useI18n()
 const { date } = useLocaleFormat()
 const auth = useAuthStore()
+const services = useServiceStatusStore()
 const saved = readApplication(props.id)
 
 const status = ref<OrgApplicationStatus | null>(null)
@@ -32,7 +36,7 @@ const verifying = ref(false)
 const codeError = ref('')
 const left = ref(0)
 const resendError = ref('')
-/** Письмо с кодом не ушло: почтовый сервер стенда не настроен (API: emailSent: false). */
+/** Письмо с кодом не ушло (API: emailSent: false): почтовый сервер не настроен или не отвечает. */
 const emailNotSent = ref(saved?.emailSent === false)
 let timer: number | undefined
 
@@ -103,6 +107,14 @@ async function resend() {
 }
 
 const timerLabel = computed(() => `${Math.floor(left.value / 60)}:${String(left.value % 60).padStart(2, '0')}`)
+/** Итог заявки под этапами; пока почта недоступна — без обещания письма. */
+const resultNote = computed(() => {
+  const s = status.value?.status
+  const off = services.emailUnavailable
+  if (s === 'approved') return off ? t('signup.approvedManual', { email: email.value }) : t('signup.approvedNote', { email: email.value })
+  if (s === 'rejected') return off ? t('signup.rejectedManual', { email: email.value }) : t('signup.rejectedNote', { email: email.value })
+  return off ? t('signup.watchStatus') : t('signup.weWillWrite', { email: email.value })
+})
 onMounted(async () => {
   await load()
   if (status.value?.status === 'pending_email') startTimer(saved?.resendAfterSeconds || RESEND_SECONDS)
@@ -131,7 +143,8 @@ onBeforeUnmount(() => window.clearInterval(timer))
           <span class="muted"> · </span><RouterLink class="text-link" to="/signup">{{ t('signup.changeData') }}</RouterLink>
         </p>
         <span v-if="resendError" class="error-text center">{{ resendError }}</span>
-        <p v-if="emailNotSent" class="note" data-testid="email-not-sent">{{ t('signup.emailNotSent') }}</p>
+        <p v-if="emailNotSent" class="note off" data-testid="email-not-sent">{{ t('signup.emailNotSent') }}</p>
+        <StateEmailOff v-else :text="t('serviceStatus.notes.code')" />
       </template>
 
       <template v-else-if="status">
@@ -141,7 +154,7 @@ onBeforeUnmount(() => window.clearInterval(timer))
         <ol v-if="status.status !== 'rejected'" class="steps">
           <li v-for="s in steps" :key="s.key" :class="{ done: s.done, current: s.current }"><span class="dot" aria-hidden="true"><i v-if="s.done" class="pi pi-check" /></span>{{ t(`signup.step.${s.key}`) }}</li>
         </ol>
-        <p class="note">{{ status.status === 'approved' ? t('signup.approvedNote', { email }) : status.status === 'rejected' ? t('signup.rejectedNote', { email }) : t('signup.weWillWrite', { email }) }}</p>
+        <p class="note" :class="{ off: services.emailUnavailable }" data-testid="status-note">{{ resultNote }}</p>
         <Button v-if="status.status === 'approved'" :label="t('auth.login')" class="wide" @click="auth.login()" />
         <Button v-else :label="t('signup.refreshStatus')" severity="secondary" class="wide" :loading="loading" data-testid="status-refresh" @click="load" />
       </template>
@@ -166,4 +179,5 @@ onBeforeUnmount(() => window.clearInterval(timer))
 .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--dm-dot-idle); display: grid; place-items: center; color: #fff; font-size: 9px; flex: none; }
 .steps li.done .dot, .steps li.current .dot { background: var(--dm-primary); }
 .note { margin: 0; padding: 12px 16px; border-radius: var(--dm-radius-md); background: var(--dm-neutral-soft); font-size: var(--dm-text-sm); }
+.note.off { background: var(--dm-warn-soft); }
 </style>

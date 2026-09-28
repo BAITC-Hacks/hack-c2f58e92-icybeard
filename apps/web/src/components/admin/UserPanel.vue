@@ -12,10 +12,12 @@ import { shortOrgName } from '@/lib/format'
 import { initials, permissionTitle, roleTitle } from '@/lib/labels'
 import { supportsOwnScope, type Scope } from '@/lib/permissions'
 import { useRefdataStore } from '@/stores/refdata'
+import { useServiceStatusStore } from '@/stores/serviceStatus'
 
-/** Панель пользователя (W-Admin-Users, справа): аватар, имя, «логин · eGov/логин · с даты»; роль (при scope own —
+/** Панель пользователя (W-Admin-Users, справа): аватар, имя, «логин · способ входа · с даты»; роль (при scope own —
  * только врач и администратор организации), организация (у ролей с mo_code; при own — своя, без выбора), доступ по
- * разрешениям роли; «Сохранить» и «Заблокировать»/«Разблокировать». */
+ * разрешениям роли; «Сохранить» и «Заблокировать»/«Разблокировать». Пока адрес сервиса eGov mobile не предоставлен
+ * (GET /public/service-status), под именем сказано, что вход через eGov недоступен и пользователи входят по логину. */
 const props = defineProps<{ user: AdminUser; scope: Scope | null; ownMoCode: string | null; organizations: OrganizationItem[]; matrix?: MatrixCell[] | null; busy?: boolean }>()
 const emit = defineEmits<{ save: [{ role: string; moCode: string | null; regionKato: string | null }]; block: []; unblock: [] }>()
 const { t } = useI18n()
@@ -23,6 +25,7 @@ const orgLabel = (o: OrganizationItem) => `${shortOrgName(o.name)} · ${o.moCode
 const orgTitle = (o: OrganizationItem) => o.name
 const { date } = useLocaleFormat()
 const refdata = useRefdataStore()
+const services = useServiceStatusStore()
 
 const role = ref<string>('')
 const moCode = ref<string | null>(null)
@@ -57,6 +60,7 @@ function save() {
         <div class="caption">{{ [user.username, user.via ? t(`admin.via.${user.via}`) : null, user.createdAt ? t('admin.users.since', { date: date(user.createdAt) }) : null].filter(Boolean).join(' · ') }}</div>
       </div>
     </div>
+    <p v-if="!services.egovAvailable" class="caption egov-off" data-testid="user-egov-off">{{ t('admin.users.egovOff') }}</p>
 
     <div class="field">
       <label for="u-role">{{ t('admin.users.colRole') }}</label>
@@ -91,6 +95,7 @@ function save() {
 <style scoped>
 .user-panel { display: flex; flex-direction: column; gap: 14px; }
 .head { display: flex; align-items: center; gap: 12px; }
+.egov-off { margin: -6px 0 0; }
 .avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--dm-neutral-soft); display: grid; place-items: center; font-weight: 500; flex: none; }
 .head-main { min-width: 0; }
 .name { font-size: var(--dm-text-lg); font-weight: 500; letter-spacing: -0.01em; }

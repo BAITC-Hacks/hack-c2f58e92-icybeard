@@ -23,6 +23,8 @@
         ${msg("dmSentLead")}
     <#elseif section = "form">
         <div class="dm-alert" role="note"><@layout.icon name="info"/><span>${msg("dmSentSpam")}</span></div>
+        <#-- скрыто; показывается, только если API сайта отвечает email.available: false (js/darumen.js) -->
+        <div class="dm-alert warning" role="status" data-dm-service-status="${layout.site()}api/v1/public/service-status" hidden><@layout.icon name="mail"/><span>${msg("dmEmailDownSent")}</span></div>
         <div class="dm-actions">
             <a class="dm-btn secondary" id="dm-resend" href="${url.loginResetCredentialsUrl}" data-dm-countdown="60"
                data-label="${msg("dmSentResend")}" data-wait="${msg("dmSentResendIn")}">${msg("dmSentResend")}</a>
@@ -58,9 +60,9 @@
             </div>
         </#if>
 
-        <#-- eGov mobile: интеграции нет, вход не имитируется — кнопка раскрывает пояснение -->
+        <#-- eGov mobile: адрес сервиса (Smart Bridge) не предоставлен, вход не имитируется — кнопка раскрывает пояснение -->
         <details class="dm-egov">
-            <summary class="dm-btn" role="button"><@layout.icon name="qr"/>${msg("dmEgov")}</summary>
+            <summary class="dm-btn secondary" role="button"><@layout.icon name="qr"/>${msg("dmEgov")}</summary>
             <div class="dm-alert" role="note"><@layout.icon name="info"/><span>${msg("dmEgovSoon")}</span></div>
         </details>
         <div class="dm-divider">${msg("dmOrByLogin")}</div>

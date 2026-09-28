@@ -141,7 +141,9 @@ void main() {
       expect(find.text(text), findsOneWidget, reason: text);
     }
     expect(find.textContaining('Отправить повторно'), findsNothing, reason: 'TOTP не отправляется — таймера нет');
-    expect(find.text('после интеграции'), findsNWidgets(2));
+    // SMS — шлюз не подключён (как у каналов уведомлений), резервные коды — после интеграции
+    expect(find.text('Сервис ещё не подключён'), findsOneWidget);
+    expect(find.text('после интеграции'), findsOneWidget);
 
     await tester.tap(find.text('Подтвердить'));
     await tester.pump();
@@ -209,7 +211,7 @@ void main() {
     expect(jsonDecode(sent.body), {'email': 'a.seitkali@almaty-onco.kz'});
   });
 
-  testWidgets('security: password age, SMS after integration, authenticator status, devices with «Завершить» and «Завершить все, кроме этого»', (tester) async {
+  testWidgets('security: password age, SMS not connected, authenticator status, devices with «Завершить» and «Завершить все, кроме этого»', (tester) async {
     await tallPhone(tester);
     final requests = <http.Request>[];
     final changed = DateTime.now().subtract(const Duration(days: 12, hours: 1)).toUtc().toIso8601String();
@@ -235,7 +237,7 @@ void main() {
     );
     await tester.pumpWidget(app(session, const SecurityScreen()));
     await tester.pumpAndSettle();
-    for (final text in ['Безопасность', 'ВХОД', 'Пароль', 'изменён 12 дн. назад', 'Сменить', 'SMS-код', 'после интеграции', 'Приложение-аутентификатор', 'не настроено', 'Настроить',
+    for (final text in ['Безопасность', 'ВХОД', 'Пароль', 'изменён 12 дн. назад', 'Сменить', 'SMS-код', 'Сервис ещё не подключён', 'Приложение-аутентификатор', 'не настроено', 'Настроить',
       'УСТРОЙСТВА', 'Android · Darumen', 'это устройство', 'Рабочий ПК · Chrome', 'Завершить', 'Завершить все, кроме этого']) {
       expect(find.text(text), findsOneWidget, reason: text);
     }

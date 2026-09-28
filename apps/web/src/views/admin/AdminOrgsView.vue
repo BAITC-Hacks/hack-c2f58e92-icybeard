@@ -11,6 +11,7 @@ import OrgApplications from '@/components/admin/OrgApplications.vue'
 import OrgPanel from '@/components/admin/OrgPanel.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
 import AsyncState from '@/components/states/AsyncState.vue'
+import StateEmailOff from '@/components/states/StateEmailOff.vue'
 import FilterPill from '@/components/ui/FilterPill.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import Pager from '@/components/ui/Pager.vue'
@@ -22,7 +23,9 @@ import { shortOrgName } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
 /** Организации (W-Admin-Orgs, admin.orgs): фильтры регион · тип · статус подключения, таблица (профили, пользователи,
- * статус по данным очередей, последняя загрузка), панель выбранной организации и «Заявки на регистрацию». */
+ * статус по данным очередей, последняя загрузка), панель выбранной организации и «Заявки на регистрацию». Одобрение
+ * отправляет администратору организации письмо-приглашение: если письмо не ушло, ссылка показывается для ручной передачи,
+ * а пока почтовый сервер недоступен (GET /public/service-status), это сказано над заявками заранее. */
 const PAGE_SIZE = 20
 const STATUSES = ['connected', 'setup', 'no_data'] as const
 /** Типы справочника организаций (API admin/orgs). */
@@ -39,7 +42,7 @@ const page = ref(1)
 const selectedCode = ref<string | null>(null)
 const busyId = ref<string | null>(null)
 const actionError = ref<unknown>(null)
-/** Одобренная заявка без письма (SMTP не настроен): ссылку-приглашение нужно передать вручную. */
+/** Одобренная заявка, письмо по которой не ушло: ссылку-приглашение нужно передать вручную. */
 const decision = ref<ApplicationDecision | null>(null)
 
 const list = useAsync<PagedList<AdminOrg>>(() => admin.orgs({ regionKato: regionKato.value ?? undefined, type: type.value ?? undefined, status: status.value ?? undefined, page: page.value, size: PAGE_SIZE }))
@@ -123,6 +126,7 @@ onMounted(async () => {
       <aside class="panel-col">
         <OrgPanel v-if="selectedCode" :org="detail.data.value?.organization ?? null" :loading="detail.loading.value" :error="detail.error.value" @retry="detail.run" />
         <section v-else class="card hint"><i class="pi pi-building muted" aria-hidden="true" /><span class="muted small">{{ t('admin.orgs.pickHint') }}</span></section>
+        <StateEmailOff :text="t('serviceStatus.notes.applications')" />
         <OrgApplications :items="applications.data.value?.items ?? []" :loading="applications.loading.value" :error="applications.error.value" :busy-id="busyId" @retry="applications.run"
           @approve="(a) => decide(() => admin.approveApplication(a.id), a.id, t('admin.orgs.approved'))"
           @reject="(a, reason) => decide(() => admin.rejectApplication(a.id, reason), a.id, t('admin.orgs.rejected'))" />
@@ -130,7 +134,6 @@ onMounted(async () => {
       </aside>
     </div>
     <Dialog :visible="decision !== null" modal :header="t('admin.orgs.approvedTitle')" :style="{ width: 'min(520px, 94vw)' }" @update:visible="(v: boolean) => !v && (decision = null)">
-      <p class="dialog-text">{{ t('admin.invite.noEmail') }}</p>
       <InviteLink v-if="decision?.inviteUrl" :url="decision.inviteUrl" />
       <template #footer><Button :label="t('common.close')" @click="decision = null" /></template>
     </Dialog>
@@ -144,7 +147,6 @@ onMounted(async () => {
 .strong { font-weight: 500; }
 .clip { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nowrap { white-space: nowrap; }
-.dialog-text { margin: 0 0 12px; }
 @media (max-width: 1500px) { .col-type { display: none; } }
 @media (max-width: 1200px) { .with-panel { grid-template-columns: 1fr; } }
 </style>

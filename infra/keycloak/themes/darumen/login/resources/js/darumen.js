@@ -4,7 +4,9 @@
    - [data-dm-confirm]     подсказка «пароли не совпадают»
    - [data-dm-otp="6"]     шесть полей по цифре поверх настоящего поля кода: автопереход, Backspace, вставка
    - [data-dm-countdown]   «Отправить повторно через 0:59» → ссылка
-   - [data-dm-if-password] на info-странице: «Пароль изменён», если эта вкладка только что сохранила новый пароль */
+   - [data-dm-if-password] на info-странице: «Пароль изменён», если эта вкладка только что сохранила новый пароль
+   - [data-dm-service-status] скрытое предупреждение «Почтовый сервер недоступен»: показывается, только если API сайта
+                           (адрес в атрибуте, GET /api/v1/public/service-status) отвечает email.available === false */
 (function () {
   "use strict";
 
@@ -172,6 +174,25 @@
     }
     store(function (s) { s.removeItem(PWD_KEY); });
   }
+
+  // Почта недоступна: предупреждение скрыто по умолчанию и открывается по ответу API. Нет ответа за 5 с, ошибка или
+  // чужой формат — статус неизвестен, предупреждение не показываем. Без cookies: статус публичный.
+  each("[data-dm-service-status]", function (note) {
+    if (!window.fetch) return;
+    var controller = window.AbortController ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, 5000) : 0;
+    fetch(note.getAttribute("data-dm-service-status"), {
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+      signal: controller ? controller.signal : undefined
+    })
+      .then(function (response) { return response.ok ? response.json() : null; })
+      .then(function (status) {
+        if (status && status.email && status.email.available === false) note.hidden = false;
+      })
+      .catch(function () { /* статус неизвестен */ })
+      .then(function () { clearTimeout(timer); });
+  });
 
   // Повторная отправка письма — после паузы
   each("[data-dm-countdown]", function (link) {

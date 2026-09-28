@@ -4,24 +4,26 @@ import Dialog from 'primevue/dialog'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useServiceStatusStore } from '@/stores/serviceStatus'
 
-/** Карточка «Вход» (W-Home): eGov mobile — primary (ink), вход по логину — secondary (soft). Гостевого режима нет:
- * без входа приложение не открывается. `hint` — подсказка над кнопками (какая роль нужна для страницы из ?denied). */
+/** Карточка «Вход» (W-Home): eGov mobile и вход по логину. Гостевого режима нет: без входа приложение не открывается.
+ * `hint` — подсказка над кнопками (какая роль нужна для страницы из ?denied). Доступность eGov — из
+ * GET /public/service-status (`egov.available`): пока адрес сервиса eGov mobile (Smart Bridge) не предоставлен, кнопка
+ * остаётся на месте, но становится вторичной, под ней — подпись «недоступно», а нажатие открывает пояснение с входом по
+ * логину и паролю; вход не имитируется. Когда сервис доступен — вход через брокер realm (idpHint egov, docs/egov-auth.md). */
 defineProps<{ hint?: string }>()
 const { t } = useI18n()
 const auth = useAuthStore()
-const roadmap = ref(false)
-// Брокер eGov в realm появится после доступа к Smart Bridge (docs/egov-auth.md); до этого кнопка честно
-// показывает «Скоро», а не имитирует вход.
-const egovEnabled = import.meta.env.VITE_EGOV_ENABLED === 'true'
+const services = useServiceStatusStore()
+const egovInfo = ref(false)
 
 function onEgov() {
-  if (egovEnabled) void auth.login({ idpHint: 'egov' })
-  else roadmap.value = true
+  if (services.egovAvailable) void auth.login({ idpHint: 'egov' })
+  else egovInfo.value = true
 }
 
-function loginFromRoadmap() {
-  roadmap.value = false
+function loginWithPassword() {
+  egovInfo.value = false
   void auth.login()
 }
 </script>
@@ -32,10 +34,20 @@ function loginFromRoadmap() {
     <p class="muted small lead-text">{{ t('auth.loginLead') }}</p>
     <p v-if="hint" class="hint" data-testid="denied">{{ hint }}</p>
     <div class="buttons">
-      <Button :label="t('auth.loginEgov')" icon="pi pi-mobile" data-testid="login-egov" @click="onEgov" />
+      <div class="egov">
+        <Button
+          :label="t('auth.loginEgov')"
+          icon="pi pi-mobile"
+          :severity="services.egovAvailable ? undefined : 'secondary'"
+          :aria-describedby="services.egovAvailable ? undefined : 'egov-off-caption'"
+          data-testid="login-egov"
+          @click="onEgov"
+        />
+        <p v-if="!services.egovAvailable" id="egov-off-caption" class="caption egov-off" data-testid="egov-unavailable">{{ t('auth.egovOffCaption') }}</p>
+      </div>
       <Button
         :label="t('auth.login')"
-        severity="secondary"
+        :severity="services.egovAvailable ? 'secondary' : undefined"
         :disabled="auth.keycloakUnavailable"
         :title="auth.keycloakUnavailable ? t('auth.unavailable') : undefined"
         data-testid="login-primary"
@@ -43,10 +55,10 @@ function loginFromRoadmap() {
       />
     </div>
     <p class="caption note">{{ auth.keycloakUnavailable ? t('auth.unavailable') : t('auth.syntheticNote') }}</p>
-    <Dialog v-model:visible="roadmap" modal :header="t('auth.roadmapTitle')" :style="{ width: 'min(480px, 92vw)' }" data-testid="egov-roadmap">
-      <p class="roadmap">{{ t('auth.roadmap') }}</p>
+    <Dialog v-model:visible="egovInfo" modal :header="t('auth.egovOffTitle')" :style="{ width: 'min(480px, 92vw)' }" data-testid="egov-roadmap">
+      <p class="egov-text">{{ t('auth.egovOffText') }}</p>
       <template #footer>
-        <Button :label="t('auth.login')" data-testid="login-from-roadmap" @click="loginFromRoadmap" />
+        <Button :label="t('auth.loginPassword')" :disabled="auth.keycloakUnavailable" data-testid="login-from-roadmap" @click="loginWithPassword" />
       </template>
     </Dialog>
   </section>
@@ -58,7 +70,9 @@ function loginFromRoadmap() {
 .lead-text { margin: 0; }
 .hint { margin: 0; padding: 10px 12px; border-radius: var(--dm-radius-sm); background: var(--dm-warn-soft); color: var(--dm-warn); font-size: var(--dm-text-sm); }
 .buttons { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
-.buttons :deep(.p-button) { justify-content: center; }
+.buttons :deep(.p-button) { justify-content: center; width: 100%; }
+.egov { display: flex; flex-direction: column; gap: 6px; }
+.egov-off { margin: 0; text-align: center; }
 .note { margin: 0; }
-.roadmap { margin: 0; line-height: 1.5; }
+.egov-text { margin: 0; line-height: 1.5; }
 </style>

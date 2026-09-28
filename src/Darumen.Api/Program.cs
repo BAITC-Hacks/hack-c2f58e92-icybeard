@@ -23,6 +23,7 @@ DotEnv.Load(); // ключи из .env в корне репозитория бе
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
+builder.Services.AddDarumenForwardedHeaders(builder.Configuration); // адрес клиента за Caddy и nginx стенда
 builder.Services.AddHealthChecks();
 builder.Services.AddOutputCache();
 builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
@@ -59,12 +60,13 @@ builder.Services.AddDarumenModules(
 
 var app = builder.Build();
 
+app.UseForwardedHeaders(); // первым: лимит частоты и журнал видят адрес клиента, а не nginx
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseCors();
 app.UseAuthentication();
+app.UseRateLimiter(); // после входа — лимит на пользователя; до проверки доступа — считаются и отказы 401/403
 app.UseAuthorization();
-app.UseRateLimiter(); // после входа: лимит считается на пользователя
 app.UseMiddleware<AuditMiddleware>();
 app.UseOutputCache();
 

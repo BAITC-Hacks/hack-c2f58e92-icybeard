@@ -10,6 +10,7 @@ import './styles/base.css'
 import App from './App.vue'
 import { i18n } from './i18n'
 import { useAuthStore } from './stores/auth'
+import { useServiceStatusStore } from './stores/serviceStatus'
 import { DarumenPreset } from './styles/preset'
 
 const app = createApp(App)
@@ -18,6 +19,10 @@ app.use(createPinia())
 app.use(PrimeVue, { theme: { preset: DarumenPreset, options: { darkModeSelector: '.darumen-dark', cssLayer: { name: 'primevue', order: 'primevue, app' } } } })
 app.use(ToastService)
 app.use(i18n)
+
+// Статус внешних каналов (почта, push, SMS, eGov mobile) — сразу и раз в 5 минут, параллельно с проверкой сессии:
+// он нужен и странице входа (кнопка eGov), и каркасу вошедшего (баннер «Почтовый сервер недоступен»).
+useServiceStatusStore().start()
 
 // Маршрутизатор подключается только после проверки сессии: его первая навигация сразу запускает защиту
 // маршрутов и переход по роли, и при переходе по прямой ссылке (например /gov/regions/19) роли уже должны быть известны.

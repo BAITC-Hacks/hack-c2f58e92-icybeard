@@ -1,5 +1,6 @@
 export 'account_models.dart';
 export 'route_models.dart';
+export 'service_status.dart';
 
 /// Модели ответов REST API Darumen (docs/api.md). Только то, что нужно мобильным экранам.
 class ModelInfo {

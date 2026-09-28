@@ -11,7 +11,7 @@
 - **Объяснение:** `explanation: { summary, factors: [{ name, contribution, text }] }`, факторы отсортированы по `|contribution|`.
 - **Пагинация:** `?page=1&size=50`, ответ `{ items, page, size, total }`.
 - **Идемпотентность записи:** заголовок `Idempotency-Key` на POST журналов и решений.
-- **Ограничение частоты:** `POST /insight/ask` и `/scribe/*` — не больше `RateLimits:ModelCallsPerMinute` запросов в минуту на пользователя (по умолчанию 20), сверх лимита 429.
+- **Ограничение частоты:** общий лимит на все `/api/*` — `RateLimiting:PermitLimit` запросов за `RateLimiting:WindowSeconds` (по умолчанию 600 за 60 с; `RateLimiting:Enabled=false` выключает) на пользователя (`sub` из токена), без входа — на адрес клиента; `/health`, OpenAPI и Scalar не ограничиваются. Поверх него `POST /insight/ask` и `/scribe/*` — не больше `RateLimits:ModelCallsPerMinute` запросов в минуту на пользователя (по умолчанию 20), публичные формы — `RateLimits:PublicFormsPerMinute` с адреса. Сверх любого лимита — 429 `application/problem+json` с `detail: "rate_limited"` и заголовком `Retry-After` (секунды). Адрес клиента за хостовым Caddy и nginx контейнера web API берёт из `X-Forwarded-For` (`UseForwardedHeaders`): доверяются loopback и частные сети docker (`ForwardedHeaders:KnownNetworks`, по умолчанию `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`), не больше `ForwardedHeaders:ForwardLimit` звеньев (по умолчанию 2: nginx и шлюз docker, через который приходит Caddy).
 - **Порог малых чисел:** публичные агрегаты со слишком малым числом наблюдений не публикуются, а не отдаются нулями/суррогатами. Порог свой у каждой витрины и указан рядом с ней: индекс доступности (`GET /index`) исключает ячейки региона и профиля с числом направлений с исходом < 20 ещё на этапе сборки `gold.access_index` (см. `ml/src/darumen/models/index.py`); длительность лечения (`GET /los`) — ячейки с числом случаев < 100 в `gold.los_by_profile`. Обе витрины уже не содержат таких строк к моменту, когда до них доходит REST API — подавленные значения просто отсутствуют в `items`, а не возвращаются как `null`.
 
 ## Queue: ожидание госпитализации
@@ -178,6 +178,21 @@
 ### `GET /api/v1/public/login-examples` (публичный, кэш 1 ч)
 Пример-карточки страницы входа одним запросом (раньше веб вызывал `/queue/predict` и `/medicines/*` без входа): `{ "wait": { "regionKato": "75", "regionName", "profileCode", "profileName", "p50Days", "p90Days", "within30" }, "rx": { "mnn", "covered", "fillP50", "fillP90" } }`. Регион и профиль — `Public:LoginExamples` (г. Алматы, первый профиль с «фтальм» в названии), МНН — первое по объёму рецептов. Часть без данных (модель или витрина недоступна) — `null` и кэш на минуту.
 
+### `GET /api/v1/public/service-status` (публичный, кэш 30 с)
+Какие внешние каналы сейчас работают — веб и мобилка показывают недоступное честно, ничего не скрывая (баннер «Почтовый сервер недоступен», выключенные колонки почты, SMS и push в настройках уведомлений, пояснение у кнопки eGov mobile):
+
+```json
+{
+  "checkedAt": "2026-09-28T10:15:00Z",
+  "email": { "available": false, "reason": "smtp_not_configured" },
+  "push":  { "available": false, "reason": "not_ready" },
+  "sms":   { "available": false, "reason": "not_ready" },
+  "egov":  { "available": false, "reason": "endpoint_not_provided" }
+}
+```
+
+`checkedAt` — UTC до секунды; у доступного канала `available: true, reason: null` (поле `reason` есть всегда). Причины: `email` — `smtp_not_configured` (пуст `Mail:Smtp:Host`) или `smtp_unreachable` (TCP-подключение к `Mail:Smtp:Host:Port` не удалось за 3 с; результат пробы кэшируется на 60 с, одновременные запросы ждут одну пробу, учётные данные SMTP не используются и не логируются, Warning в журнал — только при смене состояния); `push` и `sms` — `not_ready`, пока не выставлены `Services:Push:Ready` / `Services:Sms:Ready` (`true`, по умолчанию `false`); `egov` — `endpoint_not_provided`, пока пуст `Services:Egov:Endpoint` (адрес сервиса eGov mobile / Smart Bridge). Проба никогда не превращается в 5xx: сбой — это `smtp_unreachable`. Клиент, не получивший ответ, почту считает неизвестной (баннер не показывает), а push, SMS и eGov — недоступными.
+
 ## Intake
 
 Все `/intake/*` — `data.steward`.
@@ -229,7 +244,7 @@
 - `POST /public/org-applications/{id}/verify-email` `{ code, statusToken }` → статус `pending_review`; `POST /public/org-applications/{id}/resend-code` `{ statusToken }` → 202 (не чаще раза в 60 с, иначе 429 с `retryAfterSeconds`); `GET /public/org-applications/{id}?statusToken=` → `{ number, orgName, email (маской), status: pending_email|pending_review|approved|rejected, submittedAt }`.
 - `GET /public/invites/{token}` → `{ displayName, email, orgName, moCode, role, roleTitleRu, roleTitleKk, invitedBy, invitedAt, expiresAt }` (404 — нет такого; 410 `expired|accepted|declined`); `POST /public/invites/{token}/accept` `{ password, acceptedRules: true }` — пароль ставится через Admin API по политике реалма, нарушение — 422 с текстом на языке `Accept-Language` в `errors.password` и `passwordPolicy: { code, ru, kk }`; пользователь включается, почта подтверждается. `POST /public/invites/{token}/decline` — выключенная учётная запись удаляется.
 - `POST /public/password-reset` `{ email }` → всегда 202 `{ accepted: true }` (не раскрывает, есть ли почта); если пользователь найден и включён — Keycloak шлёт письмо `UPDATE_PASSWORD` (`execute-actions-email`, срок 1 ч, `client_id=darumen-web`, возврат на `{Web:PublicOrigin}/`).
-- `GET /public/login-examples` — см. раздел Public.
+- `GET /public/login-examples` и `GET /public/service-status` (почта, push, SMS, eGov — доступны ли сейчас) — см. раздел Public.
 
 Почта приложения: `Mail:Smtp:Host/Port/User/Password/From/EnableSsl` (в разработке — Mailpit `localhost:1025`, интерфейс `localhost:8025`; в compose — `mailpit:1025`); шаблоны «Письма системы» в Палитре C: приглашение, код подтверждения почты, решение по заявке. Смену пароля и «Забыли пароль» шлёт Keycloak своей темой писем.
 

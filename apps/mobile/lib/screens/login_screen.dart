@@ -3,9 +3,11 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../api/client.dart';
+import '../api/service_status.dart';
 import '../config/env.dart';
 import '../l10n/strings.dart';
 import '../router/guards.dart';
+import '../state/service_status_notifier.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
@@ -17,8 +19,10 @@ import '../widgets/external_link.dart';
 import 'otp_screen.dart';
 
 /// Вход по доске M-Auth-Login: круглая кнопка языка справа, знак и «darumen», «Вход» и «Кабинет врача» (если на
-/// устройстве в прошлый раз входил врач, иначе «Кабинет»); в белой карточке — «Войти через eGov mobile» (до доступа
-/// от НИТ — лист «Скоро», ничего не имитирует), «или по логину», поля «Рабочая почта или логин» и «Пароль» с
+/// устройстве в прошлый раз входил врач, иначе «Кабинет»); в белой карточке — «Войти через eGov mobile»: доступность
+/// берётся из `GET /public/service-status` (`egov.available`); пока сервис недоступен, кнопка вторичная с подписью
+/// «Сервис eGov mobile сейчас недоступен», а лист прямо говорит, что адрес Smart Bridge не предоставлен и входить
+/// нужно по логину — ничего не имитирует; «или по логину», поля «Рабочая почта или логин» и «Пароль» с
 /// «Показать», «Запомнить на 30 дней», «Забыли пароль?» и «Войти»; ниже — «Нет аккаунта? Зарегистрировать
 /// организацию» (веб `/signup` в браузере). Ошибки — у поля. Keycloak не отличает неверный пароль от отсутствующего
 /// кода TOTP, поэтому после отказа предлагается «Войти с кодом из приложения»; если на устройстве для этого логина
@@ -107,22 +111,28 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _egov() {
+  /// Лист eGov: сервис недоступен — почему (адрес Smart Bridge не предоставлен) и «Войти по логину»; сервис
+  /// доступен — честно, что в этой версии приложения вход через eGov ещё не реализован.
+  void _egov(ServiceAvailability egov) {
     final s = S.at(context);
+    final title = egov.isUp ? s.egovNotInAppTitle : s.egovUnavailableTitle;
+    final body = egov.isUp ? s.egovNotInAppBody : s.egovUnavailableBody(egov.reason);
+    // по высоте содержимого и с прокруткой: казахский текст на крупном шрифте не помещается в 9/16 экрана
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheet) => Padding(
+      isScrollControlled: true,
+      builder: (sheet) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xxl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(s.egovSoonTitle, style: Theme.of(sheet).textTheme.titleMedium),
+            Text(title, style: Theme.of(sheet).textTheme.titleMedium),
             const SizedBox(height: AppSpacing.sm),
-            Text(s.egovSoonBody, style: Theme.of(sheet).textTheme.bodySmall),
+            Text(body, style: Theme.of(sheet).textTheme.bodySmall),
             const SizedBox(height: AppSpacing.lg),
-            OutlinedButton(
+            FilledButton(
               onPressed: () {
                 Navigator.of(sheet).pop();
                 _usernameFocus.requestFocus();
@@ -141,6 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
     final lastShell = context.select<Session, ShellKind?>((x) => x.lastShell);
+    final egov = ServiceStatusNotifier.watch(context).egov;
     final fieldStyle = theme.textTheme.bodyMedium?.copyWith(fontSize: 15);
     return Scaffold(
       body: SafeArea(
@@ -162,11 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          FilledButton.icon(
-                            onPressed: Env.egovEnabled ? null : _egov,
-                            icon: const Icon(Icons.qr_code_2, size: 20),
-                            label: Text(s.loginWithEgov),
-                          ),
+                          _EgovButton(egov: egov, onPressed: () => _egov(egov)),
                           const SizedBox(height: AppSpacing.lg),
                           _OrDivider(text: s.orByLogin),
                           const SizedBox(height: AppSpacing.lg),
@@ -264,6 +271,33 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// «Войти через eGov mobile»: сервис доступен — primary; недоступен — вторичная кнопка (главным становится вход по
+/// логину) и подпись «Сервис eGov mobile сейчас недоступен» под ней. Кнопка остаётся нажимаемой — лист объясняет почему.
+class _EgovButton extends StatelessWidget {
+  const _EgovButton({required this.egov, required this.onPressed});
+
+  final ServiceAvailability egov;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = S.at(context);
+    final icon = const Icon(Icons.qr_code_2, size: 20);
+    final label = Text(s.loginWithEgov);
+    if (egov.isUp) {
+      return FilledButton.icon(onPressed: onPressed, icon: icon, label: label);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        OutlinedButton.icon(onPressed: onPressed, icon: icon, label: label),
+        const SizedBox(height: 6),
+        Text(s.egovUnavailableCaption, key: const ValueKey('egov-unavailable'), style: Theme.of(context).textTheme.labelSmall, textAlign: TextAlign.center),
+      ],
     );
   }
 }

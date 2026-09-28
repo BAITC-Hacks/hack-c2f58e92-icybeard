@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { pub } from '@/api/endpoints'
 import ErrorBox from '@/components/ErrorBox.vue'
+import StateEmailOff from '@/components/states/StateEmailOff.vue'
 import { saveApplication } from '@/lib/signupStore'
 import { formatKzPhone, isBin, isEmail, isKzPhone, phoneDigits } from '@/lib/validation'
 import { useAuthStore } from '@/stores/auth'
@@ -17,7 +18,8 @@ import { useRefdataStore } from '@/stores/refdata'
 /** Регистрация организации (W-Auth-Signup), без входа: организация (название, БИН — 12 цифр, тип, регион из
  * справочника, код в ИС БГ), администратор (ФИО, рабочая почта, телефон +7), согласие. POST /public/org-applications
  * → { id, number, statusToken }; statusToken сохраняется в браузере, дальше — /signup/:id (подтверждение почты и статус).
- * Ошибки 422 показываются у полей. */
+ * Ошибки 422 показываются у полей. Код подтверждения уходит письмом: пока почтовый сервер недоступен
+ * (GET /public/service-status), это сказано над формой до отправки заявки. */
 /** Типы — те же, что в справочнике организаций (admin/orgs). */
 const ORG_TYPES = ['hospital', 'polyclinic', 'center', 'dispensary', 'maternity', 'other'] as const
 const { t } = useI18n()
@@ -88,6 +90,7 @@ onMounted(async () => {
     <form class="card public-card" novalidate data-testid="signup-form" @submit.prevent="submit">
       <h1>{{ t('signup.title') }}</h1>
       <p class="lead">{{ t('signup.lead') }}</p>
+      <StateEmailOff :text="t('serviceStatus.notes.signup')" />
       <div class="field"><label for="s-org">{{ t('signup.orgName') }}</label><InputText id="s-org" v-model="form.orgName" :invalid="!!show('orgName')" data-testid="signup-org" /><span v-if="show('orgName')" class="error">{{ errors.orgName }}</span></div>
       <div class="pair">
         <div class="field"><label for="s-bin">{{ t('signup.bin') }}</label><InputText id="s-bin" :model-value="form.bin" inputmode="numeric" maxlength="12" :invalid="!!show('bin')" data-testid="signup-bin" @update:model-value="onBin" /><span v-if="show('bin')" class="error">{{ errors.bin }}</span></div>

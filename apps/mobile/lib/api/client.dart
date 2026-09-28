@@ -55,8 +55,14 @@ class ApiClient {
   Future<dynamic> post(String path, Object body, {Map<String, String>? headers}) async =>
       _decode(await _http.post(_uri(path), headers: {..._headers(await _bearer()), ...?headers}, body: jsonEncode(body)));
 
+  Future<dynamic> put(String path, Object body) async =>
+      _decode(await _http.put(_uri(path), headers: _headers(await _bearer()), body: jsonEncode(body)));
+
   Future<dynamic> delete(String path, [Map<String, String?>? query]) async =>
       _decode(await _http.delete(_uri(path, query), headers: _headers(await _bearer())));
+
+  /// Публичный GET без токена: фоновый опрос не должен обновлять токен и выходить из сессии, если обновить нельзя.
+  Future<dynamic> _getAnonymous(String path) async => _decode(await _http.get(_uri(path), headers: _headers(null)));
 
   dynamic _decode(http.Response response) {
     final text = utf8.decode(response.bodyBytes);
@@ -191,6 +197,17 @@ class ApiClient {
   Future<void> endSession(String sessionId) async => await delete('/api/v1/me/sessions/${Uri.encodeComponent(sessionId)}');
 
   Future<void> endOtherSessions() async => await delete('/api/v1/me/sessions', {'keepCurrent': 'true'});
+
+  Future<NotificationSettings> myNotifications() async =>
+      NotificationSettings.fromJson(await get('/api/v1/me/notifications') as Map<String, dynamic>);
+
+  /// Сохраняет настройки целиком (события, тихие часы, дайджест) и возвращает то, что записал API.
+  Future<NotificationSettings> saveNotifications(NotificationSettings settings) async =>
+      NotificationSettings.fromJson(await put('/api/v1/me/notifications', settings.toJson()) as Map<String, dynamic>);
+
+  /// Какие внешние сервисы работают (почта, push, SMS, вход через eGov) — `GET /public/service-status`, без токена.
+  /// Ошибка HTTP или сети — исключение: решение о фолбэке принимает `ServiceStatusNotifier`.
+  Future<ServiceStatus> serviceStatus() async => ServiceStatus.fromJson(await _getAnonymous('/api/v1/public/service-status'));
 
   /// Ссылка на смену пароля уходит письмом; ответ 202 одинаковый для любой почты (без перебора адресов).
   Future<void> requestPasswordReset(String email) async => await post('/api/v1/public/password-reset', {'email': email});

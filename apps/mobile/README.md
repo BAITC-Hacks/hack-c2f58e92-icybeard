@@ -17,11 +17,17 @@ flutter run --dart-define=API_BASE=https://dc.jurek.kz --dart-define=KEYCLOAK_UR
 ```
 
 Без `--dart-define` берутся адреса локального стека (`make up`): Android-эмулятор ходит на `10.0.2.2`, остальные — на
-`localhost`. Все параметры сборки — в `lib/config/env.dart` (`API_BASE`, `KEYCLOAK_URL`, `DEFAULT_REGION`, `EGOV_ENABLED`).
+`localhost`. Все параметры сборки — в `lib/config/env.dart` (`API_BASE`, `KEYCLOAK_URL`, `DEFAULT_REGION`).
 В debug-сборке разрешён http (эмулятор), в release — только https (`android/app/src/*/res/xml/network_security_config.xml`).
 
 Вход — Keycloak (realm `darumen`, клиент `darumen-mobile`): демо-пользователи `citizen1` и `doctor1`, пароль `darumen`.
-Кнопка «Войти через eGov mobile» до появления доступа от НИТ ведёт на экран «Скоро» (см. `docs/egov-auth.md`).
+Доступность внешних сервисов приложение берёт из `GET /api/v1/public/service-status` (без токена; при запуске, при
+возвращении в приложение и каждые 5 минут на переднем плане): пока адрес eGov mobile (Smart Bridge) не предоставлен,
+кнопка «Войти через eGov mobile» вторичная, с подписью «Сервис eGov mobile сейчас недоступен», и лист объясняет, что
+входить нужно по логину (см. `docs/egov-auth.md`); пока почта не работает — баннер в обоих кабинетах и карточка на
+экране восстановления пароля; почта, SMS и push в настройках уведомлений выключены и подписаны причиной, сохранённые
+значения не сбрасываются. Если статус получить не удалось — про почту ничего не утверждается, push, SMS и eGov
+считаются недоступными.
 Гостевого режима нет: без входа открыт только экран входа. Токены хранятся в защищённом хранилище платформы (`flutter_secure_storage`);
 на web-таргете — в localStorage браузера.
 

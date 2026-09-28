@@ -2,6 +2,7 @@ using Darumen.Api;
 using Darumen.Modules.Access.Data;
 using Darumen.Modules.Access.Identity;
 using Darumen.Modules.Access.Mail;
+using Darumen.Modules.Access.Status;
 using Darumen.Contracts.V1;
 using Darumen.Modules.Analytics;
 using Darumen.Modules.Insight;
@@ -47,6 +48,9 @@ public sealed class TestApp : WebApplicationFactory<Program>
 
     public FakeEmailSender Mail { get; } = new();
 
+    /// <summary>Проба почтового сервера для GET /public/service-status (по умолчанию сервер «доступен»).</summary>
+    public FakeSmtpProbe SmtpProbe { get; } = new();
+
     public InMemoryInvitationStore Invitations { get; } = new();
 
     public InMemoryOrgApplicationStore Applications { get; } = new();
@@ -74,6 +78,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
         builder.UseSetting($"{AuthOptions.Section}:Mode", AuthOptions.HeadersMode);
         // публичные формы ограничены по адресу, а у TestServer адрес один на все тесты класса; лимит проверяет отдельный тест
         builder.UseSetting($"{RateLimitOptions.Section}:{nameof(RateLimitOptions.PublicFormsPerMinute)}", "10000");
+        // общий лимит на /api/* тоже считается по одному адресу TestServer; лимит проверяют отдельные тесты RateLimitTests
+        builder.UseSetting($"{GlobalRateLimitOptions.Section}:{nameof(GlobalRateLimitOptions.PermitLimit)}", "100000");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<QueueIntelligence.QueueIntelligenceClient>();
@@ -120,6 +126,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
         services.AddSingleton<IIdentityAdmin>(Identity);
         services.RemoveAll<IEmailSender>();
         services.AddSingleton<IEmailSender>(Mail);
+        services.RemoveAll<ISmtpProbe>();
+        services.AddSingleton<ISmtpProbe>(SmtpProbe);
         services.RemoveAll<IInvitationStore>();
         services.AddSingleton<IInvitationStore>(Invitations);
         services.RemoveAll<IOrgApplicationStore>();

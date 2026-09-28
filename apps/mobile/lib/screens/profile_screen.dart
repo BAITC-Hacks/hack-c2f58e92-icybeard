@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../api/models.dart';
 import '../l10n/strings.dart';
+import '../state/service_status_notifier.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
@@ -17,8 +18,9 @@ import '../widgets/picker_sheet.dart';
 import '../widgets/section.dart';
 import '../widgets/status_chip.dart';
 
-/// Профиль по доске M-Profile: аватар-круг, имя, «ИИН •••• 4321 · из eGov» (только маской, никогда полностью), чип
-/// роли; строки Язык, Регион, Уведомления (лист «Push через eGov mobile — после интеграции»), Данные и согласия
+/// Профиль по доске M-Profile: аватар-круг, имя, «ИИН •••• 4321» (только маской, никогда полностью; без «из eGov» —
+/// вход через eGov недоступен, ИИН приходит из учётной записи), чип роли; строки Язык, Регион, Уведомления
+/// (экран каналов доставки, подпись «только в приложении», пока почта, SMS и push не работают), Данные и согласия
 /// (как считаются прогнозы + подпись о данных), «Безопасность» (M-Account-Security), «Выйти» critical-текстом; внизу версия и подпись данных.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -88,21 +90,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
 
-  void _showNotifications() {
-    final s = S.at(context);
-    _sheet((sheet) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(s.notificationsRow, style: Theme.of(sheet).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.sm),
-            Text(s.updatesPushRoadmap, style: Theme.of(sheet).textTheme.bodyMedium),
-            const SizedBox(height: AppSpacing.xs),
-            Text(s.updatesEmptyBody, style: Theme.of(sheet).textTheme.bodySmall),
-          ],
-        ));
-  }
-
   void _showConsents() {
     final s = S.at(context);
     _sheet((sheet) {
@@ -152,8 +139,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final regionName = _regions.where((r) => r.kato == session.region).map((r) => r.name).firstOrNull ?? session.region;
     final roleKey = session.primaryRoleKey;
     final role = roleKey == null ? (session.isDoctor ? s.roleDoctor : s.roleCitizen) : s.roleTitle(roleKey);
-    final securityPath = session.isDoctor ? '/doctor/profile/security' : '/profile/security';
-    final identity = session.iin != null ? '${s.iinLabel} ${maskIin(session.iin)} · ${s.fromEgov}' : regionName;
+    final profilePath = session.isDoctor ? '/doctor/profile' : '/profile';
+    final onlyInApp = !ServiceStatusNotifier.watch(context).anyExternalChannelUp;
+    final identity = session.iin != null ? '${s.iinLabel} ${maskIin(session.iin)}' : regionName;
     return PageScaffold(
       title: s.profileTitle,
       leading: const DarumenMark(size: 28),
@@ -196,9 +184,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 trailing: RowValue(session.regionFromAccount ? '$regionName · ${s.regionFromAccount}' : regionName, size: 15),
                 onTap: session.regionFromAccount || _regions.isEmpty ? null : _pickRegion,
               ),
-              ListRow(title: s.notificationsRow, onTap: _showNotifications),
+              ListRow(title: s.notificationsRow, subtitle: onlyInApp ? s.onlyInAppShort : null, onTap: () => context.go('$profilePath/notifications')),
               ListRow(title: s.dataConsents, onTap: _showConsents),
-              ListRow(title: s.securityTitle, onTap: () => context.go(securityPath)),
+              ListRow(title: s.securityTitle, onTap: () => context.go('$profilePath/security')),
               ListRow(
                 title: s.logout,
                 strong: true,

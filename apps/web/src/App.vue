@@ -5,17 +5,20 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import AppSidebar from '@/components/app/AppSidebar.vue'
 import AppTopbar from '@/components/app/AppTopbar.vue'
+import EmailOutageBanner from '@/components/app/EmailOutageBanner.vue'
 import PublicBar from '@/components/app/PublicBar.vue'
 import { useAuthStore } from '@/stores/auth'
 
 /** Каркас: у кого есть разрешения персонала — боковая навигация; гражданину и странице входа — верхняя полоса;
- * публичные страницы (регистрация организации, приглашение) — знак и RU/KK; памятка (meta.bare) — без навигации. */
+ * публичные страницы (регистрация организации, приглашение) — знак и RU/KK; памятка (meta.bare) — без навигации.
+ * Вошедшему пользователю над страницей — баннер «Почтовый сервер недоступен», пока почта не работает. */
 const { t } = useI18n()
 const auth = useAuthStore()
 const route = useRoute()
 const bare = computed(() => route.meta.bare === true)
 const isPublic = computed(() => route.meta.public === true)
 const sidebar = computed(() => !bare.value && !isPublic.value && auth.sidebar)
+const signedInShell = computed(() => !bare.value && !isPublic.value && auth.isAuthenticated)
 </script>
 
 <template>
@@ -25,6 +28,7 @@ const sidebar = computed(() => !bare.value && !isPublic.value && auth.sidebar)
     <AppTopbar v-else-if="!bare" />
     <div class="shell-main">
       <Toast />
+      <EmailOutageBanner v-if="signedInShell" />
       <RouterView />
       <footer v-if="isPublic" class="footer">{{ t('auth.syntheticNote') }}</footer>
       <footer v-else-if="!bare" class="footer">{{ t('app.footer') }}</footer>

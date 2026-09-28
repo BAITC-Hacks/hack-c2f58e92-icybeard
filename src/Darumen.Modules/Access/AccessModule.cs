@@ -3,6 +3,7 @@ using Darumen.Modules.Access.Endpoints;
 using Darumen.Modules.Access.Identity;
 using Darumen.Modules.Access.Mail;
 using Darumen.Modules.Access.Services;
+using Darumen.Modules.Access.Status;
 using Darumen.Shared.Auth;
 using Darumen.Shared.Modules;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -11,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace Darumen.Modules.Access;
 
 /// <summary>Доступ и администрирование (docs/rbac.md): /me и аккаунт, пользователи, врачи, роли, организации и заявки,
-/// публичные регистрация организации, приглашения и восстановление пароля.</summary>
+/// публичные регистрация организации, приглашения, восстановление пароля и статус внешних каналов (почта, push, SMS, eGov).</summary>
 public sealed class AccessModule : IDarumenModule
 {
     private const string RealmsSegment = "/realms/";
@@ -32,6 +33,10 @@ public sealed class AccessModule : IDarumenModule
         services.AddSingleton<KeycloakTokenProvider>();
         services.AddSingleton<IIdentityAdmin, KeycloakIdentityAdmin>();
         services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        services.Configure<ServicesOptions>(configuration.GetSection(ServicesOptions.Section));
+        services.AddSingleton<ISmtpProbe, TcpSmtpProbe>();
+        services.AddSingleton<MailServerStatus>();
+        services.AddSingleton<ServiceStatusService>();
         services.AddExceptionHandler<IdentityExceptionHandler>();
 
         services.AddSingleton<IInvitationStore, PostgresInvitationStore>();
@@ -58,6 +63,7 @@ public sealed class AccessModule : IDarumenModule
         AdminRoleEndpoints.Map(api);
         AdminOrgEndpoints.Map(api);
         PublicAccessEndpoints.Map(api);
+        ServiceStatusEndpoints.Map(api);
     }
 
     /// <summary>Keycloak:Admin:BaseUrl и Realm по умолчанию — из Auth:Authority (http://keycloak:8080/realms/darumen).</summary>

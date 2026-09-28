@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../api/models.dart';
 import '../l10n/strings.dart';
 import '../state/load_state.dart';
+import '../state/service_status_notifier.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
@@ -21,7 +22,8 @@ import '../widgets/skeleton.dart';
 
 /// Уведомления по доске M-Updates — только события маршрута (как Messages в NHS App) внутри одной карточки,
 /// группами по дням: label «Сегодня · Вчера · 22 сентября», строки 56 px с фиолетовой точкой у нового, заголовком 15,
-/// подстрокой 13 и временем справа; предложение врача открывает маршрут. Push через eGov mobile — после интеграции.
+/// подстрокой 13 и временем справа; предложение врача открывает маршрут. Пока push-сервис не подключён
+/// (`GET /public/service-status`), внизу честная подпись: push не приходят, новые события — здесь.
 class UpdatesScreen extends StatefulWidget {
   const UpdatesScreen({super.key});
 
@@ -59,6 +61,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
     final seen = context.select<Session, String?>((x) => x.seenDecisionId);
+    final push = ServiceStatusNotifier.watch(context).push;
     return PageScaffold(
       title: s.updatesTitle,
       leading: const DarumenMark(size: 28),
@@ -99,7 +102,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
             );
           },
         ),
-        Text(s.updatesPushRoadmap, style: theme.textTheme.labelSmall),
+        if (!push.isUp) Text(s.pushDownNote(push.reason), style: theme.textTheme.labelSmall),
       ],
     );
   }

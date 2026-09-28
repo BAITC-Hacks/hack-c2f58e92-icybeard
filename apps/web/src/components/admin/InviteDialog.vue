@@ -10,6 +10,7 @@ import { ApiError } from '@/api/client'
 import { admin } from '@/api/endpoints'
 import type { InviteResponse, OrganizationItem } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import StateEmailOff from '@/components/states/StateEmailOff.vue'
 import InviteLink from './InviteLink.vue'
 import SearchSelect from '@/components/ui/SearchSelect.vue'
 import { assignableRoles } from '@/lib/admin'
@@ -20,8 +21,9 @@ import { isEmail } from '@/lib/validation'
 import { useRefdataStore } from '@/stores/refdata'
 
 /** «Пригласить пользователя»: ФИО, почта, роль, организация (у ролей с mo_code), регион. POST /admin/users/invite;
- * без SMTP API отвечает `emailSent: false` и `inviteUrl` — ссылка показывается с кнопкой «Скопировать» для ручной
- * передачи. При scope own — только врач/администратор своей организации. */
+ * письмо не ушло — API отвечает `emailSent: false` и `inviteUrl`, ссылка показывается с кнопкой «Скопировать» для ручной
+ * передачи. Почтовый сервер недоступен (GET /public/service-status) — об этом сказано ещё до отправки.
+ * При scope own — только врач/администратор своей организации. */
 const props = defineProps<{ scope: Scope | null; ownMoCode: string | null; organizations: OrganizationItem[]; defaultRole?: string }>()
 const visible = defineModel<boolean>('visible', { default: false })
 const emit = defineEmits<{ invited: [] }>()
@@ -89,13 +91,12 @@ async function send() {
   <Dialog v-model:visible="visible" modal :header="t('admin.invite.title')" :style="{ width: 'min(520px, 94vw)' }" data-testid="invite-dialog">
     <div v-if="result" class="result" data-testid="invite-result">
       <template v-if="result.emailSent"><p>{{ t('admin.invite.sent', { email }) }}</p></template>
-      <template v-else>
-        <p>{{ t('admin.invite.noEmail') }}</p>
-        <InviteLink v-if="result.inviteUrl" :url="result.inviteUrl" />
-      </template>
+      <InviteLink v-else-if="result.inviteUrl" :url="result.inviteUrl" />
+      <p v-else>{{ t('admin.invite.noEmailNoLink') }}</p>
       <p class="caption">{{ t('admin.invite.validity') }}</p>
     </div>
     <form v-else class="form-col" novalidate @submit.prevent="send">
+      <StateEmailOff :text="t('serviceStatus.notes.invite')" />
       <div class="field"><label for="i-name">{{ t('admin.invite.name') }}</label><InputText id="i-name" v-model="displayName" :invalid="touched && !!errors.displayName" data-testid="invite-name" /><span v-if="touched && errors.displayName" class="error">{{ errors.displayName }}</span></div>
       <div class="field"><label for="i-email">{{ t('admin.invite.email') }}</label><InputText id="i-email" v-model="email" type="email" autocomplete="off" :invalid="touched && !!errors.email" data-testid="invite-email" /><span v-if="touched && errors.email" class="error">{{ errors.email }}</span></div>
       <div class="field"><label for="i-role">{{ t('admin.users.colRole') }}</label><Select id="i-role" v-model="role" :options="roleOptions" option-label="label" option-value="value" data-testid="invite-role" /></div>
@@ -120,6 +121,7 @@ async function send() {
 </template>
 
 <style scoped>
-.result p { margin: 0 0 12px; }
+.result { display: flex; flex-direction: column; gap: 12px; }
+.result p { margin: 0; }
 .fixed { font-size: var(--dm-text-md); }
 </style>

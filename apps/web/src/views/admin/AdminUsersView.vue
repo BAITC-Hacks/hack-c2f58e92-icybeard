@@ -23,6 +23,7 @@ import { roleShort } from '@/lib/labels'
 import { ROLE_KEYS } from '@/lib/permissions'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
+import { useServiceStatusStore } from '@/stores/serviceStatus'
 
 /** Пользователи (W-Admin-Users): фильтры роль · организация · статус и поиск, KPI (активные, приглашения, заблокированные),
  * таблица с пагинацией, справа — панель выбранного пользователя; «Пригласить пользователя». Разрешение admin.users:
@@ -33,6 +34,7 @@ const { t } = useI18n()
 const toast = useToast()
 const auth = useAuthStore()
 const refdata = useRefdataStore()
+const services = useServiceStatusStore()
 const { num, dateTimeShort } = useLocaleFormat()
 
 const scope = computed(() => auth.scopeOf('admin.users'))
@@ -57,7 +59,7 @@ const roleOptions = computed(() => ROLE_KEYS.map((key) => ({ value: key, label: 
 const orgOptions = computed(() => organizations.value.map((o) => ({ value: o.moCode, label: `${shortOrgName(o.name)} · ${o.moCode}` })))
 const statusOptions = computed(() => STATUSES.map((s) => ({ value: s, label: t(`admin.users.statusFilter.${s}`) })))
 const summary = computed(() => response.value?.summary ?? null)
-const lead = computed(() => [response.value ? t('admin.users.lead', { n: num(response.value.total) }) : null, own.value ? t('admin.ownOrgLead', { org: shortOrgName(refdata.organizationName(auth.moCode)) }) : t('admin.users.leadVia')].filter(Boolean).join(' · '))
+const lead = computed(() => [response.value ? t('admin.users.lead', { n: num(response.value.total) }) : null, own.value ? t('admin.ownOrgLead', { org: shortOrgName(refdata.organizationName(auth.moCode)) }) : services.egovAvailable ? t('admin.users.leadVia') : t('admin.users.leadPasswordOnly')].filter(Boolean).join(' · '))
 
 /** Номер последнего запроса списка: ответ на устаревший фильтр или страницу отбрасывается. */
 let latestLoad = 0

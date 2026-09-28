@@ -25,8 +25,8 @@ class OtpRequest {
 }
 
 /// Второй фактор по доске M-Auth-OTP: шесть ячеек с автопереходом и вставкой, «Код обновляется каждые 30 секунд»
-/// (TOTP не отправляется повторно — таймера нет), карточка «Другой способ» — код из приложения (текущий), SMS и
-/// резервные коды «после интеграции»; внизу «Подтвердить». Вход повторяется password grant с параметром `totp`;
+/// (TOTP не отправляется повторно — таймера нет), карточка «Другой способ» — код из приложения (текущий), SMS —
+/// «Сервис ещё не подключён», резервные коды — «после интеграции»; внизу «Подтвердить». Вход повторяется password grant с параметром `totp`;
 /// Keycloak на неверный код и неверный пароль отвечает одинаково, поэтому ошибка у поля подсказывает оба варианта.
 /// «Не спрашивать 30 дней» с доски не переносится: direct grant Keycloak не умеет доверенные устройства.
 class OtpScreen extends StatefulWidget {
@@ -141,7 +141,7 @@ class _OtpScreenState extends State<OtpScreen> {
               const SizedBox(height: AppSpacing.sm),
               _MethodRow(icon: Icons.phone_iphone, title: s.methodApp, chip: StatusChip(s.currentMethod, tone: StatusTone.accent)),
               const SizedBox(height: AppSpacing.sm),
-              _MethodRow(icon: Icons.sms_outlined, title: s.methodSms, chip: Text(s.afterIntegration, style: theme.textTheme.labelSmall, textAlign: TextAlign.end), disabled: true),
+              _MethodRow(icon: Icons.sms_outlined, title: s.methodSms, chip: Text(s.smsNotConnected, style: theme.textTheme.labelSmall, textAlign: TextAlign.end), disabled: true),
               const SizedBox(height: AppSpacing.sm),
               _MethodRow(icon: Icons.password_outlined, title: s.methodBackup, chip: Text(s.afterIntegration, style: theme.textTheme.labelSmall, textAlign: TextAlign.end), disabled: true),
             ],

@@ -208,7 +208,8 @@ void main() {
     expect(find.text('Врач предложил Достар Мед'), findsOneWidget);
     expect(find.text('«ближе к дому»'), findsOneWidget);
     expect(find.text('Вы подтвердили, что ждёте'), findsOneWidget);
-    expect(find.text('Push через eGov mobile — после интеграции'), findsOneWidget);
+    expect(find.text('Push-уведомления сейчас не приходят. Новые события появляются здесь.'), findsOneWidget,
+        reason: 'без статуса сервисов push считается недоступным — никаких обещаний «после интеграции»');
     expect(tester.takeException(), isNull);
   });
 

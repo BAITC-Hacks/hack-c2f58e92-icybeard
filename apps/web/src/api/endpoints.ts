@@ -126,6 +126,8 @@ export const pub = {
   daily: (regionKato?: string) => api<DailyResponse>('/api/v1/public/daily', { query: { regionKato } }),
   /** Пример-карточки страницы входа (анонимно, кэш 1 ч). */
   loginExamples: () => api<LoginExamples>('/api/v1/public/login-examples'),
+  /** Статус каналов (почта, push, SMS, eGov) — ответ не типизирован: его проверяет parseServiceStatus (lib/serviceStatus.ts). */
+  serviceStatus: () => api<unknown>('/api/v1/public/service-status'),
   /** Заявка на регистрацию организации: код подтверждения уходит на почту, statusToken — ключ к статусу без входа. */
   apply: (body: OrgApplicationRequest) => api<OrgApplicationCreated>('/api/v1/public/org-applications', { body }),
   application: (id: string, statusToken: string) =>

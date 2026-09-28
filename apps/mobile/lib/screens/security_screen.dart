@@ -19,7 +19,7 @@ import '../widgets/status_chip.dart';
 
 /// Безопасность аккаунта по доске M-Account-Security (из профиля): почта · организация; карточка «Вход» — пароль
 /// «изменён N дн. назад» (тап — смена пароля на странице Keycloak в браузере, `kc_action=UPDATE_PASSWORD`), SMS-код
-/// «после интеграции», приложение-аутентификатор «настроено/не настроено» (тап — `kc_action=CONFIGURE_TOTP`);
+/// «Сервис ещё не подключён», приложение-аутентификатор «настроено/не настроено» (тап — `kc_action=CONFIGURE_TOTP`);
 /// карточка «Устройства» — сеансы с «Завершить», внизу «Завершить все, кроме этого». Данные — `GET /me/security`;
 /// ошибка — состояние W-States с «Повторить», 403 — «Нет доступа».
 class SecurityScreen extends StatefulWidget {
@@ -146,8 +146,8 @@ class _SignInCard extends StatelessWidget {
             trailing: Text(s.changePassword, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 14, color: colors.accentHover)),
             onTap: onChangePassword,
           ),
-          // SMS-код появится после интеграции со шлюзом — подписью, а не чипом «включено», как на доске
-          ListRow(leading: icon(Icons.sms_outlined), title: s.methodSms, subtitle: s.afterIntegration),
+          // SMS-шлюза нет: подпись «Сервис ещё не подключён», как у каналов уведомлений, а не чип «включено»
+          ListRow(leading: icon(Icons.sms_outlined), title: s.methodSms, subtitle: s.smsNotConnected),
           ListRow(
             leading: icon(Icons.phone_iphone),
             title: s.authenticatorApp,

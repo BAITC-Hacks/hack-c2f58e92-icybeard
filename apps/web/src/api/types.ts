@@ -445,3 +445,9 @@ export interface LoginExamples {
   wait: { regionName: string; profileName: string; p50Days: number; p90Days: number; within30: number } | null
   rx: { mnn: string; covered: boolean; fillP50: number | null; fillP90: number | null } | null
 }
+
+/** Причина недоступности канала (GET /public/service-status, docs/api.md); новые причины приходят строкой как есть. */
+export type ServiceReason = 'smtp_not_configured' | 'smtp_unreachable' | 'not_ready' | 'endpoint_not_provided' | (string & {})
+export interface ServiceAvailability { available: boolean; reason: ServiceReason | null }
+/** Какие внешние каналы сейчас работают: почта, push, SMS и вход через eGov mobile. */
+export interface ServiceStatus { checkedAt: string; email: ServiceAvailability; push: ServiceAvailability; sms: ServiceAvailability; egov: ServiceAvailability }

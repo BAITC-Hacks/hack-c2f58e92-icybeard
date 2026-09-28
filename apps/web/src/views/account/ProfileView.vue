@@ -21,14 +21,18 @@ import { initials, roleTitle } from '@/lib/labels'
 import { isKzPhone, phoneDigits, TIME_ZONES, timeZoneLabel } from '@/lib/validation'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
+import { useServiceStatusStore } from '@/stores/serviceStatus'
 
 /** Профиль (W-Account-Profile): карточка «кто я», личные данные (ФИО, должность, специальность — только чтение,
  * «меняет администратор»; телефон — редактируется), рабочая почта со статусом подтверждения, язык и часовой пояс.
- * Сохранение — PUT /me/profile { phone, language, timeZone }. ИИН — только маской из /me. */
+ * Сохранение — PUT /me/profile { phone, language, timeZone }. ИИН — только маской из /me. Подтверждение через eGov
+ * (чип «подтверждён через eGov») недоступно, пока адрес сервиса eGov mobile не предоставлен (GET /public/service-status) —
+ * об этом строка в карточке «кто я». */
 const { t } = useI18n()
 const toast = useToast()
 const auth = useAuthStore()
 const refdata = useRefdataStore()
+const services = useServiceStatusStore()
 const { data: profile, loading, error, run } = useAsync<ProfileResponse>(() => account.profile())
 
 const phone = ref('')
@@ -93,6 +97,7 @@ onMounted(async () => {
           <div class="who-name">{{ name }}<StatusTag v-if="profile?.via === 'egov'" :value="t('account.profile.viaEgov')" tone="ok" /></div>
           <div class="muted small">{{ auth.role ? roleTitle(auth.role) : '—' }}<template v-if="moName"> · {{ moName }}<template v-if="moCode"> · {{ moCode }}</template></template></div>
           <div v-if="iinMasked" class="muted small tabular">{{ t('account.profile.iin') }}: {{ iinMasked }}</div>
+          <div v-if="profile?.via !== 'egov' && !services.egovAvailable" class="caption" data-testid="profile-egov-off">{{ t('account.profile.egovOff') }}</div>
         </div>
       </section>
 

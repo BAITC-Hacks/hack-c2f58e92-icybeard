@@ -8,6 +8,7 @@ import '../screens/forgot_password_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/medicines_screen.dart';
+import '../screens/notification_settings_screen.dart';
 import '../screens/otp_screen.dart';
 import '../screens/patient_route_screen.dart';
 import '../screens/profile_screen.dart';
@@ -25,9 +26,9 @@ import '../widgets/app_shell.dart';
 import 'guards.dart';
 
 /// Два shell'а с уникальными префиксами (go_router не матчит одинаковые пути в разных shell'ах):
-/// citizen — `/home` (с вложенными `route`, `wait`, `medicines`, `vaccination`), `/updates`, `/profile` (+ `security`);
-/// doctor — `/doctor/patients` (с `:ref`, `:ref/referral`, `:ref/scribe`), `/doctor/decisions`, `/doctor/profile`
-/// (+ `security`). Ассистент направления и скрайб без пациента (`/doctor/referral`, `/doctor/scribe`) живут вне
+/// citizen — `/home` (с вложенными `route`, `wait`, `medicines`, `vaccination`), `/updates`, `/profile` (+ `security`,
+/// `notifications`); doctor — `/doctor/patients` (с `:ref`, `:ref/referral`, `:ref/scribe`), `/doctor/decisions`,
+/// `/doctor/profile` (+ `security`, `notifications`). Ассистент направления и скрайб без пациента (`/doctor/referral`, `/doctor/scribe`) живут вне
 /// вкладок. Роли без мобильного кабинета — `/web`. Вход: `/login`, `/login/otp` (второй фактор, логин и пароль
 /// приходят через `extra`), `/login/forgot`. Вкладки и экраны скрываются по разрешениям (guards.dart).
 /// Переходы — `context.go`, чтобы стек ветки и кнопка «назад» были согласованы.
@@ -73,7 +74,7 @@ GoRouter buildRouter(Session session) => GoRouter(
             ]),
             StatefulShellBranch(routes: [GoRoute(path: '/updates', builder: (_, _) => const UpdatesScreen())]),
             StatefulShellBranch(routes: [
-              GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen(), routes: [GoRoute(path: 'security', builder: (_, _) => const SecurityScreen())]),
+              GoRoute(path: '/profile', builder: (_, _) => const ProfileScreen(), routes: _profileRoutes),
             ]),
           ],
         ),
@@ -105,7 +106,7 @@ GoRouter buildRouter(Session session) => GoRouter(
             ]),
             StatefulShellBranch(routes: [GoRoute(path: '/doctor/decisions', builder: (_, _) => const DecisionsScreen())]),
             StatefulShellBranch(routes: [
-              GoRoute(path: '/doctor/profile', builder: (_, _) => const ProfileScreen(), routes: [GoRoute(path: 'security', builder: (_, _) => const SecurityScreen())]),
+              GoRoute(path: '/doctor/profile', builder: (_, _) => const ProfileScreen(), routes: _profileRoutes),
             ]),
           ],
         ),
@@ -116,6 +117,12 @@ GoRouter buildRouter(Session session) => GoRouter(
         GoRoute(path: '/doctor/scribe', builder: (_, _) => const ScribeScreen()),
       ],
     );
+
+/// Экраны аккаунта под профилем обоих shell'ов: безопасность и каналы уведомлений.
+final _profileRoutes = <RouteBase>[
+  GoRoute(path: 'security', builder: (_, _) => const SecurityScreen()),
+  GoRoute(path: 'notifications', builder: (_, _) => const NotificationSettingsScreen()),
+];
 
 /// Вкладки гражданина: Главная · Уведомления · Профиль.
 List<ShellDestination> citizenDestinations(S s, Session session) => [

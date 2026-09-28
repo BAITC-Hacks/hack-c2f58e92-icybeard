@@ -4,17 +4,21 @@ import 'package:provider/provider.dart';
 
 import '../api/client.dart';
 import '../l10n/strings.dart';
+import '../state/service_status_notifier.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../widgets/app_card.dart';
 import '../widgets/error_box.dart';
+import '../widgets/notice_card.dart';
 import '../widgets/section.dart';
 
 /// Восстановление пароля по доске M-Auth-Forgot: «Укажите рабочую почту — пришлём ссылку», поле почты, «ссылка
 /// действует 60 минут», «Отправить ссылку» → `POST /api/v1/public/password-reset {email}` (202). После ответа —
 /// карточка «Проверьте почту». Новый пароль задаётся по ссылке из письма на странице Keycloak (доска M-Auth-Reset
 /// в вебе), отдельного экрана в приложении нет. Ошибки: формат почты — у поля, нет эндпоинта или сбой — плашка.
+/// Почтовый сервер недоступен (`GET /public/service-status`) — сверху карточка «Письмо сейчас не придёт» с просьбой
+/// обратиться к администратору организации; отправка остаётся доступной, но после ответа экран не обещает письмо.
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -86,6 +90,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final s = S.at(context);
     final theme = Theme.of(context);
     final sent = _sentTo != null;
+    final mailDown = ServiceStatusNotifier.watch(context).email.isDown;
     return PageScaffold(
       title: s.forgotTitle,
       neutralBack: true,
@@ -93,6 +98,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ? OutlinedButton(onPressed: () => context.go('/login'), child: Text(s.backToLogin))
           : FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? s.sendingLink : s.sendLink)),
       children: [
+        if (mailDown) NoticeCard(key: const ValueKey('reset-mail-down'), icon: Icons.mail_outline, title: s.resetMailDownTitle, body: s.resetMailDownBody),
         AppCard(
           padding: AppCard.plain,
           child: Column(
@@ -119,7 +125,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ],
           ),
         ),
-        if (sent) _SentCard(email: _sentTo!),
+        if (sent) _SentCard(email: _sentTo!, mailDown: mailDown),
         if (_failure != null) ErrorBox(error: _failure, onRetry: _busy ? null : _submit),
         Text(s.loginPrivacyNote, style: theme.textTheme.labelSmall),
       ],
@@ -127,11 +133,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 }
 
-/// «Проверьте почту»: конверт в lavender-круге, заголовок 17/500, адрес и подсказка про «Спам».
+/// «Проверьте почту»: конверт в lavender-круге, заголовок 17/500, адрес и подсказка про «Спам». Пока почтовый сервер
+/// недоступен — «Запрос принят», письмо на адрес не отправится, сменить пароль поможет администратор организации.
 class _SentCard extends StatelessWidget {
-  const _SentCard({required this.email});
+  const _SentCard({required this.email, required this.mailDown});
 
   final String email;
+  final bool mailDown;
 
   @override
   Widget build(BuildContext context) {
@@ -158,16 +166,16 @@ class _SentCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(s.checkMailTitle, style: theme.textTheme.titleMedium),
+                      Text(mailDown ? s.requestAcceptedTitle : s.checkMailTitle, style: theme.textTheme.titleMedium),
                       const SizedBox(height: 2),
-                      Text(s.checkMailBody(email), style: theme.textTheme.bodySmall),
+                      Text(mailDown ? s.mailNotSentBody(email) : s.checkMailBody(email), style: theme.textTheme.bodySmall),
                     ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(s.checkMailNote, style: theme.textTheme.labelSmall),
+            Text(mailDown ? s.askAdminNote : s.checkMailNote, style: theme.textTheme.labelSmall),
           ],
         ),
       ),

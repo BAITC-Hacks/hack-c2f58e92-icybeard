@@ -76,7 +76,7 @@ class DeviceSession {
       );
 }
 
-/// `GET /api/v1/me/security`: пароль, второй фактор и сеансы. SMS и резервные коды — после интеграции.
+/// `GET /api/v1/me/security`: пароль, второй фактор и сеансы. SMS-шлюз не подключён, резервные коды — после интеграции.
 class SecurityInfo {
   const SecurityInfo({required this.otpConfigured, required this.smsAvailable, required this.sessions, this.passwordChangedAt});
 
@@ -101,4 +101,110 @@ class SecurityInfo {
             .where((d) => d.id.isNotEmpty)
             .toList(growable: false),
       );
+}
+
+/// Канал доставки уведомления (docs/rbac.md, `GET /me/notifications`).
+enum NotificationChannel { inApp, email, sms, push }
+
+/// Событие и его каналы; `locked` — событие `security`, его не отключают.
+class NotificationEvent {
+  const NotificationEvent({
+    required this.code,
+    required this.inApp,
+    required this.email,
+    required this.sms,
+    required this.push,
+    this.locked = false,
+    this.titleRu,
+    this.titleKk,
+  });
+
+  final String code;
+  final String? titleRu;
+  final String? titleKk;
+  final bool inApp;
+  final bool email;
+  final bool sms;
+  final bool push;
+  final bool locked;
+
+  bool channel(NotificationChannel c) => switch (c) {
+        NotificationChannel.inApp => inApp,
+        NotificationChannel.email => email,
+        NotificationChannel.sms => sms,
+        NotificationChannel.push => push,
+      };
+
+  /// Копия с одним изменённым каналом.
+  NotificationEvent withChannel(NotificationChannel c, bool value) => NotificationEvent(
+        code: code,
+        titleRu: titleRu,
+        titleKk: titleKk,
+        locked: locked,
+        inApp: c == NotificationChannel.inApp ? value : inApp,
+        email: c == NotificationChannel.email ? value : email,
+        sms: c == NotificationChannel.sms ? value : sms,
+        push: c == NotificationChannel.push ? value : push,
+      );
+
+  factory NotificationEvent.fromJson(Map<String, dynamic> json) => NotificationEvent(
+        code: json['code'] as String? ?? '',
+        titleRu: json['titleRu'] as String?,
+        titleKk: json['titleKk'] as String?,
+        inApp: json['inApp'] as bool? ?? false,
+        email: json['email'] as bool? ?? false,
+        sms: json['sms'] as bool? ?? false,
+        push: json['push'] as bool? ?? false,
+        locked: json['locked'] as bool? ?? false,
+      );
+
+  /// Строка `PUT /me/notifications` — только код и каналы.
+  Map<String, dynamic> toJson() => {'code': code, 'inApp': inApp, 'email': email, 'sms': sms, 'push': push};
+}
+
+/// `GET /me/notifications`: события × каналы, тихие часы и дайджест. Мобилка меняет только каналы целиком; всё
+/// остальное уходит обратно без изменений, чтобы не затереть настройки, сделанные в вебе.
+class NotificationSettings {
+  const NotificationSettings({required this.events, this.quietFrom, this.quietTo, this.quietExceptRegulator = false, this.digest = 'off'});
+
+  final List<NotificationEvent> events;
+  final String? quietFrom;
+  final String? quietTo;
+  final bool quietExceptRegulator;
+  final String digest;
+
+  /// Канал включён хотя бы для одного события, которое пользователь может менять (у `security` почта включена
+  /// всегда — она не в счёт); если таких событий нет — по всем.
+  bool enabled(NotificationChannel c) {
+    final editable = events.where((e) => !e.locked);
+    return (editable.isEmpty ? events : editable).any((e) => e.channel(c));
+  }
+
+  /// Копия, где канал включён или выключен у всех изменяемых событий; закреплённые события не трогаются.
+  NotificationSettings withChannel(NotificationChannel c, bool value) => NotificationSettings(
+        events: List.unmodifiable([for (final e in events) e.locked ? e : e.withChannel(c, value)]),
+        quietFrom: quietFrom,
+        quietTo: quietTo,
+        quietExceptRegulator: quietExceptRegulator,
+        digest: digest,
+      );
+
+  factory NotificationSettings.fromJson(Map<String, dynamic> json) => NotificationSettings(
+        events: List.unmodifiable(((json['events'] as List<dynamic>?) ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(NotificationEvent.fromJson)
+            .where((e) => e.code.isNotEmpty)),
+        quietFrom: json['quietFrom'] as String?,
+        quietTo: json['quietTo'] as String?,
+        quietExceptRegulator: json['quietExceptRegulator'] as bool? ?? false,
+        digest: json['digest'] as String? ?? 'off',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'events': [for (final e in events) e.toJson()],
+        'quietFrom': quietFrom,
+        'quietTo': quietTo,
+        'quietExceptRegulator': quietExceptRegulator,
+        'digest': digest,
+      };
 }

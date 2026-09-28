@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import 'notice_card.dart';
 
 /// Вкладка плавающей нижней навигации: подпись, иконка, корневой путь и индекс ветки StatefulShellRoute (вкладки
 /// без разрешения скрываются, поэтому позиция в пилюле и номер ветки могут не совпадать).
@@ -18,7 +19,8 @@ class ShellDestination {
 /// Плавающая пилюля навигации поверх StatefulShellRoute: `margin 12 20 20`, высота 64, белая, тень; три пункта —
 /// иконка 22, подпись 12/500, точка 6 px accent под активным (активный пункт ink, остальные ink-2 — доска M-Home). Показывается только на корневых экранах веток: на
 /// вложенных («Мой путь», «Сколько ждут», маршрут пациента) вместо неё нижняя кнопка экрана. Повторное нажатие
-/// на активную вкладку возвращает её в корень.
+/// на активную вкладку возвращает её в корень. Над экранами обоих shell'ов — баннер «Почтовый сервер недоступен»
+/// ([EmailOutageBanner]), пока почта не работает и пользователь его не закрыл.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.shell, required this.destinations});
 
@@ -29,8 +31,16 @@ class AppShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = GoRouter.of(context).routerDelegate.currentConfiguration.uri.path;
     final atRoot = destinations.any((d) => d.path == location);
+    final banner = EmailOutageBanner.visible(context);
     return Scaffold(
-      body: shell,
+      // форма дерева не меняется при показе баннера — ветки shell'а не пересоздаются; под баннером верхний
+      // системный отступ уже занят, экран его не повторяет
+      body: Column(
+        children: [
+          const EmailOutageBanner(),
+          Expanded(child: MediaQuery.removePadding(context: context, removeTop: banner, child: shell)),
+        ],
+      ),
       bottomNavigationBar: atRoot
           ? FloatingNav(
               selectedIndex: destinations.indexWhere((d) => d.branch == shell.currentIndex),

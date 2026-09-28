@@ -13,12 +13,16 @@ import AsyncState from '@/components/states/AsyncState.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import { useAsync } from '@/composables/useAsync'
+import { emailReasonKey } from '@/lib/serviceStatus'
 import { useAuthStore } from '@/stores/auth'
+import { useServiceStatusStore, type NotifyChannel } from '@/stores/serviceStatus'
 
 /** Уведомления (W-Account-Notifications): матрица «событие × канал» (в системе · почта · SMS · push), событие
  * `security` всегда включено и не редактируется; тихие часы «с … до …» с исключением для сигналов Минздрава; сводка
- * (нет / ежедневно / еженедельно). Сохранение — PUT /me/notifications. */
-const CHANNELS = ['inApp', 'email', 'sms', 'push'] as const
+ * (нет / ежедневно / еженедельно). Сохранение — PUT /me/notifications. Каналы, которые сейчас не доставляют
+ * (GET /public/service-status: почтовый сервер недоступен, SMS и push не подключены), выключены с подписью причины;
+ * сохранённые в них отметки не стираются — PUT отправляет их как есть. */
+const CHANNELS = ['inApp', 'email', 'sms', 'push'] as const satisfies readonly NotifyChannel[]
 type Channel = (typeof CHANNELS)[number]
 const LOCKED_EVENT = 'security'
 const HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')}:00`)
@@ -26,6 +30,7 @@ const HOURS = Array.from({ length: 24 }, (_, h) => `${String(h).padStart(2, '0')
 const { t, te } = useI18n()
 const toast = useToast()
 const auth = useAuthStore()
+const services = useServiceStatusStore()
 const { data: settings, loading, error, run } = useAsync<NotificationSettings>(() => account.notifications())
 const draft = ref<NotificationSettings | null>(null)
 const saving = ref(false)
@@ -53,8 +58,23 @@ const summary = computed(() => {
   return [auth.displayName ?? auth.actor, t('account.notifications.eventsCount', { n: d.events.length }), t('account.notifications.channelsCount', { n: CHANNELS.length }), quiet].join(' · ')
 })
 
+/** Подпись причины у выключенного канала: почта — по ответу пробы SMTP, SMS и push — «Сервис ещё не подключён». */
+function offLabel(channel: Channel): string | null {
+  const reason = services.channelOff(channel)
+  if (!reason) return null
+  if (channel === 'email') return t(`serviceStatus.emailReason.${emailReasonKey(reason)}`)
+  return t('serviceStatus.notConnected')
+}
+const offChannels = computed(() => CHANNELS.filter((c) => services.channelOff(c) !== null))
+const deliveryNote = computed(() => {
+  if (offChannels.value.length === 0) return ''
+  if (offChannels.value.length === CHANNELS.length - 1) return t('account.notifications.onlyInApp')
+  return t('account.notifications.someOff', { channels: offChannels.value.map((c) => t(`account.notifications.channel.${c}`)).join(', ') })
+})
+const isOff = (channel: Channel) => services.channelOff(channel) !== null
+
 function toggle(event: NotificationEvent, channel: Channel, value: boolean) {
-  if (!draft.value || isLocked(event)) return
+  if (!draft.value || isLocked(event) || isOff(channel)) return
   draft.value = { ...draft.value, events: draft.value.events.map((e) => (e.code === event.code ? { ...e, [channel]: value } : e)) }
 }
 
@@ -83,14 +103,30 @@ onMounted(run)
         <template v-if="draft">
         <AppCard :title="t('account.notifications.matrixTitle')">
           <template #header><span class="caption">{{ t('account.notifications.matrixHint') }}</span></template>
+          <p v-if="deliveryNote" class="delivery-note" role="note" data-testid="notifications-delivery-note"><i class="pi pi-info-circle" aria-hidden="true" /><span>{{ deliveryNote }}</span></p>
           <div class="table-wrap">
             <table class="dense-table matrix" data-testid="notifications-matrix">
-              <thead><tr><th>{{ t('account.notifications.event') }}</th><th v-for="c in CHANNELS" :key="c" class="center">{{ t(`account.notifications.channel.${c}`) }}</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>{{ t('account.notifications.event') }}</th>
+                  <th v-for="c in CHANNELS" :key="c" class="center" :class="{ off: isOff(c) }" :data-testid="`channel-${c}`">
+                    {{ t(`account.notifications.channel.${c}`) }}
+                    <span v-if="offLabel(c)" class="off-reason" :data-testid="`channel-off-${c}`">{{ offLabel(c) }}</span>
+                  </th>
+                </tr>
+              </thead>
               <tbody>
                 <tr v-for="event in draft.events" :key="event.code">
                   <td>{{ eventLabel(event) }}<div v-if="isLocked(event)" class="caption">{{ t('account.notifications.locked') }}</div></td>
                   <td v-for="c in CHANNELS" :key="c" class="center">
-                    <Checkbox :model-value="event[c]" binary :disabled="isLocked(event)" :aria-label="`${eventLabel(event)} · ${t(`account.notifications.channel.${c}`)}`" @update:model-value="(v: boolean) => toggle(event, c, v)" />
+                    <Checkbox
+                      :model-value="event[c]"
+                      binary
+                      :disabled="isLocked(event) || isOff(c)"
+                      :aria-label="[eventLabel(event), t(`account.notifications.channel.${c}`), isOff(c) ? t('account.notifications.channelOff') : null].filter(Boolean).join(' · ')"
+                      :data-testid="`notify-${event.code}-${c}`"
+                      @update:model-value="(v: boolean) => toggle(event, c, v)"
+                    />
                   </td>
                 </tr>
               </tbody>
@@ -108,6 +144,7 @@ onMounted(run)
           <AppCard :title="t('account.notifications.digestTitle')">
             <div class="field"><label for="digest">{{ t('account.notifications.digestLabel') }}</label><Select id="digest" v-model="draft.digest" :options="digestOptions" option-label="label" option-value="value" /></div>
             <p class="caption">{{ t('account.notifications.digestHint') }}</p>
+            <p v-if="isOff('email')" class="caption digest-off" data-testid="digest-email-off">{{ t('account.notifications.digestEmailOff') }}</p>
           </AppCard>
         </div>
         <ErrorBox :error="saveError" />
@@ -120,7 +157,12 @@ onMounted(run)
 
 <style scoped>
 .account-col { display: flex; flex-direction: column; gap: 16px; max-width: 880px; }
-.matrix th.center, .matrix td.center { text-align: center; width: 96px; }
+.matrix th.center, .matrix td.center { text-align: center; width: 112px; }
+.matrix th.off { color: var(--dm-muted); }
+.off-reason { display: block; margin-top: 2px; font-size: var(--dm-text-xs); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--dm-warn); line-height: 1.3; }
+.delivery-note { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 12px 16px; border-radius: var(--dm-radius-md); background: var(--dm-warn-soft); color: var(--dm-ink); font-size: var(--dm-text-sm); line-height: 1.45; }
+.delivery-note i { color: var(--dm-warn-strong); margin-top: 2px; }
+.digest-off { color: var(--dm-warn); }
 .form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .quiet-except { margin-top: 12px; }
 .form-actions { display: flex; justify-content: flex-end; }

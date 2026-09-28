@@ -99,12 +99,12 @@ textarea.dm-control{height:auto;min-height:88px;padding:12px 16px}
 .dm-divider{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--dm-muted)}
 .dm-divider::before,.dm-divider::after{content:"";flex:1;height:1px;background:var(--dm-hair)}
 
-/* eGov: без интеграции — раскрывает пояснение, вход не имитируется */
+/* eGov: адрес сервиса не предоставлен — вторичная кнопка раскрывает пояснение, вход не имитируется (как на вебе) */
 .dm-egov{display:block}
 .dm-egov[open]>.dm-alert{margin-top:12px}
 .dm-egov>summary{list-style:none}
 .dm-egov>summary::-webkit-details-marker{display:none}
-.dm-egov[open]>summary{background:var(--dm-accent-hover)}
+.dm-egov[open]>summary{background:var(--dm-hair)}
 
 /* сообщения */
 .dm-alert{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:12px;background:var(--dm-inset);color:var(--dm-ink);font-size:14px;text-align:left}
@@ -112,6 +112,7 @@ textarea.dm-control{height:auto;min-height:88px;padding:12px 16px}
 .dm-alert.error{background:var(--dm-danger-soft);color:var(--dm-danger)}
 .dm-alert.success{background:var(--dm-ok-soft);color:var(--dm-ok)}
 .dm-alert.warning{background:var(--dm-warn-soft);color:var(--dm-warn)}
+.dm-alert[hidden]{display:none}
 .dm-alert .dm-alert-body{display:flex;flex-direction:column;gap:2px}
 .dm-alert strong{font-weight:600}
 

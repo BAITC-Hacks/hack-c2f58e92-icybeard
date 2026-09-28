@@ -1,11 +1,13 @@
 import { kkAccount } from './kk-account'
 import { kkAdmin } from './kk-admin'
 import { kkRbac } from './kk-rbac'
+import { kkServices } from './kk-services'
 
 export const kk = {
   ...kkRbac,
   ...kkAccount,
   ...kkAdmin,
+  ...kkServices,
   nav: {
     group: {
       patients: 'Пациенттер',
@@ -113,8 +115,10 @@ export const kk = {
     login: 'Кіру', logout: 'Шығу',
     loginTitle: 'Кіру', loginLead: 'Азаматқа — емдеуге жатқызу жолы, дәрігерге — жұмыс тізімі және жолдама көмекшісі.',
     loginEgov: 'eGov mobile арқылы кіру',
-    roadmapTitle: 'Жақында: eGov mobile арқылы кіру',
-    roadmap: 'eGov mobile арқылы кіру мемлекеттік жүйелерден ЖСН, өңір және тіркелу деректерін береді. Интеграция «ҰАТ» АҚ-дан сұратылды (Smart Bridge); ол пайда болғанша стенд логинмен кіруді қолданады.',
+    loginPassword: 'Логин мен құпиясөз арқылы кіру',
+    egovOffCaption: 'Қолжетімсіз: eGov mobile сервисінің мекенжайы берілмеген',
+    egovOffTitle: 'eGov mobile арқылы кіру қолжетімсіз',
+    egovOffText: 'eGov mobile (Smart Bridge) сервисінің мекенжайы берілмеген, сондықтан eGov арқылы кіру қолжетімсіз. Логин мен құпиясөз арқылы кіріңіз.',
     unavailable: 'Кіру уақытша қолжетімсіз: кіру сервері жауап бермейді.',
     syntheticNote: 'Деректер синтетикалық, стенд дербес деректерді сақтамайды.',
   },
