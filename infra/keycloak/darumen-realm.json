@@ -131,6 +131,7 @@
         "http://localhost:3000/*",
         "http://web/*",
         "https://dc.jurek.kz/*",
+        "https://icybeard.govtech-kz.com/*",
         "http://10.0.2.2:3000/*",
         "http://10.0.2.2:5173/*"
       ],

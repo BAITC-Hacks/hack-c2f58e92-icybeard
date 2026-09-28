@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      PUBLIC_URL: https://dc.jurek.kz
+      PUBLIC_URL: https://icybeard.govtech-kz.com
     steps:
       - name: /health, Keycloak, статус каналов
         run: |

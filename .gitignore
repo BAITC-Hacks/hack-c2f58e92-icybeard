@@ -53,3 +53,7 @@ docs/IcyBeard-secrets.pdf
 key.properties
 *.jks
 *.keystore
+
+# Секреты стендов: по env-файлу на цель деплоя (infra/deploy/targets/*.env ссылаются на них) — только локально
+infra/deploy/.env.*
+!infra/deploy/.env.*.example

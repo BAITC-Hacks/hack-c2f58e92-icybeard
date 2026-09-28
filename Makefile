@@ -67,16 +67,20 @@ pipeline: ## Конвейер данных в контейнере: intake → r
 pitch: ## Обновить копию презентации в веб-приложении из darumen-pitch.html
 	cp darumen-pitch.html apps/web/public/pitch.html
 
-deploy: pitch ## Ручной деплой на dc.jurek.kz: rsync кода и витрин, сборка на VM (основной путь — тег vX.Y.Z, docs/deploy.md)
-	scripts/deploy.sh $(ARGS)
+# Цель деплоя: infra/deploy/targets/$(TARGET).env — govtech (VPS хакатона, https://icybeard.govtech-kz.com, по
+# умолчанию) или jurek (Hetzner, https://dc.jurek.kz): make deploy TARGET=jurek
+TARGET ?= govtech
+include infra/deploy/targets/$(TARGET).env
+VM_DIR ?= $(DEPLOY_PATH)
 
-DEPLOY_HOST ?= deploy@195.201.7.56
-VM_DIR ?= /srv/darumen
+deploy: pitch ## Ручной деплой на стенд цели TARGET (по умолчанию VPS хакатона): rsync кода и витрин, сборка на VM
+	TARGET=$(TARGET) scripts/deploy.sh $(ARGS)
+
 # docker exec не наследует umask контейнера backup — задаём тот же 0077, что в compose (дампы читает только владелец)
 VM_BACKUP = docker exec $$(docker ps -q --filter label=com.docker.compose.project=darumen --filter label=com.docker.compose.service=backup) bash -c "umask 0077 && exec /backup.sh"
 
 deploy-data: ## Только данные: витрины lakehouse на VM + publish в Postgres (код и образы не трогает)
-	scripts/deploy.sh --data-only
+	TARGET=$(TARGET) scripts/deploy.sh --data-only
 
 release-status: ## Что запущено на VM: текущий и прошлый релиз, хэш шаблона, контейнеры, диск, свежие бэкапы
 	ssh $(DEPLOY_HOST) $(VM_DIR)/bin/release.sh status

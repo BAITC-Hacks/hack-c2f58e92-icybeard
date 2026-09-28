@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: Выкатить на dc.jurek.kz (нужны секреты DEPLOY_*)
+        description: Выкатить на icybeard.govtech-kz.com (нужны секреты DEPLOY_*)
         type: boolean
         default: true
       ios:
@@ -31,7 +31,8 @@ concurrency:
 env:
   # Имена образов GHCR — только в нижнем регистре; тот же реестр зашит в infra/deploy/release.sh на VM
   REGISTRY: ghcr.io/baitc-hacks/hack-c2f58e92-icybeard
-  PUBLIC_URL: https://dc.jurek.kz
+  # Стенд CD — VPS хакатона (Caddy организаторов → 127.0.0.1:8014); прежний dc.jurek.kz — только make deploy TARGET=jurek
+  PUBLIC_URL: https://icybeard.govtech-kz.com
 
 jobs:
   ci:

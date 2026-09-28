@@ -1,10 +1,23 @@
-# Деплой на dc.jurek.kz
+# Деплой стенда Darumen
 
-Публичный стенд Darumen живёт на той же VM Hetzner, что и POS (`195.201.7.56`, 8 ГБ RAM без swap, nbg1), на месте прежнего демо GovTech Camp по природным рискам. TLS и домен `dc.jurek.kz` терминирует хостовый Caddy (`pos-server/deploy/caddy/Caddyfile.host`, блок `dc.jurek.kz → reverse_proxy 127.0.0.1:5173`) — стек публикует веб на `127.0.0.1:5173`. Этот блок ставит `X-Frame-Options: DENY` на все ответы, поэтому веб проверяет сессию Keycloak редиректом с `prompt=none`, а не тихим iframe (`silentCheckSsoRedirectUri`): с `DENY` браузер отказывает iframe того же origin, `init()` keycloak-js падает по таймауту ~10 с, и веб показывал «сервер входа не отвечает». Не включайте тихую проверку через iframe и `checkLoginIframe`, пока на Caddy стоит `DENY`.
+## Цели деплоя
+
+С 28.09.2026 у Darumen два стенда. Цель выбирается переменной `TARGET` (`make deploy TARGET=jurek`); её параметры — в `infra/deploy/targets/<цель>.env` (без секретов), секреты — в env-файле цели (git-ignored).
+
+| Цель | Стенд | Хост и каталог | Порт веба | Env-файл | Кто выкатывает |
+| --- | --- | --- | --- | --- | --- |
+| `govtech` (по умолчанию) | https://icybeard.govtech-kz.com | `icybeard@82.115.43.223:/home/icybeard/darumen` — VPS хакатона, общий для всех команд | `8014` (Caddy организаторов → `127.0.0.1:8014`) | `infra/deploy/.env.govtech` | `make deploy`, CD по тегу |
+| `jurek` | https://dc.jurek.kz | `deploy@195.201.7.56:/srv/darumen` — Hetzner, общая с POS | `5173` (хостовый Caddy) | `infra/deploy/.env.prod` | только `make deploy TARGET=jurek` |
+
+На VPS хакатона Docker может быть общим для команд: `make deploy` (`DEPLOY_PRUNE=0`) и `release.sh` (без `DARUMEN_PRUNE_ALL=1`) не чистят висячие образы и кэш сборки — они принадлежат всем пользователям демона. По той же причине в `.env.govtech` нет ключа DeepSeek: переменные контейнеров видны любому, у кого есть доступ к общему Docker (`docker inspect`); если Docker общий, кладите туда отдельный ключ с лимитом трат. Логин и пароль команды на VPS — только в `docs/IcyBeard-secrets.pdf` (git-ignored), в репозиторий не попадают; для `make deploy` на VPS нужен вход по ключу (разово: `ssh-copy-id icybeard@82.115.43.223`, пароль из PDF).
+
+## Стенд dc.jurek.kz
+
+Прежний публичный стенд Darumen живёт на той же VM Hetzner, что и POS (`195.201.7.56`, 8 ГБ RAM без swap, nbg1), на месте прежнего демо GovTech Camp по природным рискам. TLS и домен `dc.jurek.kz` терминирует хостовый Caddy (`pos-server/deploy/caddy/Caddyfile.host`, блок `dc.jurek.kz → reverse_proxy 127.0.0.1:5173`) — стек публикует веб на `127.0.0.1:5173`. Этот блок ставит `X-Frame-Options: DENY` на все ответы, поэтому веб проверяет сессию Keycloak редиректом с `prompt=none`, а не тихим iframe (`silentCheckSsoRedirectUri`): с `DENY` браузер отказывает iframe того же origin, `init()` keycloak-js падает по таймауту ~10 с, и веб показывал «сервер входа не отвечает». Не включайте тихую проверку через iframe и `checkLoginIframe`, пока на Caddy стоит `DENY`.
 
 Два пути выкатки:
 
-- **CD по тегу** (основной): `git tag v1.2.0 && git push baitc v1.2.0` → `.github/workflows/release.yml` собирает образы в GHCR, выкатывает их на VM через `/srv/darumen/bin/release.sh`, проверяет и при сбое откатывает, собирает Android и публикует GitHub Release. CI выбирает только тег образов; форму инфраструктуры (compose, SQL, скрипты релиза) на VM ставит человек — `make vm-install-release`.
+- **CD по тегу** (основной, на VPS хакатона): `git tag v1.2.0 && git push origin v1.2.0` → `.github/workflows/release.yml` собирает образы в GHCR, выкатывает их на VM через `<стенд>/bin/release.sh` (`/home/icybeard/darumen` на VPS хакатона), проверяет и при сбое откатывает, собирает Android и публикует GitHub Release. CI выбирает только тег образов; форму инфраструктуры (compose, SQL, скрипты релиза) на VM ставит человек — `make vm-install-release`.
 - **`make deploy`** (ручной, с ноутбука): rsync исходников и витрин, сборка образов на VM. Нужен для данных (`make deploy-data` — lakehouse есть только на машине разработчика) и как запасной путь без CI.
 
 ## Архитектура
@@ -87,7 +100,7 @@ infra/postgres/db-init.sql       файл, на который compose ссыл�
 | Секрет Actions | Значение | Зачем |
 | --- | --- | --- |
 | `DEPLOY_SSH_KEY` | приватный ключ `darumen-ci` (ed25519, без пароля), целиком | вход на VM; на VM ключ ограничен forced command `release.sh` |
-| `DEPLOY_HOST` | `deploy@195.201.7.56` | куда выкатывать |
+| `DEPLOY_HOST` | `icybeard@82.115.43.223` (VPS хакатона; для Hetzner было бы `deploy@195.201.7.56`) | куда выкатывать |
 | `DEPLOY_KNOWN_HOSTS` | строка(и) `ssh-keyscan` VM, сверенные с отпечатком | защита от подмены хоста (`StrictHostKeyChecking=yes`) |
 | `ANDROID_KEYSTORE_BASE64` | `base64 -i upload-keystore.jks` | ключ подписи релиза Android |
 | `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | пароль хранилища, алиас, пароль ключа | то же |
@@ -106,6 +119,18 @@ infra/postgres/db-init.sql       файл, на который compose ссыл�
 Правка `.env` на VM без релиза: `ssh deploy@195.201.7.56`, отредактировать, затем `cd /srv/darumen && IMAGE_TAG=$(cat current/IMAGE_TAG) docker compose -p darumen -f current/infra/docker-compose.prod.yml --env-file .env up -d` (или выкатить тег заново).
 
 ## Разовая настройка VM
+
+### VPS хакатона (цель govtech, стенд CD)
+
+Выполняет человек команды с логином и паролем из `docs/IcyBeard-secrets.pdf`; CI этого сделать не может и не должен.
+
+1. **Вход по ключу** (с ноутбука, пароль из PDF — один раз): `ssh-copy-id icybeard@82.115.43.223`, затем проверка `ssh icybeard@82.115.43.223 'id; docker version; docker compose version; free -m; df -h ~'`. Нужны Docker с плагином compose, доступные пользователю `icybeard`; если `docker ps` показывает контейнеры других команд, Docker общий — см. «Цели деплоя».
+2. **Первый деплой с данными:** `make deploy` — кладёт код, витрины lakehouse и `infra/deploy/.env.govtech` в `/home/icybeard/darumen`, собирает образы на VPS и поднимает стек на `127.0.0.1:8014`. Проверка: https://icybeard.govtech-kz.com вместо заглушки «Приложение ещё не запущено».
+3. **Шаблон релиза:** `make vm-install-release` (цель govtech по умолчанию) — `/home/icybeard/darumen/bin/template` и симлинки `bin/release.sh`, `bin/restore.sh`.
+4. **Ключ CI** — как в шагах 4–8 ниже, но с путями VPS: в `~/.ssh/authorized_keys` пользователя `icybeard` строка `command="/home/icybeard/darumen/bin/release.sh",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-user-rc ssh-ed25519 AAAA… darumen-ci`; проверка `ssh -i ./darumen-ci icybeard@82.115.43.223 status`; known_hosts — `ssh-keyscan -t ed25519 82.115.43.223`, отпечаток сверить через `ssh icybeard@82.115.43.223 ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`.
+5. **Секреты Actions** (админ организации): `DEPLOY_SSH_KEY` — приватный `darumen-ci`, `DEPLOY_HOST` — `icybeard@82.115.43.223`, `DEPLOY_KNOWN_HOSTS` — строка keyscan.
+
+### Hetzner (цель jurek)
 
 Выполняет человек с обычным ssh-доступом `deploy@195.201.7.56`; CI этого сделать не может и не должен.
 
@@ -140,21 +165,21 @@ infra/postgres/db-init.sql       файл, на который compose ссыл�
 # если с прошлого релиза менялись файлы из infra/deploy/template-files.txt:
 make vm-install-release        # с чистого чекаута коммита, который будет помечен тегом
 git tag -a v1.2.0 -m "Darumen 1.2.0"
-git push baitc v1.2.0          # remote baitc = BAITC-Hacks/hack-c2f58e92-icybeard
+git push origin v1.2.0         # origin = BAITC-Hacks/hack-c2f58e92-icybeard
 ```
 
 Тег — `vX.Y.Z` или `vX.Y.Z-суффикс` (например `v1.2.0-rc.1`, релиз помечается как pre-release). Что происходит (Actions → release):
 
 1. **ci** — тот же `ci.yml` (.NET, Python, веб с `npm run lint`, Flutter, интеграция с Kafka).
 2. **images** — 5 образов параллельно (buildx, кэш слоёв в GitHub Actions cache), теги `vX.Y.Z` и `sha-<7 символов>`, только `linux/amd64`.
-3. **deploy** (если есть `DEPLOY_*`) — считает хэш шаблона по чекауту тега и вызывает `release <тег> <actor> <хэш>`, в stdin — только токен GHCR. На VM `release.sh`: сверяет хэш с установленным шаблоном (не совпал — отказ, стенд не тронут) → снимок шаблона в `releases/<тег>` → `docker compose config` с `.env` VM → pull образов → дамп darumen и keycloak в `backups/last` → `up -d` (db-init, keycloak, realm-sync, остальные) → ждёт healthcheck сервисов и успешного realm-sync (до 7 минут) → smoke `127.0.0.1:5173` (`/health`, `/auth/realms/darumen`, `/api/v1/public/service-status`) → `current → releases/<тег>`, `previous →` прошлый. Любой сбой после `up` — автоматический откат на прежний `current` и красный джоб.
+3. **deploy** (если есть `DEPLOY_*`) — считает хэш шаблона по чекауту тега и вызывает `release <тег> <actor> <хэш>`, в stdin — только токен GHCR. На VM `release.sh`: сверяет хэш с установленным шаблоном (не совпал — отказ, стенд не тронут) → снимок шаблона в `releases/<тег>` → `docker compose config` с `.env` VM → pull образов → дамп darumen и keycloak в `backups/last` → `up -d` (db-init, keycloak, realm-sync, остальные) → ждёт healthcheck сервисов и успешного realm-sync (до 7 минут) → smoke `127.0.0.1:<WEB_PORT из .env>` (`/health`, `/auth/realms/darumen`, `/api/v1/public/service-status`) → `current → releases/<тег>`, `previous →` прошлый. Любой сбой после `up` — автоматический откат на прежний `current` и красный джоб.
 4. **smoke** — те же три адреса снаружи, через Caddy и TLS; сбой → `rollback` по ssh.
-5. **android** — `flutter build appbundle` + `apk` с `--dart-define` `API_BASE=https://dc.jurek.kz`, `KEYCLOAK_URL=https://dc.jurek.kz/auth`, `WEB_BASE=https://dc.jurek.kz`; версия из тега, номер сборки — номер запуска workflow. Без `ANDROID_*` — только `darumen-<тег>-demo-debug-signed.apk` (ставится на устройства, но не для Google Play и не обновляется поверх подписанной сборки).
+5. **android** — `flutter build appbundle` + `apk` с `--dart-define` `API_BASE=https://icybeard.govtech-kz.com`, `KEYCLOAK_URL=https://icybeard.govtech-kz.com/auth`, `WEB_BASE=https://icybeard.govtech-kz.com` (адрес стенда CD — `PUBLIC_URL` в release.yml); версия из тега, номер сборки — номер запуска workflow. Без `ANDROID_*` — только `darumen-<тег>-demo-debug-signed.apk` (ставится на устройства, но не для Google Play и не обновляется поверх подписанной сборки).
 6. **github-release** — только для тегов, если образы и Android собрались, а выкатка и smoke прошли или пропущены: заметки GitHub (по PR и коммитам) + файлы APK/AAB.
 
 Ручной запуск (Actions → release → Run workflow) на любой ветке: `deploy` — выкатывать ли (тег образов `sha-<коммит>`; хэш шаблона этой ветки тоже должен совпасть с установленным), `ios` — собрать iOS без подписи на macOS (минута macOS = 10 минут квоты). GitHub Release при ручном запуске не создаётся, сборки — в артефактах запуска (Android — 14 дней, iOS — 7).
 
-Лог выкатки — в джобе deploy и на VM: `/srv/darumen/releases/<тег>/release.log`; состояние — `make release-status`.
+Лог выкатки — в джобе deploy и на VM: `<стенд>/releases/<тег>/release.log`; состояние — `make release-status`.
 
 ## Откат
 

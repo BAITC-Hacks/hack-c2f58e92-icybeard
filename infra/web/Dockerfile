@@ -1,11 +1,12 @@
 # Веб-клиент Darumen: сборка Vite → статический nginx, который проксирует /api к сервису api и /auth к Keycloak.
-# VITE_* задаются на этапе сборки: Keycloak стенда за тем же origin (/auth), API того же origin.
+# VITE_* задаются на этапе сборки. Пустые VITE_KEYCLOAK_URL и VITE_API_BASE — Keycloak (/auth) и API того же origin,
+# что и страница: образ из CI не привязан к домену стенда.
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY apps/web/package.json apps/web/package-lock.json ./
 RUN npm ci
 COPY apps/web/ ./
-ARG VITE_KEYCLOAK_URL=https://dc.jurek.kz/auth
+ARG VITE_KEYCLOAK_URL=
 ARG VITE_KEYCLOAK_REALM=darumen
 ARG VITE_KEYCLOAK_CLIENT=darumen-web
 ARG VITE_API_BASE=

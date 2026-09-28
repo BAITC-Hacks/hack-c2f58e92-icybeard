@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# CD-релизы Darumen на VM — forced command отдельного SSH-ключа CI в ~deploy/.ssh/authorized_keys:
+# CD-релизы Darumen на VM — forced command отдельного SSH-ключа CI в ~/.ssh/authorized_keys пользователя стенда.
+# <стенд> — каталог из infra/deploy/targets/<цель>.env: /home/icybeard/darumen на VPS хакатона (icybeard@82.115.43.223),
+# /srv/darumen на Hetzner (deploy@195.201.7.56). Скрипт берёт каталог из своего пути <стенд>/bin/release.sh:
 #
-#   command="/srv/darumen/bin/release.sh",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-user-rc ssh-ed25519 AAAA… darumen-ci
+#   command="<стенд>/bin/release.sh",no-pty,no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-user-rc ssh-ed25519 AAAA… darumen-ci
 #
 # Граница доверия. Ключ CI может только выбрать тег образов нашего реестра (ghcr.io/baitc-hacks/…), откатить стенд на
 # прошлый релиз и посмотреть состояние. Файлов от CI скрипт не принимает и не читает. Форма инфраструктуры —
 # compose-файл, SQL db-init и сами скрипты релиза — меняется только через `make vm-install-release`: человек кладёт
-# шаблон (состав — infra/deploy/template-files.txt) в /srv/darumen/bin/template, а /srv/darumen/bin/release.sh и
-# restore.sh — симлинки на копии из шаблона. Секреты — только в /srv/darumen/.env, релиз его не трогает.
+# шаблон (состав — infra/deploy/template-files.txt) в <стенд>/bin/template, а <стенд>/bin/release.sh и
+# restore.sh — симлинки на копии из шаблона. Секреты — только в <стенд>/.env, релиз его не трогает.
 #
 # Протокол (команда — в SSH_ORIGINAL_COMMAND, при ручном запуске на VM — аргументами):
 #   release <тег> <пользователь GHCR> <sha256 шаблона>
@@ -18,22 +20,33 @@
 #   status     какой релиз запущен, хэш установленного шаблона, релизы на диске, свежие бэкапы
 #
 # release: снимок шаблона в releases/<тег> → `compose config` с .env VM → pull образов <тег> → дамп БД перед
-# релизом → up -d (db-init, keycloak, realm-sync, …) → healthcheck и realm-sync → smoke по 127.0.0.1:5173 →
+# релизом → up -d (db-init, keycloak, realm-sync, …) → healthcheck и realm-sync → smoke по 127.0.0.1:<WEB_PORT> →
 # current → releases/<тег>, previous → прошлый. Сбой после up — автооткат на прежний current (или на ручной деплой
-# из /srv/darumen/infra, если CD-релизов ещё не было). Вложенного восстановления нет: если не поднялся и откат,
+# из <стенд>/infra, если CD-релизов ещё не было). Вложенного восстановления нет: если не поднялся и откат,
 # скрипт пишет «ОТКАТ НЕ УДАЛСЯ» и выходит — дальше человек (docs/deploy.md, «Откат»). Хранит 5 релизов, чистит
-# образы остальных и кэш сборки.
+# образы остальных; висячие образы и кэш сборки — только при DARUMEN_PRUNE_ALL=1 (Docker VPS хакатона общий).
 set -euo pipefail
 umask 027
 
 # Переопределения DARUMEN_RELEASE_* — только для локальной проверки: клиент SSH переменные окружения передать не
 # может (AcceptEnv sshd пропускает лишь LANG/LC_*, PermitUserEnvironment выключен), в проде — значения по умолчанию.
-DARUMEN_DIR="${DARUMEN_RELEASE_DIR:-/srv/darumen}"
+# Каталог стенда — родитель bin/, из которого запущен скрипт: forced command указывает на <стенд>/bin/release.sh
+# (симлинк в шаблон, путь не раскрываем), поэтому один скрипт служит и /srv/darumen (Hetzner), и ~/darumen (VPS хакатона).
+SELF_BIN="$(cd "$(dirname "$0")" && pwd)"
+if [ -z "${DARUMEN_RELEASE_DIR:-}" ] && [ "${SELF_BIN##*/}" != bin ]; then
+  echo "release.sh запускается как <каталог стенда>/bin/release.sh (его ставит make vm-install-release)" >&2
+  exit 2
+fi
+DARUMEN_DIR="${DARUMEN_RELEASE_DIR:-${SELF_BIN%/bin}}"
 ENV_FILE="${DARUMEN_RELEASE_ENV_FILE:-$DARUMEN_DIR/.env}"
 LAKEHOUSE_DIR="${DARUMEN_RELEASE_LAKEHOUSE_DIR:-$DARUMEN_DIR/lakehouse}"
 BACKUP_DIR="${DARUMEN_RELEASE_BACKUP_DIR:-$DARUMEN_DIR/backups}"
 PROJECT="${DARUMEN_RELEASE_PROJECT:-darumen}"
-SMOKE_BASE="${DARUMEN_RELEASE_SMOKE_BASE:-http://127.0.0.1:5173}"
+# Не секретные настройки стенда из .env: порт веба (WEB_PORT, на VPS хакатона 8014) и DARUMEN_PRUNE_ALL
+env_value() { [ -r "$ENV_FILE" ] || return 0; sed -n "s/^$1=\([A-Za-z0-9._:/-]*\)\$/\1/p" "$ENV_FILE" | tail -n 1; }
+WEB_PORT="$(env_value WEB_PORT)"
+[[ "${WEB_PORT:-}" =~ ^[0-9]{2,5}$ ]] || WEB_PORT=5173
+SMOKE_BASE="${DARUMEN_RELEASE_SMOKE_BASE:-http://127.0.0.1:$WEB_PORT}"
 PULL="${DARUMEN_RELEASE_PULL:-1}"
 WAIT_SECONDS="${DARUMEN_RELEASE_WAIT_SECONDS:-420}"
 REGISTRY="ghcr.io/baitc-hacks/hack-c2f58e92-icybeard"
@@ -71,7 +84,9 @@ EOF
 dc() {
   local dir="$1" tag="$2"
   shift 2
+  # бэкапы пишет владелец каталога стенда (deploy на Hetzner, icybeard на VPS хакатона) — не 1000 по умолчанию
   REGISTRY="$REGISTRY" IMAGE_TAG="$tag" LAKEHOUSE_DIR="$LAKEHOUSE_DIR" BACKUP_DIR="$BACKUP_DIR" \
+    BACKUP_UID="$(id -u)" BACKUP_GID="$(id -g)" \
     docker compose -p "$PROJECT" -f "$dir/infra/docker-compose.prod.yml" --env-file "$ENV_FILE" "$@"
 }
 
@@ -273,8 +288,12 @@ prune() {
       esac
     done < <(docker image ls "$REGISTRY/$repo" --format '{{.Tag}}')
   done
-  docker image prune -f >/dev/null || true
-  docker builder prune -f --keep-storage 2GB >/dev/null 2>&1 || true
+  # Висячие образы и кэш сборки общие для всех пользователей демона, а Docker на VPS хакатона делят команды:
+  # чистим их только на выделенной VM (DARUMEN_PRUNE_ALL=1 в .env), свои старые теги удалены выше
+  if [ "$(env_value DARUMEN_PRUNE_ALL)" = 1 ]; then
+    docker image prune -f >/dev/null || true
+    docker builder prune -f --keep-storage 2GB >/dev/null 2>&1 || true
+  fi
 }
 
 # --- команды --------------------------------------------------------------------------------------------------
@@ -369,7 +388,7 @@ cmd_release() {
     log "откат выполнен, стенд снова на $prev_tag"
   else
     # Вложенного восстановления нет намеренно: третий up поверх двух неудачных чаще вредит, чем помогает
-    log "ОТКАТ НЕ УДАЛСЯ — нужен человек: ssh deploy@VM, /srv/darumen/bin/release.sh status (docs/deploy.md, «Откат»)"
+    log "ОТКАТ НЕ УДАЛСЯ — нужен человек: ssh на VM, $DARUMEN_DIR/bin/release.sh status (docs/deploy.md, «Откат»)"
   fi
   exit 1
 }

@@ -112,7 +112,10 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const url: string = import.meta.env.VITE_KEYCLOAK_URL ?? 'http://localhost:8080'
+  // Без VITE_KEYCLOAK_URL прод-сборка берёт Keycloak своего origin (nginx стенда проксирует /auth): один образ из CI
+  // подходит любому домену стенда. В dev по умолчанию — Keycloak из make serve.
+  const url: string =
+    import.meta.env.VITE_KEYCLOAK_URL || (import.meta.env.DEV ? 'http://localhost:8080' : `${window.location.origin}/auth`)
   const realm: string = import.meta.env.VITE_KEYCLOAK_REALM ?? 'darumen'
 
   /** Отвечает ли realm: публичное описание realm с коротким таймаутом (без cookies и iframe). */

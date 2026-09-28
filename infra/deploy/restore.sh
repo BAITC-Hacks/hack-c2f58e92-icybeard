@@ -16,7 +16,13 @@
 set -euo pipefail
 umask 077
 
-DARUMEN_DIR="${DARUMEN_DIR:-/srv/darumen}"
+# Каталог стенда — родитель bin/, из которого запущен скрипт (<стенд>/bin/restore.sh — симлинк в шаблон)
+SELF_BIN="$(cd "$(dirname "$0")" && pwd)"
+if [ -z "${DARUMEN_DIR:-}" ] && [ "${SELF_BIN##*/}" != bin ]; then
+  echo "restore.sh запускается как <каталог стенда>/bin/restore.sh или с DARUMEN_DIR=<каталог стенда>" >&2
+  exit 2
+fi
+DARUMEN_DIR="${DARUMEN_DIR:-${SELF_BIN%/bin}}"
 ENV_FILE="${ENV_FILE:-$DARUMEN_DIR/.env}"
 BACKUP_DIR="${BACKUP_DIR:-$DARUMEN_DIR/backups}"
 PROJECT="${COMPOSE_PROJECT:-darumen}"
