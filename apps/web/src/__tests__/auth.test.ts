@@ -135,7 +135,8 @@ describe('auth store (Keycloak)', () => {
   })
 
   it('shows «Первый вход» once per user', async () => {
-    signedIn(['doctor'])
+    // worklist.view — own (задача 1.2): врачу нужна организация, иначе после «Первого входа» ему попадать некуда
+    signedIn(['doctor'], { mo_code: '028B' })
     const auth = useAuthStore()
     await auth.init()
     expect(auth.landing()).toBe('/welcome')

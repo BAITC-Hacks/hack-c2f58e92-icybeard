@@ -23,9 +23,11 @@ public sealed class OrgScopeTests(TestApp app) : IClassFixture<TestApp>
 
         await AssertForbiddenAsync(await OrgAdmin.GetAsync("/api/v1/journal/worklist?moCode=22GN"), AccessProblems.OtherOrganization);
 
-        // врач (scope all) видит весь регион, а с moCode — очереди одной организации
-        var doctor = await app.CreateClient(Roles.Doctor, "doctor1", "75").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
-        Assert.Contains(doctor!.Items, i => i.MoCode == "22GN");
+        // admin (scope all у worklist.view) видит весь регион целиком — после задачи 1.2 у врача worklist.view
+        // тоже own (как у org_admin выше), поэтому доктор для этой проверки больше не подходит: он теперь так же
+        // ограничен своей организацией, как org_admin.
+        var admin = await app.CreateClient(Roles.Admin, "admin-worklist-check").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist?regionKato=75");
+        Assert.Contains(admin!.Items, i => i.MoCode == "22GN");
     }
 
     [Fact]

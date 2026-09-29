@@ -19,7 +19,7 @@ public sealed class MeTests(TestApp app) : IClassFixture<TestApp>
         var me = await Doctor.GetFromJsonAsync<MeDto>("/api/v1/me");
         Assert.Equal("doctor1", me!.Actor);
         Assert.Equal([Roles.Doctor], me.Roles);
-        Assert.Contains(me.Permissions, p => p.Code == Permissions.WorklistView && p.Scope == PermissionScopes.All);
+        Assert.Contains(me.Permissions, p => p.Code == Permissions.WorklistView && p.Scope == PermissionScopes.Own);
         Assert.DoesNotContain(me.Permissions, p => p.Code == Permissions.GovMap);
         Assert.Equal("028B", me.MoCode);
         Assert.Equal("Казахский ордена институт глазных болезней", me.MoName);

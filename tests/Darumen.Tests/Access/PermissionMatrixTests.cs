@@ -21,7 +21,10 @@ public sealed class PermissionMatrixTests(TestApp app) : IClassFixture<TestApp>
         { Permissions.RouteOwn, "GET", "/api/v1/route/me", null, Roles.Citizen, Roles.Regulator },
         { Permissions.WaitPublic, "POST", "/api/v1/queue/alternatives", new { regionKato = "75", profileCode = "381" }, Roles.Steward, "visitor" },
         { Permissions.MedicinesCheck, "POST", "/api/v1/medicines/check", new { mnnId = "817", nosologyId = "109" }, Roles.Citizen, Roles.Regulator },
-        { Permissions.WorklistView, "GET", "/api/v1/journal/worklist", null, Roles.Doctor, Roles.Regulator },
+        // admin, не doctor: у врача worklist.view — own (задача 1.2), а этот клиент общей матрицы создаётся без
+        // moCode (CreateClient(allowed, ..., "75")) — own-скоуп без организации даёт 403 no_organization, что сломало
+        // бы эту строку; admin — тот же принцип, что уже использован для admin.users (Roles.Auditor вместо org_admin).
+        { Permissions.WorklistView, "GET", "/api/v1/journal/worklist", null, Roles.Admin, Roles.Regulator },
         { Permissions.ReferralAssist, "POST", "/api/v1/queue/alternatives", new { regionKato = "75", profileCode = "381", referralPurpose = "Оперативное лечение" }, Roles.Doctor, Roles.Citizen },
         { Permissions.ReferralConfirm, "POST", "/api/v1/journal/decisions", ReferralDecision, Roles.Doctor, Roles.Citizen },
         { Permissions.ScribeUse, "GET", "/api/v1/scribe/health", null, Roles.Doctor, Roles.Regulator },

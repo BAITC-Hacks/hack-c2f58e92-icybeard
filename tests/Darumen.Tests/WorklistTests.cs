@@ -91,13 +91,43 @@ public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task Worklist_endpoint_uses_the_doctor_region()
     {
-        var body = await app.CreateClient("doctor", "doctor1", "75").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
+        // после задачи 1.2 (worklist.view врача — own) врачу нужна своя организация: без неё — 403 no_organization,
+        // а не пустой список, поэтому оба врача ниже — с moCode (в своей организации, разных регионов).
+        var body = await app.CreateClient("doctor", "doctor1", "75", "028B").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
         Assert.True(body!.Synthetic);
         Assert.Equal("75", body.RegionKato);
         Assert.Equal("2025-03-31", body.AsOf);
         Assert.NotEmpty(body.Items);
-        var empty = await app.CreateClient("doctor", "doctor2", "10").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
+        var empty = await app.CreateClient("doctor", "doctor2", "10", "11XY").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
         Assert.Empty(empty!.Items);
+    }
+
+    /// <summary>Задача 10 плана прозрачности: врач, привязанный к отделению/профилю (клейм profile_code), видит
+    /// в рабочем списке только свою очередь — организация та же (028B, профиль 381 в фикстуре), но профиль в клейме
+    /// не совпадает с реальным, поэтому список пуст; без клейма (см. Worklist_endpoint_uses_the_doctor_region выше)
+    /// врач по-прежнему видит все профили своей организации — привязка не меняет поведение для тех, у кого её нет.</summary>
+    [Fact]
+    public async Task Doctor_bound_to_a_profile_only_sees_their_own_queue()
+    {
+        var wrongProfile = app.CreateClient("doctor", "doctor-profile-1", "75", "028B", profileCode: "999");
+        var wrongProfileBody = await wrongProfile.GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
+        Assert.Empty(wrongProfileBody!.Items);
+
+        var rightProfile = app.CreateClient("doctor", "doctor-profile-2", "75", "028B", profileCode: "381");
+        var rightProfileBody = await rightProfile.GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
+        Assert.NotEmpty(rightProfileBody!.Items);
+        Assert.All(rightProfileBody.Items, i => Assert.Equal("381", i.ProfileCode));
+    }
+
+    /// <summary>Регрессия: врач/org_admin с клеймом region_kato не может через query-параметр regionKato
+    /// подставить чужой регион — раньше параметр запроса побеждал claim пользователя.</summary>
+    [Fact]
+    public async Task Worklist_endpoint_rejects_a_foreign_region_from_the_query_string()
+    {
+        // moCode обязателен для врача (задача 1.2, own-скоуп) — иначе 403 пришёл бы из-за отсутствия организации,
+        // а не из-за подмены региона, которую здесь и проверяем.
+        var response = await app.CreateClient("doctor", "doctor1", "75", "028B").GetAsync("/api/v1/journal/worklist?regionKato=10");
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     /// <summary>Прогнозы по очередям региона запрашиваются пакетом и кэшируются на срез витрины (QueuePredictions):
@@ -105,7 +135,7 @@ public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task Worklist_predictions_are_batched_and_cached_between_requests()
     {
-        var doctor = app.CreateClient("doctor", "doctor1", "75");
+        var doctor = app.CreateClient("doctor", "doctor1", "75", "028B");
         var first = await doctor.GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
         var previous = app.Queue.OnPredictWait;
         var calls = 0;

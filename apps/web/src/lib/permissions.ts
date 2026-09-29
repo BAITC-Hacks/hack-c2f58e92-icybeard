@@ -41,7 +41,7 @@ const everything = Object.fromEntries(PERMISSION_CODES.map((code) => [code, A]))
 export const ROLE_PERMISSIONS: Readonly<Record<RoleKey, Readonly<Partial<Record<PermissionCode, Scope>>>>> = {
   citizen: { 'route.own': A, 'wait.public': A, 'medicines.check': A },
   doctor: {
-    'route.own': A, 'wait.public': A, 'medicines.check': A, 'worklist.view': A, 'referral.assist': A, 'referral.confirm': A,
+    'route.own': A, 'wait.public': A, 'medicines.check': A, 'worklist.view': O, 'referral.assist': A, 'referral.confirm': A,
     'scribe.use': A, 'decisions.own': A,
   },
   org_admin: {

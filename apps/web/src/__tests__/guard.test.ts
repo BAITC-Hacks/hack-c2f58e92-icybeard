@@ -19,6 +19,7 @@ const ACCESS: Record<string, RoleKey[]> = {
   '/wait': [...ROLE_KEYS],
   '/medicines': ['citizen', 'doctor', 'admin'],
   '/doctor/worklist': ['doctor', 'org_admin', 'admin'],
+  '/doctor/referrals/incoming': ['doctor', 'org_admin', 'admin'],
   '/doctor/patients/SYN-75-028B-381-01': ['doctor', 'org_admin', 'admin'],
   '/doctor/referral': ['doctor', 'admin'],
   '/doctor/scribe': ['doctor', 'admin'],
@@ -56,7 +57,8 @@ describe('resolveEntry', () => {
 
   it('sends a signed-in user from the login page to the first available screen (docs/rbac.md)', () => {
     expect(resolveEntry(to('/'), signedIn('citizen'))).toBe('/me/route')
-    expect(resolveEntry(to('/'), signedIn('doctor'))).toBe('/doctor/worklist')
+    // после задачи 1.2 (worklist.view у врача — own, не all) врачу без организации попадать некуда, кроме своего маршрута
+    expect(resolveEntry(to('/'), signedIn('doctor', MO))).toBe('/doctor/worklist')
     expect(resolveEntry(to('/'), signedIn('org_admin', MO))).toBe(`/gov/organizations/${MO}`)
     expect(resolveEntry(to('/'), signedIn('org_admin'))).toBe('/account/profile')
     expect(resolveEntry(to('/'), signedIn('regulator'))).toBe('/gov')

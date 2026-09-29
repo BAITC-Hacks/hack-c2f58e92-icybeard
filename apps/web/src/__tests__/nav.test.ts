@@ -6,6 +6,7 @@ import { accessFor } from './rbacFixtures'
 
 const routes = router.getRoutes()
 const ACCOUNT = ['/welcome', '/account/profile', '/account/security', '/account/notifications', '/account/consents']
+const MO = '028B'
 
 function menu(role: RoleKey, moCode: string | null = null, region: string | null = null): Record<string, string[]> {
   const access = accessFor(role, moCode)
@@ -20,12 +21,15 @@ describe('menu from permissions', () => {
   })
 
   it('doctor: patients and account', () => {
-    expect(menu('doctor')).toEqual({ patients: ['/doctor/worklist', '/doctor/referral', '/doctor/scribe', '/doctor/decisions'], account: ACCOUNT })
+    // worklist.view (и вместе с ней — входящие направления, задача 4) — own: без организации у врача их не будет
+    expect(menu('doctor', MO)).toEqual({
+      patients: ['/doctor/worklist', '/doctor/referrals/incoming', '/doctor/referral', '/doctor/scribe', '/doctor/decisions'], account: ACCOUNT,
+    })
   })
 
   it('org_admin (own organization): its worklist, cabinet, users and audit', () => {
     expect(menu('org_admin', '028B')).toEqual({
-      patients: ['/doctor/worklist', '/doctor/decisions'],
+      patients: ['/doctor/worklist', '/doctor/referrals/incoming', '/doctor/decisions'],
       hospital: ['/gov/organizations/028B', '/gov/organizations/028B/referrals'],
       admin: ['/admin/users', '/admin/doctors', '/gov/audit'],
       account: ACCOUNT,
@@ -56,7 +60,7 @@ describe('menu from permissions', () => {
   it('admin: everything, the steward console as «Данные» inside administration', () => {
     const sections = menu('admin')
     expect(sections.admin).toEqual(['/admin/users', '/admin/doctors', '/admin/roles', '/admin/orgs', '/steward', '/gov/audit'])
-    expect(sections.patients).toEqual(['/doctor/worklist', '/doctor/referral', '/doctor/scribe', '/doctor/decisions'])
+    expect(sections.patients).toEqual(['/doctor/worklist', '/doctor/referrals/incoming', '/doctor/referral', '/doctor/scribe', '/doctor/decisions'])
     expect(sections.ministry).toEqual(['/gov', '/gov/simulator', '/gov/insight', '/quality'])
     const access = accessFor('admin')
     const steward = sidebarNav(routes, { can: access.can, moCode: null, region: null }).find((s) => s.group === 'admin')!.items.find((i) => i.to === '/steward')!
