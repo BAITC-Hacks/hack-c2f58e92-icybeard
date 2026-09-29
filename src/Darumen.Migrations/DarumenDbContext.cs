@@ -12,6 +12,11 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
 
     public DbSet<AnomalyAck> AnomalyAcks => Set<AnomalyAck>();
 
+    /// <summary>Отметки «прочитано» по завершённым уведомлениям колокольчика (задача 13 плана прозрачности,
+    /// упрощена до внутрисистемных уведомлений вместо push): ключ — (actor, decision_id), запись появляется
+    /// только когда пользователь открыл/прочитал уведомление, отсутствие строки означает «не прочитано».</summary>
+    public DbSet<NotificationRead> NotificationReads => Set<NotificationRead>();
+
     public DbSet<IntakeBatch> IntakeBatches => Set<IntakeBatch>();
 
     public DbSet<AuditRecord> Audit => Set<AuditRecord>();
@@ -54,6 +59,19 @@ public sealed class DarumenDbContext(DbContextOptions<DarumenDbContext> options)
             e.Property(x => x.Comment).HasColumnName("comment");
             e.Property(x => x.Actor).HasColumnName("actor").HasMaxLength(200);
             e.Property(x => x.AckedAt).HasColumnName("acked_at").HasColumnType("timestamptz");
+        });
+
+        modelBuilder.Entity<NotificationRead>(e =>
+        {
+            e.ToTable("notification_reads");
+            // Kind в ключе — принципиально: у одного и того же decisionId направления может быть несколько разных
+            // уведомлений колокольчика по очереди (подтверждение, затем выписка/эпикриз задачи 11); без Kind отметка
+            // «прочитано» для одного события ложно закрывала бы и другое, ещё не показанное пользователю.
+            e.HasKey(x => new { x.Actor, x.DecisionId, x.Kind });
+            e.Property(x => x.Actor).HasColumnName("actor").HasMaxLength(200);
+            e.Property(x => x.DecisionId).HasColumnName("decision_id");
+            e.Property(x => x.Kind).HasColumnName("kind").HasMaxLength(50);
+            e.Property(x => x.ReadAt).HasColumnName("read_at").HasColumnType("timestamptz");
         });
 
         modelBuilder.Entity<IntakeBatch>(e =>
@@ -134,6 +152,19 @@ public sealed class AnomalyAck
     public string Actor { get; set; } = string.Empty;
 
     public DateTime AckedAt { get; set; }
+}
+
+/// <summary>Отметка «прочитано» для одного события колокольчика (Kind — вид события: подтверждение направления,
+/// выписка/эпикриз и т.д.; DecisionId — исходное решение redirect, к которому относится событие) одним пользователем.</summary>
+public sealed class NotificationRead
+{
+    public string Actor { get; set; } = string.Empty;
+
+    public Guid DecisionId { get; set; }
+
+    public string Kind { get; set; } = string.Empty;
+
+    public DateTime ReadAt { get; set; }
 }
 
 /// <summary>Партия загрузки из Data Intake Fabric, приходит событием intake.batch.loaded из Python.</summary>

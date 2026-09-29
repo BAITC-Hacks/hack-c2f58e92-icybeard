@@ -8,6 +8,7 @@ import { sidebarNav } from '@/lib/nav'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 import LocaleSwitch from './LocaleSwitch.vue'
+import NotificationBell from './NotificationBell.vue'
 import ThemeToggle from './ThemeToggle.vue'
 
 /** Содержимое боковой навигации персонала: знак + «Darumen Health», группы с label uppercase, пункты 40 px radius 999
@@ -79,6 +80,7 @@ watch(() => auth.moCode, resolveOrganization)
         <i class="pi pi-user icon" aria-hidden="true" /><span class="label">{{ auth.actor }} · {{ affiliation }}</span>
       </RouterLink>
       <div class="controls">
+        <NotificationBell />
         <span class="wide"><LocaleSwitch surface="soft" /></span>
         <span class="narrow"><LocaleSwitch mode="toggle" /></span>
         <ThemeToggle />
