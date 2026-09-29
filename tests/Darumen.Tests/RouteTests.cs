@@ -99,7 +99,10 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
         Assert.NotEmpty(first.Alternatives);
         Assert.Equal("Офтальмологические для взрослых", first.Organization.ProfileName);
 
-        var worklist = await app.CreateClient("doctor", "doctor1", "75").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist");
+        // admin (worklist.view: all) — чтобы проверка не зависела от того, в какую организацию региона (028B/22GN/027O)
+        // попадёт детерминированный пациент гражданина; после задачи 1.2 (worklist.view врача — own) обычный врач
+        // видит только свою организацию и для этой проверки не подходит.
+        var worklist = await app.CreateClient("admin", "admin-worklist-check").GetFromJsonAsync<WorklistResponseDto>("/api/v1/journal/worklist?regionKato=75");
         Assert.Contains(worklist!.Items, i => i.PatientRef == first.PatientRef);
     }
 
@@ -190,6 +193,228 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
         Assert.Equal(HttpStatusCode.UnprocessableEntity, noReason.StatusCode);
     }
 
+    /// <summary>Согласие пациента: redirect больше не вступает в силу сам по себе — до ответа гражданина решение
+    /// висит в статусе pending, виден и пациенту, и врачу; Severe — клинический флаг тяжести, независимый от очереди.</summary>
+    [Fact]
+    public async Task Redirect_requires_patient_consent_and_carries_the_severity_flag()
+    {
+        var citizen = app.CreateClient("citizen", "c-consent");
+        var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        // moCode = организация-отправитель (route.Organization.MoCode): GET /route/{ref} ниже требует worklist.view,
+        // у врача это own (задача 1.2) — без совпадающего moCode получил бы 403 no_organization вместо ожидаемого 200.
+        var doctor = app.CreateClient("doctor", "doctor-consent", "75", route!.Organization.MoCode);
+        var alternative = route.Organization.MoCode == "22GN" ? "028B" : "22GN";
+
+        var redirect = await doctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/redirect",
+            new RouteRedirectRequestDto(alternative, "требуется профиль другой клиники", Severe: true));
+        Assert.Equal(HttpStatusCode.Created, redirect.StatusCode);
+        var decisionId = (await redirect.Content.ReadFromJsonAsync<DecisionCreatedDto>())!.DecisionId;
+
+        var pending = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        var pendingDecision = Assert.Single(pending!.Decisions, d => d.DecisionId == decisionId);
+        Assert.Equal(RouteConsent.Pending, pendingDecision.PatientConsent);
+        Assert.True(pendingDecision.Severe);
+
+        // тот же decisionId виден и врачу на маршруте пациента
+        var doctorView = await doctor.GetFromJsonAsync<RouteDto>($"/api/v1/route/{route.PatientRef}");
+        Assert.Equal(RouteConsent.Pending, Assert.Single(doctorView!.Decisions, d => d.DecisionId == decisionId).PatientConsent);
+
+        // чужой decisionId — 404, а не тихое согласие на что-то другое
+        var wrongId = await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(Guid.NewGuid(), true, null));
+        Assert.Equal(HttpStatusCode.NotFound, wrongId.StatusCode);
+
+        var consent = await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, "согласен"));
+        Assert.Equal(HttpStatusCode.Created, consent.StatusCode);
+
+        var after = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        Assert.Equal(RouteConsent.Accepted, Assert.Single(after!.Decisions, d => d.DecisionId == decisionId).PatientConsent);
+
+        // повторное согласие на уже отвеченное решение — тоже 404 (не pending)
+        var again = await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, false, null));
+        Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
+    }
+
+    /// <summary>Задача 4 плана прозрачности: /route/{patientRef} завязан на организацию-ОТПРАВИТЕЛЯ (она зашита в сам
+    /// реф) — принимающая организация получает на нём 403. Видит и подтверждает направление она через отдельный
+    /// список входящих (/journal/referrals/incoming) и не может подтвердить его, пока пациент не согласился
+    /// (RouteConsent.Accepted) — human-in-the-loop с обеих сторон одного решения.</summary>
+    [Fact]
+    public async Task Incoming_referral_requires_patient_consent_before_the_receiving_organization_can_confirm_it()
+    {
+        var citizen = app.CreateClient("citizen", "c-incoming");
+        var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        var sendingDoctor = app.CreateClient("doctor", "doctor-incoming-send", "75");
+        var receivingMoCode = route!.Organization.MoCode == "22GN" ? "028B" : "22GN";
+
+        var redirect = await sendingDoctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/redirect",
+            new RouteRedirectRequestDto(receivingMoCode, "нужен профиль принимающей организации", Severe: true));
+        Assert.Equal(HttpStatusCode.Created, redirect.StatusCode);
+        var decisionId = (await redirect.Content.ReadFromJsonAsync<DecisionCreatedDto>())!.DecisionId;
+
+        // у врача принимающей организации нет доступа к /route/{patientRef} — реф закодирован под отправителя
+        var receivingDoctor = app.CreateClient("doctor", "doctor-incoming-receive", "75", receivingMoCode);
+        var blocked = await receivingDoctor.GetAsync($"/api/v1/route/{route.PatientRef}");
+        Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+
+        // зато оно видно в списке входящих направлений принимающей организации, с флагом тяжести
+        var incoming = await receivingDoctor.GetFromJsonAsync<List<IncomingReferralDto>>("/api/v1/journal/referrals/incoming?severe=true");
+        var item = Assert.Single(incoming!, i => i.DecisionId == decisionId);
+        Assert.Equal(route.PatientRef, item.PatientRef);
+        Assert.True(item.Severe);
+        Assert.Equal(RouteConsent.Pending, item.PatientConsent);
+        Assert.False(item.Confirmed);
+
+        // подтвердить нельзя, пока пациент не согласился
+        var tooEarly = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm",
+            new ReferralConfirmRequestDto(route.PatientRef, null));
+        Assert.Equal(HttpStatusCode.Conflict, tooEarly.StatusCode);
+
+        await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, "согласен"));
+
+        var confirm = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm",
+            new ReferralConfirmRequestDto(route.PatientRef, "место подготовлено"));
+        Assert.Equal(HttpStatusCode.Created, confirm.StatusCode);
+
+        // подтверждённое направление по умолчанию больше не в списке несделанных, но видно с includeConfirmed=true
+        var afterConfirm = await receivingDoctor.GetFromJsonAsync<List<IncomingReferralDto>>("/api/v1/journal/referrals/incoming");
+        Assert.DoesNotContain(afterConfirm!, i => i.DecisionId == decisionId);
+        var withConfirmed = await receivingDoctor.GetFromJsonAsync<List<IncomingReferralDto>>("/api/v1/journal/referrals/incoming?includeConfirmed=true");
+        var confirmed = Assert.Single(withConfirmed!, i => i.DecisionId == decisionId);
+        Assert.True(confirmed.Confirmed);
+        Assert.NotNull(confirmed.ConfirmedAt);
+
+        // повторное подтверждение — 409, не тихий успех
+        var again = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm",
+            new ReferralConfirmRequestDto(route.PatientRef, null));
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+
+        // организация-отправитель не видит собственное направление как «входящее» у себя
+        var sendingSide = app.CreateClient("doctor", "doctor-incoming-send-view", "75", route.Organization.MoCode);
+        var sendingIncoming = await sendingSide.GetFromJsonAsync<List<IncomingReferralDto>>("/api/v1/journal/referrals/incoming?includeConfirmed=true");
+        Assert.DoesNotContain(sendingIncoming!, i => i.DecisionId == decisionId);
+
+        // регрессия: запись-подтверждение ({"moCode","confirms":decisionId}) — тоже с полем "moCode", как и настоящий
+        // redirect/keep, но это не отдельное решение маршрута — не должна попадать в RouteDto.Decisions как фиктивная
+        // дублирующая строка ни у гражданина, ни у отправляющей стороны.
+        var citizenAfterConfirm = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        Assert.Equal(decisionId, Assert.Single(citizenAfterConfirm!.Decisions).DecisionId);
+        var sendingRoute = await sendingSide.GetFromJsonAsync<RouteDto>($"/api/v1/route/{route.PatientRef}");
+        Assert.Equal(decisionId, Assert.Single(sendingRoute!.Decisions).DecisionId);
+    }
+
+    /// <summary>Колокольчик (задача 13, упрощена до внутрисистемных уведомлений): после подтверждения направления
+    /// отправляющая организация видит его как непрочитанное; отметка прочитанным убирает его из списка и не
+    /// затрагивает счётчик входящих (это разные сущности одного и того же decisionId — своё vs чужое направление).</summary>
+    [Fact]
+    public async Task Bell_shows_unread_confirmation_to_the_sending_organization_until_marked_read()
+    {
+        var citizen = app.CreateClient("citizen", "c-bell");
+        var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        var sendingDoctor = app.CreateClient("doctor", "doctor-bell-send", "75");
+        var receivingMoCode = route!.Organization.MoCode == "22GN" ? "028B" : "22GN";
+
+        var redirect = await sendingDoctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/redirect",
+            new RouteRedirectRequestDto(receivingMoCode, "нужен профиль принимающей организации", Severe: false));
+        var decisionId = (await redirect.Content.ReadFromJsonAsync<DecisionCreatedDto>())!.DecisionId;
+
+        var sendingSide = app.CreateClient("doctor", "doctor-bell-send-view", "75", route.Organization.MoCode);
+        var beforeConfirm = await sendingSide.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
+        Assert.DoesNotContain(beforeConfirm!.UnreadConfirmations, c => c.DecisionId == decisionId);
+
+        await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, "согласен"));
+        var receivingDoctor = app.CreateClient("doctor", "doctor-bell-receive", "75", receivingMoCode);
+        await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm", new ReferralConfirmRequestDto(route.PatientRef, null));
+
+        var afterConfirm = await sendingSide.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
+        var item = Assert.Single(afterConfirm!.UnreadConfirmations, c => c.DecisionId == decisionId);
+        Assert.Equal(receivingMoCode, item.ToMoCode);
+        // Название организации — из справочника (refdata.mo_registry), не код: в колокольчике конечный пользователь
+        // не должен видеть технический код вместо человеческого названия.
+        var expectedName = receivingMoCode == "22GN" ? "Городская больница №2" : "Казахский ордена институт глазных болезней";
+        Assert.Equal(expectedName, item.ToMoName);
+        Assert.False(item.Read);
+
+        // второй сотрудник той же отправляющей организации — общие данные направления, но своя отметка прочтения
+        var colleague = app.CreateClient("doctor", "doctor-bell-colleague", "75", route.Organization.MoCode);
+        var colleagueView = await colleague.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
+        Assert.Contains(colleagueView!.UnreadConfirmations, c => c.DecisionId == decisionId);
+
+        var markRead = await sendingSide.PostAsync($"/api/v1/journal/notifications/bell/{NotificationKinds.ReferralConfirmed}/{decisionId}/read", null);
+        Assert.Equal(HttpStatusCode.NoContent, markRead.StatusCode);
+
+        var afterRead = await sendingSide.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
+        Assert.DoesNotContain(afterRead!.UnreadConfirmations, c => c.DecisionId == decisionId);
+
+        // у коллеги без своей отметки — по-прежнему непрочитано (отметка личная, не на организацию)
+        var colleagueStillUnread = await colleague.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
+        Assert.Contains(colleagueStillUnread!.UnreadConfirmations, c => c.DecisionId == decisionId);
+    }
+
+    /// <summary>Выписка/эпикриз обратно направившему врачу (задача 11 плана прозрачности): закрыть лечение можно
+    /// только после подтверждения приёма, повторная выписка — 409; направившая сторона видит эпикриз в колокольчике
+    /// отдельно от уведомления о подтверждении (разные kind — прочтение одного не закрывает другое); запись выписки,
+    /// как и подтверждение (регрессия задачи 4), не должна протекать фиктивной строкой в RouteDto.Decisions.</summary>
+    [Fact]
+    public async Task Discharge_requires_prior_confirmation_and_reaches_the_referring_doctor_separately_from_confirmation()
+    {
+        var citizen = app.CreateClient("citizen", "c-discharge");
+        var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        var sendingDoctor = app.CreateClient("doctor", "doctor-discharge-send", "75");
+        var receivingMoCode = route!.Organization.MoCode == "22GN" ? "028B" : "22GN";
+
+        var redirect = await sendingDoctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/redirect",
+            new RouteRedirectRequestDto(receivingMoCode, "нужен профиль принимающей организации", Severe: false));
+        var decisionId = (await redirect.Content.ReadFromJsonAsync<DecisionCreatedDto>())!.DecisionId;
+        var receivingDoctor = app.CreateClient("doctor", "doctor-discharge-receive", "75", receivingMoCode);
+
+        // выписать нельзя раньше подтверждения приёма
+        var tooEarly = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/discharge",
+            new DischargeRequestDto(route.PatientRef, "пролечен, выписан"));
+        Assert.Equal(HttpStatusCode.Conflict, tooEarly.StatusCode);
+
+        await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, "согласен"));
+        await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm", new ReferralConfirmRequestDto(route.PatientRef, null));
+
+        var discharge = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/discharge",
+            new DischargeRequestDto(route.PatientRef, "госпитализация прошла успешно, рекомендовано наблюдение по месту жительства"));
+        Assert.Equal(HttpStatusCode.Created, discharge.StatusCode);
+
+        // повторная выписка — 409, не тихий успех
+        var again = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/discharge",
+            new DischargeRequestDto(route.PatientRef, "ещё раз"));
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+
+        // принимающая сторона видит статус выписки в своём же списке входящих (не только по ошибке 409)
+        var ownIncoming = await receivingDoctor.GetFromJsonAsync<List<IncomingReferralDto>>("/api/v1/journal/referrals/incoming?includeConfirmed=true");
+        var ownItem = Assert.Single(ownIncoming!, i => i.DecisionId == decisionId);
+        Assert.True(ownItem.Discharged);
+        Assert.NotNull(ownItem.DischargedAt);
+
+        // направившая сторона видит эпикриз в колокольчике, отдельно от уведомления о подтверждении
+        var sendingSide = app.CreateClient("doctor", "doctor-discharge-send-view", "75", route.Organization.MoCode);
+        var bell = await sendingSide.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
+        var dischargeItem = Assert.Single(bell!.UnreadDischarges, d => d.DecisionId == decisionId);
+        Assert.Equal(receivingMoCode, dischargeItem.FromMoCode);
+        Assert.Contains("госпитализация", dischargeItem.Summary);
+        Assert.Contains(bell.UnreadConfirmations, c => c.DecisionId == decisionId); // подтверждение по-прежнему отдельно непрочитано
+
+        // отметка «прочитано» для подтверждения не должна закрывать непрочитанную выписку (разные kind)
+        await sendingSide.PostAsync($"/api/v1/journal/notifications/bell/{NotificationKinds.ReferralConfirmed}/{decisionId}/read", null);
+        var afterConfirmRead = await sendingSide.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
+        Assert.DoesNotContain(afterConfirmRead!.UnreadConfirmations, c => c.DecisionId == decisionId);
+        Assert.Contains(afterConfirmRead.UnreadDischarges, d => d.DecisionId == decisionId);
+
+        await sendingSide.PostAsync($"/api/v1/journal/notifications/bell/{NotificationKinds.ReferralDischarged}/{decisionId}/read", null);
+        var afterDischargeRead = await sendingSide.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
+        Assert.DoesNotContain(afterDischargeRead!.UnreadDischarges, d => d.DecisionId == decisionId);
+
+        // регрессия (как в задаче 4): запись выписки не должна протекать фиктивной дублирующей строкой в маршруте
+        var citizenRoute = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        Assert.Equal(decisionId, Assert.Single(citizenRoute!.Decisions).DecisionId);
+        var sendingRoute = await sendingSide.GetFromJsonAsync<RouteDto>($"/api/v1/route/{route.PatientRef}");
+        Assert.Equal(decisionId, Assert.Single(sendingRoute!.Decisions).DecisionId);
+    }
+
     /// <summary>Двусторонний маршрут: просьба гражданина «рассмотреть организацию быстрее» поднимает его в рабочем
     /// списке врача с флагом и остаётся открытой, пока врач не ответит решением; «оставить» с причиной закрывает её,
     /// гражданин видит и сигнал, и ответ. Повтор с тем же Idempotency-Key не создаёт второй записи.</summary>
@@ -217,7 +442,9 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
         Assert.DoesNotContain(after.Decisions, d => d.DecisionId == created.DecisionId);
         Assert.True(after.ValidationDue);
 
-        var doctor = app.CreateClient("doctor", "doctor-sig", "75");
+        // moCode = своя же организация пациента (route.Organization.MoCode): и /journal/worklist, и GET /route/{ref}
+        // ниже требуют worklist.view own (задача 1.2) — без совпадающего moCode оба вернули бы 403 no_organization.
+        var doctor = app.CreateClient("doctor", "doctor-sig", "75", route!.Organization.MoCode);
         var worklist = await doctor.GetFromJsonAsync<WorklistResponseDto>($"/api/v1/journal/worklist?flag={WorklistBuilder.PatientSignal}");
         var row = Assert.Single(worklist!.Items, i => i.PatientRef == route.PatientRef);
         Assert.Contains(WorklistBuilder.PatientSignal, row.RiskFlags);
@@ -280,11 +507,13 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task Doctor_route_lookup_returns_404_for_unknown_ref_and_403_for_another_region()
     {
-        var doctor = app.CreateClient("doctor", "doctor1", "75");
+        // GET /route/{ref} требует worklist.view, у врача это own (задача 1.2) — moCode обязателен; "028B" совпадает
+        // с рефом, "11XY" у второго врача — чтобы 403 ниже был именно из-за чужой организации/региона, а не отсутствия moCode.
+        var doctor = app.CreateClient("doctor", "doctor1", "75", "028B");
         Assert.Equal(HttpStatusCode.OK, (await doctor.GetAsync("/api/v1/route/SYN-75-028B-381-01")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await doctor.GetAsync("/api/v1/route/SYN-75-028B-381-99")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await doctor.GetAsync("/api/v1/route/nonsense")).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("doctor", "doctor2", "10").GetAsync("/api/v1/route/SYN-75-028B-381-01")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("doctor", "doctor2", "10", "11XY").GetAsync("/api/v1/route/SYN-75-028B-381-01")).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await app.CreateClient("citizen", Citizen).GetAsync("/api/v1/route/SYN-75-028B-381-01")).StatusCode);
     }
 
@@ -317,7 +546,10 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
     {
         var citizen = await app.CreateClient("citizen", Citizen).GetFromJsonAsync<RouteDto>("/api/v1/route/me");
         Assert.Null(citizen!.Doctor);
-        var doctor = await app.CreateClient("doctor", "doctor1", "75").GetFromJsonAsync<RouteDto>($"/api/v1/route/{citizen.PatientRef}");
+        // admin вместо doctor: GET /route/{ref} требует worklist.view (own у врача, задача 1.2), а рандомизированный
+        // по актору PatientRef гражданина может оказаться в любой из трёх организаций региона — admin (scope all)
+        // получает тот же RouteAudience.Doctor независимо от организации рефа (эндпоинт не смотрит на роль).
+        var doctor = await app.CreateClient("admin", "admin-route-check").GetFromJsonAsync<RouteDto>($"/api/v1/route/{citizen.PatientRef}");
         Assert.Equal(RouteAudience.Doctor, doctor!.Audience);
         Assert.NotNull(doctor.Doctor);
         Assert.Equal(0.08, doctor.Doctor!.PRefusal, 3);

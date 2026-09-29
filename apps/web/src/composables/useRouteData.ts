@@ -58,11 +58,11 @@ export function useRouteData(patientRef: () => string | undefined) {
     }
   }
 
-  /** Врач: перенаправить в другую организацию с причиной (Kind = redirect). */
-  function redirect(toMoCode: string, reason: string) {
+  /** Врач: перенаправить в другую организацию с причиной (Kind = redirect); severe — клинический флаг тяжести (задача 3). */
+  function redirect(toMoCode: string, reason: string, severe = false) {
     const ref = patientRef()
     if (!ref) return Promise.resolve(false)
-    return act(toMoCode, () => routeApi.redirect(ref, { toMoCode, reason }, key))
+    return act(toMoCode, () => routeApi.redirect(ref, { toMoCode, reason, severe: severe || undefined }, key))
   }
 
   /** Врач: оставить в текущей организации с причиной — ответ на сигнал гражданина (Kind = keep). */
@@ -77,5 +77,13 @@ export function useRouteData(patientRef: () => string | undefined) {
     return act(toMoCode ?? kind, () => routeApi.signal({ kind, toMoCode, comment: comment?.trim() || undefined }, crypto.randomUUID()))
   }
 
-  return { data, error, notFound, forbidden, busy, acting, openSig, pendingRequest, entries, expired, valid, target, requestedAlternative, latestDecision, load, redirect, keep, signal }
+  /** Гражданин: согласие или отказ на решение врача о переносе (задача 2) — decisionId того самого решения redirect. */
+  function consent(decisionId: string, accepted: boolean, reason?: string) {
+    return act(decisionId, () => routeApi.consent({ decisionId, accepted, reason: reason?.trim() || undefined }, crypto.randomUUID()))
+  }
+
+  return {
+    data, error, notFound, forbidden, busy, acting, openSig, pendingRequest, entries, expired, valid, target, requestedAlternative, latestDecision,
+    load, redirect, keep, signal, consent,
+  }
 }

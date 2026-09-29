@@ -9,6 +9,10 @@ public static class JournalEndpoints
     /// исчисляется десятками записей, одной страницы хватает.</summary>
     private const int RouteDecisionsPage = 500;
 
+    /// <summary>Сколько решений по одному маршруту читать для вычисления согласия пациента/подтверждения принимающей
+    /// организации по конкретному направлению — как DecisionsLimit в RouteEndpoints (один маршрут — считаные записи).</summary>
+    private const int ReferralHistoryLimit = 20;
+
     public static void Map(IEndpointRouteBuilder api)
     {
         var group = api.MapGroup("/journal").WithTags("Journal");
@@ -64,8 +68,23 @@ public static class JournalEndpoints
                 }
 
                 var user = CurrentUser.From(http);
-                var region = regionKato ?? user.RegionKato ?? "75";
+                var regionScope = RegionAccess.RegionScope(user);
+                if (regionScope is not null && regionKato is not null && regionKato != regionScope)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Регион другого пользователя",
+                        detail: "видны только очереди своего региона");
+                }
+
+                var region = regionScope ?? regionKato ?? user.RegionKato ?? "75";
                 var states = await ForOrganizationAsync(repository, region, scope.MoCode, ct);
+                // задача 10 плана прозрачности: врач, привязанный к отделению/профилю (клейм profile_code), видит
+                // только свою очередь — без клейма (как и раньше) видны все профили организации.
+                var profileScope = ProfileAccess.ProfileScope(user);
+                if (profileScope is not null)
+                {
+                    states = states.Where(s => s.ProfileCode == profileScope).ToList();
+                }
+
                 var asOf = states.Count > 0 ? states[0].AsOf.ToString("yyyy-MM-dd") : string.Empty;
                 var (byQueue, modelBacked) = await predictions.ForQueuesAsync(states, ct);
                 // открытые сигналы граждан: решения по маршрутам немногочисленны (только по рефам региона), одна страница
@@ -79,6 +98,180 @@ public static class JournalEndpoints
             .WithName("Worklist")
             .WithSummary("Рабочий список: синтетические пациенты на реальных очередях региона; moCode или scope own — только очереди организации")
             .Produces<WorklistResponseDto>().ProducesProblem(StatusCodes.Status403Forbidden);
+
+        group.MapGet("/referrals/incoming", async (string? moCode, bool? severe, bool? includeConfirmed, HttpContext http,
+                IDecisionRepository decisions, IWorklistRepository worklist, CancellationToken ct) =>
+            {
+                var scope = await OrgAccess.ResolveAsync(http, moCode, Permissions.WorklistView);
+                if (scope.Problem is not null)
+                {
+                    return scope.Problem;
+                }
+
+                if (scope.MoCode is null)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: "Нужна организация",
+                        detail: "укажите moCode: без организации список входящих направлений не имеет смысла");
+                }
+
+                // redirect в эту организацию: chosen.moCode == своя организация, отправитель — другая (из рефа), это не
+                // сигнал гражданина и не сама запись согласия/подтверждения (у них другая форма chosen)
+                var candidates = (await decisions.ListForOrganizationAsync(scope.MoCode, null, DecisionSubjects.Route, null, 1, RouteDecisionsPage, ct)).Items
+                    .Where(d => RouteSignals.MoCode(d.Chosen) == scope.MoCode && RouteSignals.Kind(d.Chosen) is null
+                                && RouteConsent.Response(d.Chosen) is null && ReferralConfirmation.Confirms(d.Chosen) is null
+                                && RoutePatientRef.TryParse(d.SubjectId, out var parsed) && parsed!.MoCode != scope.MoCode)
+                    .ToList();
+
+                var loadedRegions = new HashSet<string>(StringComparer.Ordinal);
+                var names = new Dictionary<string, string>(StringComparer.Ordinal);
+                var rows = new List<IncomingReferralDto>();
+                foreach (var candidate in candidates)
+                {
+                    RoutePatientRef.TryParse(candidate.SubjectId, out var parsed);
+                    if (loadedRegions.Add(parsed!.RegionKato))
+                    {
+                        foreach (var state in await worklist.QueueStatesAsync(parsed.RegionKato, ct))
+                        {
+                            names.TryAdd(state.MoCode, state.MoName);
+                        }
+                    }
+
+                    var related = (await decisions.ListAsync(null, DecisionSubjects.Route, candidate.SubjectId, 1, ReferralHistoryLimit, ct)).Items;
+                    var confirmedAt = ReferralConfirmation.ConfirmedAt(candidate.DecisionId, related);
+                    if (confirmedAt is not null && includeConfirmed != true)
+                    {
+                        continue;
+                    }
+
+                    var isSevere = ReferralConfirmation.Severe(candidate.Chosen);
+                    if (severe == true && !isSevere)
+                    {
+                        continue;
+                    }
+
+                    var dischargeRecord = DischargeSummary.RecordFor(candidate.DecisionId, related);
+                    rows.Add(new IncomingReferralDto(
+                        candidate.DecisionId, candidate.SubjectId, parsed!.MoCode, names.GetValueOrDefault(parsed.MoCode, parsed.MoCode),
+                        parsed.ProfileCode, candidate.Reason, candidate.RecordedAt, isSevere,
+                        RouteConsent.StatusFor(candidate.DecisionId, related), confirmedAt is not null, confirmedAt,
+                        dischargeRecord is not null, dischargeRecord?.RecordedAt));
+                }
+
+                return Results.Ok(rows.OrderByDescending(r => r.Severe).ThenByDescending(r => r.RecordedAt).ToList());
+            })
+            .RequireAuthorization(Permissions.Policy(Permissions.WorklistView))
+            .WithName("IncomingReferrals")
+            .WithSummary("Входящие направления в организацию (redirect от других организаций): scope own — только своя организация, как в /journal/worklist; "
+                + "severe=true — только тяжёлые случаи; includeConfirmed=true — показать и уже подтверждённые")
+            .Produces<List<IncomingReferralDto>>().ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost("/referrals/{decisionId:guid}/confirm", async (Guid decisionId, ReferralConfirmRequestDto body, HttpContext http,
+                IDecisionRepository decisions, CancellationToken ct) =>
+            {
+                if (await OrgAccess.CheckAsync(http, null, Permissions.ReferralConfirm) is { } denied)
+                {
+                    return denied;
+                }
+
+                var moCode = CurrentUser.From(http).MoCode;
+                if (string.IsNullOrWhiteSpace(moCode))
+                {
+                    return AccessProblems.Forbidden(AccessProblems.NoOrganization);
+                }
+
+                var errors = new ValidationErrors().Require("patientRef", body.PatientRef);
+                if (errors.Any)
+                {
+                    return errors.Problem();
+                }
+
+                var related = (await decisions.ListAsync(null, DecisionSubjects.Route, body.PatientRef, 1, ReferralHistoryLimit, ct)).Items;
+                var target = related.FirstOrDefault(d =>
+                    d.DecisionId == decisionId && RouteSignals.MoCode(d.Chosen) == moCode && RouteSignals.Kind(d.Chosen) is null
+                    && RouteConsent.Response(d.Chosen) is null && ReferralConfirmation.Confirms(d.Chosen) is null);
+                if (target is null)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Направление не найдено",
+                        detail: "нет решения redirect на этот маршрут в вашу организацию с таким decisionId");
+                }
+
+                if (ReferralConfirmation.ConfirmedAt(decisionId, related) is not null)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Уже подтверждено",
+                        detail: "это направление уже подтверждено вашей организацией");
+                }
+
+                if (RouteConsent.StatusFor(decisionId, related) != RouteConsent.Accepted)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Пациент ещё не согласился",
+                        detail: "нельзя подтвердить приём, пока пациент не принял направление (patientConsent должен быть accepted)");
+                }
+
+                var comment = string.IsNullOrWhiteSpace(body.Comment) ? null : body.Comment.Trim();
+                return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, body.PatientRef!,
+                    null, ReferralConfirmation.Json(moCode, decisionId), comment, _ => "/api/v1/journal/referrals/incoming", ct);
+            })
+            .RequireAuthorization(Permissions.Policy(Permissions.ReferralConfirm))
+            .WithName("ConfirmReferral")
+            .WithSummary("Принимающая организация подтверждает приём направленного пациента; требует, чтобы пациент уже согласился (patientConsent == accepted); "
+                + "повторное подтверждение и подтверждение без согласия пациента — 409")
+            .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
+            .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+        group.MapPost("/referrals/{decisionId:guid}/discharge", async (Guid decisionId, DischargeRequestDto body, HttpContext http,
+                IDecisionRepository decisions, CancellationToken ct) =>
+            {
+                if (await OrgAccess.CheckAsync(http, null, Permissions.ReferralConfirm) is { } denied)
+                {
+                    return denied;
+                }
+
+                var moCode = CurrentUser.From(http).MoCode;
+                if (string.IsNullOrWhiteSpace(moCode))
+                {
+                    return AccessProblems.Forbidden(AccessProblems.NoOrganization);
+                }
+
+                var errors = new ValidationErrors().Require("patientRef", body.PatientRef).Require("summary", body.Summary);
+                if (errors.Any)
+                {
+                    return errors.Problem();
+                }
+
+                var related = (await decisions.ListAsync(null, DecisionSubjects.Route, body.PatientRef, 1, ReferralHistoryLimit, ct)).Items;
+                var target = related.FirstOrDefault(d =>
+                    d.DecisionId == decisionId && RouteSignals.MoCode(d.Chosen) == moCode && RouteSignals.Kind(d.Chosen) is null
+                    && RouteConsent.Response(d.Chosen) is null && ReferralConfirmation.Confirms(d.Chosen) is null);
+                if (target is null)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Направление не найдено",
+                        detail: "нет решения redirect на этот маршрут в вашу организацию с таким decisionId");
+                }
+
+                if (ReferralConfirmation.ConfirmedAt(decisionId, related) is null)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Приём ещё не подтверждён",
+                        detail: "нельзя выписать пациента, пока принимающая организация не подтвердила приём направления");
+                }
+
+                if (DischargeSummary.RecordFor(decisionId, related) is not null)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Уже выписан",
+                        detail: "по этому направлению уже есть эпикриз выписки");
+                }
+
+                var summary = body.Summary!.Trim();
+                return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, body.PatientRef!,
+                    null, DischargeSummary.Json(moCode, decisionId, summary), null, _ => "/api/v1/journal/referrals/incoming", ct);
+            })
+            .RequireAuthorization(Permissions.Policy(Permissions.ReferralConfirm))
+            .WithName("DischargeReferral")
+            .WithSummary("Принимающая организация закрывает лечение и отправляет эпикриз направившему врачу (задача 11); "
+                + "требует, чтобы приём уже был подтверждён; выписка без подтверждения и повторная выписка — 409")
+            .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
+            .ProducesProblem(StatusCodes.Status403Forbidden).ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status409Conflict).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
         group.MapGet("/audit", async (string? actor, string? moCode, int? page, int? size, HttpContext http, IAuditRepository repository, CancellationToken ct) =>
             {

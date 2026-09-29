@@ -187,8 +187,11 @@ export interface RouteBenchmark { code: string; value: number; unit: string; tit
 export interface RouteChecklistItem {
   code: string; title: string; validityDays: number; validityLabel: string; doneAt: string; validUntil: string; status: 'valid' | 'expiring' | 'expired'
 }
+/** patientConsent — только для kind = redirect: pending, пока пациент не ответил, иначе accepted | declined; для keep всегда null.
+ * severe — клинический флаг тяжести (задача 3): видно только врачу, гражданину в интерфейсе не показывается. */
 export interface RouteDecision {
   decisionId: string; role: string; recordedAt: string; fromMoCode: string | null; toMoCode: string; toMoName: string; reason: string | null; kind: 'redirect' | 'keep'
+  patientConsent: 'pending' | 'accepted' | 'declined' | null; severe: boolean
 }
 export interface RouteHistoryItem {
   moCode: string; moName: string; profileCode: string; profileName: string; registeredAt: string; outcome: 'hospitalized' | 'refused'; outcomeAt: string; waitDays: number
@@ -217,6 +220,31 @@ export interface PatientRoute {
   /** Сигналы гражданина, свежие первыми; validationDue — нет подтверждения ожидания за 30 дней, показать «Вы ещё ждёте?». */
   signals: RouteSignal[]; validationDue: boolean
 }
+
+/** Входящее направление в организацию (задача 4): GET /journal/referrals/incoming, POST /journal/referrals/{id}/confirm.
+ * Confirmed/confirmedAt — уже подтверждено принимающей организацией; подтвердить можно только когда patientConsent === 'accepted'. */
+export interface IncomingReferral {
+  decisionId: string; patientRef: string; fromMoCode: string; fromMoName: string; profileCode: string; reason: string | null
+  recordedAt: string; severe: boolean; patientConsent: 'pending' | 'accepted' | 'declined'; confirmed: boolean; confirmedAt: string | null
+  /** Эпикриз выписки (задача 11): появляется только после confirmed - принимающая сторона закрывает лечение. */
+  discharged: boolean; dischargedAt: string | null
+}
+
+/** Колокольчик (задача 13, упрощена до внутрисистемных уведомлений): GET /journal/notifications/bell, опрашивается
+ * поллингом - см. useNotificationBell. unreadConfirmations/unreadDischarges - kind различает их отметки прочтения,
+ * так что пометка одного прочитанным не закрывает другое по тому же decisionId направления. */
+export interface NotificationBell {
+  pendingIncomingCount: number
+  unreadConfirmations: SentReferralConfirmation[]
+  unreadDischarges: DischargeReady[]
+}
+
+export interface SentReferralConfirmation { decisionId: string; patientRef: string; toMoCode: string; toMoName: string; confirmedAt: string; read: boolean }
+
+export interface DischargeReady { decisionId: string; patientRef: string; fromMoCode: string; fromMoName: string; summary: string; dischargedAt: string; read: boolean }
+
+export type NotificationKind = 'referral-confirmed' | 'referral-discharged'
+
 
 export interface Region { regionKato: string; name: string; capital: string; lat: number | null; lon: number | null; populationThousands: number | null }
 export interface OrganizationItem { moCode: string; name: string; regionKato: string; moType: string | null; sizeBucket: string | null; moKey: string | null }

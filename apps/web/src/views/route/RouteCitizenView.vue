@@ -82,6 +82,13 @@ async function signal(kind: SignalKind, toMoCode?: string) {
   requestComment.value = ''
 }
 
+/** Ответ на решение redirect, ждущее согласия (задача 2): пока не ответит — «Понятно» не показывается, банер держится. */
+async function respondConsent(decisionId: string, accepted: boolean) {
+  const ok = await r.consent(decisionId, accepted)
+  if (!ok) return
+  toast.add({ severity: 'success', summary: t(accepted ? 'route.consentAccepted' : 'route.consentDeclined'), life: 4000 })
+}
+
 onMounted(r.load)
 </script>
 
@@ -118,8 +125,14 @@ onMounted(r.load)
               {{ shortOrgName(doctorAnswer.toMoName) }}<template v-if="answerAlternative"> · ≈ {{ days(answerAlternative.p50Days) }} {{ t('common.days') }} — {{ t('hero.half') }}</template>
             </span>
             <span v-if="doctorAnswer.reason" class="muted">{{ t('route.doctorReason', { reason: doctorAnswer.reason }) }}</span>
+            <StatusTag v-if="doctorAnswer.patientConsent === 'accepted'" :value="t('route.consentAccepted')" tone="ok" />
+            <StatusTag v-else-if="doctorAnswer.patientConsent === 'declined'" :value="t('route.consentDeclined')" tone="neutral" />
             <div class="signal-actions">
-              <Button :label="t('route.gotIt')" @click="dismissAnswer(doctorAnswer.decisionId)" />
+              <template v-if="doctorAnswer.patientConsent === 'pending'">
+                <Button :label="t('route.consentAccept')" :loading="r.acting.value === doctorAnswer.decisionId" :disabled="r.acting.value !== null" data-testid="consent-accept" @click="respondConsent(doctorAnswer.decisionId, true)" />
+                <Button :label="t('route.consentDecline')" severity="secondary" :loading="r.acting.value === doctorAnswer.decisionId" :disabled="r.acting.value !== null" data-testid="consent-decline" @click="respondConsent(doctorAnswer.decisionId, false)" />
+              </template>
+              <Button v-else :label="t('route.gotIt')" @click="dismissAnswer(doctorAnswer.decisionId)" />
               <RouterLink class="link-arrow" to="/wait">{{ t('route.compareWait') }}</RouterLink>
             </div>
           </section>

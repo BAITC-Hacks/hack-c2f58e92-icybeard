@@ -11,6 +11,7 @@ public sealed class JournalModule : IDarumenModule
         services.AddScoped<IDecisionRepository, DecisionRepository>();
         services.AddScoped<IAuditRepository, AuditRepository>();
         services.AddScoped<IWorklistRepository, WorklistRepository>();
+        services.AddScoped<INotificationReadRepository, NotificationReadRepository>();
         services.AddMemoryCache();
         services.AddScoped<QueuePredictions>();
     }
@@ -19,5 +20,6 @@ public sealed class JournalModule : IDarumenModule
     {
         JournalEndpoints.Map(api);
         RouteEndpoints.Map(api);
+        NotificationBellEndpoints.Map(api);
     }
 }

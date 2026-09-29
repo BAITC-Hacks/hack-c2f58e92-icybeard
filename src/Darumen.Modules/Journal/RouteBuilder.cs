@@ -202,16 +202,24 @@ public static class RouteBuilder
         var rows = new List<RouteDecisionDto>();
         foreach (var decision in decisions)
         {
-            // сигналы гражданина ({"signal": …}) — не решения врача: они идут в RouteDto.Signals
+            // сигналы гражданина ({"signal": …}) — не решения врача, они идут в RouteDto.Signals; подтверждение
+            // приёма принимающей организацией ({"moCode", "confirms": decisionId}, задача 4) и выписка/эпикриз
+            // ({"moCode", "discharges": decisionId, "summary": …}, задача 11) — тоже не отдельные решения redirect/keep
+            // для этого списка (у обеих есть поле "moCode", иначе бы прошли через фильтр ниже и создали фиктивную
+            // дублирующую строку redirect/keep, как уже было найдено и исправлено для задачи 4) — их статус виден
+            // отдельно, через ReferralConfirmation.ConfirmedAt/DischargeSummary.RecordFor на решении redirect.
             var to = MoCode(decision.Chosen);
-            if (to is null || RouteSignals.Kind(decision.Chosen) is not null)
+            if (to is null || RouteSignals.Kind(decision.Chosen) is not null || ReferralConfirmation.Confirms(decision.Chosen) is not null
+                || DischargeSummary.Discharges(decision.Chosen) is not null)
             {
                 continue;
             }
 
+            var kind = to == currentMoCode ? RouteDecisionKinds.Keep : RouteDecisionKinds.Redirect;
             rows.Add(new RouteDecisionDto(
                 decision.DecisionId, decision.Role, decision.RecordedAt, MoCode(decision.Recommended), to, names.GetValueOrDefault(to, to), decision.Reason,
-                to == currentMoCode ? RouteDecisionKinds.Keep : RouteDecisionKinds.Redirect));
+                kind, kind == RouteDecisionKinds.Redirect ? RouteConsent.StatusFor(decision.DecisionId, decisions) : null,
+                kind == RouteDecisionKinds.Redirect && Severe(decision.Chosen)));
         }
 
         return rows;
@@ -221,6 +229,12 @@ public static class RouteBuilder
         json is { ValueKind: JsonValueKind.Object } element && element.TryGetProperty("moCode", out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
+
+    /// <summary>Клинический флаг тяжести (RouteRedirectRequestDto.Severe), независимый от очередных RiskFlags в WorklistBuilder:
+    /// врач ставит его при направлении беременных или сложных операций — принимающая сторона видит это отдельно от риска отказа.</summary>
+    private static bool Severe(JsonElement? json) =>
+        json is { ValueKind: JsonValueKind.Object } element && element.TryGetProperty("severe", out var value)
+        && value.ValueKind == JsonValueKind.True;
 
     private static string Basis(bool kk, DateOnly asOf) => kk
         ? $"Синтетикалық маршрут: пациент ойдан шығарылған, ал мерзімдер, кезек және нәтижелер {asOf:dd.MM.yyyy} күнгі аймақ кезектерінің нақты жағдайынан алынған. Бас тарту себептері ашық деректерде жоқ және пациентке тіркелмейді."

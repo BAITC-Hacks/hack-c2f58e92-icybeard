@@ -40,9 +40,12 @@ public sealed record RouteForecastDto(double P50Days, double P90Days, double? PW
 /// <summary>Пункт чек-листа приложения 5: DoneAt и ValidUntil — даты, Status — valid | expiring | expired, только по датам.</summary>
 public sealed record RouteChecklistItemDto(string Code, string Title, int ValidityDays, string ValidityLabel, string DoneAt, string ValidUntil, string Status);
 
-/// <summary>Решение врача по маршруту из journal.decisions: Kind — redirect (другая организация) | keep.</summary>
+/// <summary>Решение врача по маршруту из journal.decisions: Kind — redirect (другая организация) | keep. PatientConsent —
+/// только для redirect: pending, пока гражданин не ответил на это конкретное решение, иначе accepted | declined
+/// (<see cref="RouteConsent"/>); для keep всегда null — решение остаться в этой же организации не требует согласия.</summary>
 public sealed record RouteDecisionDto(
-    Guid DecisionId, string Role, DateTimeOffset RecordedAt, string? FromMoCode, string ToMoCode, string ToMoName, string? Reason, string Kind);
+    Guid DecisionId, string Role, DateTimeOffset RecordedAt, string? FromMoCode, string ToMoCode, string ToMoName, string? Reason, string Kind,
+    string? PatientConsent = null, bool Severe = false);
 
 public sealed record RouteHistoryDto(
     string MoCode, string MoName, string ProfileCode, string ProfileName, string RegisteredAt, string Outcome, string OutcomeAt, int WaitDays);
@@ -54,7 +57,10 @@ public sealed record RouteDoctorPanelDto(
 
 public sealed record RouteStandardRefDto(string Source, string SourceUrl, string SourceDate, bool Available);
 
-public sealed record RouteRedirectRequestDto(string? ToMoCode, string? Reason);
+public sealed record RouteRedirectRequestDto(string? ToMoCode, string? Reason, bool Severe = false);
+
+/// <summary>Ответ гражданина на решение врача о переносе (redirect): DecisionId — то самое решение, Accepted — согласие/отказ.</summary>
+public sealed record RouteConsentRequestDto(Guid? DecisionId, bool Accepted, string? Reason);
 
 public static class RouteAudience
 {

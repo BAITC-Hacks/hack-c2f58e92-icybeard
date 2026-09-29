@@ -17,7 +17,10 @@ const { t } = useI18n()
         <i :class="e.kind === 'decision' ? 'pi pi-user' : 'pi pi-comment'" class="icon" aria-hidden="true" />
         <template v-if="e.kind === 'decision'">
           <span :title="e.decision.toMoName">{{ e.decision.kind === 'redirect' ? t('route.redirect', { name: shortOrgName(e.decision.toMoName) }) : t('route.keep') }}</span>
-          <div class="row-sub">{{ dateShort(e.decision.recordedAt) }} · {{ t('decision.role.' + e.decision.role) }}<template v-if="e.decision.reason"> · «{{ e.decision.reason }}»</template></div>
+          <div class="row-sub">
+            {{ dateShort(e.decision.recordedAt) }} · {{ t('decision.role.' + e.decision.role) }}<template v-if="e.decision.reason"> · «{{ e.decision.reason }}»</template>
+            <template v-if="audience === 'doctor' && e.decision.severe"> · {{ t('route.severeFlag') }}</template>
+          </div>
         </template>
         <template v-else>
           <span :title="e.signal.toMoName ?? undefined">{{ t((audience === 'doctor' ? 'route.patientSignal.' : 'route.signal.') + e.signal.kind, { name: shortOrgName(e.signal.toMoName) }) }}</span>
@@ -25,6 +28,9 @@ const { t } = useI18n()
         </template>
       </div>
       <div v-if="e.kind === 'signal' && e.signal.open" class="row-value"><StatusTag :value="t('route.awaitingDoctor')" tone="accent" /></div>
+      <div v-else-if="e.kind === 'decision' && e.decision.patientConsent" class="row-value">
+        <StatusTag :value="t('route.consentStatus.' + e.decision.patientConsent)" :tone="e.decision.patientConsent === 'accepted' ? 'ok' : e.decision.patientConsent === 'declined' ? 'neutral' : 'accent'" />
+      </div>
     </div>
   </div>
 </template>

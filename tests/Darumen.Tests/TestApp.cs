@@ -59,8 +59,9 @@ public sealed class TestApp : WebApplicationFactory<Program>
 
     public InMemoryActivity Activity { get; } = new();
 
-    /// <summary>Клиент с ролью для схемы заголовков; moCode — клейм mo_code (scope own), session — клейм sid.</summary>
-    public HttpClient CreateClient(string role, string actor = "user-1", string? region = null, string? moCode = null, string? session = null)
+    /// <summary>Клиент с ролью для схемы заголовков; moCode — клейм mo_code (scope own), session — клейм sid,
+    /// profileCode — клейм profile_code (задача 10, привязка врача к отделению/профилю).</summary>
+    public HttpClient CreateClient(string role, string actor = "user-1", string? region = null, string? moCode = null, string? session = null, string? profileCode = null)
     {
         var client = CreateClient();
         client.DefaultRequestHeaders.Add(HeaderAuthenticationHandler.ActorHeader, actor);
@@ -68,6 +69,7 @@ public sealed class TestApp : WebApplicationFactory<Program>
         AddHeader(client, HeaderAuthenticationHandler.RegionHeader, region);
         AddHeader(client, HeaderAuthenticationHandler.MoCodeHeader, moCode);
         AddHeader(client, HeaderAuthenticationHandler.SessionHeader, session);
+        AddHeader(client, HeaderAuthenticationHandler.ProfileCodeHeader, profileCode);
         return client;
     }
 
@@ -98,6 +100,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
             services.AddSingleton<IRefDataRepository, InMemoryRefData>();
             services.RemoveAll<IWorklistRepository>();
             services.AddSingleton<IWorklistRepository, InMemoryWorklist>();
+            services.RemoveAll<INotificationReadRepository>();
+            services.AddSingleton<INotificationReadRepository, InMemoryNotificationReads>();
             services.RemoveAll<IMedicinesRepository>();
             services.AddSingleton<IMedicinesRepository, InMemoryMedicines>();
             services.RemoveAll<IInsightChatClientFactory>();

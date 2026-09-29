@@ -264,6 +264,20 @@ public sealed class InMemoryWorklist : IWorklistRepository
         ]);
 }
 
+public sealed class InMemoryNotificationReads : INotificationReadRepository
+{
+    private readonly HashSet<(string Actor, string Kind, Guid DecisionId)> _reads = [];
+
+    public Task MarkReadAsync(string actor, string kind, Guid decisionId, CancellationToken cancellationToken)
+    {
+        _reads.Add((actor, kind, decisionId));
+        return Task.CompletedTask;
+    }
+
+    public Task<HashSet<Guid>> ReadDecisionIdsAsync(string actor, string kind, IReadOnlyCollection<Guid> decisionIds, CancellationToken cancellationToken) =>
+        Task.FromResult(_reads.Where(r => r.Actor == actor && r.Kind == kind && decisionIds.Contains(r.DecisionId)).Select(r => r.DecisionId).ToHashSet());
+}
+
 public sealed class InMemoryMedicines : IMedicinesRepository
 {
     public static IReadOnlyList<RxWeek> Weeks(int fulfilledRecent) =>

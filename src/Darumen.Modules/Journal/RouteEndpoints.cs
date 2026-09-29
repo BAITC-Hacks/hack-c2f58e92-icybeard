@@ -79,6 +79,48 @@ public static class RouteEndpoints
             .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
             .ProducesProblem(StatusCodes.Status404NotFound).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
 
+        group.MapPost("/me/consent", async (RouteConsentRequestDto body, string? regionKato, HttpContext http, IWorklistRepository worklist,
+                IRefDataRepository refData, IDecisionRepository decisions, QueuePredictions predictions, CancellationToken ct) =>
+            {
+                var (parsed, _, problem) = await ResolveCitizenAsync(regionKato, http, worklist, refData, predictions, ct);
+                if (problem is not null)
+                {
+                    return problem;
+                }
+
+                var errors = new ValidationErrors();
+                if (body.DecisionId is null)
+                {
+                    errors.Add("decisionId", "обязательное поле");
+                }
+
+                if (errors.Any)
+                {
+                    return errors.Problem();
+                }
+
+                // согласие относится к конкретному решению redirect по этому же маршруту, которое ещё без ответа
+                var reference = parsed!.Format();
+                var existing = (await decisions.ListAsync(null, DecisionSubjects.Route, reference, 1, DecisionsLimit, ct)).Items;
+                var target = existing.FirstOrDefault(d =>
+                    d.DecisionId == body.DecisionId && RouteSignals.Kind(d.Chosen) is null && RouteConsent.Response(d.Chosen) is null
+                    && RouteSignals.MoCode(d.Chosen) is { } toMoCode && toMoCode != parsed.MoCode);
+                if (target is null || RouteConsent.StatusFor(target.DecisionId, existing) != RouteConsent.Pending)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Решение не найдено",
+                        detail: "нет направления на этом маршруте, ожидающего согласия, с таким decisionId");
+                }
+
+                var comment = string.IsNullOrWhiteSpace(body.Reason) ? null : body.Reason.Trim();
+                return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, reference,
+                    null, RouteConsent.Json(body.Accepted, body.DecisionId!.Value), comment, _ => "/api/v1/route/me", ct);
+            })
+            .RequireAuthorization(Permissions.Policy(Permissions.RouteOwn))
+            .WithName("MyRouteConsent")
+            .WithSummary("Согласие или отказ гражданина на решение врача о переносе (redirect) в другую организацию; до ответа направление в статусе consent pending, виден и врачу")
+            .Produces<DecisionCreatedDto>(StatusCodes.Status201Created).Produces<DecisionCreatedDto>()
+            .ProducesProblem(StatusCodes.Status404NotFound).ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
         group.MapGet("/{patientRef}", async (string patientRef, HttpContext http, IWorklistRepository worklist, IRefDataRepository refData,
                 IDecisionRepository decisions, QueueService queueService, CancellationToken ct) =>
             {
@@ -117,7 +159,7 @@ public static class RouteEndpoints
 
                 var reference = parsed!.Format();
                 return await DecisionRecording.RecordAsync(http, decisions, DecisionSubjects.Route, reference,
-                    MoJson(await RecommendedAsync(parsed, states!, queueService, ct)), MoJson(body.ToMoCode!), body.Reason, _ => $"/api/v1/route/{reference}", ct);
+                    MoJson(await RecommendedAsync(parsed, states!, queueService, ct)), MoJson(body.ToMoCode!, body.Severe), body.Reason, _ => $"/api/v1/route/{reference}", ct);
             })
             .RequireAuthorization(Permissions.Policy(Permissions.ReferralConfirm))
             .WithName("RedirectRoute")
@@ -281,4 +323,9 @@ public static class RouteEndpoints
     }
 
     private static string MoJson(string moCode) => JsonSerializer.Serialize(new { moCode });
+
+    /// <summary>chosen решения redirect: moCode всегда, severe — только когда врач пометил случай тяжёлым (клинический флаг,
+    /// не путать с очередными RiskFlags в WorklistBuilder).</summary>
+    private static string MoJson(string moCode, bool severe) =>
+        severe ? JsonSerializer.Serialize(new { moCode, severe = true }) : MoJson(moCode);
 }

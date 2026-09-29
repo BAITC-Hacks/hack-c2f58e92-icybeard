@@ -1,7 +1,7 @@
 import { api, apiDownload, apiUpload } from './client'
 import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, EquipmentOrganization, EquipmentResponse, ForecastResponse, IndexResponse,
-  IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult,
+  IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult, IncomingReferral, NotificationBell, NotificationKind,
   DailyResponse, LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, RouteStandard, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
   SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistResponse, SignalKind,
   AccessLogEntry, AdminDoctor, ApplicationDecision, CodeResent, InviteAccepted, AdminOrg, AdminOrgDetailResponse, AdminUserDetail, AdminUsersResponse, AdminUserUpdate, ApplicationStatus, ConsentsResponse, InviteInfo,
@@ -56,13 +56,29 @@ export const journal = {
     api<WorklistResponse>('/api/v1/journal/worklist', { query: filter }),
   audit: (filter: { actor?: string; page?: number; size?: number } = {}) =>
     api<Paged<AuditEntry>>('/api/v1/journal/audit', { query: filter }),
+  /** Входящие направления в свою организацию (задача 4): severe — только тяжёлые, includeConfirmed — и уже подтверждённые. */
+  referralsIncoming: (filter: { moCode?: string; severe?: boolean; includeConfirmed?: boolean } = {}) =>
+    api<IncomingReferral[]>('/api/v1/journal/referrals/incoming', { query: filter }),
+  /** Принимающая организация подтверждает приём; требует, чтобы пациент уже согласился (409 иначе). */
+  confirmReferral: (decisionId: string, body: { patientRef: string; comment?: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/journal/referrals/${encodeURIComponent(decisionId)}/confirm`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Принимающая организация закрывает лечение и отправляет эпикриз направившему врачу (задача 11); требует, чтобы
+   * приём уже был подтверждён (409 иначе); повторная выписка — тоже 409. */
+  dischargeReferral: (decisionId: string, body: { patientRef: string; summary: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/journal/referrals/${encodeURIComponent(decisionId)}/discharge`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Колокольчик (задача 13): своей организации, требует moCode. */
+  notificationBell: (moCode?: string) => api<NotificationBell>('/api/v1/journal/notifications/bell', { query: { moCode } }),
+  /** Отмечает одно уведомление колокольчика прочитанным для текущего пользователя. */
+  markNotificationRead: (kind: NotificationKind, decisionId: string) =>
+    api<void>(`/api/v1/journal/notifications/bell/${kind}/${encodeURIComponent(decisionId)}/read`, { method: 'POST' }),
 }
 
 /** Маршрут пациента: гражданин — свой (/route/me), врач — любой из рабочего списка своего региона, с перенаправлением. */
 export const route = {
   me: (regionKato?: string) => api<PatientRoute>('/api/v1/route/me', { query: { regionKato } }),
   patient: (patientRef: string) => api<PatientRoute>(`/api/v1/route/${encodeURIComponent(patientRef)}`),
-  redirect: (patientRef: string, body: { toMoCode: string; reason: string }, idempotencyKey: string) =>
+  /** severe — клинический флаг тяжести (задача 3): попадает в /journal/referrals/incoming принимающей организации. */
+  redirect: (patientRef: string, body: { toMoCode: string; reason: string; severe?: boolean }, idempotencyKey: string) =>
     api<DecisionCreated>(`/api/v1/route/${encodeURIComponent(patientRef)}/redirect`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
   /** «Оставить в текущей организации» с причиной — ответ врача на сигнал гражданина (Kind = keep). */
   keep: (patientRef: string, body: { reason: string }, idempotencyKey: string) =>
@@ -70,6 +86,9 @@ export const route = {
   /** Сигнал гражданина: still_waiting | treated_elsewhere | withdraw | request_redirect (с toMoCode). */
   signal: (body: { kind: SignalKind; toMoCode?: string; comment?: string }, idempotencyKey: string) =>
     api<DecisionCreated>('/api/v1/route/me/signals', { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Согласие/отказ гражданина на решение врача о переносе (задача 2); decisionId — то самое решение redirect. */
+  consent: (body: { decisionId: string; accepted: boolean; reason?: string }, idempotencyKey: string) =>
+    api<DecisionCreated>('/api/v1/route/me/consent', { body, headers: { 'Idempotency-Key': idempotencyKey } }),
 }
 
 export const refdata = {

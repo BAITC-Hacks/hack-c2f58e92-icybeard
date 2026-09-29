@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -30,6 +31,8 @@ const { t } = useI18n()
 const toast = useToast()
 const r = useRouteData(() => props.patientRef)
 const reason = ref('')
+/** Клинический флаг тяжести (задача 3): применяется только к «Направить» — принимающая организация видит его в /journal/referrals/incoming. */
+const severe = ref(false)
 
 const FLAG_TONES: Record<string, 'neutral' | 'danger' | 'accent'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'accent' }
 const doctor = computed(() => r.data.value?.doctor ?? null)
@@ -47,9 +50,10 @@ function requireReason(): boolean {
 
 async function redirect(toMoCode: string) {
   if (!requireReason()) return
-  if (await r.redirect(toMoCode, reason.value.trim())) {
+  if (await r.redirect(toMoCode, reason.value.trim(), severe.value)) {
     toast.add({ severity: 'success', summary: t('route.redirected'), life: 4000 })
     reason.value = ''
+    severe.value = false
   }
 }
 
@@ -138,6 +142,7 @@ watch(() => props.patientRef, r.load)
 
       <div class="sticky-actions">
         <InputText v-model="reason" :placeholder="t('route.reason')" class="reason-inline" data-testid="redirect-reason" />
+        <label class="severe-check"><Checkbox v-model="severe" binary input-id="severe" data-testid="redirect-severe" /> <span>{{ t('route.severeCheckbox') }}</span></label>
         <RouterLink :to="{ name: 'referral', query: { moCode: r.data.value.organization.moCode, profileCode: r.data.value.organization.profileCode } }">
           <Button :label="t('route.openReferral')" />
         </RouterLink>
@@ -170,6 +175,7 @@ watch(() => props.patientRef, r.load)
 .current-row { color: var(--dm-muted); border-top: 1px solid var(--dm-hairline); }
 .sticky-actions { gap: 12px; }
 .reason-inline { flex: 1 1 280px; }
+.severe-check { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .spacer { flex: 1; }
 @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
 </style>

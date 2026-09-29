@@ -10,6 +10,11 @@ export function openRequest(route: Pick<PatientRoute, 'signals'>): RouteSignal |
   return route.signals.find((s) => s.open && s.kind === 'request_redirect') ?? null
 }
 
+/** Решение redirect, ждущее ответа гражданина (задача 2) — банер с кнопками «Согласен»/«Отказаться» вместо «Понятно». */
+export function pendingConsent(route: Pick<PatientRoute, 'decisions'>): RouteDecision | null {
+  return route.decisions.find((d) => d.kind === 'redirect' && d.patientConsent === 'pending') ?? null
+}
+
 export type RouteEntry = { at: string; kind: 'decision'; decision: RouteDecision } | { at: string; kind: 'signal'; signal: RouteSignal }
 
 /** Решения врача и сигналы гражданина одной лентой, свежие первыми (ISO-время сравнивается как строки). */
