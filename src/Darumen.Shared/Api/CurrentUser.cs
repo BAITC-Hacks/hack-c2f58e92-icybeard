@@ -21,6 +21,10 @@ public sealed record CurrentUser(string Actor, string Role, string? RegionKato, 
     /// <summary>Сессия Keycloak (sid) — «текущая» в списке сессий.</summary>
     public string? SessionId { get; init; }
 
+    /// <summary>Профиль/отделение из клейма profile_code (задача 10 плана прозрачности) — необязателен; используется
+    /// только для врача, см. <see cref="Auth.ProfileAccess"/>.</summary>
+    public string? ProfileCode { get; init; }
+
     public bool IsAuthenticated => Actor != Anonymous;
 
     public static CurrentUser From(HttpContext context) => From(context.User);
@@ -42,6 +46,7 @@ public sealed record CurrentUser(string Actor, string Role, string? RegionKato, 
             Roles = roles,
             UserId = principal.FindFirst(DarumenClaims.Subject)?.Value ?? actor,
             SessionId = principal.FindFirst(DarumenClaims.SessionId)?.Value,
+            ProfileCode = principal.FindFirst(DarumenClaims.ProfileCode)?.Value,
         };
     }
 }

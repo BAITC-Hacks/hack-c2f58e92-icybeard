@@ -7,7 +7,8 @@ using Microsoft.Extensions.Options;
 namespace Darumen.Shared.Auth;
 
 /// <summary>Схема для тестов и разработки без Keycloak: X-Actor, X-Role (через запятую; chief → org_admin), X-Region,
-/// X-MoCode (клейм mo_code для scope own) и X-Session-Id (клейм sid).</summary>
+/// X-MoCode (клейм mo_code для scope own), X-Profile-Code (клейм profile_code — привязка врача к отделению,
+/// задача 10) и X-Session-Id (клейм sid).</summary>
 public sealed class HeaderAuthenticationHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
@@ -16,6 +17,7 @@ public sealed class HeaderAuthenticationHandler(IOptionsMonitor<AuthenticationSc
     public const string RoleHeader = "X-Role";
     public const string RegionHeader = "X-Region";
     public const string MoCodeHeader = "X-MoCode";
+    public const string ProfileCodeHeader = "X-Profile-Code";
     public const string SessionHeader = "X-Session-Id";
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
@@ -31,6 +33,7 @@ public sealed class HeaderAuthenticationHandler(IOptionsMonitor<AuthenticationSc
             .Select(Roles.Normalize).Distinct().Select(role => new Claim(ClaimTypes.Role, role)));
         AddOptional(claims, RegionHeader, DarumenClaims.Region);
         AddOptional(claims, MoCodeHeader, DarumenClaims.MoCode);
+        AddOptional(claims, ProfileCodeHeader, DarumenClaims.ProfileCode);
         AddOptional(claims, SessionHeader, DarumenClaims.SessionId);
 
         var identity = new ClaimsIdentity(claims, Scheme, DarumenClaims.Name, ClaimTypes.Role);

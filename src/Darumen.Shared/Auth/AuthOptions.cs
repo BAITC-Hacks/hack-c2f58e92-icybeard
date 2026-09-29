@@ -28,14 +28,21 @@ public static class Roles
     public const string Auditor = "auditor";
     public const string Admin = "admin";
 
+    /// <summary>Менеджер по койкам организации (задача 8 плана прозрачности): урезанная версия org_admin — только
+    /// рабочий список своей организации и подтверждение приёма направлений, без кабинета организации/пользователей.
+    /// Не сидируется миграцией (см. doc-комментарий AuthRbac.Seed — матрица после сида меняется через
+    /// POST/PUT /admin/roles), заводится через уже готовый общий механизм создания ролей; существующих org_admin
+    /// принудительно не переносит — это отдельная, назначаемая по желанию роль, а не замена.</summary>
+    public const string BedManager = "bed_manager";
+
     /// <summary>Прежняя роль главврача: в токене трактуется как <see cref="OrgAdmin"/> (legacy-алиас).</summary>
     public const string LegacyChief = "chief";
 
-    public static readonly string[] All = [Citizen, Doctor, OrgAdmin, Regulator, Steward, Auditor, Admin];
+    public static readonly string[] All = [Citizen, Doctor, OrgAdmin, BedManager, Regulator, Steward, Auditor, Admin];
 
     /// <summary>Встроенные роли, чьи запросы попадают в журнал аудита: все, кроме гражданина. Созданные в матрице роли
     /// тоже аудируются (<see cref="IsAudited"/>).</summary>
-    public static readonly string[] Audited = [Doctor, OrgAdmin, Regulator, Steward, Auditor, Admin];
+    public static readonly string[] Audited = [Doctor, OrgAdmin, BedManager, Regulator, Steward, Auditor, Admin];
 
     /// <summary>Роли самого Keycloak, которые не относятся к приложению.</summary>
     private static readonly string[] KeycloakBuiltins = ["offline_access", "uma_authorization"];
@@ -66,6 +73,11 @@ public static class DarumenClaims
 
     /// <summary>Код организации (атрибут пользователя `mo_code` в realm): scope `own` разрешений ограничен этой организацией.</summary>
     public const string MoCode = "mo_code";
+
+    /// <summary>Профиль/отделение врача (задача 10 плана прозрачности): необязательный атрибут пользователя `profile_code`
+    /// в realm — врач с этим клеймом видит в рабочем списке только очереди своего профиля, без клейма — все профили
+    /// своей организации, как раньше. См. <see cref="ProfileAccess"/>.</summary>
+    public const string ProfileCode = "profile_code";
     public const string RealmAccess = "realm_access";
     public const string Subject = "sub";
     /// <summary>Идентификатор сессии Keycloak: текущая сессия в «Безопасности» аккаунта.</summary>
