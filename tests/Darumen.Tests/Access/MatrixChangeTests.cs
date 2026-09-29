@@ -84,7 +84,9 @@ public sealed class MatrixChangeTests
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         Assert.Contains("nurse", app.Identity.CreatedRoles);
 
-        var nurse = app.CreateClient("nurse", "nurse1", "75");
+        // moCode обязателен: "nurse" копирует текущую матрицу doctor, а worklist.view у врача — own (задача 1.2
+        // плана прозрачности), без организации был бы 403 no_organization вместо ожидаемого 200.
+        var nurse = app.CreateClient("nurse", "nurse1", "75", "028B");
         Assert.Equal(HttpStatusCode.OK, (await nurse.GetAsync("/api/v1/journal/worklist")).StatusCode);
         var roles = await admin.GetFromJsonAsync<RolesResponseDto>("/api/v1/admin/roles");
         Assert.Contains(roles!.Roles, r => r.Key == "nurse" && !r.Builtin);
@@ -95,5 +97,44 @@ public sealed class MatrixChangeTests
 
         Assert.Equal(HttpStatusCode.Conflict, (await admin.PostAsJsonAsync("/api/v1/admin/roles", new RoleCreateDto("nurse", "Дубль", "Дубль", null, null, null))).StatusCode);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await admin.PostAsJsonAsync("/api/v1/admin/roles", new RoleCreateDto("Bad Key", "x", "x", null, null, null))).StatusCode);
+    }
+
+    /// <summary>Задача 8 плана прозрачности: «Менеджер по койкам» — урезанная версия org_admin (рабочий список и
+    /// подтверждение направлений своей организации, без кабинета организации/пользователей), заводится тем же
+    /// общим механизмом, что и «nurse» выше (POST /admin/roles), а не сидируется миграцией — см. doc-комментарии
+    /// AuthRbac.Seed и Roles.BedManager. Существующих org_admin роль не трогает и никого не переносит: это отдельная,
+    /// назначаемая по желанию роль.</summary>
+    [Fact]
+    public async Task Bed_manager_role_is_scoped_to_worklist_and_referral_confirm_of_its_own_organization()
+    {
+        using var app = new TestApp();
+        var admin = app.CreateClient(Roles.Admin, "admin1");
+        var created = await admin.PostAsJsonAsync("/api/v1/admin/roles",
+            new RoleCreateDto(Roles.BedManager, "Менеджер по койкам", "Төсек-орын менеджері",
+                "Рабочий список пациентов и подтверждение приёма направлений в своей организации", null, null));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Contains(Roles.BedManager, app.Identity.CreatedRoles);
+
+        var grant = await admin.PutAsJsonAsync($"/api/v1/admin/roles/{Roles.BedManager}/permissions",
+            new RolePermissionsUpdateDto(
+                [new PermissionChangeDto(Permissions.WorklistView, PermissionScopes.Own), new PermissionChangeDto(Permissions.ReferralConfirm, PermissionScopes.Own)],
+                "задача 8 плана прозрачности"));
+        Assert.Equal(HttpStatusCode.OK, grant.StatusCode);
+
+        var bedManager = app.CreateClient(Roles.BedManager, "bm-028B", "75", "028B");
+        var me = await bedManager.GetFromJsonAsync<MeDto>("/api/v1/me");
+        Assert.Contains(me!.Permissions, p => p.Code == Permissions.WorklistView && p.Scope == PermissionScopes.Own);
+        Assert.Contains(me.Permissions, p => p.Code == Permissions.ReferralConfirm && p.Scope == PermissionScopes.Own);
+
+        // свой рабочий список — можно, чужая организация в own-скоупе — 403 (тот же принцип, что у org_admin/doctor)
+        Assert.Equal(HttpStatusCode.OK, (await bedManager.GetAsync("/api/v1/journal/worklist")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await bedManager.GetAsync("/api/v1/journal/worklist?moCode=ZZZZ")).StatusCode);
+
+        // ничего сверх выданного (в отличие от doctor/org_admin, урезанная роль не копирует более широкую матрицу)
+        Assert.Equal(HttpStatusCode.Forbidden, (await bedManager.GetAsync("/api/v1/route/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await bedManager.GetAsync("/api/v1/streams")).StatusCode);
+
+        // org_admin теперь может назначать эту роль в своей организации (AdminGuards.CheckRole проверяет ровно этот список)
+        Assert.Contains(Roles.BedManager, PermissionCatalog.OrgAssignableRoles);
     }
 }

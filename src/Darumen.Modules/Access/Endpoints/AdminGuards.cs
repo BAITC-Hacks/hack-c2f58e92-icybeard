@@ -4,8 +4,9 @@ using Darumen.Shared.Auth;
 
 namespace Darumen.Modules.Access.Endpoints;
 
-/// <summary>Кто кого администрирует: при scope own — только пользователей своей организации и только роли doctor/org_admin;
-/// учётные записи и роль admin — только администратору системы.</summary>
+/// <summary>Кто кого администрирует: при scope own — только пользователей своей организации и только роли из
+/// <see cref="PermissionCatalog.OrgAssignableRoles"/> (doctor/org_admin/bed_manager); учётные записи и роль admin —
+/// только администратору системы.</summary>
 public static class AdminGuards
 {
     public const string RoleNotAssignable = "role_not_assignable";
@@ -24,7 +25,8 @@ public static class AdminGuards
     {
         if (scope.IsOwn && !PermissionCatalog.OrgAssignableRoles.Contains(role))
         {
-            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Администратор организации назначает только врачей и администраторов организации",
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden,
+                title: "Администратор организации назначает только врачей, администраторов организации и менеджеров по койкам",
                 detail: RoleNotAssignable);
         }
 

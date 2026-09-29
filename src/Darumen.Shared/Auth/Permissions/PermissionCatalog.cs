@@ -26,7 +26,7 @@ public static class PermissionCatalog
         new(Permissions.InsightAsk, "Вопросы к данным (AI)", "Деректерге сұрақтар (AI)", false),
         new(Permissions.OrgCabinet, "Кабинет организации", "Ұйым кабинеті", false),
         new(Permissions.AdminUsers, "Аудит и управление пользователями", "Аудит және пайдаланушыларды басқару", false),
-        new(Permissions.DataSteward, "Консоль стюарда данных", "Деректер стюардының консолі", true),
+        new(Permissions.DataSteward, "Консоль оператора данных", "Деректер операторының консолі", true),
         new(Permissions.AdminOrgs, "Организации и заявки на регистрацию", "Ұйымдар және тіркеуге өтінімдер", true),
         new(Permissions.AdminRoles, "Матрица ролей и создание ролей", "Рөлдер матрицасы және рөл құру", true),
     ];
@@ -37,7 +37,7 @@ public static class PermissionCatalog
         new(Roles.Doctor, "Врач ПМСП", "МСАК дәрігері", "Рабочий список, направления, AI-скрайб", "Жұмыс тізімі, жолдамалар, AI-скрайб"),
         new(Roles.OrgAdmin, "Администратор организации", "Ұйым әкімшісі", "Кабинет и пользователи своей организации", "Өз ұйымының кабинеті мен пайдаланушылары"),
         new(Roles.Regulator, "Регулятор (Минздрав)", "Реттеуші (ДСМ)", "Карта, прогнозы и симулятор по всей стране", "Бүкіл ел бойынша карта, болжамдар және симулятор"),
-        new(Roles.Steward, "Стюард данных", "Деректер стюарды", "Загрузки и качество данных", "Деректерді жүктеу және сапасы"),
+        new(Roles.Steward, "Оператор данных", "Деректер операторы", "Загрузки и качество данных", "Деректерді жүктеу және сапасы"),
         new(Roles.Auditor, "Аудитор", "Аудитор", "Журналы решений и аудита", "Шешімдер мен аудит журналдары"),
         new(Roles.Admin, "Администратор системы", "Жүйе әкімшісі", "Все разрешения; строка матрицы не редактируется", "Барлық рұқсаттар; матрица жолы өзгертілмейді"),
     ];
@@ -51,7 +51,7 @@ public static class PermissionCatalog
         [Roles.Citizen] = [(Permissions.RouteOwn, A), (Permissions.WaitPublic, A), (Permissions.MedicinesCheck, A)],
         [Roles.Doctor] =
         [
-            (Permissions.RouteOwn, A), (Permissions.WaitPublic, A), (Permissions.MedicinesCheck, A), (Permissions.WorklistView, A),
+            (Permissions.RouteOwn, A), (Permissions.WaitPublic, A), (Permissions.MedicinesCheck, A), (Permissions.WorklistView, O),
             (Permissions.ReferralAssist, A), (Permissions.ReferralConfirm, A), (Permissions.ScribeUse, A), (Permissions.DecisionsOwn, A),
         ],
         [Roles.OrgAdmin] =
@@ -73,8 +73,10 @@ public static class PermissionCatalog
         [Roles.Admin] = All.Select(p => (p.Code, A)).ToArray(),
     });
 
-    /// <summary>Роли, которые администратор организации (scope own у admin.users) может назначать в своей организации.</summary>
-    public static readonly IReadOnlyList<string> OrgAssignableRoles = [Roles.Doctor, Roles.OrgAdmin];
+    /// <summary>Роли, которые администратор организации (scope own у admin.users) может назначать в своей организации.
+    /// bed_manager (задача 8) добавлена сюда заранее: саму роль в матрицу сидирует не миграция, а POST /admin/roles
+    /// (см. doc-комментарий AuthRbac.Seed), а вот то, кем её может назначать org_admin после создания, решает код.</summary>
+    public static readonly IReadOnlyList<string> OrgAssignableRoles = [Roles.Doctor, Roles.OrgAdmin, Roles.BedManager];
 
     public static PermissionInfo? Find(string code) => All.FirstOrDefault(p => p.Code == code);
 
