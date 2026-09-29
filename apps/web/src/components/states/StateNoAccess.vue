@@ -13,7 +13,7 @@ import StateBlock from './StateBlock.vue'
 /** «Нет доступа к разделу» (W-Auth-Blocked, W-States): чья роль и какой раздел, кто выдаёт доступ, и «Запросить
  * доступ →» — POST /me/access-requests { permission, path } (запрос попадает в журнал аудита). Показывается и защитой
  * маршрутов, и на любой странице, где API ответил 403 (detail `other_organization` / `no_organization` — свой текст). */
-const props = defineProps<{ permission?: string | null; path?: string | null; detail?: string | null; permissions?: string[] | null; compact?: boolean }>()
+const props = defineProps<{ permission?: string | null; path?: string | null; detail?: string | null; permissions?: string[] | null; compact?: boolean; tone?: 'neutral' | 'danger' }>()
 const { t } = useI18n()
 const auth = useAuthStore()
 const refdata = useRefdataStore()
@@ -52,7 +52,7 @@ async function request() {
 </script>
 
 <template>
-  <StateBlock icon="pi pi-lock" :title="t('access.title')" :text="text" :compact="compact" data-testid="state-no-access">
+  <StateBlock icon="pi pi-lock" :tone="tone" :title="t('access.title')" :text="text" :compact="compact" data-testid="state-no-access">
     <span v-if="state === 'sent'" class="sent" data-testid="access-requested"><i class="pi pi-check" aria-hidden="true" /> {{ t('access.sent') }}</span>
     <button v-else type="button" class="link-arrow" :disabled="state === 'sending'" data-testid="request-access" @click="request">{{ t('access.request') }}</button>
     <template #text>
@@ -63,8 +63,8 @@ async function request() {
 </template>
 
 <style scoped>
-.sent { color: var(--dm-ok); font-weight: 500; font-size: var(--dm-text-md); }
-.failed { margin: 0; color: var(--dm-danger); font-size: var(--dm-text-sm); }
+.sent { color: var(--success-text); font-weight: var(--fw-bold); font-size: var(--fs-base); }
+.failed { margin: 0; color: var(--danger-text); font-size: var(--fs-sm); }
 .note { margin: 0; }
 .link-arrow:disabled { opacity: 0.6; cursor: default; }
 </style>

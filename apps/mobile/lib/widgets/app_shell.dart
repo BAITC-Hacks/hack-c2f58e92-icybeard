@@ -16,8 +16,9 @@ class ShellDestination {
   final int branch;
 }
 
-/// Плавающая пилюля навигации поверх StatefulShellRoute: `margin 12 20 20`, высота 64, белая, тень; три пункта —
-/// иконка 22, подпись 12/500, точка 6 px accent под активным (активный пункт ink, остальные ink-2 — доска M-Home). Показывается только на корневых экранах веток: на
+/// Плавающая пилюля навигации поверх StatefulShellRoute: `margin 12 16 16`, высота 64, белая, тень `--shadow-pop`;
+/// три пункта — иконка 22, подпись 11/700, полоска 16×3 accent под активным (активный пункт — accent-strong,
+/// остальные text-muted — доска m-home-new). Показывается только на корневых экранах веток: на
 /// вложенных («Мой путь», «Сколько ждут», маршрут пациента) вместо неё нижняя кнопка экрана. Повторное нажатие
 /// на активную вкладку возвращает её в корень. Над экранами обоих shell'ов — баннер «Почтовый сервер недоступен»
 /// ([EmailOutageBanner]), пока почта не работает и пользователь его не закрыл.
@@ -33,6 +34,9 @@ class AppShell extends StatelessWidget {
     final atRoot = destinations.any((d) => d.path == location);
     final banner = EmailOutageBanner.visible(context);
     return Scaffold(
+      // контент уходит под плавающую пилюлю (гранит градиента главной дотягивается до низа экрана),
+      // нижний отступ содержимому возвращает MediaQuery через SafeArea экранов
+      extendBody: true,
       // форма дерева не меняется при показе баннера — ветки shell'а не пересоздаются; под баннером верхний
       // системный отступ уже занят, экран его не повторяет
       body: Column(
@@ -74,7 +78,7 @@ class FloatingNav extends StatelessWidget {
           decoration: BoxDecoration(
             color: colors.card,
             borderRadius: BorderRadius.circular(AppRadius.pill),
-            boxShadow: [BoxShadow(color: colors.navShadow, offset: const Offset(0, -4), blurRadius: 16)],
+            boxShadow: colors.popShadow,
           ),
           clipBehavior: Clip.antiAlias,
           child: Row(
@@ -99,7 +103,7 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppPalette.of(context);
-    final color = selected ? colors.ink : colors.muted;
+    final color = selected ? colors.accentHover : colors.muted;
     return Semantics(
       button: true,
       selected: selected,
@@ -111,12 +115,20 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(destination.icon, size: 22, color: color),
             const SizedBox(height: 3),
-            Text(destination.label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              destination.label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 11, color: color),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
             const SizedBox(height: 3),
             Container(
-              width: AppSizes.dot,
-              height: AppSizes.dot,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: selected ? colors.accent : ColorTokens.transparent),
+              width: AppSizes.navPipWidth,
+              height: AppSizes.bar,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(2),
+                color: selected ? colors.accent : ColorTokens.transparent,
+              ),
             ),
           ],
         ),

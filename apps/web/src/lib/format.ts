@@ -56,7 +56,7 @@ export function dateTimeShort(iso: string | null | undefined): string {
 }
 
 /** Ступень шкалы карты для индекса нагрузки (0…100): 1 — ниже 60, 2 — 60–69, 3 — 70–79, 4 — 80–86, 5 — 87 и выше.
- * Цвета ступеней — рамп карты Палитры C --dm-map-1…5 (#EEF0FB → #5B5BD6): выше = хуже = насыщеннее. */
+ * Цвета ступеней — рамп --dm-map-1…5 синей гаммы (--scale-good → --scale-mid → --scale-bad): выше = хуже. */
 export const INDEX_SCALE_STEPS = [60, 70, 80, 87] as const
 export function indexStep(value: number): 1 | 2 | 3 | 4 | 5 {
   const step = INDEX_SCALE_STEPS.filter((edge) => value >= edge).length

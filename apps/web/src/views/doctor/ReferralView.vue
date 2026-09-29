@@ -245,9 +245,9 @@ watch(() => [form.moCode, form.referralPurpose, form.territorialType, form.icd10
       <div class="col">
         <AppCard v-if="busy && !prediction"><Skeleton kind="kpi" /><Skeleton :lines="4" style="margin-top: 12px" /></AppCard>
         <AppCard v-else-if="!prediction"><EmptyState :title="t('doctor.referral.fillForm')" icon="pi pi-compass" /></AppCard>
-        <AppCard v-else :title="t('doctor.referral.forecastChosen')" label origin="ml" data-testid="referral-result">
+        <AppCard v-else :title="t('doctor.referral.forecastChosen')" label origin="ml" class="forecast-card" data-testid="referral-result">
           <div class="org-line" :title="selectedOrg?.name">{{ selectedName }} <span class="caption">{{ form.moCode }}</span></div>
-          <HeroNumber :value="days(prediction.p50Days)" :unit="`${t('common.days')} — ${t('hero.half')}`" label="" compact class="hero-line" />
+          <HeroNumber :value="days(prediction.p50Days)" :unit="`${t('common.days')} — ${t('hero.half')}`" label="" class="hero-line" />
           <div class="rows">
             <div class="row"><span class="row-main muted">{{ t('citizen.wait.p90Label') }}</span><span class="row-value strong">{{ days(prediction.p90Days) }} {{ t('common.days') }}</span></div>
             <div class="row"><span class="row-main muted">{{ t('doctor.referral.within30Row') }}</span><span class="row-value strong">{{ pct(prediction.pWithin30Days) }}</span></div>
@@ -273,15 +273,14 @@ watch(() => [form.moCode, form.referralPurpose, form.territorialType, form.icd10
             </p>
           </CollapsibleSection>
           <p class="human-note">{{ t('doctor.referral.humanNote') }}</p>
+          <div class="confirm-row">
+            <Button :label="recorded ? t('doctor.referral.recorded') : t('common.confirm')" :disabled="!!recorded" :loading="recording" data-testid="referral-confirm" @click="record" />
+            <span v-if="!recorded" class="muted small">{{ chosenName }}</span>
+            <RouterLink v-else class="link-arrow small" :to="{ name: 'decisions' }">{{ t('nav.decisions') }}</RouterLink>
+            <span class="spacer" />
+            <RouterLink class="link-arrow small" :to="{ name: 'worklist' }">{{ t('doctor.referral.toWorklist') }}</RouterLink>
+          </div>
         </AppCard>
-
-        <div v-if="prediction" class="confirm-row">
-          <Button :label="recorded ? t('doctor.referral.recorded') : t('common.confirm')" :disabled="!!recorded" :loading="recording" data-testid="referral-confirm" @click="record" />
-          <span v-if="!recorded" class="muted small">{{ chosenName }}</span>
-          <RouterLink v-else class="link-arrow small" :to="{ name: 'decisions' }">{{ t('nav.decisions') }}</RouterLink>
-          <span class="spacer" />
-          <RouterLink class="link-arrow small" :to="{ name: 'worklist' }">{{ t('doctor.referral.toWorklist') }}</RouterLink>
-        </div>
       </div>
     </div>
   </PageShell>
@@ -291,34 +290,35 @@ watch(() => [form.moCode, form.referralPurpose, form.territorialType, form.icd10
 .pill-select { display: inline-flex; align-items: center; gap: 4px; background: var(--dm-surface); border-radius: var(--dm-radius-pill); padding: 0 6px 0 16px; min-height: 36px; }
 .pill-label { font-size: var(--dm-text-sm); color: var(--dm-muted); white-space: nowrap; }
 .pill-select :deep(.p-select) { background: transparent; min-height: 32px; min-width: 180px; font-weight: 500; font-size: var(--dm-text-sm); }
-.main-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
 .form-card { display: flex; flex-direction: column; gap: var(--dm-space-4); }
 .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
 .pair.tight { gap: 8px; }
 .pair.tight :deep(.p-select) { width: 100%; min-width: 0; }
-.icd-reason { grid-template-columns: 160px minmax(0, 1fr); }
+.icd-reason { grid-template-columns: 200px minmax(0, 1fr); }
 .org-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
 .options { display: flex; flex-direction: column; gap: 8px; }
-.option { display: flex; align-items: center; gap: 12px; border: 0; border-radius: var(--dm-radius-md); background: var(--dm-surface-2); padding: 14px 16px; text-align: left; color: var(--dm-ink); font: inherit; cursor: pointer; }
-.option.selected { box-shadow: inset 0 0 0 2px var(--dm-ink); }
+.option { display: flex; align-items: center; gap: 12px; border: 1.5px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 12px 15px; text-align: left; color: var(--text); font: inherit; cursor: pointer; }
+.option.selected { border-color: var(--accent); background: var(--surface-info); }
 .option:disabled { cursor: default; opacity: 0.8; }
-.radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--dm-muted); box-sizing: border-box; flex: none; display: grid; place-items: center; }
-.option.selected .radio { border-color: var(--dm-ink); }
+.radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border-strong); box-sizing: border-box; flex: none; display: grid; place-items: center; }
+.option.selected .radio { border-color: var(--accent); }
 .radio-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dm-primary); }
 .option-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.option-title { font-size: var(--dm-text-md); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.option-wait { font-size: var(--dm-text-base); font-weight: 500; white-space: nowrap; }
+.option-title { font-size: var(--dm-text-md); font-weight: var(--fw-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.option-wait { font-size: var(--dm-text-base); font-weight: var(--fw-bold); white-space: nowrap; }
 .option-risk { font-size: var(--dm-text-sm); color: var(--dm-muted); width: 64px; text-align: right; }
 .change { align-self: flex-start; margin-top: 4px; }
 .more { background: var(--dm-surface-2); }
 .more :deep(.head) { padding: 12px 16px; }
 .more :deep(.head-title) { font-size: var(--dm-text-md); }
 .checkbox { flex-direction: row; align-items: center; gap: 8px; }
-.org-line { font-size: var(--dm-text-lg); font-weight: 500; letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
+.org-line { font-size: var(--dm-text-lg); font-weight: var(--fw-bold); letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
+.forecast-card { border-top: 4px solid var(--accent); }
 .hero-line { margin: 8px 0 4px; }
 .hero-line :deep(.hero-label) { display: none; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .why { margin-top: 12px; background: var(--dm-surface-2); }
 .why :deep(.head) { padding: 12px 16px; }
 .why :deep(.head-title) { font-size: var(--dm-text-md); }

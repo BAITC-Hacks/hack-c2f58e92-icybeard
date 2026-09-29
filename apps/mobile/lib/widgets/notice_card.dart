@@ -6,7 +6,7 @@ import '../state/service_status_notifier.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
-/// Предупреждение в тоне attention (янтарный, доска C-Tokens: `#9A5A00` на `#FFE9C7`): radius 16, иконка 22,
+/// Предупреждение в тоне attention (янтарный `--warning-text` на `--warning-bg`): radius 14, иконка 22,
 /// необязательный заголовок 15/500 и текст 14; крестик «скрыть» — если передан [onDismiss]. Для того, что сейчас не
 /// работает и о чём пользователь должен знать до действия (почта, вход через eGov).
 class NoticeCard extends StatelessWidget {

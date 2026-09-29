@@ -18,8 +18,8 @@ const { date } = useLocaleFormat()
 </template>
 
 <style scoped>
-.stale { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-radius: var(--dm-radius-md); background: var(--dm-info-soft); color: var(--dm-ink); font-size: var(--dm-text-sm); }
-.stale-icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--dm-surface); color: var(--dm-info); flex: none; }
-.stale-text { flex: 1; min-width: 200px; }
-.stale-text strong { font-weight: 500; }
+.stale { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-radius: var(--radius-lg); background: var(--accent-subtle); color: var(--text); font-size: var(--fs-base-sm); }
+.stale-icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-strong); flex: none; }
+.stale-text { flex: 1; min-width: 200px; font-variant-numeric: tabular-nums; }
+.stale-text strong { font-weight: var(--fw-bold); }
 </style>

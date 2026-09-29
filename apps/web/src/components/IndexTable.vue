@@ -40,6 +40,6 @@ const { t } = useI18n()
 
 <style scoped>
 .index-wrap { max-height: 520px; overflow-y: auto; }
-.index { font-weight: 500; display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.index { font-weight: var(--fw-bold); display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: none; }
 </style>

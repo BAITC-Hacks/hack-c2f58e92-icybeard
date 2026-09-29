@@ -89,7 +89,7 @@ class _PickerSheetState<T> extends State<PickerSheet<T>> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: AppSpacing.xs),
                           title: Text(item.label, maxLines: 2, overflow: TextOverflow.ellipsis),
                           subtitle: item.detail == null ? null : Text(item.detail!, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          trailing: selected ? Icon(Icons.check, color: colors.ink) : null,
+                          trailing: selected ? Icon(Icons.check, color: colors.accent) : null,
                           selected: selected,
                           onTap: () => Navigator.of(context).pop(item.value),
                         );
@@ -103,7 +103,8 @@ class _PickerSheetState<T> extends State<PickerSheet<T>> {
   }
 }
 
-/// Кнопка-селектор 48 px radius 12 на soft-фоне: колонка label 64 px (12/500 ink-2), значение 15/500 и «⌄».
+/// Кнопка-селектор 48 px radius 12 — белая с рамкой 1.5 px `--border` (доска m-wait-new `.select`):
+/// колонка label 64 px (12/700 text-muted), значение 14/800 и «⌄».
 class PickerRow extends StatelessWidget {
   const PickerRow({super.key, required this.label, this.value, this.placeholder, this.detail, required this.onTap, this.enabled = true});
 
@@ -126,8 +127,11 @@ class PickerRow extends StatelessWidget {
       enabled: enabled,
       label: '$label: $shown${detail == null ? '' : ' · $detail'}',
       child: Material(
-        color: colors.neutralSoft,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: colors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          side: BorderSide(color: colors.hairline, width: 1.5),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: enabled ? onTap : null,

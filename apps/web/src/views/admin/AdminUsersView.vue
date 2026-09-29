@@ -162,7 +162,7 @@ onMounted(async () => {
 
     <KpiRow v-if="summary">
       <KpiTile :value="num(summary.active)" :label="t('admin.users.kpiActive')" />
-      <KpiTile :value="num(summary.invited ?? summary.invitedStale)" :label="summary.invited !== undefined ? t('admin.users.kpiInvited') : t('admin.users.kpiInvitedStale')" :chip="summary.invited !== undefined && summary.invitedStale ? t('admin.users.staleChip', { n: summary.invitedStale }) : undefined" chip-tone="info" />
+      <KpiTile :value="num(summary.invited ?? summary.invitedStale)" :label="summary.invited !== undefined ? t('admin.users.kpiInvited') : t('admin.users.kpiInvitedStale')" :chip="summary.invited !== undefined && summary.invitedStale ? t('admin.users.staleChip', { n: summary.invitedStale }) : undefined" chip-tone="warn" />
       <KpiTile :value="num(summary.blocked)" :label="t('admin.users.kpiBlocked')" />
     </KpiRow>
 
@@ -176,7 +176,7 @@ onMounted(async () => {
               <tbody>
                 <tr v-for="user in response!.items" :key="user.id" class="clickable" :class="{ selected: selected?.id === user.id }" @click="select(user)">
                   <td class="user-cell"><span class="strong">{{ user.displayName ?? user.username }}</span><div class="caption">{{ user.username }}</div></td>
-                  <td><span class="chips"><StatusTag v-for="r in user.roles" :key="r" :value="roleShort(r)" /></span></td>
+                  <td><span class="chips"><StatusTag v-for="r in user.roles" :key="r" :value="roleShort(r)" tone="info" /></span></td>
                   <td class="clip" :title="user.moName ?? ''">{{ user.moName ? `${shortOrgName(user.moName)} · ${user.moCode}` : user.moCode ?? '—' }}</td>
                   <td class="clip region col-region">{{ user.regionKato ? refdata.regionName(user.regionKato) : '—' }}</td>
                   <td class="nowrap tabular">{{ user.lastActivity ? dateTimeShort(user.lastActivity) : t('admin.users.neverSigned') }}</td>
@@ -206,7 +206,7 @@ onMounted(async () => {
 .with-panel { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
 .panel-col { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }
 .hint { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 32px 24px; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .user-cell { white-space: nowrap; }
 .clip.region { max-width: 110px; }
 .clip { max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

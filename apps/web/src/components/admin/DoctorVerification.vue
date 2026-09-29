@@ -38,6 +38,6 @@ const { date } = useLocaleFormat()
 .head h2 { margin: 0; }
 .pending { display: flex; flex-direction: column; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--dm-hairline); }
 .pending:last-child { border-bottom: 0; padding-bottom: 0; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .buttons { display: flex; gap: 8px; margin-top: 6px; }
 </style>

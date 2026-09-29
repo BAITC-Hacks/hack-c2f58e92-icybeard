@@ -76,7 +76,7 @@ onMounted(run)
             <Button :label="t('account.security.changePassword')" severity="secondary" data-testid="change-password" @click="auth.accountAction('UPDATE_PASSWORD')" />
           </div>
         </AppCard>
-        <AppCard :title="t('account.security.twoFactor')">
+        <AppCard :title="t('account.security.twoFactor')" label>
           <div class="rows">
             <div class="row">
               <span class="row-main">{{ t('account.security.sms') }}</span>
@@ -93,7 +93,7 @@ onMounted(run)
           </div>
         </AppCard>
       </div>
-      <AppCard :title="t('account.security.recentLogins')">
+      <AppCard :title="t('account.security.recentLogins')" label>
         <AsyncState :loading="loading" :error="error" :empty="!security?.recentLogins.length" skeleton="lines" :lines="4" :empty-title="t('account.security.noLogins')" empty-icon="pi pi-sign-in" @retry="run">
           <div class="rows">
             <div v-for="login in security!.recentLogins" :key="login.at + login.method" class="row">
@@ -105,7 +105,7 @@ onMounted(run)
       </AppCard>
     </div>
 
-    <AppCard :title="t('account.security.sessions')" class="sessions">
+    <AppCard :title="t('account.security.sessions')" label class="sessions">
       <template #header><span class="caption">{{ t('account.security.sessionsNote', { n: security?.sessions.length ?? 0 }) }}</span></template>
       <AsyncState :loading="loading" :error="error" :empty="!security?.sessions.length" :lines="3" :empty-title="t('account.security.noSessions')" empty-icon="pi pi-desktop" @retry="run">
         <div class="table-wrap">
@@ -135,14 +135,18 @@ onMounted(run)
 </template>
 
 <style scoped>
-.security-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; max-width: 880px; align-items: start; }
+/* аккаунт (account-security-new): колонка 880 по центру, карточки padding 24 */
+.page { max-width: 880px; }
+.card { padding: 24px; }
+.security-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .col { display: flex; flex-direction: column; gap: 16px; }
 .line { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.line h2 { margin: 0 0 4px; }
+.line h2 { margin: 0 0 4px; font-size: 15px; font-weight: var(--fw-extrabold); }
+.line .small { font-size: var(--fs-base-sm); }
 .row-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row-main.stack { display: block; }
-.sessions { max-width: 880px; }
-.strong { font-weight: 500; }
-.sessions-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.row-main .tabular { font-weight: var(--fw-bold); font-size: 13px; }
+.strong { font-weight: var(--fw-bold); }
+.sessions-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
 @media (max-width: 900px) { .security-grid { grid-template-columns: 1fr; } }
 </style>

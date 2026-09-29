@@ -11,6 +11,7 @@ import { useRouter } from 'vue-router'
 import { journal, route as routeApi } from '@/api/endpoints'
 import type { PatientRoute, WorklistItem } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import AsyncState from '@/components/states/AsyncState.vue'
 import StateStale from '@/components/states/StateStale.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -31,10 +32,10 @@ import { useRefdataStore } from '@/stores/refdata'
  * списка со строками 48 px (пациент · профиль · организация · ждёт · приоритет · статус · «Открыть →»). Полный
  * список региона грузится один раз, фильтры и поиск считаются на клиенте; строки с запросом пациента — ответ прямо
  * в строке; клик по строке — панель с превью маршрута. */
-const FLAGS = ['patient_signal', 'stuck_over_30', 'refusal_risk', 'faster_alternative'] as const
+const FLAGS = ['stuck_over_30', 'refusal_risk', 'faster_alternative', 'patient_signal'] as const
 type Flag = (typeof FLAGS)[number]
-const FLAG_TONES: Record<Flag, 'neutral' | 'danger' | 'accent'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'accent' }
-const STAGE_TONES: Record<string, 'neutral' | 'accent' | 'ok'> = { registered: 'neutral', waiting: 'accent', called: 'ok' }
+const FLAG_TONES: Record<Flag, 'neutral' | 'danger' | 'accent' | 'warn'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'warn' }
+const STAGE_TONES: Record<string, 'neutral' | 'accent' | 'ok'> = { registered: 'ok', waiting: 'accent', called: 'ok' }
 
 const { t, te } = useI18n()
 const toast = useToast()
@@ -72,7 +73,7 @@ function stageLabel(item: WorklistItem): string {
   return te(key) ? t(key) : item.stage
 }
 /** Главный чип строки: запрос пациента, иначе риск отказа, иначе первый флаг, иначе этап. */
-function primaryFlag(item: WorklistItem): { label: string; tone: 'neutral' | 'danger' | 'accent' | 'ok' } {
+function primaryFlag(item: WorklistItem): { label: string; tone: 'neutral' | 'danger' | 'accent' | 'warn' | 'ok' } {
   const f = (['patient_signal', 'refusal_risk', 'faster_alternative', 'stuck_over_30'] as const).find((x) => item.riskFlags.includes(x))
   return f ? { label: flagLabel(f), tone: FLAG_TONES[f] } : { label: stageLabel(item), tone: STAGE_TONES[item.stageCode] ?? 'neutral' }
 }
@@ -171,30 +172,34 @@ onMounted(async () => {
       {{ t('doctor.worklist.subtitle') }}<template v-if="asOf"> · {{ t('shell.asOf', { date: dateShort(asOf) }) }}</template> · {{ t('doctor.worklist.syntheticShort') }}
     </template>
     <template #actions>
-      <IconField>
-        <InputIcon class="pi pi-search" />
-        <InputText v-model="search" size="small" :placeholder="t('doctor.worklist.searchRef')" data-testid="worklist-search" />
-      </IconField>
       <Select v-model="sortBy" :options="sortOptions" option-label="label" option-value="value" size="small" />
     </template>
     <p v-if="!busy && !error && !modelBacked" class="lead synthetic">{{ t('doctor.worklist.noteFallback') }}</p>
 
-    <div class="chips" role="group" :aria-label="t('doctor.worklist.flags')">
-      <button type="button" class="chip-filter" :class="{ active: flag === null }" @click="flag = null">{{ t('common.allShort') }} · {{ items.length }}</button>
-      <button v-for="f in FLAGS" :key="f" type="button" class="chip-filter" :class="{ active: flag === f }" :data-testid="`flag-${f}`" @click="flag = flag === f ? null : f">{{ flagLabel(f) }} · {{ counts[f] }}</button>
-    </div>
     <StateStale v-if="!busy && !error && isStale(asOf)" :as-of="asOf" @refresh="load" />
     <ErrorBox :error="actionError" />
 
     <KpiRow>
       <KpiTile :value="items.length" :label="t('doctor.worklist.kpiTotal')" :loading="busy && items.length === 0" />
-      <KpiTile :value="counts.stuck_over_30" :label="t('doctor.worklist.kpiStuck')" :loading="busy && items.length === 0" />
-      <KpiTile :value="counts.refusal_risk" :label="t('doctor.worklist.kpiRisk')" :origin="modelBacked ? 'ml' : 'formula'" :loading="busy && items.length === 0" />
+      <KpiTile :value="counts.stuck_over_30" :label="t('doctor.worklist.kpiStuck')" tone="warn" :loading="busy && items.length === 0" />
+      <KpiTile :value="counts.refusal_risk" :label="t('doctor.worklist.kpiRisk')" tone="danger" :origin="modelBacked ? 'ml' : 'formula'" :loading="busy && items.length === 0" />
       <KpiTile :value="counts.faster_alternative" :label="t('doctor.worklist.kpiFaster')" :origin="modelBacked ? 'ml' : 'formula'" :loading="busy && items.length === 0" />
     </KpiRow>
 
-    <AppCard :title="t('doctor.worklist.title')" :origin="modelBacked ? 'ml' : 'formula'" :origin-note="modelBacked ? t('doctor.worklist.note') : t('doctor.worklist.noteFallback')">
-      <template #header><span class="caption">{{ t('doctor.worklist.shown', { shown: visible.length, total: items.length }) }}</span></template>
+    <AppCard>
+      <div class="toolbar list-toolbar">
+        <div class="chips" role="group" :aria-label="t('doctor.worklist.flags')">
+          <button type="button" class="chip-filter" :class="{ active: flag === null }" @click="flag = null">{{ t('common.allShort') }} · {{ items.length }}</button>
+          <button v-for="f in FLAGS" :key="f" type="button" class="chip-filter" :class="{ active: flag === f }" :data-testid="`flag-${f}`" @click="flag = flag === f ? null : f">{{ flagLabel(f) }} · {{ counts[f] }}</button>
+        </div>
+        <span class="spacer" />
+        <span class="caption">{{ t('doctor.worklist.shown', { shown: visible.length, total: items.length }) }}</span>
+        <OriginTag :kind="modelBacked ? 'ml' : 'formula'" :note="modelBacked ? t('doctor.worklist.note') : t('doctor.worklist.noteFallback')" />
+        <IconField>
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="search" size="small" :placeholder="t('doctor.worklist.searchRef')" data-testid="worklist-search" />
+        </IconField>
+      </div>
       <AsyncState :loading="busy" :error="error" :empty="visible.length === 0" :filtered="items.length > 0 && !!(flag || search)" :lines="8"
         :empty-title="t('doctor.worklist.empty')" :empty-text="t('doctor.worklist.emptyText')" :filter-hint="t('doctor.worklist.emptyFilter')" empty-icon="pi pi-user-plus" @retry="load" @reset="resetFilters">
         <template v-if="auth.can('referral.assist')" #empty-actions><Button :label="t('doctor.worklist.createReferral')" size="small" @click="router.push({ name: 'referral' })" /></template>
@@ -224,10 +229,10 @@ onMounted(async () => {
                 </td>
                 <td class="actions-cell" @click.stop>
                   <template v-if="item.patientSignal">
-                    <Button v-if="item.patientSignal.toMoCode" :label="t('route.referHereShort')" size="small" :disabled="sending !== null" @click="startAnswer(item, 'redirect')" />
+                    <Button v-if="item.patientSignal.toMoCode" :label="t('route.referHereShort')" size="small" severity="secondary" :disabled="sending !== null" @click="startAnswer(item, 'redirect')" />
                     <Button :label="t('route.keepHere')" size="small" severity="secondary" :disabled="sending !== null" @click="startAnswer(item, 'keep')" />
                   </template>
-                  <RouterLink v-else :to="{ name: 'patient-route', params: { patientRef: item.patientRef } }" class="link-arrow small">{{ t('shell.open') }}</RouterLink>
+                  <RouterLink v-else :to="{ name: 'patient-route', params: { patientRef: item.patientRef } }" class="open-pill">{{ t('shell.open') }} →</RouterLink>
                 </td>
               </tr>
               <tr v-if="answering?.ref === item.patientRef" class="answer-row">
@@ -275,11 +280,14 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.ref { font-weight: 500; white-space: nowrap; }
+.list-toolbar { margin-bottom: var(--gap-cabinet); row-gap: 8px; }
+.open-pill { display: inline-flex; align-items: center; justify-content: center; padding: 6px 12px; border-radius: var(--radius-pill); background: var(--accent-subtle); color: var(--accent-strong); font-size: var(--fs-xs); font-weight: var(--fw-bold); text-decoration: none; white-space: nowrap; }
+.open-pill:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.ref { font-weight: var(--fw-bold); white-space: nowrap; }
 .ref-link { text-decoration: none; }
 .clip { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .next { max-width: 280px; }
-.signal { font-weight: 500; }
+.signal { font-weight: var(--fw-semibold); }
 .actions-cell { white-space: nowrap; text-align: right; }
 .actions-cell .p-button { margin-left: 4px; }
 .answer-row td { background: var(--dm-surface-2); }

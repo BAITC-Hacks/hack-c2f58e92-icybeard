@@ -73,6 +73,10 @@ const error = ref<unknown>(null)
 const busy = ref(false)
 const approved = ref(false)
 const tab = ref<'draft' | 'leaflet'>('draft')
+const tabOptions = computed(() => [
+  { value: 'draft' as const, label: t('doctor.scribe.draftTitle') },
+  { value: 'leaflet' as const, label: t('doctor.scribe.leafletLabel') },
+])
 
 const recordingFormat = typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices ? pickRecordingFormat((type) => MediaRecorder.isTypeSupported(type)) : null
 const recorder = useRecorder(recordingFormat, (blob, name) => upload(blob, name))
@@ -270,7 +274,7 @@ onBeforeUnmount(() => recorder.dispose())
 
       <AppCard :title="tab === 'draft' ? t('doctor.scribe.draftTitle') : t('doctor.scribe.leafletLabel')" :origin="tab === 'draft' ? 'ai' : undefined" :origin-note="t('doctor.scribe.draftNote')">
         <template #header>
-          <button type="button" class="link-arrow small" @click="tab = tab === 'draft' ? 'leaflet' : 'draft'">{{ tab === 'draft' ? t('doctor.scribe.leafletLabel') : t('doctor.scribe.draftTitle') }}</button>
+          <SelectButton v-model="tab" :options="tabOptions" option-label="label" option-value="value" size="small" :allow-empty="false" />
         </template>
         <p v-if="!draft" class="muted">{{ t('doctor.scribe.noDraft') }}</p>
         <template v-else-if="tab === 'draft'">
@@ -311,23 +315,23 @@ onBeforeUnmount(() => recorder.dispose())
 </template>
 
 <style scoped>
-.main-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
 .consent-row { display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer; margin-top: 12px; }
 .what { margin: 8px 0 0; padding-left: 20px; }
 .rec-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dm-dot-idle); flex: none; }
-.rec-dot.live { background: var(--dm-danger); }
-.rec-label { font-size: var(--dm-text-md); font-weight: 500; }
-.timer { font-size: var(--dm-text-kpi); font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
-.timer.live { color: var(--dm-danger); }
+.rec-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--dm-dot-idle); flex: none; }
+.rec-dot.live { background: var(--danger-strong); }
+.rec-label { font-size: var(--dm-text-md); font-weight: var(--fw-bold); }
+.timer { font-size: 18px; font-weight: var(--fw-extrabold); letter-spacing: -0.02em; line-height: 1; }
+.timer.live { color: var(--danger-strong); }
 .spacer { flex: 1; }
 .upload { cursor: pointer; }
 .wave { display: flex; align-items: center; gap: 3px; height: 40px; padding: 0 4px; margin-top: 12px; border-radius: var(--dm-radius-md); background: var(--dm-surface-2); }
 .wave .bar { flex: 1; background: var(--dm-dot-idle); border-radius: 2px; transition: height 0.08s linear; }
 .wave.live .bar { background: var(--dm-primary); }
-.segment { display: flex; gap: 12px; align-items: flex-start; justify-content: flex-start; margin: 0; min-height: 44px; }
-.stamp { flex: none; width: 72px; font-size: var(--dm-text-xs); color: var(--dm-muted); letter-spacing: 0.02em; padding-top: 3px; }
+.segment { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; justify-content: flex-start; margin: 0; min-height: 44px; }
+.stamp { flex: none; font-size: 10.5px; color: var(--text-faint); letter-spacing: 0.02em; }
 .segment-text { font-size: var(--dm-text-md); }
 .section { margin-bottom: 8px; }
 .approve-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }

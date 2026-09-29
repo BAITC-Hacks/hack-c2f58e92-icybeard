@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../l10n/strings.dart';
 import '../theme/tokens.dart';
+import '../theme/tones.dart';
 import 'circle_button.dart';
 import 'origin_tag.dart';
 
@@ -39,9 +40,10 @@ class Section extends StatelessWidget {
       );
 }
 
-/// Каркас экрана: без AppBar — шапка `padding 0 20 12` с круглой кнопкой назад (если есть куда
-/// вернуться) или знаком слева, H1 29/500 и круглыми кнопками справа; контент — ListView `padding 4 20`, gap 12
-/// между детьми; нижняя зона `padding 12 20 24` для primary-кнопки. Pull-to-refresh при наличии onRefresh.
+/// Каркас экрана: без AppBar — топбар 56 `padding 0 16 12` с круглой кнопкой назад 40 на surface-muted (если есть
+/// куда вернуться) или знаком слева, заголовок 24/800 и круглыми кнопками справа; контент — ListView `padding 4 16`,
+/// gap 12 между детьми; нижняя зона `padding 12 16 24` для primary-кнопки. Pull-to-refresh при наличии onRefresh.
+/// `hero` — голубой градиент `--bg-hero-gradient` вместо серого фона (ТОЛЬКО стартовый вход и главная гражданина).
 class PageScaffold extends StatelessWidget {
   const PageScaffold({
     super.key,
@@ -54,6 +56,7 @@ class PageScaffold extends StatelessWidget {
     this.showBack,
     this.gap = AppSpacing.md,
     this.neutralBack = false,
+    this.hero = false,
   });
 
   final String title;
@@ -75,6 +78,9 @@ class PageScaffold extends StatelessWidget {
 
   /// Кнопка «назад» на inset-фоне (экраны входа и аккаунта) вместо selected.
   final bool neutralBack;
+
+  /// Голубой градиент фона — только стартовый вход и главная гражданина (m-welcome-new, m-home-new).
+  final bool hero;
 
   static bool _canPop(BuildContext context) {
     final router = GoRouter.maybeOf(context);
@@ -101,13 +107,15 @@ class PageScaffold extends StatelessWidget {
       separatorBuilder: (_, _) => SizedBox(height: gap),
       itemBuilder: (_, i) => children[i],
     );
-    return Scaffold(
+    final page = Scaffold(
+      backgroundColor: hero ? ColorTokens.transparent : null,
       body: SafeArea(
         bottom: bottom == null,
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.md),
+              // топбар 56: кнопка 40 + по 8 сверху и снизу (доски m-*)
+              padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
               child: Row(
                 children: [
                   if (back) CircleIconButton(icon: Icons.arrow_back, label: s.back, neutral: neutralBack, onTap: () => _pop(context)) else ?leading,
@@ -126,10 +134,22 @@ class PageScaffold extends StatelessWidget {
       ),
       bottomNavigationBar: bottom == null ? null : BottomAction(child: bottom!),
     );
+    if (!hero) {
+      return page;
+    }
+    return Container(decoration: BoxDecoration(gradient: heroGradient(context)), child: page);
   }
 }
 
-/// Нижняя зона экрана `padding 12 20 24` с учётом системного отступа — под primary-кнопку.
+/// Голубой градиент `--bg-hero-gradient` (150deg, остановки 0/30/55/100 %) из токенов текущей темы.
+LinearGradient heroGradient(BuildContext context) => LinearGradient(
+      begin: const Alignment(-0.5, -1),
+      end: const Alignment(0.5, 1),
+      colors: AppPalette.of(context).heroGradient,
+      stops: ColorTokens.heroGradientStops,
+    );
+
+/// Нижняя зона экрана `padding 12 16 24` с учётом системного отступа — под primary-кнопку.
 class BottomAction extends StatelessWidget {
   const BottomAction({super.key, required this.child});
 

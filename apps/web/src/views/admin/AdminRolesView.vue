@@ -157,9 +157,9 @@ onMounted(() => Promise.all([data.run(), history.run()]))
 .legend { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: var(--dm-text-sm); color: var(--dm-muted); }
 .legend-item { display: inline-flex; align-items: center; gap: 8px; }
 .spacer { flex: 1; }
-.mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; }
-.mark.all { background: var(--dm-ok-soft); color: var(--dm-ok); }
-.mark.part { background: var(--dm-info-soft); color: var(--dm-info); }
+.mark { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 10px; }
+.mark.all { background: var(--success-bg); color: var(--success-text); }
+.mark.part { background: var(--warning-bg); color: var(--warning-text); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dm-dot-idle); }
 .with-panel { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
 .panel-col { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }

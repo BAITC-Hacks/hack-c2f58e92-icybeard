@@ -4,8 +4,8 @@ import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../theme/typography.dart';
 
-/// Белая карточка radius 16 без рамки и тени: `padding 20 16 16` у hero-карточек, `16` у списков и опций,
-/// `4 16` у карточек-списков (строки со своими отступами). Тап — по всей карточке.
+/// Белая карточка radius 18 с мягкой тенью `--shadow-card` (доски m-*): `padding 20 16 16` у hero-карточек,
+/// `16` у списков и опций, `4 16` у карточек-списков (строки со своими отступами). Тап — по всей карточке.
 class AppCard extends StatelessWidget {
   const AppCard({super.key, required this.child, this.padding = hero, this.onTap, this.color, this.border, this.semanticsLabel});
 
@@ -25,10 +25,10 @@ class AppCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppPalette.of(context);
-    final radius = BorderRadius.circular(AppRadius.lg);
+    final radius = BorderRadius.circular(AppRadius.card);
     final body = Container(
       padding: padding,
-      decoration: BoxDecoration(color: color ?? colors.card, borderRadius: radius, border: border),
+      decoration: BoxDecoration(color: color ?? colors.card, borderRadius: radius, border: border, boxShadow: colors.cardShadow),
       child: child,
     );
     if (onTap == null) {
@@ -92,7 +92,7 @@ class ListRow extends StatelessWidget {
   /// Заголовок 15/500 вместо 15/400.
   final bool strong;
 
-  /// true — фиолетовая точка (новое), false — пустое место под точку, null — без колонки.
+  /// true — синяя точка (новое), false — пустое место под точку, null — без колонки.
   final bool? dot;
   final Color? titleColor;
 
@@ -171,7 +171,7 @@ class RowValue extends StatelessWidget {
   }
 }
 
-/// Ссылка-действие 15/500 ink со стрелкой «→» accentHover (Ghost-ссылка доски C-Tokens).
+/// Ссылка-действие 13.5/700 цвета `--link` со стрелкой «→» (ghost-ссылка components.md).
 class ArrowLink extends StatelessWidget {
   const ArrowLink(this.text, {super.key, this.onTap});
 
@@ -185,9 +185,9 @@ class ArrowLink extends StatelessWidget {
     final child = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Flexible(child: Text(text, style: theme.textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
+        Flexible(child: Text(text, style: theme.textTheme.titleSmall?.copyWith(color: colors.link), maxLines: 1, overflow: TextOverflow.ellipsis)),
         const SizedBox(width: 6),
-        Text('→', style: theme.textTheme.titleSmall?.copyWith(color: colors.accentHover)),
+        Text('→', style: theme.textTheme.titleSmall?.copyWith(color: colors.link)),
       ],
     );
     if (onTap == null) {

@@ -42,14 +42,14 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
   }
 }
 
-/// Плейсхолдер карточки: белый блок radius 16 нужной высоты.
+/// Плейсхолдер карточки: блок radius 18 нужной высоты.
 class CardSkeleton extends StatelessWidget {
   const CardSkeleton({super.key, this.height = 160});
 
   final double height;
 
   @override
-  Widget build(BuildContext context) => Skeleton(height: height, radius: AppRadius.lg);
+  Widget build(BuildContext context) => Skeleton(height: height, radius: AppRadius.card);
 }
 
 /// Три плитки KPI в ряд.

@@ -164,7 +164,7 @@ onMounted(async () => {
 <style scoped>
 .with-panel { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
 .panel-col { display: flex; flex-direction: column; gap: 16px; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .nowrap { white-space: nowrap; }
 .clip { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .match { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }

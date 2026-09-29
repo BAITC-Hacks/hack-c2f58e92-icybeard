@@ -97,13 +97,13 @@ onMounted(async () => {
           <div class="who-name">{{ name }}<StatusTag v-if="profile?.via === 'egov'" :value="t('account.profile.viaEgov')" tone="ok" /></div>
           <div class="muted small">{{ auth.role ? roleTitle(auth.role) : '—' }}<template v-if="moName"> · {{ moName }}<template v-if="moCode"> · {{ moCode }}</template></template></div>
           <div v-if="iinMasked" class="muted small tabular">{{ t('account.profile.iin') }}: {{ iinMasked }}</div>
-          <div v-if="profile?.via !== 'egov' && !services.egovAvailable" class="caption" data-testid="profile-egov-off">{{ t('account.profile.egovOff') }}</div>
+          <div v-if="profile?.via !== 'egov' && !services.egovAvailable" class="egov-off" data-testid="profile-egov-off">{{ t('account.profile.egovOff') }}</div>
         </div>
       </section>
 
       <StateError v-if="error" :error="error" class="card" @retry="run" />
       <template v-else>
-        <AppCard :title="t('account.profile.personal')">
+        <AppCard :title="t('account.profile.personal')" label>
           <Skeleton v-if="loading && !profile" :lines="4" />
           <div v-else class="form-grid two">
             <div class="field"><label for="p-name">{{ t('account.profile.fullName') }}</label><InputText id="p-name" :model-value="profile?.displayName ?? name" disabled /><span class="caption">{{ t('account.profile.byAdmin') }}</span></div>
@@ -117,11 +117,12 @@ onMounted(async () => {
           </div>
         </AppCard>
         <div class="grid cols-2">
-          <AppCard :title="t('account.profile.email')">
-            <div class="email-row"><span>{{ profile?.email ?? auth.email ?? '—' }}</span><StatusTag v-if="emailVerified !== null" :value="emailVerified ? t('account.profile.emailVerified') : t('account.profile.emailNotVerified')" :tone="emailVerified ? 'ok' : 'warn'" /></div>
-            <p class="caption">{{ t('account.profile.emailByAdmin') }}</p>
+          <AppCard :title="t('account.profile.email')" label>
+            <template #header><StatusTag v-if="emailVerified !== null" :value="emailVerified ? t('account.profile.emailVerified') : t('account.profile.emailNotVerified')" :tone="emailVerified ? 'ok' : 'warn'" /></template>
+            <div class="email-row">{{ profile?.email ?? auth.email ?? '—' }}</div>
+            <p class="caption email-note">{{ t('account.profile.emailByAdmin') }}</p>
           </AppCard>
-          <AppCard :title="t('account.profile.languageRegion')">
+          <AppCard :title="t('account.profile.languageRegion')" label>
             <div class="form-grid two">
               <div class="field"><label for="p-lang">{{ t('account.profile.language') }}</label><Select id="p-lang" v-model="language" :options="languages" option-label="label" option-value="value" :disabled="!profile" /></div>
               <div class="field"><label for="p-tz">{{ t('account.profile.timeZone') }}</label><Select id="p-tz" v-model="timeZone" :options="zones" option-label="label" option-value="value" :disabled="!profile" /></div>
@@ -139,12 +140,18 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.account-col { display: flex; flex-direction: column; gap: 16px; max-width: 880px; }
-.who { display: flex; align-items: center; gap: 16px; padding: 20px 24px; }
-.avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--dm-accent-soft); color: var(--dm-accent-hover); display: grid; place-items: center; font-size: var(--dm-text-xl); font-weight: 500; flex: none; }
+/* аккаунт (account-profile-new): колонка 880 по центру, карточки padding 24 */
+.page { max-width: 880px; }
+.card { padding: 24px; }
+.account-col { display: flex; flex-direction: column; gap: 16px; }
+.who { display: flex; align-items: center; gap: 18px; }
+.avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); display: grid; place-items: center; font-size: 19px; font-weight: var(--fw-extrabold); flex: none; }
 .who-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.who-name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--dm-text-xl); font-weight: 500; letter-spacing: -0.01em; }
+.who-name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 17px; font-weight: var(--fw-extrabold); letter-spacing: -0.01em; }
+.egov-off { font-size: var(--fs-sm); color: var(--warning-text); margin-top: 2px; }
 .form-grid.two { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-.email-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.form-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.form-grid.two :deep(.p-inputtext), .form-grid.two :deep(.p-select) { min-height: 44px; border-radius: var(--radius-lg); }
+.email-row { font-size: var(--fs-md); font-weight: var(--fw-bold); }
+.email-note { margin: 8px 0 0; color: var(--text-faint); }
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; }
 </style>

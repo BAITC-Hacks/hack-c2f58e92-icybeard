@@ -1,5 +1,5 @@
 # Darumen logo assets
-Colours (с 28.09.2026, Палитра C «Белый холст»): знак — блок Ink #333333, дуга и сектор Violet #5B5BD6; иконки на белом #FFFFFF; холст #F5F6F8. Прежние Navy/Sky и Navy/Coral сняты.
+Colours (с 30.09.2026, синяя гамма): знак — блок Ink #1B2440, дуга и сектор Blue #2F6FE4 (hover/тёмный #1E4FB8); иконки на белом #FFFFFF; холст #F5F6F8, ночной #0D1526. Прежняя Палитра C (Violet) снята.
 
 ## Web — paste into <head>
 ```html
@@ -7,7 +7,7 @@ Colours (с 28.09.2026, Палитра C «Белый холст»): знак �
 <link rel="icon" href="/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon-180.png">
 <link rel="manifest" href="/site.webmanifest">
-<meta name="theme-color" content="#5B5BD6">
+<meta name="theme-color" content="#2F6FE4">
 ```
 - svg/logo-animated.svg — looping loader/splash, pure CSS, stops under prefers-reduced-motion. Use via <img> or inline.
 - svg/lockup*.svg use live text (Golos Text via Google Fonts). Outline the text in Figma/Illustrator before production use.

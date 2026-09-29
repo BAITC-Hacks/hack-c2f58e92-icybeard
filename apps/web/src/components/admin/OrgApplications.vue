@@ -59,6 +59,6 @@ function confirmReject() {
 .head h2 { margin: 0; }
 .app { display: flex; flex-direction: column; gap: 3px; padding: 10px 0; border-bottom: 1px solid var(--dm-hairline); }
 .app:last-child { border-bottom: 0; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .buttons { display: flex; gap: 8px; margin-top: 6px; }
 </style>

@@ -11,10 +11,12 @@ import LocaleSwitch from './LocaleSwitch.vue'
 import NotificationBell from './NotificationBell.vue'
 import ThemeToggle from './ThemeToggle.vue'
 
-/** Содержимое боковой навигации персонала: знак + «Darumen Health», группы с label uppercase, пункты 40 px radius 999
- * (активный — selected #E7ECFF, фиолетовая точка и ink-текст, остальные с отступом 28), внизу «пользователь ·
- * организация/роль» (ссылка на профиль), пилюля RU/KK, тема и «Выйти». Меню строится только из разрешений (lib/nav.ts):
+/** Содержимое боковой навигации персонала («синяя гамма», components.md): знак + «Darumen Health» 16/800, группы
+ * 10/700 uppercase --text-faint, пункты 36 px radius 10 с иконкой 15 px (активный — --accent-soft и --accent-strong,
+ * 700). Подвал «пользователь · организация/роль», RU/KK, тема и «Выйти» показывается только в drawer (prop foot):
+ * на десктопе эти элементы — в верхней полосе AppTopstrip. Меню строится только из разрешений (lib/nav.ts):
  * пункты маршрутов с meta.nav плюс кабинет своей организации и «Регион». Группа «Аккаунт» — у всех вошедших. */
+withDefaults(defineProps<{ foot?: boolean }>(), { foot: true })
 const emit = defineEmits<{ navigate: [] }>()
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -65,17 +67,17 @@ watch(() => auth.moCode, resolveOrganization)
 <template>
   <div class="sidenav">
     <RouterLink class="brand" to="/" title="Darumen Health" @click="emit('navigate')">
-      <BrandMark :size="28" /><span class="label">Darumen Health</span>
+      <BrandMark :size="26" /><span class="label">Darumen Health</span>
     </RouterLink>
     <nav class="groups" :aria-label="t('shell.menu')">
       <div v-for="g in groups" :key="g.group" class="group" :data-testid="`nav-group-${g.group}`">
         <div class="group-title eyebrow">{{ g.label }}</div>
         <RouterLink v-for="item in g.items" :key="item.to" :to="item.to" class="item" :class="{ active: isActive(item.to) }" :title="item.label" @click="emit('navigate')">
-          <span class="dot" aria-hidden="true" /><i :class="item.icon" class="icon" aria-hidden="true" /><span class="label">{{ item.label }}</span>
+          <i :class="item.icon" class="icon" aria-hidden="true" /><span class="label">{{ item.label }}</span>
         </RouterLink>
       </div>
     </nav>
-    <div class="foot">
+    <div v-if="foot" class="foot">
       <RouterLink class="user" to="/account/profile" :title="`${auth.actor} · ${affiliation}`" data-testid="user-chip" @click="emit('navigate')">
         <i class="pi pi-user icon" aria-hidden="true" /><span class="label">{{ auth.actor }} · {{ affiliation }}</span>
       </RouterLink>
@@ -93,38 +95,36 @@ watch(() => auth.moCode, resolveOrganization)
 </template>
 
 <style scoped>
-.sidenav { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 24px 16px 20px; gap: 4px; box-sizing: border-box; }
-.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 20px; text-decoration: none; color: var(--dm-ink); font-weight: 600; font-size: 16px; letter-spacing: -0.02em; }
-.groups { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
-.group { display: flex; flex-direction: column; gap: 4px; }
-.group + .group { margin-top: 12px; }
-.group-title { padding: 8px 12px 6px; }
-.item { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px 0 28px; border-radius: var(--dm-radius-pill); text-decoration: none; color: var(--dm-muted); font-size: var(--dm-text-md); font-weight: 500; white-space: nowrap; overflow: hidden; box-sizing: border-box; flex: none; }
-.item .icon { display: none; }
-.item .dot { display: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dm-accent); flex: none; }
-.item:hover { background: var(--dm-bg); color: var(--dm-ink); }
-.item.active { background: var(--dm-accent-soft); color: var(--dm-ink); padding-left: 12px; }
-.item.active .dot { display: block; }
-.foot { display: flex; flex-direction: column; gap: 10px; padding: 12px 12px 0; font-size: 13px; color: var(--dm-muted); }
-.user { display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--dm-muted); text-decoration: none; }
-.user:hover { color: var(--dm-accent-hover); }
+.sidenav { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 18px 0 16px; gap: 2px; box-sizing: border-box; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 20px 16px; text-decoration: none; color: var(--text); font-weight: var(--fw-extrabold); font-size: 16px; letter-spacing: -0.01em; }
+.groups { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+.group { display: flex; flex-direction: column; }
+.group-title { padding: 14px 20px 6px; font-size: var(--fs-2xs); font-weight: var(--fw-bold); letter-spacing: 0.06em; color: var(--text-faint); }
+.group:first-child .group-title { padding-top: 4px; }
+.item { display: flex; align-items: center; gap: 11px; height: 36px; margin: 1px 8px; padding: 0 12px; border-radius: var(--radius-md); text-decoration: none; color: var(--text-secondary); font-size: 13px; font-weight: var(--fw-semibold); white-space: nowrap; overflow: hidden; box-sizing: border-box; flex: none; }
+.item .icon { font-size: 15px; flex: none; color: currentColor; }
+.item:hover { background: var(--surface-hover); color: var(--text); }
+.item.active { background: var(--accent-soft); color: var(--accent-strong); font-weight: var(--fw-bold); }
+.foot { display: flex; flex-direction: column; gap: 10px; padding: 12px 20px 0; font-size: 13px; color: var(--text-secondary); border-top: 1px solid var(--border); }
+.user { display: flex; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-secondary); font-weight: var(--fw-semibold); text-decoration: none; }
+.user:hover { color: var(--accent-strong); }
 .user .label { overflow: hidden; text-overflow: ellipsis; }
 .user .icon { display: none; }
 .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .narrow { display: none; }
-.logout { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; color: var(--dm-muted); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-.logout:hover { color: var(--dm-danger); }
+.logout { border: 0; background: none; padding: 0; font: inherit; font-size: 13px; font-weight: var(--fw-semibold); color: var(--text-secondary); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.logout:hover { color: var(--danger-strong); }
 .logout .icon { display: none; }
 
 /* до 1100 px — только иконки: подписи скрыты, всё центрируется */
 @media (max-width: 1100px) and (min-width: 641px) {
-  .sidenav { padding-inline: 6px; }
+  .sidenav { padding-inline: 0; }
   .label, .group-title { display: none; }
-  .brand, .item, .user { justify-content: center; padding-inline: 0; }
+  .brand { justify-content: center; padding-inline: 0; }
+  .item, .user { justify-content: center; padding-inline: 0; }
+  .item { margin-inline: 10px; }
   .item .icon, .user .icon, .logout .icon { display: inline-block; }
-  .item.active { padding-left: 0; }
-  .item.active .dot { display: none; }
-  .item.active .icon { color: var(--dm-accent); }
+  .item.active .icon { color: var(--accent-strong); }
   .controls { flex-direction: column; align-items: center; }
   .wide { display: none; }
   .narrow { display: inline-flex; }

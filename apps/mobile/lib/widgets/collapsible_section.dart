@@ -41,11 +41,13 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
     final colors = AppPalette.of(context);
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final duration = reduceMotion ? Duration.zero : AppDurations.fast * 1.5;
-    return Material(
-      color: colors.card,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
+    return Container(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(AppRadius.card), boxShadow: colors.cardShadow),
+      child: Material(
+        color: colors.card,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Semantics(
@@ -108,8 +110,9 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
                     ],
                   )
                 : const SizedBox(width: double.infinity),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

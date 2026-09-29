@@ -153,21 +153,21 @@ watch(signalStatus, loadSignals)
 
     <KpiRow data-testid="gov-kpis">
       <KpiTile :value="days(kpis.avgP90)" :unit="t('common.days')" :label="t('gov.map.kpiAvgP90')" origin="formula" :loading="loading && !index" />
-      <KpiTile :value="pct(kpis.shareOver30)" :label="t('gov.map.kpiShareOver30')" origin="formula" :loading="loading && !index" />
+      <KpiTile :value="pct(kpis.shareOver30)" :label="t('gov.map.kpiShareOver30')" tone="warn" origin="formula" :loading="loading && !index" />
       <KpiTile :value="index ? kpis.below : '—'" :label="t('gov.map.kpiBelow', { threshold: INDEX_THRESHOLD })" origin="formula" :loading="loading && !index" />
-      <KpiTile :value="overloaded.length" :label="t('gov.map.kpiOverloaded')" :chip="openTotal ? t('gov.map.signalsChip', { n: openTotal }) : undefined" origin="formula" :loading="loading && !index" />
+      <KpiTile :value="overloaded.length" :label="t('gov.map.kpiOverloaded')" tone="danger" :chip="openTotal ? t('gov.map.signalsChip', { n: openTotal }) : undefined" origin="formula" :loading="loading && !index" />
     </KpiRow>
 
     <div class="main-grid">
       <AppCard :title="t('gov.map.indexByRegion')" origin="formula">
-        <template #header>
-          <RouterLink v-if="focusRegion" class="link-arrow small" :to="{ name: 'region', params: { kato: focusRegion } }">{{ t('gov.map.openRegion', { name: refdata.regionName(focusRegion) }) }}</RouterLink>
-        </template>
         <RegionMap :regions="refdata.regions" :index="index?.items ?? []" :highlight="hovered" :anomalies="anomalyRegions" @select="toRegion" @hover="hovered = $event" />
         <div class="legend caption">
-          <span v-for="(label, i) in ['below60', 'r60', 'r70', 'r80', 'r87']" :key="label" class="legend-item"><span class="swatch" :style="{ background: `var(--dm-map-${i + 1})` }" />{{ t('gov.map.legend.' + label) }}</span>
+          <span class="legend-item"><span class="swatch" :style="{ background: 'var(--scale-good)' }" />{{ t('gov.map.legend.good') }}</span>
+          <span class="legend-item"><span class="swatch" :style="{ background: 'var(--scale-mid)' }" />{{ t('gov.map.legend.mid') }}</span>
+          <span class="legend-item"><span class="swatch" :style="{ background: 'var(--scale-bad)' }" />{{ t('gov.map.legend.bad') }}</span>
           <span class="legend-item"><span class="swatch dot" />{{ t('gov.map.legend.anomaly') }}</span>
           <span>· {{ t('gov.map.legend.higherBetter') }}</span>
+          <RouterLink v-if="focusRegion" class="link-arrow small legend-open" :to="{ name: 'region', params: { kato: focusRegion } }">{{ t('gov.map.openRegion', { name: refdata.regionName(focusRegion) }) }}</RouterLink>
         </div>
         <p class="caption" style="margin: 8px 0 0">{{ index?.method }}</p>
       </AppCard>
@@ -221,7 +221,8 @@ watch(signalStatus, loadSignals)
 .profile-select { min-width: 220px; }
 .main-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
-.legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.legend-open { margin-left: auto; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
 .swatch.dot { border-radius: 50%; background: var(--dm-warn-strong); width: 10px; height: 10px; }

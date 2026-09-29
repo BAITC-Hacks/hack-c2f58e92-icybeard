@@ -89,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final unseen = answer != null && answer.decisionId != session.seenDecisionId;
     return PageScaffold(
       title: s.navHome,
+      hero: true,
       leading: const HomeMarkAnchor(),
       actions: const [LanguageButton()],
       onRefresh: _load,
@@ -186,8 +187,8 @@ class _RouteCard extends StatelessWidget {
   }
 }
 
-/// Три плитки: «Сколько ждут», «Лекарства» (при `medicines.check`), «Вакцинация» — белые, radius 16, иконка 24
-/// и подпись 13/500.
+/// Три плитки: «Сколько ждут», «Лекарства» (при `medicines.check`), «Вакцинация» — белые, radius 18, иконка
+/// в круге 36 surface-sunken/accent и подпись 13/700 (доска m-home-new `.tile`).
 class _Tiles extends StatelessWidget {
   const _Tiles();
 
@@ -225,17 +226,22 @@ class _Tile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppPalette.of(context);
     return AppCard(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.lg),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
       onTap: onTap,
       semanticsLabel: label,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: colors.ink, size: 24),
-          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: colors.surfaceSunken),
+            child: Icon(icon, color: colors.accent, size: 20),
+          ),
+          const SizedBox(height: AppSpacing.md),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 13, letterSpacing: 0, height: 1.25),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 13, height: 1.25),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),

@@ -288,11 +288,11 @@ onMounted(async () => {
 <style scoped>
 .result { padding: 12px 16px; }
 .result p { margin: 2px 0; }
-.main-grid { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .period { max-width: 180px; }
 .nowrap { white-space: nowrap; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .step-row { justify-content: flex-start; gap: 12px; }
 .step-row .row-main { display: flex; flex-direction: column; gap: 2px; }
 .step-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--dm-ok-soft); color: var(--dm-ok); display: grid; place-items: center; font-size: 11px; flex: none; }

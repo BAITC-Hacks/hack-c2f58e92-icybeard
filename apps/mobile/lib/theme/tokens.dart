@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Токены Палитры C «Белый холст» (доска C-Tokens, docs/design-system.md) — те же значения, что в
-/// `design/tokens.json`, паритет проверяет `test/theme_test.dart`. Белые карточки на светло-сером холсте, текст #333,
-/// фиолетовый — единственный brand-акцент (primary-кнопки, навигация, серия графика); аномалии и риск — только
-/// янтарные. Тёмная тема — производная от той же палитры, контраст ink/surface ≥ 4.5:1 в обеих.
+/// Токены «синей гаммы» (handoff/tokens.json дизайн-холста «Darumen Health — макеты»): рабочие экраны на светло-сером
+/// `--bg-page`, карточки белые radius 18 с мягкой тенью, текст — тёмно-синие чернила `--text`, единственный
+/// brand-акцент — синий `--accent`; семантика good/attention/critical не менялась. Голубой градиент [heroGradient] —
+/// только стартовый вход и главная гражданина. Светлая тема утверждена, тёмная — предложение из того же handoff.
+/// Паритет значений проверяет `test/theme_test.dart`.
 class ColorTokens {
   const ColorTokens({
     required this.surface,
@@ -15,7 +16,14 @@ class ColorTokens {
     required this.accent,
     required this.accentHover,
     required this.accentSoft,
+    required this.accentSubtle,
+    required this.accentLine,
+    required this.link,
     required this.neutralSoft,
+    required this.surfaceSunken,
+    required this.surfaceHover,
+    required this.surfaceInfo,
+    required this.toggleOff,
     required this.ok,
     required this.okSoft,
     required this.warn,
@@ -23,88 +31,142 @@ class ColorTokens {
     required this.warnStrong,
     required this.danger,
     required this.dangerSoft,
+    required this.dangerStrong,
     required this.info,
     required this.infoSoft,
     required this.ai,
     required this.aiSoft,
     required this.benchSoft,
+    required this.barNeutral,
     required this.map1,
     required this.map2,
     required this.map3,
     required this.map4,
     required this.map5,
     required this.onAccent,
-    required this.navShadow,
+    required this.heroGradient,
+    required this.shadowTint,
+    required this.cardShadowAlpha,
+    required this.popShadowAlpha,
   });
 
-  /// ground — светло-серый холст экрана.
+  /// bg-page — светло-серый нейтральный фон рабочих экранов.
   final Color surface;
 
-  /// card — белые карточки и поля выбора.
+  /// surface — белые карточки, поля и таббар.
   final Color card;
 
-  /// ink — основной текст.
+  /// text — основной текст, тёмно-синие чернила.
   final Color ink;
 
-  /// ink-2 — вторичный текст, подписи, неактивные вкладки. Единственный вторичный цвет текста.
+  /// text-secondary — вторичный текст, подписи, ячейки.
   final Color muted;
 
-  /// dot-off — неактивная точка, столбики тишины в волне скрайба, скелетоны. Не для текста: контраст на белом < 3:1.
+  /// border-strong — рамка чекбокса, будущий шаг, столбики тишины скрайба, точечное подчёркивание. Не для текста.
   final Color faint;
 
-  /// Разделители строк списков.
+  /// border — разделители строк, рамки инпутов.
   final Color hairline;
 
-  /// Brand primary — primary-кнопки, активная пилюля, точка навигации, полосы прогресса и серия графика.
+  /// accent — primary-кнопка, активная локаль, прогресс, шаги, чекбокс.
   final Color accent;
 
-  /// Наведение и ссылки: TextButton, стрелка «→» у ссылок-действий, текст чипов «AI» и «текущая».
+  /// accent-strong — текст на светло-синем, активная вкладка, secondary-кнопка, hover.
   final Color accentHover;
 
-  /// selected — активный пункт, выбранная строка, чип «текущая», карточка-сигнал, круглые кнопки шапки.
+  /// accent-soft — активный чип, статус «инфо», карточка-сигнал, кольцо фокуса.
   final Color accentSoft;
 
-  /// inset — поле ввода, вторичная и «опасная» кнопки, нейтральные чипы.
+  /// accent-subtle — фон secondary-кнопки.
+  final Color accentSubtle;
+
+  /// accent-line — рамка mini-кнопки.
+  final Color accentLine;
+
+  /// link — ghost-ссылки («Попросить рассмотреть», «Регистрация →»).
+  final Color link;
+
+  /// surface-muted — трек локали, круглые кнопки шапки, чип пользователя, трек прогресса, метка происхождения.
   final Color neutralSoft;
+
+  /// surface-sunken — фильтр-чипы, неактивные ячейки, номер шага, нейтральный статус.
+  final Color surfaceSunken;
+
+  /// surface-hover — кнопки-ответы, строки «Другой способ», выбранная опция списка.
+  final Color surfaceHover;
+
+  /// surface-info — подложка графиков, блок «Рекомендуется…», выбранная опция-карточка.
+  final Color surfaceInfo;
+
+  /// toggle-off — выключенный тумблер.
+  final Color toggleOff;
 
   /// good — текст и заливка («покрыт», «совпало», «подтверждено»).
   final Color ok;
   final Color okSoft;
 
-  /// attention — риск и аномалии (всегда янтарные, никогда не фиолетовые); warnStrong — янтарные точки и полосы.
+  /// attention — риск и аномалии (всегда янтарные, никогда не синие); warnStrong — янтарные точки и полосы.
   final Color warn;
   final Color warnSoft;
   final Color warnStrong;
 
-  /// critical — отказ, «Выйти», опасное действие.
+  /// critical — отказ, «Выйти», опасное действие; dangerStrong — красные акценты (точка записи, полоса риска).
   final Color danger;
   final Color dangerSoft;
+  final Color dangerStrong;
 
-  /// info / ML — фон чипа «ML-модель» (текст чипа — ink) и состояния «данные устарели».
+  /// Сервисная информация «данные устарели» — информационный статус (accent-soft/accent-strong).
   final Color info;
   final Color infoSoft;
 
-  /// lavender — чип «AI» и маркер заголовка.
+  /// Метка «AI» — упразднённый лавандовый стал нейтральной пилюлей surface-muted/text-secondary.
   final Color ai;
   final Color aiSoft;
 
-  /// Внешний ориентир («ВОЗ/ЮНИСЕФ · 2021»), совпадает с infoSoft.
+  /// Внешний ориентир («ВОЗ/ЮНИСЕФ · 2021») — та же нейтральная пилюля.
   final Color benchSoft;
 
-  /// Рамп карты: выше — хуже.
+  /// bar-neutral — серые столбцы в сравнении «где быстрее».
+  final Color barNeutral;
+
+  /// Шкала good → mid → bad (--scale-*): выше — хуже; синий в шкале риска запрещён.
   final Color map1;
   final Color map2;
   final Color map3;
   final Color map4;
   final Color map5;
 
-  /// ink-inverse — текст и иконки на фиолетовом (белый в светлой теме, холст — в тёмной).
+  /// text-on-accent — текст и иконки на синем.
   final Color onAccent;
 
-  /// Тень плавающей навигации `0 -4px 16px`.
-  final Color navShadow;
+  /// bg-hero-gradient (150deg, 0 → 30 → 55 → 100 %) — ТОЛЬКО стартовый вход и главная гражданина.
+  final List<Color> heroGradient;
 
-  /// Белый и прозрачный — единственные цвета вне палитры (текст на primary, surfaceTint).
+  /// Базовый цвет теней (rgba(24,52,110,…) в светлой, чёрный в тёмной) и их прозрачности.
+  final Color shadowTint;
+
+  /// shadow-card: (0 1px 2px, 0 8px 20px -12px).
+  final (double, double) cardShadowAlpha;
+
+  /// shadow-pop: (0 4px 10px, 0 24px 48px -18px) — плавающий таббар и всплывающие панели.
+  final (double, double) popShadowAlpha;
+
+  /// Остановки градиента из tokens.css: 0 / 30 / 55 / 100 %.
+  static const heroGradientStops = [0.0, 0.3, 0.55, 1.0];
+
+  /// Тень карточки (--shadow-card).
+  List<BoxShadow> get cardShadow => [
+        BoxShadow(color: shadowTint.withValues(alpha: cardShadowAlpha.$1), offset: const Offset(0, 1), blurRadius: 2),
+        BoxShadow(color: shadowTint.withValues(alpha: cardShadowAlpha.$2), offset: const Offset(0, 8), blurRadius: 20, spreadRadius: -12),
+      ];
+
+  /// Тень плавающей панели (--shadow-pop): таббар, выпадающие списки.
+  List<BoxShadow> get popShadow => [
+        BoxShadow(color: shadowTint.withValues(alpha: popShadowAlpha.$1), offset: const Offset(0, 4), blurRadius: 10),
+        BoxShadow(color: shadowTint.withValues(alpha: popShadowAlpha.$2), offset: const Offset(0, 24), blurRadius: 48, spreadRadius: -18),
+      ];
+
+  /// Белый и прозрачный — единственные цвета вне палитры (текст на accent, surfaceTint).
   static const white = Color(0xFFFFFFFF);
   static const transparent = Color(0x00000000);
   static const shadow = Color(0xFF000000);
@@ -113,14 +175,21 @@ class ColorTokens {
   static const light = ColorTokens(
     surface: Color(0xFFF5F6F8),
     card: Color(0xFFFFFFFF),
-    ink: Color(0xFF333333),
-    muted: Color(0xFF535768),
-    faint: Color(0xFFC4C9D8),
-    hairline: Color(0xFFE4E7EE),
-    accent: Color(0xFF5B5BD6),
-    accentHover: Color(0xFF4646B8),
-    accentSoft: Color(0xFFE7ECFF),
-    neutralSoft: Color(0xFFEAECF2),
+    ink: Color(0xFF1B2440),
+    muted: Color(0xFF48536D),
+    faint: Color(0xFFD3DCEC),
+    hairline: Color(0xFFE1E8F5),
+    accent: Color(0xFF2F6FE4),
+    accentHover: Color(0xFF1E4FB8),
+    accentSoft: Color(0xFFDEEAFD),
+    accentSubtle: Color(0xFFEAF1FE),
+    accentLine: Color(0xFFC9DBFA),
+    link: Color(0xFF2F6FE4),
+    neutralSoft: Color(0xFFE8EEFA),
+    surfaceSunken: Color(0xFFEEF3FC),
+    surfaceHover: Color(0xFFF4F7FD),
+    surfaceInfo: Color(0xFFF6F8FC),
+    toggleOff: Color(0xFFDCE4F2),
     ok: Color(0xFF2A5C4E),
     okSoft: Color(0xFFDDF7C8),
     warn: Color(0xFF9A5A00),
@@ -128,50 +197,67 @@ class ColorTokens {
     warnStrong: Color(0xFFB45309),
     danger: Color(0xFF9F1239),
     dangerSoft: Color(0xFFFFE0E6),
-    info: Color(0xFF0E6F8A),
-    infoSoft: Color(0xFFD1FAFF),
-    ai: Color(0xFF4646B8),
-    aiSoft: Color(0xFFEDDFF7),
-    benchSoft: Color(0xFFD1FAFF),
-    map1: Color(0xFFEEF0FB),
-    map2: Color(0xFFDDE1FA),
-    map3: Color(0xFFB6BCF0),
-    map4: Color(0xFF8386E0),
-    map5: Color(0xFF5B5BD6),
+    dangerStrong: Color(0xFFD6395E),
+    info: Color(0xFF1E4FB8),
+    infoSoft: Color(0xFFDEEAFD),
+    ai: Color(0xFF48536D),
+    aiSoft: Color(0xFFE8EEFA),
+    benchSoft: Color(0xFFE8EEFA),
+    barNeutral: Color(0xFFB4C0D8),
+    map1: Color(0xFF8CC152),
+    map2: Color(0xFFBFB546),
+    map3: Color(0xFFF2A93B),
+    map4: Color(0xFFE4714C),
+    map5: Color(0xFFD6395E),
     onAccent: white,
-    navShadow: Color(0x0F333558),
+    heroGradient: [Color(0xFFE8F0FE), Color(0xFFEEF3FD), Color(0xFFF2F5FB), Color(0xFFEAF3FA)],
+    shadowTint: Color(0xFF18346E),
+    cardShadowAlpha: (0.04, 0.10),
+    popShadowAlpha: (0.06, 0.24),
   );
 
   static const dark = ColorTokens(
-    surface: Color(0xFF16171D),
-    card: Color(0xFF1F2029),
-    ink: Color(0xFFE8E9F0),
-    muted: Color(0xFFA3A7B8),
-    faint: Color(0xFF4A4E5E),
-    hairline: Color(0xFF2C2E3A),
-    accent: Color(0xFF8B8BF0),
-    accentHover: Color(0xFFA5A5F5),
-    accentSoft: Color(0xFF2A2B52),
-    neutralSoft: Color(0xFF272936),
-    ok: Color(0xFF8FD3B8),
-    okSoft: Color(0xFF1E3A30),
-    warn: Color(0xFFF0B45A),
-    warnSoft: Color(0xFF3D2E14),
-    warnStrong: Color(0xFFF59E0B),
-    danger: Color(0xFFF48CA5),
-    dangerSoft: Color(0xFF40202A),
-    info: Color(0xFF6FD3EE),
-    infoSoft: Color(0xFF15343D),
-    ai: Color(0xFFB9A5F0),
-    aiSoft: Color(0xFF2E2440),
-    benchSoft: Color(0xFF15343D),
-    map1: Color(0xFF23253A),
-    map2: Color(0xFF2F3260),
-    map3: Color(0xFF4B4F9A),
-    map4: Color(0xFF6A6DC8),
-    map5: Color(0xFF8B8BF0),
-    onAccent: Color(0xFF16171D),
-    navShadow: Color(0x66000000),
+    surface: Color(0xFF0D1526),
+    card: Color(0xFF141E33),
+    ink: Color(0xFFE7EDF8),
+    muted: Color(0xFFB5C0D6),
+    faint: Color(0xFF33446B),
+    hairline: Color(0xFF27365A),
+    accent: Color(0xFF2F6FE4),
+    accentHover: Color(0xFFA9C6FF),
+    accentSoft: Color(0xFF1B3263),
+    accentSubtle: Color(0xFF172A50),
+    accentLine: Color(0xFF2C4A85),
+    link: Color(0xFF8DB4FF),
+    neutralSoft: Color(0xFF1F2C48),
+    surfaceSunken: Color(0xFF1A2640),
+    surfaceHover: Color(0xFF1A2640),
+    surfaceInfo: Color(0xFF172238),
+    toggleOff: Color(0xFF33446B),
+    ok: Color(0xFF8FDDB0),
+    okSoft: Color(0xFF16382B),
+    warn: Color(0xFFF4C574),
+    warnSoft: Color(0xFF3A2A10),
+    warnStrong: Color(0xFFE59A3A),
+    danger: Color(0xFFFF9FB3),
+    dangerSoft: Color(0xFF3F1824),
+    dangerStrong: Color(0xFFF0607F),
+    info: Color(0xFFA9C6FF),
+    infoSoft: Color(0xFF1B3263),
+    ai: Color(0xFFB5C0D6),
+    aiSoft: Color(0xFF1F2C48),
+    benchSoft: Color(0xFF1F2C48),
+    barNeutral: Color(0xFF3A4A6E),
+    map1: Color(0xFF7DB548),
+    map2: Color(0xFFB0A83C),
+    map3: Color(0xFFE39B30),
+    map4: Color(0xFFE17450),
+    map5: Color(0xFFE04D6E),
+    onAccent: white,
+    heroGradient: [Color(0xFF0F1B34), Color(0xFF0E1830), Color(0xFF0D1526), Color(0xFF0E1A2C)],
+    shadowTint: shadow,
+    cardShadowAlpha: (0.30, 0.55),
+    popShadowAlpha: (0.35, 0.70),
   );
 }
 
@@ -184,30 +270,33 @@ abstract final class AppSpacing {
   static const double xl = 24;
   static const double xxl = 32;
 
-  /// Боковой отступ экрана (шапка и контент): `padding 0 20`.
-  static const double page = 20;
+  /// Боковой отступ экрана (шапка и контент): `padding 0 16` по мобильным доскам.
+  static const double page = 16;
 }
 
+/// Радиусы синей гаммы: 4 — полоски, 8 — статус-бейджи, 12 — поля и внутренние блоки, 14 — заметки и строки-плашки,
+/// 18 — карточки, pill — кнопки и чипы.
 abstract final class AppRadius {
   static const double xs = 4;
   static const double sm = 8;
   static const double md = 12;
-  static const double lg = 16;
+  static const double lg = 14;
+  static const double card = 18;
   static const double pill = 999;
 }
 
-/// Размеры компонентов мобилки (docs/design-system.md, «Компоненты — мобилка»).
+/// Размеры компонентов мобилки по доскам m-* синей гаммы.
 abstract final class AppSizes {
-  /// Primary/secondary-кнопка и поле ввода.
-  static const double control = 52;
+  /// Primary/secondary-кнопка и поле ввода — h48.
+  static const double control = 48;
 
-  /// Компактное поле и пилюля-фильтр.
+  /// Компактное поле и пилюля-фильтр (touch target ≥ 44).
   static const double compact = 44;
 
   /// Кнопка-селектор (регион/профиль) и поле входа.
   static const double select = 48;
 
-  /// Круглая кнопка-иконка в шапке.
+  /// Круглая кнопка-иконка в шапке (назад 40 px на surface-muted).
   static const double iconButton = 40;
 
   /// Малая кнопка в состояниях экрана и в строках («Завершить», «Повторить»).
@@ -216,7 +305,7 @@ abstract final class AppSizes {
   /// Строка списка внутри карточки.
   static const double row = 56;
 
-  /// Плавающая нижняя навигация.
+  /// Плавающая нижняя pill-панель.
   static const double nav = 64;
 
   /// Точка «новое/активное» (6), маркер текущего этапа (14), полоса этапа (3).
@@ -224,7 +313,10 @@ abstract final class AppSizes {
   static const double marker = 14;
   static const double bar = 3;
 
-  /// Иконка в круге у состояний экрана (W-States).
+  /// Полоска активной вкладки таббара 16×3.
+  static const double navPipWidth = 16;
+
+  /// Иконка в круге у состояний экрана (states-new).
   static const double stateIcon = 48;
 }
 

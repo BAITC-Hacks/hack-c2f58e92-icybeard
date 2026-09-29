@@ -149,12 +149,14 @@ onBeforeUnmount(() => window.clearInterval(timer))
 
       <template v-else-if="status">
         <span class="status-icon" :class="status.status" aria-hidden="true"><i :class="status.status === 'approved' ? 'pi pi-check' : status.status === 'rejected' ? 'pi pi-times' : 'pi pi-clock'" /></span>
-        <h1>{{ t(`signup.state.${status.status}`) }}</h1>
-        <p class="lead">{{ status.orgName }}<br />{{ t('signup.numberSent', { number: status.number, date: date(status.submittedAt) }) }}</p>
+        <h1 class="center">{{ t(`signup.state.${status.status}`) }}</h1>
+        <p class="lead center">{{ status.orgName }}<br />{{ t('signup.numberSent', { number: status.number, date: date(status.submittedAt) }) }}</p>
         <ol v-if="status.status !== 'rejected'" class="steps">
-          <li v-for="s in steps" :key="s.key" :class="{ done: s.done, current: s.current }"><span class="dot" aria-hidden="true"><i v-if="s.done" class="pi pi-check" /></span>{{ t(`signup.step.${s.key}`) }}</li>
+          <li v-for="(s, i) in steps" :key="s.key" :class="{ done: s.done, current: s.current, todo: !s.done && !s.current }">
+            <span class="dot" aria-hidden="true"><i v-if="s.done" class="pi pi-check" /><span v-else-if="s.current" class="dot-mark" /><template v-else>{{ i + 1 }}</template></span>{{ t(`signup.step.${s.key}`) }}
+          </li>
         </ol>
-        <p class="note" :class="{ off: services.emailUnavailable }" data-testid="status-note">{{ resultNote }}</p>
+        <p class="note center" :class="{ off: services.emailUnavailable }" data-testid="status-note">{{ resultNote }}</p>
         <Button v-if="status.status === 'approved'" :label="t('auth.login')" class="wide" @click="auth.login()" />
         <Button v-else :label="t('signup.refreshStatus')" severity="secondary" class="wide" :loading="loading" data-testid="status-refresh" @click="load" />
       </template>
@@ -163,21 +165,25 @@ onBeforeUnmount(() => window.clearInterval(timer))
 </template>
 
 <style scoped>
-.public-page { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 64px 16px 16px; }
-.public-card { width: min(440px, 100%); display: flex; flex-direction: column; gap: 16px; padding: 32px; }
-.public-card h1 { font-size: var(--dm-text-xl); margin: 0; }
-.lead { margin: -4px 0 0; color: var(--dm-muted); }
+/* публичная карточка (public-signup-status-new): 460, radius 20, статусная ветка по центру */
+.public-page { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 60px 16px 16px; }
+.public-card { width: min(460px, 100%); display: flex; flex-direction: column; gap: 16px; padding: 32px; border-radius: var(--radius-card-lg); }
+.public-card h1 { font-size: var(--fs-xl); margin: 0; }
+.lead { margin: -4px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 .wide { width: 100%; justify-content: center; }
 .center { text-align: center; margin: 0; }
-.error-text { color: var(--dm-danger); font-size: var(--dm-text-sm); }
-.status-icon { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--dm-neutral-soft); }
-.status-icon.approved { background: var(--dm-ok-soft); color: var(--dm-ok); }
-.status-icon.rejected { background: var(--dm-warn-soft); color: var(--dm-warn); }
-.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; position: relative; }
-.steps li { display: flex; align-items: center; gap: 12px; color: var(--dm-muted); font-size: var(--dm-text-md); }
-.steps li.done, .steps li.current { color: var(--dm-ink); }
-.dot { width: 16px; height: 16px; border-radius: 50%; background: var(--dm-dot-idle); display: grid; place-items: center; color: #fff; font-size: 9px; flex: none; }
-.steps li.done .dot, .steps li.current .dot { background: var(--dm-primary); }
-.note { margin: 0; padding: 12px 16px; border-radius: var(--dm-radius-md); background: var(--dm-neutral-soft); font-size: var(--dm-text-sm); }
-.note.off { background: var(--dm-warn-soft); }
+.error-text { color: var(--danger-text); font-size: var(--fs-sm); }
+.status-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-sunken); color: var(--text-secondary); margin: 0 auto; }
+.status-icon.approved { background: var(--success-bg); color: var(--success-text); }
+.status-icon.rejected { background: var(--warning-bg); color: var(--warning-text); }
+.steps { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.steps li { display: flex; align-items: center; gap: 12px; color: var(--text); font-size: 13px; }
+.steps li.todo { color: var(--text-muted); }
+.dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: var(--fs-2xs); font-weight: var(--fw-extrabold); flex: none; background: var(--surface-sunken); color: var(--text-faint); }
+.dot i { font-size: 10px; }
+.steps li.done .dot { background: var(--success-bg); color: var(--success-text); }
+.steps li.current .dot { background: var(--accent-soft); color: var(--accent-strong); }
+.dot-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-strong); }
+.note { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.5; }
+.note.off { padding: 12px 16px; border-radius: var(--radius-lg); background: var(--warning-bg); color: var(--text); text-align: left; }
 </style>

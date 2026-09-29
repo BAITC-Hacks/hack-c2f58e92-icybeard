@@ -159,8 +159,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Container(
                       width: 48,
                       height: 48,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: colors.neutralSoft),
-                      child: Icon(Icons.person_outline, color: colors.ink),
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: colors.accentSoft),
+                      child: Icon(Icons.person_outline, color: colors.accentHover),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(

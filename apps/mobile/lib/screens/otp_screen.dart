@@ -154,8 +154,8 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 }
 
-/// Способ подтверждения: inset-строка radius 12 min-height 56 — иконка, название 15/500, чип справа. SMS и
-/// резервные коды недоступны до интеграции и не нажимаются.
+/// Способ подтверждения: строка на surface-hover radius 14 min-height 56 — иконка, название 13.5/700, чип справа.
+/// SMS и резервные коды недоступны до интеграции и не нажимаются.
 class _MethodRow extends StatelessWidget {
   const _MethodRow({required this.icon, required this.title, required this.chip, this.disabled = false});
 
@@ -173,7 +173,7 @@ class _MethodRow extends StatelessWidget {
       child: Container(
         constraints: const BoxConstraints(minHeight: AppSizes.row),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(color: colors.neutralSoft, borderRadius: BorderRadius.circular(AppRadius.md)),
+        decoration: BoxDecoration(color: colors.surfaceHover, borderRadius: BorderRadius.circular(AppRadius.lg)),
         child: Row(
           children: [
             Icon(icon, size: 20, color: color),

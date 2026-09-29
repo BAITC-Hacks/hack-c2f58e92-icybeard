@@ -2,33 +2,33 @@ using System.Net;
 
 namespace Darumen.Modules.Access.Mail;
 
-/// <summary>Каркас писем по доске «Письма системы» в Палитре C (design/tokens.json): холст #F5F6F8, белая карточка с
-/// радиусом 12, текст #333333, кнопка #5B5BD6 с белым текстом, Manrope/system-ui. Таблицы и инлайн-стили — для почтовых клиентов.</summary>
+/// <summary>Каркас писем по доске mail-new («синяя гамма», handoff/tokens.css): холст #F5F6F8, белая карточка с
+/// радиусом 20, текст #1B2440, кнопка-pill #2F6FE4 с белым текстом, Manrope/system-ui. Таблицы и инлайн-стили — для почтовых клиентов.</summary>
 internal static class EmailLayout
 {
     private const string Surface = "#F5F6F8";
     private const string Card = "#FFFFFF";
-    private const string Ink = "#333333";
-    private const string Muted = "#535768";
-    private const string Hairline = "#E4E7EE";
-    private const string Accent = "#5B5BD6";
+    private const string Ink = "#1B2440";
+    private const string Muted = "#48536D";
+    private const string Hairline = "#E1E8F5";
+    private const string Accent = "#2F6FE4";
     private const string Font = "Manrope, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif";
 
     public static string E(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
 
     public static string Paragraph(string html) =>
-        $"<p style=\"margin:0 0 16px;font-size:15px;line-height:1.6;color:{Ink};\">{html}</p>";
+        $"<p style=\"margin:0 0 16px;font-size:14px;line-height:1.55;color:{Ink};\">{html}</p>";
 
     public static string Note(string html) =>
         $"<p style=\"margin:16px 0 0;font-size:13px;line-height:1.5;color:{Muted};\">{html}</p>";
 
     public static string Button(string url, string label) =>
-        $"<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:8px 0 8px;\"><tr><td style=\"border-radius:12px;background:{Accent};\">" +
-        $"<a href=\"{E(url)}\" style=\"display:inline-block;padding:14px 24px;font-family:{Font};font-size:15px;font-weight:600;color:#FFFFFF;" +
-        $"text-decoration:none;border-radius:12px;\">{E(label)}</a></td></tr></table>";
+        $"<table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\" style=\"margin:8px 0 8px;\"><tr><td style=\"border-radius:999px;background:{Accent};\">" +
+        $"<a href=\"{E(url)}\" style=\"display:inline-block;padding:14px 24px;font-family:{Font};font-size:14px;font-weight:700;color:#FFFFFF;" +
+        $"text-decoration:none;border-radius:999px;\">{E(label)}</a></td></tr></table>";
 
     public static string Code(string code) =>
-        $"<div style=\"margin:8px 0 16px;padding:18px 24px;background:{Surface};border-radius:12px;font-size:32px;font-weight:700;" +
+        $"<div style=\"margin:8px 0 16px;padding:18px 24px;background:#F4F7FD;border-radius:14px;font-size:32px;font-weight:800;" +
         $"letter-spacing:10px;text-align:center;color:{Ink};\">{E(code)}</div>";
 
     /// <summary>Строки «подпись — значение» (организация, роль, номер заявки).</summary>
@@ -48,9 +48,9 @@ internal static class EmailLayout
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{Surface};padding:32px 16px;">
         <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
-        <tr><td style="padding:0 4px 16px;font-size:17px;font-weight:700;color:{Ink};">Darumen Health</td></tr>
-        <tr><td style="background:{Card};border-radius:12px;padding:32px 28px;">
-        <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;font-weight:700;color:{Ink};">{E(title)}</h1>
+        <tr><td style="padding:0 4px 16px;font-size:16px;font-weight:800;color:{Ink};">Darumen Health</td></tr>
+        <tr><td style="background:{Card};border-radius:20px;padding:32px 28px;">
+        <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;font-weight:800;color:{Ink};">{E(title)}</h1>
         {body}
         </td></tr>
         <tr><td style="padding:16px 4px 0;font-size:12px;line-height:1.5;color:{Muted};">Письмо отправлено автоматически, отвечать на него не нужно. Darumen Health — сервис маршрутов и сроков ожидания для системы здравоохранения Казахстана.</td></tr>

@@ -4,10 +4,11 @@ import 'tokens.dart';
 import 'tones.dart';
 import 'typography.dart';
 
-/// Светлая и тёмная темы из одних токенов Палитры C: холст ground, белые карточки radius 16 без рамки и тени,
-/// primary-кнопки 52 px фиолетовый/белый, secondary — inset/ink, опасное действие — inset/critical ([AppButtons]),
-/// TextButton и ссылки — accentHover, поля на inset-фоне без рамки (в фокусе — обводка 2 px accent), чипы radius 8.
-/// Компонентные темы задают вид один раз — экраны не несут собственных стилей и не трогают `Colors.*`.
+/// Светлая и тёмная темы из одних токенов синей гаммы: рабочие экраны на `--bg-page`, белые карточки radius 18
+/// с тенью `--shadow-card`, все кнопки — pill h48 (primary — accent/белый 15/800, secondary — accent-subtle/
+/// accent-strong, опасное действие — danger-bg/danger-text, [AppButtons]), TextButton и ссылки — `--link`,
+/// поля белые с рамкой 1.5 px `--border` radius 12 (в фокусе — обводка 2 px accent), чипы — pill на
+/// surface-sunken. Компонентные темы задают вид один раз — экраны не несут собственных стилей и не трогают `Colors.*`.
 abstract final class AppTheme {
   static ThemeData light() => _build(ColorTokens.light, Brightness.light);
 
@@ -51,10 +52,10 @@ abstract final class AppTheme {
       surfaceTint: ColorTokens.transparent,
     );
     final text = AppType.textTheme(c);
-    final radius = BorderRadius.circular(AppRadius.md);
-    final noBorder = OutlineInputBorder(borderRadius: radius, borderSide: BorderSide.none);
-    OutlineInputBorder ring(Color color) => OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: color, width: 2));
-    final buttonShape = RoundedRectangleBorder(borderRadius: radius);
+    final fieldRadius = BorderRadius.circular(AppRadius.md);
+    OutlineInputBorder line(Color color, {double width = 1.5}) =>
+        OutlineInputBorder(borderRadius: fieldRadius, borderSide: BorderSide(color: color, width: width));
+    const buttonShape = StadiumBorder();
     const buttonSize = Size.fromHeight(AppSizes.control);
     const buttonPadding = EdgeInsets.symmetric(horizontal: AppSpacing.xl);
 
@@ -82,7 +83,7 @@ abstract final class AppTheme {
         color: c.card,
         surfaceTintColor: ColorTokens.transparent,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -96,13 +97,13 @@ abstract final class AppTheme {
           disabledForegroundColor: c.muted,
         ),
       ),
-      // secondary-кнопка: inset-фон, текст ink, без рамки (OutlinedButton и FilledButton.tonal выглядят одинаково)
+      // secondary-кнопка: pill accent-subtle/accent-strong без рамки (OutlinedButton и FilledButton.tonal одинаковы)
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           minimumSize: buttonSize,
           padding: buttonPadding,
-          backgroundColor: c.neutralSoft,
-          foregroundColor: c.ink,
+          backgroundColor: c.accentSubtle,
+          foregroundColor: c.accentHover,
           disabledForegroundColor: c.muted,
           side: BorderSide.none,
           shape: buttonShape,
@@ -111,7 +112,7 @@ abstract final class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: c.accentHover,
+          foregroundColor: c.link,
           disabledForegroundColor: c.muted,
           textStyle: text.titleSmall,
           shape: buttonShape,
@@ -120,47 +121,54 @@ abstract final class AppTheme {
       ),
       iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(foregroundColor: c.ink)),
       chipTheme: ChipThemeData(
-        backgroundColor: c.neutralSoft,
+        backgroundColor: c.surfaceSunken,
         selectedColor: c.accentSoft,
         side: BorderSide.none,
         labelStyle: text.labelMedium,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.xs),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: AppSpacing.sm),
+        shape: const StadiumBorder(),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: c.neutralSoft,
-        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 14),
-        border: noBorder,
-        enabledBorder: noBorder,
-        focusedBorder: ring(c.accent),
-        disabledBorder: noBorder,
-        errorBorder: ring(c.danger),
-        focusedErrorBorder: ring(c.danger),
+        fillColor: c.card,
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 13),
+        border: line(c.hairline),
+        enabledBorder: line(c.hairline),
+        focusedBorder: line(c.accent, width: 2),
+        disabledBorder: line(c.hairline),
+        errorBorder: line(c.dangerStrong),
+        focusedErrorBorder: line(c.dangerStrong, width: 2),
         // label живёт над полем (FieldLabel); labelText, если остался, ведёт себя как плейсхолдер
         floatingLabelBehavior: FloatingLabelBehavior.never,
-        labelStyle: text.bodyMedium?.copyWith(color: c.muted),
+        labelStyle: text.bodyLarge?.copyWith(color: c.muted),
         helperStyle: text.labelSmall,
         errorStyle: text.labelSmall?.copyWith(color: c.danger),
-        hintStyle: text.bodyMedium?.copyWith(color: c.muted),
+        hintStyle: text.bodyLarge?.copyWith(color: c.muted),
         prefixIconColor: c.muted,
         suffixIconColor: c.muted,
       ),
+      // сегмент: трек surface-muted, активный — белая пилюля с текстом ink
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: SegmentedButton.styleFrom(
-          backgroundColor: c.card,
-          selectedBackgroundColor: c.accent,
-          selectedForegroundColor: onAccent,
-          foregroundColor: c.ink,
+          backgroundColor: c.neutralSoft,
+          selectedBackgroundColor: c.card,
+          selectedForegroundColor: c.ink,
+          foregroundColor: c.muted,
           side: BorderSide.none,
-          textStyle: text.labelMedium?.copyWith(fontSize: 14),
+          textStyle: text.labelMedium,
         ),
       ),
       checkboxTheme: CheckboxThemeData(
         fillColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? c.accent : ColorTokens.transparent),
         checkColor: WidgetStatePropertyAll(onAccent),
-        side: BorderSide(color: c.muted, width: 1.5),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xs)),
+        side: BorderSide(color: c.faint, width: 1.5),
+        // чекбокс radius 6 по components.md
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: const WidgetStatePropertyAll(ColorTokens.white),
+        trackColor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.selected) ? c.accent : c.toggleOff),
+        trackOutlineColor: const WidgetStatePropertyAll(ColorTokens.transparent),
       ),
       dividerTheme: DividerThemeData(color: c.hairline, thickness: 1, space: 1),
       listTileTheme: ListTileThemeData(
@@ -173,29 +181,29 @@ abstract final class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.ink,
-        contentTextStyle: text.bodySmall?.copyWith(color: c.surface, fontSize: 15),
+        contentTextStyle: text.bodyMedium?.copyWith(color: c.surface, fontSize: 14),
         actionTextColor: c.accentSoft,
-        shape: RoundedRectangleBorder(borderRadius: radius),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent, linearTrackColor: c.neutralSoft),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: c.card,
         surfaceTintColor: ColorTokens.transparent,
-        dragHandleColor: c.hairline,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.lg))),
+        dragHandleColor: c.faint,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card))),
       ),
       extensions: [AppTones.from(c), AppPalette(c)],
     );
   }
 }
 
-/// Кнопки вне темы по доске C-Tokens: «опасное действие» — inset-фон и critical-текст; малая кнопка 36 px (14/500)
+/// Кнопки вне темы по components.md: «опасное действие» — danger-bg/danger-text pill; малая кнопка 36 px
 /// в состояниях экрана и строках списка. Цвета — из палитры темы, без литералов.
 abstract final class AppButtons {
   static ButtonStyle danger(BuildContext context, {bool small = false}) {
     final c = AppPalette.of(context);
     return OutlinedButton.styleFrom(
-      backgroundColor: c.neutralSoft,
+      backgroundColor: c.dangerSoft,
       foregroundColor: c.danger,
       side: BorderSide.none,
       minimumSize: small ? const Size(0, AppSizes.small) : const Size.fromHeight(AppSizes.control),
@@ -204,12 +212,12 @@ abstract final class AppButtons {
     );
   }
 
-  /// Малая кнопка: primary (фиолетовая) для FilledButton, secondary (inset) для OutlinedButton.
+  /// Малая кнопка: primary (синяя) для FilledButton, secondary (accent-subtle) для OutlinedButton.
   static ButtonStyle small(BuildContext context) => ButtonStyle(
         minimumSize: const WidgetStatePropertyAll(Size(0, AppSizes.small)),
         padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: AppSpacing.lg)),
         textStyle: WidgetStatePropertyAll(_smallText(context)),
       );
 
-  static TextStyle? _smallText(BuildContext context) => Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 14);
+  static TextStyle? _smallText(BuildContext context) => Theme.of(context).textTheme.titleSmall;
 }

@@ -14,6 +14,11 @@ use([CanvasRenderer, BarChart, CustomChart, GridComponent, TooltipComponent, Leg
 const props = defineProps<{ before: number; after: number; interval: [number, number] }>()
 const { t } = useI18n()
 const { theme, base, axis } = useChartTheme()
+/** Столбец «сейчас» — нейтральный серый (--bar-neutral), синий — только сценарий (доска gov-simulator). */
+const neutral = computed(() => {
+  void theme.value // пересчитать при смене темы
+  return typeof document === 'undefined' ? '#B4C0D8' : getComputedStyle(document.documentElement).getPropertyValue('--bar-neutral').trim() || '#B4C0D8'
+})
 
 const option = computed(() => ({
   ...base.value,
@@ -25,7 +30,7 @@ const option = computed(() => ({
     {
       type: 'bar',
       data: [
-        { value: props.before, itemStyle: { color: theme.value.scale[2] } },
+        { value: props.before, itemStyle: { color: neutral.value } },
         { value: props.after, itemStyle: { color: theme.value.series } },
       ],
       barWidth: 56,

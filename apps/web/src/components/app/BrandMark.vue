@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** Знак Darumen (геометрия svg/mark.svg из darumen-assets): в шапке и сайдбаре; сюда прилетает знак заставки из
- * index.html (по атрибуту data-brand-mark). Цвета Палитры C: блок #333333 (в тёмной теме — светлые чернила),
- * дуга и сектор — фиолетовый accent #5B5BD6 (в тёмной теме — #8B8BF0). */
+ * index.html (по атрибуту data-brand-mark). Цвета «синей гаммы»: блок — чернила --text (в тёмной теме светлые),
+ * дуга и сектор — синий --accent. */
 withDefaults(defineProps<{ size?: number }>(), { size: 28 })
 </script>
 
@@ -15,7 +15,7 @@ withDefaults(defineProps<{ size?: number }>(), { size: 28 })
 
 <style scoped>
 .brand-mark { display: block; flex: none; }
-.block { fill: var(--dm-ink, #333333); }
-.arc { stroke: var(--dm-accent, #5B5BD6); }
-.sector { fill: var(--dm-accent, #5B5BD6); }
+.block { fill: var(--text, #1B2440); }
+.arc { stroke: var(--accent, #2F6FE4); }
+.sector { fill: var(--accent, #2F6FE4); }
 </style>

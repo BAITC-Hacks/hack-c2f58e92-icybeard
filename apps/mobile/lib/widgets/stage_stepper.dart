@@ -5,9 +5,9 @@ import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
-/// Прогресс этапов Стандарта по доскам M-Home/M-Route: полосы 3 px radius 2 (пройдено — accent, впереди — hairline)
-/// и точка 14 px accent с белой обводкой 2 px на текущем; под ними три подписи 12 ink-2 — первый · текущий ·
-/// последний. `compact` — только полосы.
+/// Прогресс этапов Стандарта по доске m-home-new: полосы 3 px radius 2 (пройдено — accent, впереди —
+/// border-strong, как линии `.ml` макета) и точка 14 px accent с обводкой цвета карточки на текущем; под ними
+/// три подписи text-muted — первый · текущий · последний. `compact` — только полосы.
 class StageStepper extends StatelessWidget {
   const StageStepper({super.key, required this.stages, this.compact = false});
 
@@ -66,7 +66,7 @@ class StageStepper extends StatelessWidget {
   }
 }
 
-/// Полоса этапа 3 px: accent — пройдено, hairline — впереди.
+/// Полоса этапа 3 px: accent — пройдено, border-strong — впереди.
 class StageBar extends StatelessWidget {
   const StageBar({super.key, required this.done});
 
@@ -77,12 +77,13 @@ class StageBar extends StatelessWidget {
     final colors = AppPalette.of(context);
     return Container(
       height: AppSizes.bar,
-      decoration: BoxDecoration(color: done ? colors.accent : colors.hairline, borderRadius: BorderRadius.circular(2)),
+      decoration: BoxDecoration(color: done ? colors.accent : colors.faint, borderRadius: BorderRadius.circular(2)),
     );
   }
 }
 
-/// Маркер этапа 14 px: активный — accent с обводкой 2 px цвета карточки, неактивный — пустой круг с обводкой hairline.
+/// Маркер этапа 14 px: активный — accent с обводкой 2 px цвета карточки, неактивный — пустой круг с обводкой
+/// border-strong (будущий узел доски).
 class StageMarker extends StatelessWidget {
   const StageMarker({super.key, required this.active});
 
@@ -97,7 +98,7 @@ class StageMarker extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: active ? colors.accent : ColorTokens.transparent,
-        border: Border.all(color: active ? colors.card : colors.hairline, width: 2),
+        border: Border.all(color: active ? colors.card : colors.faint, width: 2),
       ),
     );
   }

@@ -1,66 +1,164 @@
-/* Палитра C «Белый холст» — токены веба (docs/design-system.md, доска C-Tokens). Цвета совпадают с design/tokens.json
- * и apps/mobile/lib/theme/tokens.dart (паритет проверяет src/__tests__/tokens.test.ts). Тёмная тема — класс darumen-dark
- * на <html>: его ставит composables/useTheme.ts и bootstrap-скрипт в index.html до загрузки стилей (без вспышки).
- * PrimeVue читает переменные через styles/preset.ts, графики и карта — через composables/useChartTheme.ts
- * (canvas не понимает var()).
+/* «Синяя гамма» (30.09.2026) — токены веба. Источник: холст «Darumen Health — макеты»
+ * (https://claude.ai/artifact/V4aoFSCsbtjdX8KpHKszFp, project/handoff/tokens.css); значения совпадают с design/tokens.json
+ * (паритет проверяет src/__tests__/tokens.test.ts). Светлая тема утверждена, тёмная — предложение из handoff.
+ * Тёмная тема — класс darumen-dark на <html>: его ставит composables/useTheme.ts и bootstrap-скрипт в index.html
+ * до загрузки стилей (без вспышки). PrimeVue читает переменные через styles/preset.ts, графики и карта — через
+ * composables/useChartTheme.ts (canvas не понимает var(), поэтому производные для графиков — литералы в обеих темах).
  *
- * Роли: ground (--dm-bg) — светло-серый холст; card (--dm-surface) — белые карточки; inset (--dm-surface-2 =
- * --dm-neutral-soft) — поля ввода, вторичные кнопки, нейтральные чипы; selected (--dm-accent-soft) — активный пункт
- * навигации, выбранная строка, чип «текущая»; ink — основной текст; ink-2 (--dm-muted) — вторичный текст и подписи;
- * dot-off (--dm-faint = --dm-dot-idle) — неактивная точка и скелетоны, не текст; accent (= --dm-primary) — фиолетовый
- * brand: primary-кнопки, навигация, серия графика, текст на нём белый; --dm-accent-hover — наведение и ссылки;
- * семантика good (--dm-ok), attention (--dm-warn, точки и полосы --dm-warn-strong: аномалии и риск только янтарные),
- * critical (--dm-danger), info/ML (--dm-info-soft, текст чипа — ink), AI (--dm-ai-soft/--dm-ai);
- * --dm-map-1…5 — рамп карты, выше = хуже. */
+ * Роли: --bg-page — светло-серый фон рабочих страниц; --surface — карточки и всё «меню» (шапка, сайдбар, верхняя
+ * полоса, таббар); --bg-hero-gradient — ТОЛЬКО главная без входа; --surface-sunken — чипы-фильтры и неактивные ячейки;
+ * --surface-muted — треки, кнопка темы, чип пользователя; --accent — синий бренд (primary-кнопки, навигация, выбор,
+ * информационные статусы); --accent-strong — hover и текст на светло-синем; семантика good/attention/critical не
+ * менялась: риск, аномалии и перегрузка — только warning и danger, никогда не акцентный синий.
+ * Прежние имена --dm-* оставлены как алиасы на новые токены — их ещё используют существующие экраны. */
 :root {
   color-scheme: light;
-  --dm-bg: #F5F6F8;
-  --dm-surface: #FFFFFF;
-  --dm-surface-2: #EAECF2;
-  --dm-ink: #333333;
-  --dm-muted: #535768;
-  --dm-faint: #C4C9D8;
-  --dm-hairline: #E4E7EE;
-  --dm-primary: #5B5BD6;
-  --dm-primary-contrast: #FFFFFF;
-  --dm-accent: #5B5BD6;
-  --dm-accent-hover: #4646B8;
-  --dm-accent-soft: #E7ECFF;
-  --dm-ok: #2A5C4E;
-  --dm-ok-soft: #DDF7C8;
-  --dm-warn: #9A5A00;
-  --dm-warn-soft: #FFE9C7;
-  --dm-warn-strong: #B45309;
-  --dm-danger: #9F1239;
-  --dm-danger-soft: #FFE0E6;
-  --dm-info: #0E6F8A;
-  --dm-info-soft: #D1FAFF;
-  --dm-ai: #4646B8;
-  --dm-ai-soft: #EDDFF7;
-  --dm-neutral-soft: #EAECF2;
-  --dm-bench-soft: #D1FAFF;
-  --dm-dot-idle: #C4C9D8;
 
-  /* рамп карты и индекса: ниже 60 → 87 и выше (выше = хуже) */
-  --dm-map-1: #EEF0FB;
-  --dm-map-2: #DDE1FA;
-  --dm-map-3: #B6BCF0;
-  --dm-map-4: #8386E0;
-  --dm-map-5: #5B5BD6;
+  /* --- Шрифт: Manrope Variable покрывает начертания 400–800 (900 у Manrope нет) --- */
+  --font-sans: 'Manrope Variable', 'Manrope', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
 
-  /* шкала поверхностей для PrimeVue (surface.0…950) */
+  /* --- Фон и поверхности --- */
+  --bg-page: #F5F6F8;
+  --bg-hero-gradient: linear-gradient(150deg, #E8F0FE 0%, #EEF3FD 30%, #F2F5FB 55%, #EAF3FA 100%);
+  --surface: #FFFFFF;
+  --surface-sunken: #EEF3FC;
+  --surface-muted: #E8EEFA;
+  --surface-hover: #F4F7FD;
+  --surface-info: #F6F8FC;
+
+  /* --- Линии --- */
+  --border: #E1E8F5;
+  --border-soft: #E6ECF7;
+  --border-strong: #D3DCEC;
+  --toggle-off: #DCE4F2;
+
+  /* --- Текст --- */
+  --text: #1B2440;
+  --text-secondary: #48536D;
+  --text-muted: #76819A;
+  --text-faint: #9FA9BF;
+  --text-on-accent: #FFFFFF;
+
+  /* --- Акцент (бренд, синий) --- */
+  --accent: #2F6FE4;
+  --accent-strong: #1E4FB8;
+  --accent-soft: #DEEAFD;
+  --accent-subtle: #EAF1FE;
+  --accent-line: #C9DBFA;
+  --link: #2F6FE4;
+
+  /* --- Семантика (не менялась со старой палитры) --- */
+  --success-bg: #DDF7C8;
+  --success-text: #2A5C4E;
+  --success-line: #B9EBA0;
+  --success-soft-text: #5C8A6E;
+  --warning-bg: #FFE9C7;
+  --warning-text: #9A5A00;
+  --warning-strong: #B45309;
+  --danger-bg: #FFE0E6;
+  --danger-text: #9F1239;
+  --danger-strong: #D6395E;
+
+  /* --- Шкала карты / приоритета --- */
+  --scale-good: #8CC152;
+  --scale-mid: #F2A93B;
+  --scale-bad: #D6395E;
+  --bar-neutral: #B4C0D8;
+
+  /* --- Радиусы --- */
+  --radius-xs: 3px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-card: 18px;
+  --radius-card-lg: 20px;
+  --radius-pill: 999px;
+
+  /* --- Тени --- */
+  --shadow-card: 0 1px 2px rgba(24,52,110,.04), 0 8px 20px -12px rgba(24,52,110,.10);
+  --shadow-card-citizen: 0 1px 2px rgba(24,52,110,.03), 0 10px 26px -18px rgba(24,52,110,.14);
+  --shadow-pop: 0 4px 10px rgba(24,52,110,.06), 0 24px 48px -18px rgba(24,52,110,.24);
+  --shadow-login: 0 16px 36px -18px rgba(24,52,110,.20);
+  --focus-ring: 0 0 0 4px var(--accent-soft);
+
+  /* --- Типографика (px) --- */
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 11.5px;
+  --fs-base-sm: 12.5px;
+  --fs-base: 13.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-h1-cabinet: 22px;
+  --fs-kpi: 24px;
+  --fs-h1-citizen: 26px;
+  --fs-display: 34px;
+  --fw-regular: 400;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+  --fw-black: 800; /* у Manrope нет 900 — «чёрное» начертание рендерится как 800 */
+
+  /* --- Раскладка --- */
+  --sidebar-w: 240px;
+  --topstrip-h: 60px;
+  --citizen-header-h: 84px;
+  --citizen-container: 1240px;
+  --content-pad-cabinet: 22px 28px;
+  --gap-cabinet: 14px;
+  --gap-citizen: 16px;
+
+  /* --- Прежние имена (Палитра C) → новые токены; экраны переезжают постепенно --- */
+  --dm-bg: var(--bg-page);
+  --dm-surface: var(--surface);
+  --dm-surface-2: var(--surface-muted);
+  --dm-ink: var(--text);
+  --dm-muted: var(--text-secondary);
+  --dm-faint: var(--border-strong);
+  --dm-hairline: var(--border);
+  --dm-primary: var(--accent);
+  --dm-primary-contrast: var(--text-on-accent);
+  --dm-accent: var(--accent);
+  --dm-accent-hover: var(--accent-strong);
+  --dm-accent-soft: var(--accent-soft);
+  --dm-ok: var(--success-text);
+  --dm-ok-soft: var(--success-bg);
+  --dm-warn: var(--warning-text);
+  --dm-warn-soft: var(--warning-bg);
+  --dm-warn-strong: var(--warning-strong);
+  --dm-danger: var(--danger-text);
+  --dm-danger-soft: var(--danger-bg);
+  /* бирюзовый «ML» и лавандовый «AI» упразднены: метка происхождения — нейтральная пилюля */
+  --dm-info: var(--text-secondary);
+  --dm-info-soft: var(--surface-muted);
+  --dm-ai: var(--text-secondary);
+  --dm-ai-soft: var(--surface-muted);
+  --dm-neutral-soft: var(--surface-muted);
+  --dm-bench-soft: var(--surface-muted);
+  --dm-dot-idle: var(--border-strong);
+
+  /* рамп карты и индекса (выше = хуже): good → mid → bad, промежуточные — линейная смесь соседних ступеней */
+  --dm-map-1: #8CC152;
+  --dm-map-2: #BFB547;
+  --dm-map-3: #F2A93B;
+  --dm-map-4: #E4714C;
+  --dm-map-5: #D6395E;
+
+  /* шкала поверхностей для PrimeVue (surface.0…950) — оттенки синевато-серого из новой гаммы */
   --dm-surface-0: #FFFFFF;
   --dm-surface-50: #F5F6F8;
-  --dm-surface-100: #EAECF2;
-  --dm-surface-200: #E4E7EE;
-  --dm-surface-300: #C4C9D8;
-  --dm-surface-400: #9A9EB0;
-  --dm-surface-500: #7A7F93;
-  --dm-surface-600: #535768;
-  --dm-surface-700: #44485A;
-  --dm-surface-800: #333333;
-  --dm-surface-900: #222222;
-  --dm-surface-950: #16171D;
+  --dm-surface-100: #EEF3FC;
+  --dm-surface-200: #E1E8F5;
+  --dm-surface-300: #D3DCEC;
+  --dm-surface-400: #9FA9BF;
+  --dm-surface-500: #76819A;
+  --dm-surface-600: #48536D;
+  --dm-surface-700: #313D5C;
+  --dm-surface-800: #1B2440;
+  --dm-surface-900: #131A30;
+  --dm-surface-950: #0D1526;
 
   --dm-space-1: 4px;
   --dm-space-2: 8px;
@@ -70,87 +168,110 @@
   --dm-space-6: 32px;
   --dm-space-7: 48px;
   --dm-space-8: 64px;
-  --dm-radius-sm: 8px;
-  --dm-radius-md: 12px;
-  --dm-radius-lg: 16px;
-  --dm-radius-pill: 999px;
+  --dm-radius-sm: var(--radius-sm);
+  --dm-radius-md: var(--radius-md);
+  --dm-radius-lg: var(--radius-card);
+  --dm-radius-pill: var(--radius-pill);
 
-  --dm-text-xs: 12px;
-  --dm-text-sm: 14px;
-  --dm-text-md: 15px;
-  --dm-text-base: 17px;
-  --dm-text-lg: 20px;
-  --dm-text-xl: 24px;
-  --dm-text-h1: 35px;
-  --dm-text-kpi: 42px;
-  --dm-text-hero: 60px;
-  --dm-font-sans: 'Manrope Variable', 'Manrope', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  /* плотнее прежней: тело 12.5–13.5, заголовки 22/26, KPI 24, крупный срок 34 */
+  --dm-text-xs: var(--fs-xs);
+  --dm-text-sm: var(--fs-base-sm);
+  --dm-text-md: var(--fs-base);
+  --dm-text-base: 14px;
+  --dm-text-lg: var(--fs-lg);
+  --dm-text-xl: var(--fs-xl);
+  --dm-text-h1: var(--fs-h1-cabinet);
+  --dm-text-kpi: var(--fs-kpi);
+  --dm-text-hero: var(--fs-display);
+  --dm-font-sans: var(--font-sans);
 
-  /* ряды графиков: факт — фиолетовый, перегрузка — янтарь, лучший — good; прогноз и интервал — светлые фиолетовые */
-  --dm-chart-1: #5B5BD6;
-  --dm-chart-2: #B45309;
-  --dm-chart-3: #2A5C4E;
-  --dm-chart-4: #B6BCF0;
-  --dm-chart-forecast: #8386E0;
-  --dm-chart-band: rgba(91, 91, 214, 0.14);
-  --dm-shadow: 0 8px 24px rgba(51, 51, 51, 0.08);
-  --dm-shadow-nav: 0 -4px 16px rgba(51, 51, 51, 0.06);
+  /* ряды графиков: факт — синий accent, перегрузка — янтарь, лучший — good; прогноз и интервал — светлые синие.
+   * useChartTheme читает вычисленные значения, поэтому производные — литералы, а не color-mix() */
+  --dm-chart-1: var(--accent);
+  --dm-chart-2: var(--warning-strong);
+  --dm-chart-3: var(--success-text);
+  --dm-chart-4: var(--accent-line);
+  --dm-chart-forecast: #82A9EF;
+  --dm-chart-band: rgba(47, 111, 228, 0.14);
+  --dm-shadow: var(--shadow-card);
+  --dm-shadow-nav: 0 -4px 16px rgba(24, 52, 110, 0.06);
 }
 
+/* Тёмная тема — предложение из handoff (контраст проверен: текст/карточка 14.1, вторичный 9.1, приглушённый 5.9,
+ * белый на акценте 4.65, ссылка/карточка 8.0, статусы ≥7.9). Акцентная заливка остаётся #2F6FE4, для текстового
+ * акцента на тёмном — светлые --accent-strong/--link. Алиасы --dm-* пересчитываются сами. */
 html.darumen-dark {
   color-scheme: dark;
-  --dm-bg: #16171D;
-  --dm-surface: #1F2029;
-  --dm-surface-2: #272936;
-  --dm-ink: #E8E9F0;
-  --dm-muted: #A3A7B8;
-  --dm-faint: #4A4E5E;
-  --dm-hairline: #2C2E3A;
-  --dm-primary: #8B8BF0;
-  --dm-primary-contrast: #16171D;
-  --dm-accent: #8B8BF0;
-  --dm-accent-hover: #A5A5F5;
-  --dm-accent-soft: #2A2B52;
-  --dm-ok: #8FD3B8;
-  --dm-ok-soft: #1E3A30;
-  --dm-warn: #F0B45A;
-  --dm-warn-soft: #3D2E14;
-  --dm-warn-strong: #F59E0B;
-  --dm-danger: #F48CA5;
-  --dm-danger-soft: #40202A;
-  --dm-info: #6FD3EE;
-  --dm-info-soft: #15343D;
-  --dm-ai: #B9A5F0;
-  --dm-ai-soft: #2E2440;
-  --dm-neutral-soft: #272936;
-  --dm-bench-soft: #15343D;
-  --dm-dot-idle: #4A4E5E;
+  --bg-page: #0D1526;
+  --bg-hero-gradient: linear-gradient(150deg, #0F1B34 0%, #0E1830 30%, #0D1526 55%, #0E1A2C 100%);
+  --surface: #141E33;
+  --surface-sunken: #1A2640;
+  --surface-muted: #1F2C48;
+  --surface-hover: #1A2640;
+  --surface-info: #172238;
 
-  --dm-map-1: #23253A;
-  --dm-map-2: #2F3260;
-  --dm-map-3: #4B4F9A;
-  --dm-map-4: #6A6DC8;
-  --dm-map-5: #8B8BF0;
+  --border: #27365A;
+  --border-soft: #22304F;
+  --border-strong: #33446B;
+  --toggle-off: #33446B;
 
-  --dm-surface-0: #1F2029;
-  --dm-surface-50: #272936;
-  --dm-surface-100: #2C2E3A;
-  --dm-surface-200: #2C2E3A;
-  --dm-surface-300: #4A4E5E;
-  --dm-surface-400: #6B6F82;
-  --dm-surface-500: #8A8EA0;
-  --dm-surface-600: #A3A7B8;
-  --dm-surface-700: #C4C7D4;
-  --dm-surface-800: #DCDEE7;
-  --dm-surface-900: #E8E9F0;
+  --text: #E7EDF8;
+  --text-secondary: #B5C0D6;
+  --text-muted: #8D9AB5;
+  --text-faint: #66738F;
+  --text-on-accent: #FFFFFF;
+
+  --accent: #2F6FE4;
+  --accent-strong: #A9C6FF;
+  --accent-soft: #1B3263;
+  --accent-subtle: #172A50;
+  --accent-line: #2C4A85;
+  --link: #8DB4FF;
+
+  --success-bg: #16382B;
+  --success-text: #8FDDB0;
+  --success-line: #2F6B4F;
+  --success-soft-text: #7CC39B;
+  --warning-bg: #3A2A10;
+  --warning-text: #F4C574;
+  --warning-strong: #E59A3A;
+  --danger-bg: #3F1824;
+  --danger-text: #FF9FB3;
+  --danger-strong: #F0607F;
+
+  --scale-good: #7DB548;
+  --scale-mid: #E39B30;
+  --scale-bad: #E04D6E;
+  --bar-neutral: #3A4A6E;
+
+  --shadow-card: 0 1px 2px rgba(0,0,0,.30), 0 8px 20px -12px rgba(0,0,0,.55);
+  --shadow-card-citizen: 0 1px 2px rgba(0,0,0,.30), 0 10px 26px -18px rgba(0,0,0,.60);
+  --shadow-pop: 0 4px 10px rgba(0,0,0,.35), 0 24px 48px -18px rgba(0,0,0,.70);
+  --shadow-login: 0 16px 36px -18px rgba(0,0,0,.60);
+
+  --dm-map-1: #7DB548;
+  --dm-map-2: #B0A83C;
+  --dm-map-3: #E39B30;
+  --dm-map-4: #E1744F;
+  --dm-map-5: #E04D6E;
+
+  --dm-surface-0: #141E33;
+  --dm-surface-50: #1A2640;
+  --dm-surface-100: #1F2C48;
+  --dm-surface-200: #27365A;
+  --dm-surface-300: #33446B;
+  --dm-surface-400: #66738F;
+  --dm-surface-500: #8D9AB5;
+  --dm-surface-600: #B5C0D6;
+  --dm-surface-700: #CBD4E6;
+  --dm-surface-800: #DDE4F1;
+  --dm-surface-900: #E7EDF8;
   --dm-surface-950: #FFFFFF;
 
-  --dm-chart-1: #8B8BF0;
-  --dm-chart-2: #F59E0B;
-  --dm-chart-3: #8FD3B8;
-  --dm-chart-4: #4B4F9A;
-  --dm-chart-forecast: #B6BCF0;
-  --dm-chart-band: rgba(139, 139, 240, 0.18);
-  --dm-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --dm-chart-forecast: #8DB4FF;
+  --dm-chart-band: rgba(141, 180, 255, 0.18);
   --dm-shadow-nav: 0 -4px 16px rgba(0, 0, 0, 0.4);
 }
+
+/* a11y-заметка (решение за владельцем продукта): --text-muted #76819A даёт 3.9:1 на белом — ниже AA для мелкого
+ * текста. Если нужен AA — заменить на #66728C (4.8:1 на белом, 4.3:1 на фоне страницы). */

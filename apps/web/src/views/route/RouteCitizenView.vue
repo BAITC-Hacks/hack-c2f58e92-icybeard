@@ -11,21 +11,22 @@ import RouteAlternatives from '@/components/route/RouteAlternatives.vue'
 import RouteChecklist from '@/components/route/RouteChecklist.vue'
 import RouteFeed from '@/components/route/RouteFeed.vue'
 import RouteHistory from '@/components/route/RouteHistory.vue'
+import RouteTimeline from '@/components/route/RouteTimeline.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import CollapsibleSection from '@/components/ui/CollapsibleSection.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import HeroNumber from '@/components/ui/HeroNumber.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import StageStepper from '@/components/ui/StageStepper.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useRouteData } from '@/composables/useRouteData'
 import { days, pct, shortOrgName } from '@/lib/format'
 import { dateShort, stageTone, type Tone } from '@/lib/route'
 
-/** «Мой путь» (W-Route): заголовок с чипом стадии и подписью «организация · профиль · с даты · ждёт N дн.»;
- * слева карточка «Этапы маршрута» вертикальной лентой, справа карточка-сигнал (ответ врача / валидация листа ожидания)
- * и «Что дальше» строками; ниже прогноз, «где быстрее», решения и прошлые направления. Риск отказа не показывается. */
+/** «Мой путь» (route-new): чип стадии справа от заголовка; во всю ширину карточка «Этапы маршрута» горизонтальным
+ * степпером (узлы 40); ниже две колонки — слева «Сколько ждать» (крупный срок 34) и «Что дальше», справа
+ * карточка-сигнал (ответ врача / валидация листа ожидания) и «Где быстрее» плитками с зелёными сроками;
+ * внизу решения и прошлые направления. Риск отказа не показывается. */
 const { t } = useI18n()
 const toast = useToast()
 const r = useRouteData(() => undefined)
@@ -94,31 +95,63 @@ onMounted(r.load)
 
 <template>
   <PageShell :title="t('route.myTitle')">
-    <template v-if="r.data.value" #title-extra>
-      <StatusTag :value="t('route.stage.' + r.data.value.stage)" :tone="tone(stageTone(r.data.value.stage))" data-testid="route-stage" />
-    </template>
     <template v-if="r.data.value" #subtitle>
       <span :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }}</span> · {{ r.data.value.organization.profileName }} ·
       {{ t('route.since', { date: dateShort(r.data.value.dates.registeredAt), days: r.data.value.daysWaiting }) }} · {{ t('shell.asOf', { date: dateShort(r.data.value.asOf) }) }}
+    </template>
+    <template v-if="r.data.value" #actions>
+      <StatusTag :value="t('route.stage.' + r.data.value.stage)" :tone="tone(stageTone(r.data.value.stage))" data-testid="route-stage" />
     </template>
     <ErrorBox :error="r.error.value" />
     <EmptyState v-if="r.notFound.value" :title="t('route.notFound')" icon="pi pi-map">
       <RouterLink class="link-arrow" to="/wait">{{ t('nav.wait') }}</RouterLink>
     </EmptyState>
-    <div v-else-if="r.busy.value && !r.data.value" class="top-grid">
+    <div v-else-if="r.busy.value && !r.data.value" class="cols">
       <AppCard><Skeleton :lines="5" /></AppCard>
       <AppCard><Skeleton :lines="4" /></AppCard>
     </div>
 
     <template v-if="r.data.value">
-      <div class="top-grid">
-        <AppCard :title="t('route.stagesTitle')">
-          <template #header><span class="caption">{{ t('route.stagesCount', { total: r.data.value.timeline.length, done: doneCount }) }}</span></template>
-          <StageStepper :stages="r.data.value.timeline" vertical norms />
-        </AppCard>
+      <AppCard :title="t('route.stagesTitle')" label class="stages-card">
+        <template #header><span class="caption">{{ t('route.stagesCount', { total: r.data.value.timeline.length, done: doneCount }) }}</span></template>
+        <RouteTimeline :stages="r.data.value.timeline" variant="citizen" norms />
+      </AppCard>
+
+      <div class="cols">
+        <div class="col">
+          <AppCard :title="t('route.forecast')" label :origin="r.data.value.forecast.fromModel ? 'ml' : 'formula'">
+            <HeroNumber :value="`≈ ${days(r.data.value.forecast.p50Days)}`" :unit="t('common.days')" :label="t('hero.half')" :sub="heroSub" />
+            <p v-if="r.target.value" class="caption benchmark">{{ t('route.benchmark', { days: days(r.target.value.value), source: r.target.value.source }) }} <OriginTag kind="formula" /></p>
+          </AppCard>
+
+          <AppCard :title="t('route.whatNext')" label class="grow" data-testid="what-now">
+            <div class="rows">
+              <div class="row">
+                <span class="row-main"><span class="row-title">{{ r.data.value.dates.plannedAt ? t('route.dates.planned') : t('route.dates.expected') }}</span><span class="row-sub">{{ shortOrgName(r.data.value.organization.moName) }} · {{ r.data.value.organization.moCode }}</span></span>
+                <span class="row-value strong tabular">{{ dateShort(r.data.value.dates.plannedAt ?? r.data.value.dates.expectedAt) }}</span>
+              </div>
+              <div v-if="r.expired.value" class="row">
+                <span class="row-main"><span class="row-title">{{ t('route.updateTests', { n: r.expired.value }) }}</span><span class="row-sub">{{ expiredTitles }}</span></span>
+                <span class="row-value"><StatusTag :value="t('route.status.expired')" tone="danger" /></span>
+              </div>
+              <div v-if="validItems.length" class="row">
+                <span class="row-main"><span class="row-title">{{ t('route.validTests', { n: validItems.length }) }}</span><span class="row-sub">{{ validItems[0]!.title }} · {{ t('route.validUntil', { date: dateShort(validItems[0]!.validUntil) }) }}</span></span>
+                <span class="row-value"><StatusTag :value="t('route.status.valid')" tone="ok" /></span>
+              </div>
+              <div v-if="nextStage" class="row">
+                <span class="row-main"><span class="row-title">{{ nextStage.title }}</span><span v-if="nextStage.norm" class="row-sub">{{ t('route.normLabel') }}: {{ nextStage.norm }}</span></span>
+              </div>
+              <div v-else-if="currentStage" class="row"><span class="row-main row-title">{{ currentStage.title }}</span></div>
+              <div v-if="r.pendingRequest.value" class="row">
+                <span class="row-main row-title" :title="r.pendingRequest.value.toMoName ?? ''">{{ t('route.signal.request_redirect', { name: shortOrgName(r.pendingRequest.value.toMoName) }) }}</span>
+                <span class="row-value"><StatusTag :value="t('route.awaitingDoctor')" tone="accent" /></span>
+              </div>
+            </div>
+          </AppCard>
+        </div>
 
         <div class="col">
-          <!-- ответ врача: карточка-сигнал на coral-wash -->
+          <!-- ответ врача: карточка-сигнал на accent-soft -->
           <section v-if="doctorAnswer" class="card signal-card" data-testid="doctor-answer">
             <div class="signal-head"><i class="pi pi-shield" aria-hidden="true" /><span class="signal-title">{{ doctorAnswer.kind === 'redirect' ? t('route.doctorSuggested') : t('route.keep') }}</span></div>
             <span v-if="doctorAnswer.kind === 'redirect'" class="signal-body" :title="doctorAnswer.toMoName">
@@ -137,85 +170,68 @@ onMounted(r.load)
             </div>
           </section>
           <!-- валидация листа ожидания -->
-          <AppCard v-else-if="r.data.value.validationDue" :title="t('route.validationTitle')" data-testid="validation-card">
-            <p class="muted small" style="margin: 0 0 12px">{{ t('route.validationBody') }}</p>
+          <AppCard v-else-if="r.data.value.validationDue" :title="t('route.validationTitle')" class="validation" data-testid="validation-card">
+            <p class="muted small validation-body">{{ t('route.validationBody') }}</p>
             <div class="options">
-              <button type="button" class="option" :disabled="r.acting.value !== null" data-testid="still-waiting" @click="signal('still_waiting')"><i class="pi pi-check-circle" aria-hidden="true" /><span>{{ t('route.validationStill') }}</span></button>
-              <button type="button" class="option" :disabled="r.acting.value !== null" @click="signal('treated_elsewhere')"><i class="pi pi-building" aria-hidden="true" /><span>{{ t('route.validationTreated') }}</span></button>
-              <button type="button" class="option" :disabled="r.acting.value !== null" @click="signal('withdraw')"><i class="pi pi-times-circle" aria-hidden="true" /><span>{{ t('route.validationWithdraw') }}</span></button>
+              <button type="button" class="option" :disabled="r.acting.value !== null" data-testid="still-waiting" @click="signal('still_waiting')">{{ t('route.validationStill') }}</button>
+              <button type="button" class="option" :disabled="r.acting.value !== null" @click="signal('treated_elsewhere')">{{ t('route.validationTreated') }}</button>
+              <button type="button" class="option" :disabled="r.acting.value !== null" @click="signal('withdraw')">{{ t('route.validationWithdraw') }}</button>
             </div>
           </AppCard>
 
-          <AppCard :title="t('route.whatNext')" data-testid="what-now">
-            <div class="rows">
-              <div class="row">
-                <span class="row-main"><span>{{ r.data.value.dates.plannedAt ? t('route.dates.planned') : t('route.dates.expected') }}</span><span class="row-sub">{{ shortOrgName(r.data.value.organization.moName) }} · {{ r.data.value.organization.moCode }}</span></span>
-                <span class="row-value strong">{{ dateShort(r.data.value.dates.plannedAt ?? r.data.value.dates.expectedAt) }}</span>
+          <AppCard :title="t('route.whereFaster')" label :origin="r.data.value.alternativesModel ? 'ml' : undefined" class="grow">
+            <p class="muted small faster-lead">{{ t('route.sameRegionProfile') }}. {{ t('route.doctorOnly') }}.</p>
+            <RouteAlternatives :items="r.data.value.alternatives" audience="citizen" :acting="r.acting.value" :pending-code="r.pendingRequest.value?.toMoCode" :action-label="t('route.requestConsider')" :baseline-days="r.data.value.forecast.p50Days" @act="signal('request_redirect', $event)" />
+            <div v-if="r.data.value.alternatives.length" class="comment-block">
+              <div class="field">
+                <label>{{ t('route.requestComment') }}</label>
+                <Textarea v-model="requestComment" rows="2" auto-resize data-testid="request-comment" />
               </div>
-              <div v-if="r.expired.value" class="row">
-                <span class="row-main"><span>{{ t('route.updateTests', { n: r.expired.value }) }}</span><span class="row-sub">{{ expiredTitles }}</span></span>
-                <span class="row-value"><StatusTag :value="t('route.status.expired')" tone="danger" /></span>
-              </div>
-              <div v-if="validItems.length" class="row">
-                <span class="row-main"><span>{{ t('route.validTests', { n: validItems.length }) }}</span><span class="row-sub">{{ validItems[0]!.title }} · {{ t('route.validUntil', { date: dateShort(validItems[0]!.validUntil) }) }}</span></span>
-                <span class="row-value"><StatusTag :value="t('route.status.valid')" tone="ok" /></span>
-              </div>
-              <div v-if="nextStage" class="row">
-                <span class="row-main"><span>{{ nextStage.title }}</span><span v-if="nextStage.norm" class="row-sub">{{ t('route.normLabel') }}: {{ nextStage.norm }}</span></span>
-              </div>
-              <div v-else-if="currentStage" class="row"><span class="row-main">{{ currentStage.title }}</span></div>
-              <div v-if="r.pendingRequest.value" class="row">
-                <span class="row-main" :title="r.pendingRequest.value.toMoName ?? ''">{{ t('route.signal.request_redirect', { name: shortOrgName(r.pendingRequest.value.toMoName) }) }}</span>
-                <span class="row-value"><StatusTag :value="t('route.awaitingDoctor')" tone="accent" /></span>
-              </div>
+              <p class="caption comment-note">{{ t('route.doctorOnly') }}</p>
             </div>
           </AppCard>
         </div>
-      </div>
-
-      <div class="grid cols-2">
-        <AppCard>
-          <HeroNumber :value="`≈ ${days(r.data.value.forecast.p50Days)}`" :unit="t('common.days')" :caption="t('route.forecast')" :label="t('hero.half')" :sub="heroSub" :origin="r.data.value.forecast.fromModel ? 'ml' : 'formula'" compact />
-          <p v-if="r.target.value" class="caption benchmark">{{ t('route.benchmark', { days: days(r.target.value.value), source: r.target.value.source }) }} <OriginTag kind="formula" /></p>
-        </AppCard>
-        <AppCard :title="t('route.whereFaster')" :origin="r.data.value.alternativesModel ? 'ml' : undefined">
-          <RouteAlternatives :items="r.data.value.alternatives" audience="citizen" :acting="r.acting.value" :pending-code="r.pendingRequest.value?.toMoCode" :action-label="t('route.requestConsider')" @act="signal('request_redirect', $event)" />
-          <div v-if="r.data.value.alternatives.length" class="field" style="margin-top: 12px">
-            <label>{{ t('route.requestComment') }}</label>
-            <Textarea v-model="requestComment" rows="2" auto-resize data-testid="request-comment" />
-          </div>
-          <p class="caption" style="margin: 8px 0 0">{{ t('route.doctorOnly') }}</p>
-        </AppCard>
       </div>
 
       <CollapsibleSection :title="t('route.checklist')" :summary="t('route.checklistSummary', { expired: r.expired.value, valid: r.valid.value })" :tone="r.expired.value ? 'danger' : undefined" origin="formula">
         <RouteChecklist :items="r.data.value.checklist" :standard="r.data.value.standard" />
       </CollapsibleSection>
       <div class="grid cols-2">
-        <AppCard :title="t('route.signalsTitle')"><RouteFeed :entries="r.entries.value" audience="citizen" /></AppCard>
-        <AppCard :title="t('route.pastReferrals')"><RouteHistory :items="r.data.value.history" /></AppCard>
+        <AppCard :title="t('route.signalsTitle')" label><RouteFeed :entries="r.entries.value" audience="citizen" /></AppCard>
+        <AppCard :title="t('route.pastReferrals')" label><RouteHistory :items="r.data.value.history" /></AppCard>
       </div>
-      <p class="caption">{{ r.data.value.basis }} · {{ t('route.synthetic', { asOf: dateShort(r.data.value.asOf) }) }} · {{ t('route.stagesSource') }}</p>
+      <p class="caption footnote">{{ r.data.value.basis }} · {{ t('route.synthetic', { asOf: dateShort(r.data.value.asOf) }) }} · {{ t('route.stagesSource') }}</p>
     </template>
   </PageShell>
 </template>
 
 <style scoped>
-.top-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
-.col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
-.signal-card { background: var(--dm-accent-soft); display: flex; flex-direction: column; gap: 10px; color: var(--dm-ink); }
+/* карточки гражданина: padding 22/24 (route-new) */
+.card { padding: 22px 24px; }
+.stages-card { padding: 26px 28px; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--gap-citizen); align-items: stretch; }
+.col { display: flex; flex-direction: column; gap: var(--gap-citizen); min-width: 0; }
+.grow { flex: 1; }
+.benchmark { border-top: 1px solid var(--surface-muted); margin: 14px 0 0; padding-top: 12px; }
+.row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.row-title { font-weight: var(--fw-bold); }
+.strong { font-weight: var(--fw-extrabold); font-size: var(--fs-md); }
+.signal-card { background: var(--accent-soft); border-color: var(--accent-soft); display: flex; flex-direction: column; gap: 10px; color: var(--text); }
 .signal-head { display: flex; align-items: center; gap: 12px; }
-.signal-head i { font-size: 1.3rem; }
-.signal-title { font-size: var(--dm-text-lg); font-weight: 500; letter-spacing: -0.01em; }
-.signal-body { font-size: var(--dm-text-base); }
+.signal-head i { font-size: 1.2rem; color: var(--accent-strong); }
+.signal-title { font-size: 15px; font-weight: var(--fw-extrabold); letter-spacing: -0.01em; }
+.signal-body { font-size: var(--fs-base); }
 .signal-actions { display: flex; align-items: center; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
-.row-main { display: flex; flex-direction: column; gap: 2px; }
-.strong { font-weight: 500; font-size: var(--dm-text-base); }
-.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-.option { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px 16px; border: 0; border-radius: var(--dm-radius-md); background: var(--dm-surface-2); color: var(--dm-ink); font: inherit; font-size: var(--dm-text-md); text-align: left; cursor: pointer; }
-.option:hover:not(:disabled) { box-shadow: inset 0 0 0 2px var(--dm-ink); }
+.validation :deep(h2) { font-size: 15px; font-weight: var(--fw-extrabold); }
+.validation-body { margin: 0 0 14px; line-height: 1.5; }
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.option { border: 0; border-radius: var(--radius-lg); background: var(--surface-hover); color: var(--text); font: inherit; font-size: var(--fs-base-sm); font-weight: var(--fw-bold); text-align: center; padding: 12px; cursor: pointer; }
+.option:hover:not(:disabled) { background: var(--accent-subtle); color: var(--accent-strong); }
 .option:disabled { opacity: 0.6; cursor: default; }
-.option i { color: var(--dm-accent); }
-.benchmark { margin: 12px 0 0; }
-@media (max-width: 900px) { .top-grid { grid-template-columns: 1fr; } }
+.faster-lead { margin: -4px 0 10px; line-height: 1.45; }
+.comment-block { margin-top: auto; padding-top: 14px; }
+.comment-note { margin: 8px 0 0; color: var(--text-faint); }
+.footnote { color: var(--text-faint); }
+.grid.cols-2 .card { display: flex; flex-direction: column; }
+@media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
 </style>

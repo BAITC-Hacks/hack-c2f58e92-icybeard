@@ -5,17 +5,15 @@ import { useRoute } from 'vue-router'
 import { medicines, pub, queue } from '@/api/endpoints'
 import type { LoginExamples } from '@/api/types'
 import LoginPanel from '@/components/app/LoginPanel.vue'
-import OriginTag from '@/components/OriginTag.vue'
-import StatusTag from '@/components/ui/StatusTag.vue'
-import { days, num, pct } from '@/lib/format'
+import { days, num } from '@/lib/format'
 import { readPref, WAIT_PREFS } from '@/lib/prefs'
 import { useRefdataStore } from '@/stores/refdata'
 
-/** Страница входа (W-Home) — единственная страница без сессии (кроме регистрации организации, приглашения и памятки по
- * QR). Слева заголовок, подводка, карточка «Вход» и «Зарегистрировать организацию»; справа две плавающие
- * карточки-примера («Сколько ждут», «Проверка рецепта») — статичные примеры из GET /public/login-examples (пока
- * эндпоинта нет — из публичных прогноза и проверки рецепта), не ссылки; внизу ряд фактов о данных. Вошедший сюда не
- * попадает: защита маршрутов уводит его на свой экран. */
+/** Главная без входа (доска home-prop-5, утверждена): градиент на каркасе (.shell--hero), слева H1, подводка,
+ * карточка «Вход» с синей полосой сверху и ряд фактов о данных; справа обезличенный путь пациента из 5 этапов
+ * (названия — существующие ключи route.stage.*), в этапе «В листе ожидания» — реальный медианный срок из
+ * GET /public/login-examples (пока эндпоинта нет — из публичных прогноза и проверки рецепта). Вошедший сюда
+ * не попадает: защита маршрутов уводит его на свой экран. */
 const DEFAULT_REGION = '75'
 
 const { t } = useI18n()
@@ -44,11 +42,8 @@ async function legacyExamples(): Promise<LoginExamples> {
   }
 }
 
-/** МНН из API приходит кодом («286») — подпись «МНН 286», название — как есть. */
-const mnnTitle = (mnn: string) => (/^\d+$/.test(mnn) ? t('medicines.mnnShort', { id: mnn }) : mnn)
-
 onMounted(async () => {
-  // примеры и факты — витрина: без API страница остаётся страницей входа
+  // срок в этапе «В листе ожидания» и факты — витрина: без API страница остаётся страницей входа
   await refdata.load().catch(() => undefined)
   try {
     examples.value = await pub.loginExamples()
@@ -64,70 +59,100 @@ onMounted(async () => {
       <div class="intro">
         <h1>{{ t('home.headline') }}</h1>
         <p class="lead intro-lead">{{ t('home.lead') }}</p>
-        <LoginPanel :hint="loginHint" />
-        <p class="signup-line small">{{ t('home.signupLead') }} <RouterLink class="link-arrow small" to="/signup" data-testid="signup-link">{{ t('home.signup') }}</RouterLink></p>
+        <LoginPanel :hint="loginHint">
+          <template #footer>
+            <span class="signup-lead">{{ t('home.signupLead') }}</span>
+            <RouterLink class="link-arrow small signup-link" to="/signup" data-testid="signup-link">{{ t('home.signup') }}</RouterLink>
+          </template>
+        </LoginPanel>
+        <div class="facts-row" data-testid="data-facts">
+          <div class="fact"><span class="fact-value tabular">{{ refdata.referralsTotal ? `${num(Math.round(refdata.referralsTotal / 1000))} ${t('home.thousand')}` : '—' }}</span><span class="fact-label">{{ t('home.factReferrals') }}</span></div>
+          <div class="fact"><span class="fact-value tabular">{{ refdata.regionsCount || '—' }}</span><span class="fact-label">{{ t('home.factRegions') }}</span></div>
+          <div class="fact"><span class="fact-value">{{ t('home.factPeriodValue') }}</span><span class="fact-label">{{ t('home.factPeriod') }}</span></div>
+        </div>
+        <span class="caption provenance">{{ t('home.factsNote') }}</span>
       </div>
 
-      <div class="examples">
-        <section class="card example example-wait" data-testid="example-wait">
-          <div class="example-head"><span class="eyebrow">{{ t('home.exampleWait') }}</span><span class="spacer" /><OriginTag kind="ml" /></div>
-          <span class="muted small">{{ examples?.wait ? `${examples.wait.regionName} · ${examples.wait.profileName.toLowerCase()}` : '—' }}</span>
-          <div class="hero-value tabular"><span class="hero-number">{{ examples?.wait ? `≈ ${days(examples.wait.p50Days)}` : '—' }}</span><span class="hero-unit">{{ t('common.days') }}</span></div>
-          <span class="hero-label">{{ t('hero.half') }}</span>
-          <span v-if="examples?.wait" class="muted small tabular">{{ t('hero.nineOfTen', { days: days(examples.wait.p90Days) }) }} · {{ t('hero.within30', { pct: pct(examples.wait.within30) }) }}</span>
-          <span class="caption">{{ t('home.exampleTag') }}</span>
-        </section>
-
-        <section class="card example example-rx" data-testid="example-rx">
-          <div class="example-head">
-            <span class="eyebrow">{{ t('home.exampleRx') }}</span><span class="spacer" />
-            <StatusTag v-if="examples?.rx" :value="examples.rx.covered ? t('medicines.covered') : t('medicines.notCovered')" :tone="examples.rx.covered ? 'ok' : 'warn'" />
+      <ol class="path" data-testid="patient-path">
+        <li class="step">
+          <span class="node done" aria-hidden="true"><i class="pi pi-check" /></span>
+          <div class="step-title">{{ t('route.stage.referral_issued') }}</div>
+          <div class="step-note">{{ t('home.path.issuedNote') }}</div>
+        </li>
+        <li class="step">
+          <span class="node done" aria-hidden="true"><i class="pi pi-check" /></span>
+          <div class="step-title">{{ t('route.stage.examination') }}</div>
+          <div class="step-note">{{ t('home.path.examNote') }}</div>
+        </li>
+        <li class="step">
+          <span class="node done" aria-hidden="true"><i class="pi pi-check" /></span>
+          <div class="step-card card" data-testid="example-wait">
+            <span class="step-kicker">{{ t('route.stage.waitlisted') }}</span>
+            <div class="wait-value tabular">
+              <span class="wait-number">{{ examples?.wait ? `≈${days(examples.wait.p50Days)}` : '—' }}</span>
+              <span class="wait-unit">{{ t('common.days') }} · {{ t('hero.half') }}</span>
+            </div>
+            <span class="wait-note">{{ t('home.path.waitNote') }}</span>
           </div>
-          <span class="rx-title">{{ examples?.rx ? mnnTitle(examples.rx.mnn) : '—' }}</span>
-          <div class="rx-row"><span class="muted">{{ t('home.rxMedian') }}</span><span class="tabular rx-value">{{ examples?.rx && examples.rx.fillP50 !== null ? `${days(examples.rx.fillP50)} ${t('common.days')}` : '—' }}</span></div>
-          <div class="rx-row last"><span class="muted">{{ t('home.rxNineOfTen') }}</span><span class="tabular rx-value">{{ examples?.rx && examples.rx.fillP90 !== null ? t('home.rxUpTo', { days: days(examples.rx.fillP90) }) : '—' }}</span></div>
-          <span class="caption">{{ t('home.exampleTag') }}</span>
-        </section>
-      </div>
-    </div>
-
-    <div class="facts-row" data-testid="data-facts">
-      <div class="fact"><span class="fact-value tabular">{{ refdata.referralsTotal ? `${num(Math.round(refdata.referralsTotal / 1000))} ${t('home.thousand')}` : '—' }}</span><span class="muted small">{{ t('home.factReferrals') }}</span></div>
-      <div class="fact"><span class="fact-value tabular">{{ refdata.regionsCount || '—' }}</span><span class="muted small">{{ t('home.factRegions') }}</span></div>
-      <div class="fact"><span class="fact-value">{{ t('home.factPeriodValue') }}</span><span class="muted small">{{ t('home.factPeriod') }}</span></div>
-      <span class="spacer" />
-      <span class="caption provenance">{{ t('home.factsNote') }}</span>
+        </li>
+        <li class="step">
+          <span class="node current" aria-hidden="true"><span class="node-dot" /></span>
+          <div class="step-card assigned">
+            <span class="step-kicker accent">{{ t('route.stage.date_assigned') }}</span>
+            <span class="assigned-text">{{ t('home.path.assignedNote') }}</span>
+          </div>
+        </li>
+        <li class="step">
+          <span class="node future" aria-hidden="true" />
+          <div class="step-title future">{{ t('route.stage.hospitalized') }}</div>
+        </li>
+      </ol>
     </div>
   </main>
 </template>
 
 <style scoped>
-.home { gap: 40px; }
-.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 48px; align-items: start; }
-.intro { display: flex; flex-direction: column; gap: 20px; }
-.intro-lead { font-size: var(--dm-text-base); max-width: 52ch; }
-.examples { position: relative; min-height: 488px; }
-.example { position: absolute; display: flex; flex-direction: column; gap: 12px; }
-.example-wait { top: 0; left: 0; width: min(400px, 100%); }
-.example-rx { top: 300px; right: 0; width: min(340px, 100%); }
-.example-head { display: flex; align-items: center; gap: 10px; }
-.spacer { flex: 1; }
-.hero-value { display: flex; align-items: baseline; gap: 10px; }
-.hero-number { font-size: var(--dm-text-hero); font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
-.hero-unit { font-size: var(--dm-text-base); color: var(--dm-muted); }
-.hero-label { font-size: var(--dm-text-md); }
-.rx-title { font-size: var(--dm-text-lg); font-weight: 500; letter-spacing: -0.01em; }
-.rx-row { display: flex; justify-content: space-between; gap: 12px; font-size: var(--dm-text-sm); padding: 8px 0; border-bottom: 1px solid var(--dm-hairline); }
-.rx-row.last { border-bottom: 0; padding-bottom: 0; }
-.signup-line { margin: -4px 0 0; color: var(--dm-muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.rx-value { font-weight: 500; }
-.facts-row { border-top: 1px solid var(--dm-hairline); padding-top: 24px; display: flex; align-items: flex-end; gap: 48px; flex-wrap: wrap; }
-.fact { display: flex; flex-direction: column; gap: 4px; }
-.fact-value { font-size: 29px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.05; }
+/* home-prop-5: две колонки 1fr/1fr gap 64 в контейнере 1240, градиент даёт .shell--hero */
+.home { gap: 24px; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 64px; align-items: center; flex: 1; }
+.intro { display: flex; flex-direction: column; gap: 24px; }
+.intro h1 { font-size: 38px; line-height: 1.22; letter-spacing: -0.02em; max-width: 14ch; }
+.intro-lead { font-size: 15.5px; max-width: 40ch; line-height: 1.6; }
+.facts-row { display: flex; align-items: flex-end; gap: 40px; flex-wrap: wrap; }
+.fact { display: flex; flex-direction: column; gap: 2px; }
+.fact-value { font-size: var(--fs-xl); font-weight: var(--fw-extrabold); letter-spacing: -0.01em; line-height: 1.2; }
+.fact-label { font-size: var(--fs-sm); color: var(--text-muted); }
+.provenance { margin-top: -12px; }
+
+/* путь пациента: узлы 36, линия 2px --border-strong */
+.path { list-style: none; margin: 0; padding: 0 0 0 56px; display: flex; flex-direction: column; }
+.step { position: relative; margin-bottom: 32px; }
+.step:last-child { margin-bottom: 0; }
+.node { position: absolute; left: -56px; top: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box; z-index: 1; }
+.node.done { background: var(--accent); color: var(--text-on-accent); }
+.node.done .pi { font-size: 14px; font-weight: 700; }
+.node.current { background: var(--accent-soft); border: 2.5px solid var(--accent); }
+.node-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.node.future { background: var(--surface); border: 2px solid var(--border-strong); }
+.step:not(:last-child)::before { content: ''; position: absolute; left: -39px; top: 36px; bottom: -30px; width: 2px; background: var(--border-strong); }
+.step-title { font-size: var(--fs-lg); font-weight: var(--fw-extrabold); padding-top: 7px; }
+.step-title.future { color: var(--text-faint); font-weight: var(--fw-bold); }
+.step-note { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+.step-card { max-width: 400px; display: flex; flex-direction: column; gap: 6px; }
+.step-kicker { font-size: var(--fs-base-sm); font-weight: var(--fw-extrabold); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.step-kicker.accent { color: var(--accent-strong); }
+.wait-value { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.wait-number { font-size: 38px; font-weight: var(--fw-extrabold); letter-spacing: -0.02em; line-height: 1; }
+.wait-unit { font-size: var(--fs-md); font-weight: var(--fw-bold); color: var(--text-muted); }
+.wait-note { font-size: var(--fs-base); color: var(--text-secondary); }
+.step-card.assigned { background: var(--accent-soft); border: 0; border-radius: var(--radius-card); padding: 22px 24px; box-shadow: none; }
+.assigned-text { font-size: 16.5px; font-weight: var(--fw-bold); color: var(--text); line-height: 1.5; }
+.signup-lead { font-size: var(--fs-base-sm); color: var(--text-muted); }
+.signup-link { color: var(--link); }
+
 @media (max-width: 900px) {
-  .hero-grid { grid-template-columns: 1fr; gap: 24px; }
-  .examples { min-height: 0; display: grid; gap: 16px; }
-  .example { position: static; width: auto; }
+  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  .intro h1 { font-size: 30px; }
   .facts-row { gap: 24px; }
 }
 </style>

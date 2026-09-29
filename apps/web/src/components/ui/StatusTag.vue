@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { StatusTone } from './tones'
 
-/** Чип статуса (доска C-Tokens): radius 8, 12 / 500, letter-spacing 0.02em. Тона: neutral — inset/ink-2 («нет данных»),
- * ok — good («подтверждено», «в норме»), warn — attention («риск», «перегрузка»; янтарь), danger — critical («отказ»),
- * accent — selected/accent-hover («текущая»), info — info-soft/ink («приглашён», «ожидает»), ai — lavender,
- * bench — внешний ориентир. */
+/** Чип статуса (components.md «Бейджи и метки»): radius 8, 11 / 700. Тона: neutral — surface-sunken/text-secondary
+ * («нет данных»), ok — успех («подтверждено», «в норме»), warn — внимание («есть сигнал»; янтарь), danger — ошибка
+ * («риск отказа», «истёк»), accent и info — инфо (--accent-soft/--accent-strong: «в очереди», «ожидает», роль),
+ * ai и bench — бывшие лавандовый «AI» и бирюзовый ориентир, теперь нейтральная пилюля surface-muted/text-secondary. */
 withDefaults(defineProps<{ value: string; tone?: StatusTone; icon?: string }>(), { tone: 'neutral' })
 </script>
 
@@ -13,14 +13,14 @@ withDefaults(defineProps<{ value: string; tone?: StatusTone; icon?: string }>(),
 </template>
 
 <style scoped>
-.status { display: inline-flex; align-items: center; gap: 4px; font-size: var(--dm-text-xs); font-weight: 500; letter-spacing: 0.02em; line-height: 1.2; padding: 4px 10px; border-radius: var(--dm-radius-sm); white-space: nowrap; vertical-align: middle; }
+.status { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.01em; line-height: 1.2; padding: 4px 9px; border-radius: var(--radius-sm); white-space: nowrap; vertical-align: middle; }
 .status i { font-size: 0.75rem; }
-.status.neutral { background: var(--dm-neutral-soft); color: var(--dm-muted); }
-.status.ok { background: var(--dm-ok-soft); color: var(--dm-ok); }
-.status.warn { background: var(--dm-warn-soft); color: var(--dm-warn); }
-.status.danger { background: var(--dm-danger-soft); color: var(--dm-danger); }
-.status.accent { background: var(--dm-accent-soft); color: var(--dm-accent-hover); }
-.status.info { background: var(--dm-info-soft); color: var(--dm-ink); }
-.status.ai { background: var(--dm-ai-soft); color: var(--dm-ai); }
-.status.bench { background: var(--dm-bench-soft); color: var(--dm-ink); }
+.status.neutral { background: var(--surface-sunken); color: var(--text-secondary); }
+.status.ok { background: var(--success-bg); color: var(--success-text); }
+.status.warn { background: var(--warning-bg); color: var(--warning-text); }
+.status.danger { background: var(--danger-bg); color: var(--danger-text); }
+.status.accent { background: var(--accent-soft); color: var(--accent-strong); }
+.status.info { background: var(--accent-soft); color: var(--accent-strong); }
+.status.ai { background: var(--surface-muted); color: var(--text-secondary); }
+.status.bench { background: var(--surface-muted); color: var(--text-secondary); }
 </style>

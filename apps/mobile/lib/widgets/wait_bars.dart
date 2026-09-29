@@ -7,8 +7,9 @@ import '../theme/tones.dart';
 import '../theme/typography.dart';
 import 'format.dart';
 
-/// Бары «Где быстрее» по доске M-Wait: имя 13 (500 — предложенная врачом), полоса 12 px radius 4 шириной
-/// пропорционально p50 (accent — серия графика), «≈ N дн.» 12/500 и подпись «· предложил врач».
+/// Бары «Где быстрее» по доске m-wait-new: имя 13 (700 — предложенная врачом), полоса 8 px radius 4 шириной
+/// пропорционально p50 (accent — самое короткое ожидание, остальные — bar-neutral), «≈ N дн.» и подпись
+/// «· предложил врач».
 class WaitBars extends StatelessWidget {
   const WaitBars({super.key, required this.alternatives, this.proposedMoCode, this.onTap});
 
@@ -22,6 +23,7 @@ class WaitBars extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
     final max = alternatives.map((a) => a.p50Days).fold<double>(0, (m, v) => v > m ? v : m);
+    final min = alternatives.map((a) => a.p50Days).fold<double>(double.infinity, (m, v) => v < m ? v : m);
     return Column(
       children: [
         for (final (i, a) in alternatives.indexed)
@@ -38,7 +40,7 @@ class WaitBars extends StatelessWidget {
                   children: [
                     Text(
                       shortOrgName(a.name),
-                      style: theme.textTheme.rowDetail.copyWith(fontWeight: a.moCode == proposedMoCode ? FontWeight.w500 : FontWeight.w400),
+                      style: theme.textTheme.rowDetail.copyWith(fontWeight: a.moCode == proposedMoCode ? FontWeight.w700 : FontWeight.w400),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -50,9 +52,10 @@ class WaitBars extends StatelessWidget {
                           children: [
                             Container(
                               width: constraints.maxWidth * 0.62 * share,
-                              height: 12,
+                              height: 8,
                               decoration: BoxDecoration(
-                                color: colors.accent,
+                                // синий — только у самого короткого ожидания, остальные нейтральные (m-wait-new)
+                                color: a.p50Days <= min ? colors.accent : colors.barNeutral,
                                 borderRadius: BorderRadius.circular(AppRadius.xs),
                               ),
                             ),

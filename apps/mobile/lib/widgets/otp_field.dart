@@ -5,8 +5,8 @@ import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import '../theme/typography.dart';
 
-/// Шесть ячеек кода по доске M-Auth-OTP (48×56, inset-фон, 24/500 табличными цифрами, текущая ячейка — обводка
-/// 2 px accent, при ошибке — critical). Под ячейками одно настоящее поле ввода: цифры сами переходят в следующую
+/// Шесть ячеек кода по доске m-auth-otp-new (48×56, белые с рамкой 1.5 px `--border` radius 12, 22/800 табличными
+/// цифрами, текущая ячейка — обводка 2 px accent, при ошибке — danger-strong). Под ячейками одно настоящее поле ввода: цифры сами переходят в следующую
 /// ячейку, стирание возвращает назад, вставка «123 456» или SMS-автозаполнение раскладывается по ячейкам.
 class OtpField extends StatefulWidget {
   const OtpField({super.key, required this.controller, required this.label, this.length = 6, this.onCompleted, this.hasError = false, this.enabled = true, this.autofocus = true});
@@ -129,15 +129,16 @@ class _Cell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppPalette.of(context);
-    final ring = error ? colors.danger : colors.accent;
+    final ring = error ? colors.dangerStrong : colors.accent;
+    final highlighted = active || (error && digit.isNotEmpty);
     return AnimatedContainer(
       duration: AppDurations.fast,
       height: 56,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: colors.neutralSoft,
+        color: colors.card,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: active || (error && digit.isNotEmpty) ? ring : ColorTokens.transparent, width: 2),
+        border: Border.all(color: highlighted ? ring : colors.hairline, width: highlighted ? 2 : 1.5),
       ),
       child: Text(digit, style: Theme.of(context).textTheme.headlineSmall?.merge(AppType.numeric)),
     );

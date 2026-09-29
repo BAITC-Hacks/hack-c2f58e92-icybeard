@@ -344,17 +344,17 @@ watch(vaccinationPlan, () => {
 <style scoped>
 .w-profile { min-width: 240px; }
 .w-org { min-width: 240px; max-width: 100%; }
-.main-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
 .facts-line { margin-bottom: 8px; }
-.facts-line .ink { color: var(--dm-ink); font-weight: 500; }
+.facts-line .ink { color: var(--dm-ink); font-weight: var(--fw-bold); }
 .links { display: flex; gap: 20px; margin-top: 12px; flex-wrap: wrap; }
 .bed-block { border-top: 1px solid var(--dm-hairline); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
 .bed-head { display: flex; align-items: center; gap: 10px; }
 .bed-row { display: flex; gap: 24px; flex-wrap: wrap; }
 .bed { display: flex; flex-direction: column; gap: 2px; }
-.bed-value { font-size: var(--dm-text-xl); font-weight: 500; letter-spacing: -0.01em; }
+.bed-value { font-size: var(--dm-text-xl); font-weight: var(--fw-extrabold); letter-spacing: -0.01em; }
 .clip { max-width: 280px; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 @media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
 </style>

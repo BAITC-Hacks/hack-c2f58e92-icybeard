@@ -101,7 +101,7 @@ onMounted(run)
     <div class="account-col">
       <AsyncState :loading="loading" :error="error" :empty="!draft" skeleton="table" :lines="7" :empty-title="t('account.notifications.empty')" @retry="run">
         <template v-if="draft">
-        <AppCard :title="t('account.notifications.matrixTitle')">
+        <AppCard :title="t('account.notifications.matrixTitle')" label>
           <template #header><span class="caption">{{ t('account.notifications.matrixHint') }}</span></template>
           <p v-if="deliveryNote" class="delivery-note" role="note" data-testid="notifications-delivery-note"><i class="pi pi-info-circle" aria-hidden="true" /><span>{{ deliveryNote }}</span></p>
           <div class="table-wrap">
@@ -134,14 +134,14 @@ onMounted(run)
           </div>
         </AppCard>
         <div class="grid cols-2">
-          <AppCard :title="t('account.notifications.quietTitle')">
+          <AppCard :title="t('account.notifications.quietTitle')" label>
             <div class="form-grid two">
               <div class="field"><label for="q-from">{{ t('account.notifications.from') }}</label><Select id="q-from" v-model="draft.quietFrom" :options="hourOptions" option-label="label" option-value="value" show-clear :placeholder="t('account.notifications.none')" /></div>
               <div class="field"><label for="q-to">{{ t('account.notifications.to') }}</label><Select id="q-to" v-model="draft.quietTo" :options="hourOptions" option-label="label" option-value="value" show-clear :placeholder="t('account.notifications.none')" /></div>
             </div>
             <div class="field checkbox quiet-except"><Checkbox v-model="draft.quietExceptRegulator" binary input-id="q-except" /><label for="q-except">{{ t('account.notifications.exceptRegulator') }}</label></div>
           </AppCard>
-          <AppCard :title="t('account.notifications.digestTitle')">
+          <AppCard :title="t('account.notifications.digestTitle')" label>
             <div class="field"><label for="digest">{{ t('account.notifications.digestLabel') }}</label><Select id="digest" v-model="draft.digest" :options="digestOptions" option-label="label" option-value="value" /></div>
             <p class="caption">{{ t('account.notifications.digestHint') }}</p>
             <p v-if="isOff('email')" class="caption digest-off" data-testid="digest-email-off">{{ t('account.notifications.digestEmailOff') }}</p>
@@ -156,14 +156,19 @@ onMounted(run)
 </template>
 
 <style scoped>
-.account-col { display: flex; flex-direction: column; gap: 16px; max-width: 880px; }
-.matrix th.center, .matrix td.center { text-align: center; width: 112px; }
-.matrix th.off { color: var(--dm-muted); }
-.off-reason { display: block; margin-top: 2px; font-size: var(--dm-text-xs); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--dm-warn); line-height: 1.3; }
-.delivery-note { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 12px 16px; border-radius: var(--dm-radius-md); background: var(--dm-warn-soft); color: var(--dm-ink); font-size: var(--dm-text-sm); line-height: 1.45; }
-.delivery-note i { color: var(--dm-warn-strong); margin-top: 2px; }
-.digest-off { color: var(--dm-warn); }
-.form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.quiet-except { margin-top: 12px; }
+/* аккаунт (account-notifications-new): колонка 880 по центру, карточки padding 24 */
+.page { max-width: 880px; }
+.card { padding: 24px; }
+.account-col { display: flex; flex-direction: column; gap: 16px; }
+.matrix th.center, .matrix td.center { text-align: center; width: 96px; }
+.matrix th.off { color: var(--text-muted); }
+.off-reason { display: block; margin-top: 2px; font-size: 9.5px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--warning-text); line-height: 1.3; }
+.delivery-note { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 14px; padding: 12px 16px; border-radius: var(--radius-lg); background: var(--warning-bg); color: var(--text); font-size: var(--fs-base-sm); line-height: 1.45; }
+.delivery-note i { color: var(--warning-strong); margin-top: 2px; }
+.digest-off { color: var(--warning-text); }
+.form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.form-grid.two :deep(.p-select) { min-height: 42px; }
+.quiet-except { margin-top: 14px; }
+.quiet-except label { font-weight: var(--fw-bold); font-size: 13px; }
 .form-actions { display: flex; justify-content: flex-end; }
 </style>

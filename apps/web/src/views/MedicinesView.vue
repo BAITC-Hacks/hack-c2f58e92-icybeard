@@ -140,10 +140,10 @@ watch(forecastMnnId, loadDemandForecast)
         <label>{{ t('medicines.mnn') }}</label>
         <SearchSelect v-model="mnnId" :options="mnns" :option-label="mnnLabel" option-value="mnnId" :option-title="mnnTitle" :placeholder="t('medicines.mnn')" :disabled="mnns.length === 0" />
       </div>
-      <label class="pill-select">
-        <span class="pill-label">{{ t('common.region') }}</span>
+      <div class="field region-field">
+        <label>{{ t('common.region') }}</label>
         <SearchSelect v-model="region" :options="refdata.regions" option-label="name" option-value="regionKato" show-clear :placeholder="t('medicines.wholeCountry')" />
-      </label>
+      </div>
       <Button :label="t('medicines.check')" :loading="busy" :disabled="!nosologyId && !mnnId" @click="check" />
     </div>
     <ErrorBox :error="error" />
@@ -167,7 +167,13 @@ watch(forecastMnnId, loadDemandForecast)
         <div class="rows">
           <div class="row"><span class="row-main muted">{{ t('home.rxMedian') }}</span><span class="row-value strong">{{ result.fillDaysP50 !== null ? `${days(result.fillDaysP50)} ${t('common.days')}` : '—' }}</span></div>
           <div class="row"><span class="row-main muted">{{ t('home.rxNineOfTen') }}</span><span class="row-value strong">{{ result.fillDaysP90 !== null ? t('home.rxUpTo', { days: days(result.fillDaysP90) }) : '—' }}</span></div>
-          <div class="row"><span class="row-main muted">{{ t('medicines.within14Row') }}</span><span class="row-value strong">{{ pct(result.pFilled14d) }}</span></div>
+          <div class="row">
+            <span class="row-main muted within14">
+              <span>{{ t('medicines.within14Row') }}</span>
+              <span class="track" aria-hidden="true"><span class="fill" :style="{ width: `${Math.min(100, Math.max(0, (result.pFilled14d ?? 0) * 100))}%` }" /></span>
+            </span>
+            <span class="row-value strong accent-num">{{ pct(result.pFilled14d) }}</span>
+          </div>
           <div v-if="result.fillDaysP50Model !== null" class="row"><span class="row-main muted">{{ t('medicines.modelP50') }} <OriginTag kind="ml" :note="t('medicines.modelP50Note')" /></span><span class="row-value strong">{{ days(result.fillDaysP50Model) }} {{ t('common.days') }}</span></div>
           <div class="row">
             <span class="row-main muted">{{ t('medicines.shortage') }}</span>
@@ -183,15 +189,15 @@ watch(forecastMnnId, loadDemandForecast)
         </div>
       </AppCard>
 
-      <AppCard :title="t('medicines.otherMnn')">
+      <AppCard :title="t('medicines.otherMnn')" label class="other-card">
         <p v-if="result.alternatives.length === 0" class="muted">{{ t('common.empty') }}</p>
-        <div v-else class="rows">
+        <div v-else class="rows other-rows">
           <button v-for="a in result.alternatives" :key="a.mnnId" type="button" class="row row-button" @click="mnnId = a.mnnId">
-            <span class="row-main">{{ a.name }}</span>
+            <span class="row-main other-name">{{ a.name }}</span>
             <span class="row-value muted small">{{ num(a.issued12m) }} {{ t('medicines.perYearCol') }}</span>
           </button>
         </div>
-        <p class="caption" style="margin: 12px 0 0">{{ t('medicines.pharmaciesHint') }}</p>
+        <p class="caption other-foot">{{ t('medicines.pharmaciesHint') }}</p>
       </AppCard>
     </div>
 
@@ -213,21 +219,32 @@ watch(forecastMnnId, loadDemandForecast)
 </template>
 
 <style scoped>
-.searchbar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-.searchbar .field { flex: 1 1 240px; max-width: 360px; }
-.pill-select { display: inline-flex; align-items: center; gap: 4px; background: var(--dm-surface); border-radius: var(--dm-radius-pill); padding: 0 6px 0 20px; min-height: 44px; }
-.pill-label { font-size: var(--dm-text-sm); color: var(--dm-muted); white-space: nowrap; }
-.pill-select :deep(.p-select) { background: transparent; min-height: 40px; min-width: 180px; font-weight: 500; font-size: var(--dm-text-sm); }
-.result-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+/* карточки гражданина (rx-new): radius 20, padding 26 */
+.card { border-radius: var(--radius-card-lg); padding: 26px; }
+.searchbar { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.searchbar .field { flex: 1 1 220px; max-width: 300px; }
+.searchbar .region-field { flex: 0 1 220px; }
+.searchbar :deep(.p-select) { min-height: 44px; border-radius: var(--radius-lg); font-weight: var(--fw-bold); }
+.searchbar :deep(.p-button) { min-height: 44px; }
+.result-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+.result-grid > .card { display: flex; flex-direction: column; }
 .status-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.mnn-title { font-size: var(--dm-text-xl); font-weight: 500; letter-spacing: -0.01em; }
+.mnn-title { font-size: 19px; font-weight: var(--fw-extrabold); letter-spacing: -0.01em; }
 .spacer { flex: 1; }
-.details { margin: 4px 0 8px; }
-.strong { font-weight: 500; font-size: var(--dm-text-base); }
-.how { border-top: 1px solid var(--dm-hairline); margin-top: 8px; padding-top: 14px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--dm-muted); }
-.how-title { font-weight: 500; color: var(--dm-ink); }
-.row-button { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--dm-hairline); font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 12px 0; }
+.details { margin: 4px 0 8px; line-height: 1.5; }
+.strong { font-weight: var(--fw-extrabold); font-size: 15px; }
+.row .row-main.muted { color: var(--text-secondary); font-size: var(--fs-md); }
+.within14 { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+.within14 .track { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; max-width: 260px; }
+.within14 .fill { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.accent-num { color: var(--accent); }
+.how { border-top: 1px solid var(--border); margin-top: auto; padding-top: 12px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
+.how-title { font-weight: var(--fw-bold); color: var(--text); }
+.other-rows { flex: 1; }
+.other-name { font-size: var(--fs-base); font-weight: var(--fw-bold); }
+.row-button { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 12px 0; }
 .row-button:last-child { border-bottom: 0; }
-.row-button:hover .row-main { color: var(--dm-accent-hover); }
+.row-button:hover .row-main { color: var(--accent-strong); }
+.other-foot { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--border); color: var(--text-faint); }
 @media (max-width: 900px) { .result-grid { grid-template-columns: 1fr; } }
 </style>

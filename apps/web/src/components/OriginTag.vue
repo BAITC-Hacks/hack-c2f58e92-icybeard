@@ -4,8 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 
 /**
- * Метка происхождения числа или текста (доска C-Tokens): «ML-модель» (info-soft/ink), «расчёт по формуле» (inset/ink-2),
- * «AI-черновик» (lavender/accent-hover). С разрешением gov.map или referral.assist метка — ссылка на страницу качества моделей.
+ * Метка происхождения числа или текста (components.md «Происхождение числа»): бирюзовый «ML» и лавандовый «AI»
+ * упразднены — все виды выглядят одинаково: нейтральная пилюля --surface-muted/--text-secondary с title-подсказкой.
+ * С разрешением gov.map или referral.assist метка — ссылка на страницу качества моделей.
  */
 const props = defineProps<{ kind: 'ml' | 'formula' | 'ai'; note?: string }>()
 const auth = useAuthStore()
@@ -24,19 +25,19 @@ const linkable = computed(() => auth.canAny(['gov.map', 'referral.assist']))
 <style scoped>
 .origin {
   display: inline-block;
-  font-size: var(--dm-text-xs);
-  font-weight: 500;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
   line-height: 1.2;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   padding: 4px 10px;
-  border-radius: var(--dm-radius-sm);
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
   text-decoration: none;
   vertical-align: middle;
   cursor: help;
   white-space: nowrap;
 }
 a.origin { cursor: pointer; }
-.origin.ml { background: var(--dm-info-soft); color: var(--dm-ink); }
-.origin.formula { background: var(--dm-neutral-soft); color: var(--dm-muted); }
-.origin.ai { background: var(--dm-ai-soft); color: var(--dm-ai); }
+a.origin:hover { color: var(--accent-strong); }
 </style>

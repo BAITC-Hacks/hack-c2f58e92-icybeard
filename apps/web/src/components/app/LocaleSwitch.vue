@@ -3,8 +3,8 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { setLocale } from '@/i18n'
 
-/** Переключатель языка — пилюля RU | KK (активный фиолетовый/белый): на ground белая (верхняя полоса), в сайдбаре — на soft.
- * mode="toggle" — одна кнопка с текущим языком (свёрнутый сайдбар). */
+/** Переключатель языка — пилюля RU | KK: трек --surface-muted, активный — синий --accent с белым текстом.
+ * mode="toggle" — одна кнопка с текущим языком (свёрнутый сайдбар). Проп surface оставлен для прежних вызовов. */
 withDefaults(defineProps<{ mode?: 'segment' | 'toggle'; surface?: 'white' | 'soft' }>(), { mode: 'segment', surface: 'white' })
 const { locale } = useI18n()
 const options = [
@@ -26,9 +26,9 @@ const other = computed<'ru' | 'kk'>(() => (locale.value === 'kk' ? 'ru' : 'kk'))
 </template>
 
 <style scoped>
-.locale { display: inline-flex; background: var(--dm-surface); border-radius: var(--dm-radius-pill); padding: 3px; font-size: var(--dm-text-xs); font-weight: 500; }
-.locale.soft { background: var(--dm-surface-2); }
-.opt { border: 0; background: transparent; color: var(--dm-muted); padding: 4px 10px; border-radius: var(--dm-radius-pill); font: inherit; cursor: pointer; line-height: 1.3; }
-.opt.active { background: var(--dm-primary); color: var(--dm-primary-contrast); }
-.locale-toggle { border: 0; background: var(--dm-surface-2); color: var(--dm-ink); font: inherit; font-size: var(--dm-text-xs); font-weight: 500; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; }
+.locale { display: inline-flex; background: var(--surface-muted); border-radius: var(--radius-pill); padding: 3px; font-size: var(--fs-xs); font-weight: var(--fw-bold); }
+.locale.soft { background: var(--surface-muted); }
+.opt { border: 0; background: transparent; color: var(--text-muted); padding: 4px 10px; border-radius: var(--radius-pill); font: inherit; cursor: pointer; line-height: 1.3; }
+.opt.active { background: var(--accent); color: var(--text-on-accent); }
+.locale-toggle { border: 0; background: var(--surface-muted); color: var(--text); font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-bold); width: 36px; height: 36px; border-radius: 50%; cursor: pointer; }
 </style>

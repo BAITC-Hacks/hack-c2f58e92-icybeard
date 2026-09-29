@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Нативный сплэш до первого кадра Flutter: только холст (#F5F6F8, ночью #16171D) — сам знак собирает DarumenIntro
+<!-- Нативный сплэш до первого кадра Flutter: только холст (#F5F6F8, ночью #0D1526) — сам знак собирает DarumenIntro
      на том же фоне, так переход без мигания -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/darumen_canvas" />

@@ -6,8 +6,9 @@ import '../theme/tones.dart';
 import '../theme/typography.dart';
 import 'status_chip.dart';
 
-/// Карточка записи скрайба по доске M-Scribe: точка 10 px (фиолетовая — идёт запись), «Запись» 14/500, чип языка;
-/// таймер 42/600 табличными цифрами; волна — столбики 3 px accent на 40 px (тишина — dot-off); строка согласия 12 ink-2.
+/// Карточка записи скрайба по доске m-scribe-new: точка 10 px (danger-strong с ореолом danger-bg — идёт запись),
+/// «Запись» 14/800, чип языка; таймер 40/800 табличными цифрами; волна — столбики 3 px accent на 40 px
+/// (тишина — border-strong); строка согласия text-muted.
 class ScribeRecordCard extends StatelessWidget {
   const ScribeRecordCard({super.key, required this.recording, required this.seconds, required this.levels, required this.language, required this.caption});
 
@@ -28,15 +29,23 @@ class ScribeRecordCard extends StatelessWidget {
     final ss = (seconds % 60).toString().padLeft(2, '0');
     return Container(
       padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.page, AppSpacing.lg, AppSpacing.lg),
-      decoration: BoxDecoration(color: colors.card, borderRadius: BorderRadius.circular(AppRadius.lg)),
+      decoration: BoxDecoration(color: colors.card, borderRadius: BorderRadius.circular(AppRadius.card), boxShadow: colors.cardShadow),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(width: 10, height: 10, decoration: BoxDecoration(shape: BoxShape.circle, color: recording ? colors.accent : colors.faint)),
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: recording ? colors.dangerStrong : colors.faint,
+                  boxShadow: recording ? [BoxShadow(color: colors.dangerSoft, spreadRadius: 4)] : null,
+                ),
+              ),
               const SizedBox(width: 10),
-              Expanded(child: Text(recording ? s.scribeRecordingTitle : s.scribeRecordShort, style: theme.textTheme.bodySmall?.copyWith(color: colors.ink, fontWeight: FontWeight.w500))),
+              Expanded(child: Text(recording ? s.scribeRecordingTitle : s.scribeRecordShort, style: theme.textTheme.rowStrong)),
               StatusChip(language, tone: StatusTone.neutral),
             ],
           ),

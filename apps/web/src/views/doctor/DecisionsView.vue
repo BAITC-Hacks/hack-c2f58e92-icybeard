@@ -51,7 +51,7 @@ function outcome(d: Decision): Outcome {
   if (d.recommended === null || d.recommended === undefined) return 'none'
   return JSON.stringify(d.recommended) === JSON.stringify(d.chosen) ? 'matched' : 'differ'
 }
-const OUTCOME_TONES: Record<Outcome, 'ok' | 'danger' | 'neutral'> = { matched: 'ok', differ: 'danger', none: 'neutral' }
+const OUTCOME_TONES: Record<Outcome, 'ok' | 'warn' | 'neutral'> = { matched: 'ok', differ: 'warn', none: 'neutral' }
 const subjects = computed(() => [...new Set([SUBJECT_REFERRAL, SUBJECT_ANOMALY, ...items.value.map((d) => d.subject)])])
 const roles = computed(() => [...new Set(items.value.map((d) => d.role))])
 const inPeriod = computed(() => {
@@ -110,13 +110,12 @@ onMounted(async () => {
   <PageShell :title="t('doctor.decisions.title')">
     <template #subtitle>{{ auth.can('decisions.all') ? t('doctor.decisions.leadRegulator') : t('doctor.decisions.subtitle') }} · {{ auth.actor }} · {{ t('doctor.decisions.total').toLowerCase() }} {{ total }}</template>
     <template #actions>
-      <div class="chips">
-        <button v-for="p in PERIODS" :key="p" type="button" class="chip-filter" :class="{ active: period === p }" @click="period = period === p ? null : p">{{ t('doctor.decisions.periodLabel', { days: p }) }}</button>
-      </div>
       <Button :label="t('doctor.decisions.refresh')" icon="pi pi-refresh" size="small" severity="secondary" text :loading="loading" @click="load" />
-      <button type="button" class="link-arrow small" :disabled="visible.length === 0" data-testid="decisions-export" @click="exportCsv">{{ t('shell.exportCsv') }}</button>
+      <Button :label="t('shell.exportCsv')" size="small" severity="secondary" :disabled="visible.length === 0" data-testid="decisions-export" @click="exportCsv" />
     </template>
     <div class="chips">
+      <button v-for="p in PERIODS" :key="p" type="button" class="chip-filter" :class="{ active: period === p }" @click="period = period === p ? null : p">{{ t('doctor.decisions.periodLabel', { days: p }) }}</button>
+      <span class="sep" />
       <button type="button" class="chip-filter" :class="{ active: subject === null }" @click="subject = null">{{ t('common.allShort') }} · {{ inPeriod.length }}</button>
       <button v-for="s in subjects" :key="s" type="button" class="chip-filter" :class="{ active: subject === s }" @click="subject = subject === s ? null : s">{{ subjectLabel(s) }} · {{ count((d) => d.subject === s) }}</button>
       <template v-if="roles.length > 1">
@@ -126,8 +125,8 @@ onMounted(async () => {
     </div>
     <KpiRow>
       <KpiTile :value="inPeriod.length" :label="period ? t('doctor.decisions.kpiPeriod', { days: period }) : t('doctor.decisions.kpiAll')" :loading="loading && items.length === 0" />
-      <KpiTile :value="matched" :label="t('doctor.decisions.kpiMatched')" :loading="loading && items.length === 0" />
-      <KpiTile :value="differ" :label="t('doctor.decisions.kpiDiffer')" :loading="loading && items.length === 0" />
+      <KpiTile :value="matched" :label="t('doctor.decisions.kpiMatched')" tone="ok" :loading="loading && items.length === 0" />
+      <KpiTile :value="differ" :label="t('doctor.decisions.kpiDiffer')" tone="warn" :loading="loading && items.length === 0" />
     </KpiRow>
 
     <AppCard>
@@ -171,8 +170,7 @@ onMounted(async () => {
 <style scoped>
 .nowrap { white-space: nowrap; }
 .clip { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .reason { max-width: 280px; }
 .sep { width: 1px; height: 24px; background: var(--dm-hairline); margin: 0 4px; }
-.link-arrow:disabled { opacity: 0.5; cursor: default; }
 </style>

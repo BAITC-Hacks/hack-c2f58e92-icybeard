@@ -3,20 +3,24 @@ import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import BrandMark from '@/components/app/BrandMark.vue'
 import { accountNav, topbarNav } from '@/lib/nav'
 import { useAuthStore } from '@/stores/auth'
 import LocaleSwitch from './LocaleSwitch.vue'
 import ThemeToggle from './ThemeToggle.vue'
 
-/** Верхняя полоса гражданина (W-Home): 72 px, прозрачная на холсте; слева знак + «darumen», по центру белая
- * пилюля-контейнер с пунктами из разрешений (Мой путь · Сколько ждут · Проверка рецепта; активный фиолетовый/белый),
- * справа RU/KK, тема и меню пользователя (аккаунт, «Выйти»); без сессии — «Войти» (пунктов нет). */
+/** Шапка гражданина («синяя гамма», components.md): 84 px, белая с разделителем, контейнер 1240; слева знак +
+ * «darumen», по центру пункты из разрешений (Мой путь · Сколько ждут · Проверка рецепта) с подчёркиванием активной
+ * вкладки, справа RU/KK, тема и меню пользователя (аккаунт, «Выйти»); без сессии — «Войти» (пунктов нет).
+ * На главной без входа (home-prop-5) шапка прозрачная — фон даёт градиент каркаса. */
 const { t } = useI18n()
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const menu = ref<InstanceType<typeof Menu> | null>(null)
+/** Прозрачный вариант шапки — только главная без входа (градиент — на .shell--hero). */
+const hero = computed(() => route.name === 'home' && !auth.isAuthenticated)
 
 const links = computed(() => (auth.isAuthenticated ? topbarNav(router.getRoutes(), { can: auth.can }).map((i) => ({ to: i.to, label: t(i.labelKey) })) : []))
 const accountItems = computed(() => [
@@ -27,12 +31,12 @@ const accountItems = computed(() => [
 </script>
 
 <template>
-  <header class="topbar">
+  <header class="topbar" :class="{ hero }">
     <div class="inner">
       <RouterLink class="brand" to="/"><BrandMark :size="28" /><span>darumen</span></RouterLink>
       <span class="spacer" />
-      <nav v-if="links.length" class="pills" :aria-label="t('shell.menu')">
-        <RouterLink v-for="link in links" :key="link.to" :to="link.to" class="pill" active-class="active">{{ link.label }}</RouterLink>
+      <nav v-if="links.length" class="nav-links" :aria-label="t('shell.menu')">
+        <RouterLink v-for="link in links" :key="link.to" :to="link.to" class="nav-link" active-class="active">{{ link.label }}</RouterLink>
       </nav>
       <span class="spacer" />
       <LocaleSwitch />
@@ -50,18 +54,19 @@ const accountItems = computed(() => [
 </template>
 
 <style scoped>
-.topbar { background: transparent; }
-.inner { width: min(1200px, 100% - 48px); margin: 0 auto; min-height: 72px; display: flex; align-items: center; gap: var(--dm-space-4); flex-wrap: wrap; }
-.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--dm-ink); font-size: var(--dm-text-lg); font-weight: 600; letter-spacing: -0.02em; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+.topbar.hero { background: transparent; border-bottom: 0; }
+.inner { width: min(var(--citizen-container), 100% - 48px); margin: 0 auto; min-height: var(--citizen-header-h); display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-size: 18px; font-weight: var(--fw-extrabold); letter-spacing: -0.01em; }
 .spacer { flex: 1; }
-.pills { display: flex; gap: 2px; background: var(--dm-surface); border-radius: var(--dm-radius-pill); padding: 4px; }
-.pill { padding: 8px 16px; border-radius: var(--dm-radius-pill); font-size: var(--dm-text-sm); font-weight: 500; color: var(--dm-ink); text-decoration: none; white-space: nowrap; }
-.pill:hover { background: var(--dm-bg); color: var(--dm-ink); }
-.pill.active { background: var(--dm-primary); color: var(--dm-primary-contrast); }
-.user { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 0; border-radius: var(--dm-radius-pill); background: var(--dm-surface); color: var(--dm-ink); font: inherit; font-size: var(--dm-text-sm); font-weight: 500; cursor: pointer; }
-.user:hover { background: var(--dm-accent-soft); }
+.nav-links { display: flex; gap: 26px; align-self: stretch; }
+.nav-link { display: inline-flex; align-items: center; font-size: var(--fs-md); font-weight: var(--fw-bold); color: var(--text-muted); text-decoration: none; white-space: nowrap; border-bottom: 2.5px solid transparent; padding-top: 2.5px; box-sizing: border-box; }
+.nav-link:hover { color: var(--text); }
+.nav-link.active { color: var(--text); border-bottom-color: var(--accent); }
+.user { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 0; border-radius: var(--radius-pill); background: var(--surface-muted); color: var(--text); font: inherit; font-size: var(--fs-base); font-weight: var(--fw-bold); cursor: pointer; }
+.user:hover { background: var(--accent-soft); }
 .session-button { min-height: 40px; height: 40px; padding: 0 20px; }
-.session-button :deep(.p-button-label) { font-size: var(--dm-text-sm); }
-@media (max-width: 900px) { .pills { order: 10; flex-basis: 100%; justify-content: center; } .spacer { display: none; } .brand { margin-right: auto; } }
-@media (max-width: 640px) { .user-name { display: none; } .inner { width: min(1200px, 100% - 32px); } }
+.session-button :deep(.p-button-label) { font-size: var(--fs-base); }
+@media (max-width: 900px) { .nav-links { order: 10; flex-basis: 100%; justify-content: center; align-self: auto; } .nav-link { padding-block: 8px 10px; } .spacer { display: none; } .brand { margin-right: auto; } }
+@media (max-width: 640px) { .user-name { display: none; } .inner { width: min(var(--citizen-container), 100% - 32px); min-height: 64px; } }
 </style>

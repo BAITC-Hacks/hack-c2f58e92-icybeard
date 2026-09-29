@@ -112,6 +112,7 @@ export const kk = {
     decisions: 'Дәрігер шешімдері', noDecisions: 'Шешімдер әлі жоқ.', redirect: 'Дәрігер басқа ұйымды ұсынды: {name}', keep: 'Дәрігер ағымдағы ұйымда қалдырды',
     severeFlag: 'ауыр жағдай', consentStatus: { pending: 'пациенттің келісімін күтудеміз', accepted: 'пациент келісті', declined: 'пациент бас тартты' },
     history: 'Тарих', outcome: { hospitalized: 'емдеуге жатқызу', refused: 'бас тарту' }, waited: '{days} күн күтті',
+    fasterBy: '{days} күнге жылдамырақ', // TODO native review
   },
   app: { footer: 'Darumen Health · GovTech Camp 2026 · ҚР ДСМ деректері, 2025 жылғы I тоқсан және 2012 жылдан бергі ЭРСБ тарихы' },
   theme: { light: 'Ашық тақырып', dark: 'Қараңғы тақырып', system: 'Жүйедегідей тақырып' },
@@ -270,6 +271,7 @@ export const kk = {
       monthsIn: ',қаңтарда,ақпанда,наурызда,сәуірде,мамырда,маусымда,шілдеде,тамызда,қыркүйекте,қазанда,қарашада,желтоқсанда',
       inMonth: '',
       pickTitle: 'Өңір мен төсек бейінін таңдаңыз', pickText: 'Күту болжамы өңір мен бейін бойынша есептеледі; жеке деректер қажет емес.',
+      legendFaster: 'жасыл сан — қазіргіден қысқарақ', // TODO native review
     },
   },
   doctor: {
@@ -660,7 +662,7 @@ export const kk = {
     map: {
       unitsShort: 'бірл.',
       subtitle: 'Қазақстан · 2025 ж. I тоқсан', indexByRegion: 'Өңірлер бойынша қолжетімділік индексі', openRegion: '{name} ашу',
-      legend: { below60: '60-тан төмен', r60: '60–69', r70: '70–79', r80: '80–86', r87: '87 және жоғары', anomaly: 'ауытқу', higherBetter: 'жоғары = қолжетімдірек' },
+      legend: { below60: '60-тан төмен', r60: '60–69', r70: '70–79', r80: '80–86', r87: '87 және жоғары', anomaly: 'ауытқу', higherBetter: 'жоғары = қолжетімдірек', good: 'қалыпты', mid: 'жүктеме жоғары', bad: 'сыни' }, // TODO native review: good/mid/bad
       anomaliesTitle: 'Ауытқулар', allSignals: 'Барлық сигналдар', kpiOverloaded: 'шамадан тыс жүктелген ұйымдар', signalsChip: 'сигналдар: {n}', ranking: 'Өңірлер рейтингі',
       signals: 'Сигналдар',
       reasonsShort: 'себеп',
@@ -724,6 +726,13 @@ export const kk = {
     deniedGuest: '{page} беті кіргеннен кейін қолжетімді.',
     signupLead: 'Ұйым әлі қосылмаған ба?',
     signup: 'Ұйымды тіркеу',
+    // обезличенный путь пациента на главной без входа (home-prop-5); названия этапов — route.stage.*
+    path: {
+      issuedNote: 'емдеуші дәрігер ресімдейді', // TODO native review
+      examNote: 'талдаулар мен қарап-тексеру қабылданды', // TODO native review
+      waitNote: 'жүйе деректері бойынша, бейінге байланысты', // TODO native review
+      assignedNote: 'Кезек жақындағанда хабарламамен келеді', // TODO native review
+    },
   },
   hero: {
     half: 'жартысы одан ұзақ күтпейді',

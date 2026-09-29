@@ -24,7 +24,7 @@ class EmptyState extends StatelessWidget {
     final circle = tone ?? AppTones.of(context).neutral;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: AppSpacing.xl),
-      decoration: BoxDecoration(color: colors.card, borderRadius: BorderRadius.circular(AppRadius.lg)),
+      decoration: BoxDecoration(color: colors.card, borderRadius: BorderRadius.circular(AppRadius.card), boxShadow: colors.cardShadow),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [

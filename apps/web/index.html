@@ -6,7 +6,7 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="theme-color" content="#5B5BD6" />
+    <meta name="theme-color" content="#2F6FE4" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>Darumen Health</title>
@@ -22,12 +22,12 @@
     </script>
   </head>
   <body>
-    <!-- Заставка до монтирования приложения (Палитра C): холст #F5F6F8, знак собирается (блок #333 → фиолетовые дуга и сектор),
-         main.ts убирает её после mount; в тёмной теме — холст #16171D и светлый блок -->
+    <!-- Заставка до монтирования приложения (синяя гамма): холст #F5F6F8, знак собирается (блок #1B2440 → синие дуга и сектор),
+         main.ts убирает её после mount; в тёмной теме — холст #0D1526 и светлый блок -->
     <style>
       #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; z-index: 9999; }
       #boot::before { content: ''; position: absolute; inset: 0; background: #F5F6F8; transition: opacity .6s ease; }
-      :root.darumen-dark #boot::before { background: #16171D; }
+      :root.darumen-dark #boot::before { background: #0D1526; }
       #boot svg, #boot .w { position: relative; }
       #boot.out { pointer-events: none; }
       #boot.out::before, #boot.out .w { opacity: 0; }
@@ -35,11 +35,11 @@
       #boot.out .w { animation: none; }
       #boot.out:not(.fly) svg { opacity: 0; transition: opacity .5s ease; }
       :root.darumen-dark #boot .l { fill: #E8E9F0; }
-      :root.darumen-dark #boot .a { stroke: #8B8BF0; }
-      :root.darumen-dark #boot .s { fill: #8B8BF0; }
+      :root.darumen-dark #boot .a { stroke: #7EA7F1; }
+      :root.darumen-dark #boot .s { fill: #7EA7F1; }
       :root.darumen-dark #boot .w { color: #E8E9F0; }
       #boot svg { width: 120px; height: 114px; }
-      #boot .w { margin: 0; font: 600 34px/1 Manrope, 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; color: #333333; opacity: 0; transform: translateY(10px); animation: boot-word .6s ease-out 3.1s forwards; transition: opacity .3s ease; }
+      #boot .w { margin: 0; font: 600 34px/1 Manrope, 'Segoe UI', system-ui, sans-serif; letter-spacing: -0.02em; color: #1B2440; opacity: 0; transform: translateY(10px); animation: boot-word .6s ease-out 3.1s forwards; transition: opacity .3s ease; }
       #boot .l { transform-origin: 35.5px 50px; animation: boot-block 1.2s cubic-bezier(.2,.9,.3,1.2) both; }
       #boot .a { stroke-dasharray: 40; stroke-dashoffset: 40; animation: boot-arc 1.4s ease-in-out 1s forwards; }
       #boot .f { transform-origin: 48px 50px; transform: scaleX(0); animation: boot-fill 1s cubic-bezier(.2,.8,.2,1) 2.2s forwards; }
@@ -53,9 +53,9 @@
       <script>document.currentScript.parentElement.dataset.started = String(Date.now())</script>
       <svg viewBox="20 20 63 60" xmlns="http://www.w3.org/2000/svg">
         <defs><clipPath id="boot-c"><rect class="f" x="48" y="50" width="40" height="32"/></clipPath></defs>
-        <path class="l" d="M30 22h19v56H30a8 8 0 0 1-8-8V30a8 8 0 0 1 8-8z" fill="#333333"/>
-        <path class="a" d="M53 25a25 25 0 0 1 25 25" fill="none" stroke="#5B5BD6" stroke-width="6" stroke-linecap="round"/>
-        <path class="s" d="M53 50h28a28 28 0 0 1-28 28z" fill="#5B5BD6" clip-path="url(#boot-c)"/>
+        <path class="l" d="M30 22h19v56H30a8 8 0 0 1-8-8V30a8 8 0 0 1 8-8z" fill="#1B2440"/>
+        <path class="a" d="M53 25a25 25 0 0 1 25 25" fill="none" stroke="#2F6FE4" stroke-width="6" stroke-linecap="round"/>
+        <path class="s" d="M53 50h28a28 28 0 0 1-28 28z" fill="#2F6FE4" clip-path="url(#boot-c)"/>
       </svg>
       <p class="w">darumen</p>
     </div>

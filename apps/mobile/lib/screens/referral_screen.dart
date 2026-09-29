@@ -383,6 +383,7 @@ class _Options extends StatelessWidget {
             child: AppCard(
               padding: AppCard.plain,
               onTap: locked ? null : () => onSelect(o.moCode),
+              color: o.moCode == chosen ? colors.surfaceInfo : null,
               border: o.moCode == chosen ? Border.all(color: colors.accent, width: 2) : null,
               semanticsLabel: '${shortOrgName(o.name)}, ${s.altLine(days(o.p50Days), o.risk)}',
               child: Column(

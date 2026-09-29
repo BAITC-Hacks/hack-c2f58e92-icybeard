@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import AppSidebar from '@/components/app/AppSidebar.vue'
 import AppTopbar from '@/components/app/AppTopbar.vue'
+import AppTopstrip from '@/components/app/AppTopstrip.vue'
 import EmailOutageBanner from '@/components/app/EmailOutageBanner.vue'
 import PublicBar from '@/components/app/PublicBar.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -19,14 +20,17 @@ const bare = computed(() => route.meta.bare === true)
 const isPublic = computed(() => route.meta.public === true)
 const sidebar = computed(() => !bare.value && !isPublic.value && auth.sidebar)
 const signedInShell = computed(() => !bare.value && !isPublic.value && auth.isAuthenticated)
+/** Голубой градиент --bg-hero-gradient — только главная без входа (home-prop-5); вошедших защита маршрутов сюда не пускает. */
+const hero = computed(() => route.name === 'home' && !auth.isAuthenticated)
 </script>
 
 <template>
-  <div class="shell" :class="{ 'shell--side': sidebar, 'shell--bare': bare, 'shell--public': isPublic }">
+  <div class="shell" :class="{ 'shell--side': sidebar, 'shell--bare': bare, 'shell--public': isPublic, 'shell--hero': hero }">
     <AppSidebar v-if="sidebar" />
     <PublicBar v-else-if="isPublic" />
     <AppTopbar v-else-if="!bare" />
     <div class="shell-main">
+      <AppTopstrip v-if="sidebar" />
       <Toast />
       <EmailOutageBanner v-if="signedInShell" />
       <RouterView />

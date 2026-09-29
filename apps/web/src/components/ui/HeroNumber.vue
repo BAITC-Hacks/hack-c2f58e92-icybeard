@@ -38,8 +38,8 @@ defineProps<{
 .hero-caption { display: flex; align-items: center; gap: 10px; }
 .spacer { flex: 1; }
 .hero-value { display: flex; align-items: baseline; gap: 10px; line-height: 1; margin-top: 4px; }
-.number { font-size: var(--dm-text-hero); font-weight: 600; letter-spacing: -0.02em; }
-.compact .number { font-size: var(--dm-text-kpi); font-weight: 500; }
+.number { font-size: var(--dm-text-hero); font-weight: var(--fw-extrabold); letter-spacing: -0.02em; }
+.compact .number { font-size: var(--dm-text-kpi); font-weight: var(--fw-extrabold); }
 .unit { font-size: var(--dm-text-base); color: var(--dm-muted); }
 .hero-label { font-size: var(--dm-text-md); }
 .hero-sub { font-size: var(--dm-text-sm); }

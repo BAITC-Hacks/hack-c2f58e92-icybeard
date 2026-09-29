@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
-/// Карточка-сигнал на selected-фоне по доскам M-Home/M-Route («Врач предложил …», «Пациент просит …»): radius 16,
-/// `padding 14 16`, иконка 22, две строки (15/500 и 13 ink-2) и янтарная стрелка «→», если есть действие.
+/// Карточка-сигнал на accent-soft по доске m-home-new («Врач предложил …», «Пациент просит …»): radius 18,
+/// `padding 14 16`, иконка 22, две строки и стрелка «→» accent-strong, если есть действие.
 class SignalCard extends StatelessWidget {
   const SignalCard({super.key, required this.title, this.subtitle, this.icon = Icons.verified_user_outlined, this.onTap});
 
@@ -17,13 +17,13 @@ class SignalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
-    final radius = BorderRadius.circular(AppRadius.lg);
+    final radius = BorderRadius.circular(AppRadius.card);
     final body = Container(
       padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 14, AppSpacing.lg, 14),
       decoration: BoxDecoration(color: colors.accentSoft, borderRadius: radius),
       child: Row(
         children: [
-          Icon(icon, size: 22, color: colors.ink),
+          Icon(icon, size: 22, color: colors.accentHover),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -37,7 +37,7 @@ class SignalCard extends StatelessWidget {
           ),
           if (onTap != null) ...[
             const SizedBox(width: AppSpacing.md),
-            Text('→', style: theme.textTheme.titleSmall?.copyWith(color: colors.warn)),
+            Text('→', style: theme.textTheme.titleSmall?.copyWith(color: colors.accentHover)),
           ],
         ],
       ),

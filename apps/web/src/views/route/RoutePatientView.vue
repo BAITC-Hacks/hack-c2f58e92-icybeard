@@ -16,7 +16,6 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import HeroNumber from '@/components/ui/HeroNumber.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
-import StageStepper from '@/components/ui/StageStepper.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useRouteData } from '@/composables/useRouteData'
 import { days, pct, refusalWords, shortOrgName, signed } from '@/lib/format'
@@ -34,7 +33,7 @@ const reason = ref('')
 /** Клинический флаг тяжести (задача 3): применяется только к «Направить» — принимающая организация видит его в /journal/referrals/incoming. */
 const severe = ref(false)
 
-const FLAG_TONES: Record<string, 'neutral' | 'danger' | 'accent'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'accent' }
+const FLAG_TONES: Record<string, 'neutral' | 'danger' | 'accent' | 'warn'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'warn' }
 const doctor = computed(() => r.data.value?.doctor ?? null)
 const nextAction = computed(() => {
   const key = nextActionKey(doctor.value?.nextActionCode)
@@ -87,16 +86,23 @@ watch(() => props.patientRef, r.load)
     </div>
 
     <template v-if="r.data.value && doctor">
-      <StageStepper :stages="r.data.value.timeline" norms class="progress" />
+      <div class="card stepper-card">
+        <div class="steps">
+          <div v-for="(stage, i) in r.data.value.timeline" :key="stage.code" class="step" :class="stage.status">
+            <span class="step-dot"><i v-if="stage.status === 'done'" class="pi pi-check" aria-hidden="true" /><template v-else>{{ i + 1 }}</template></span>
+            <span class="step-label">{{ stage.title }}<template v-if="stage.date"> · {{ dateShort(stage.date) }}</template><template v-else-if="stage.norm"> · {{ stage.norm }}</template></span>
+          </div>
+        </div>
+      </div>
 
       <div class="main-grid">
-        <AppCard :title="t('route.forecastCurrentOrg')" label :origin="r.data.value.forecast.fromModel ? 'ml' : 'formula'" data-testid="doctor-panel">
+        <AppCard :title="t('route.forecastCurrentOrg')" label :origin="r.data.value.forecast.fromModel ? 'ml' : 'formula'" class="forecast-card" data-testid="doctor-panel">
           <div class="org-line" :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }} <span class="caption">{{ r.data.value.organization.moCode }}</span></div>
           <HeroNumber :value="days(r.data.value.forecast.p50Days)" :unit="`${t('common.days')} — ${t('hero.half')}`" label="" compact class="hero-line" />
-          <div class="facts-line muted tabular">
-            <span>{{ t('hero.nineOfTen', { days: days(r.data.value.forecast.p90Days) }) }}</span><span>·</span>
-            <span>{{ t('route.refusal') }} <b class="ink">{{ doctor.refusalOrgInTraining ? pct(doctor.pRefusal) : refusalWords(doctor.pRefusal) }}</b></span>
-            <template v-if="alternativesCount"><span>·</span><span>{{ t('route.alternativesCount', { n: alternativesCount }) }}</span></template>
+          <div class="stat-rows tabular">
+            <div class="stat-row"><span>{{ t('route.p90') }}</span><b>{{ days(r.data.value.forecast.p90Days) }} {{ t('common.days') }}</b></div>
+            <div class="stat-row"><span>{{ t('route.refusal') }}</span><b class="stat-danger">{{ doctor.refusalOrgInTraining ? pct(doctor.pRefusal) : refusalWords(doctor.pRefusal) }}</b></div>
+            <div v-if="alternativesCount" class="stat-row"><span>{{ t('route.whereFaster') }}</span><b class="stat-ok">{{ t('route.alternativesCount', { n: alternativesCount }) }}</b></div>
           </div>
           <div class="next-step"><span class="eyebrow">{{ t('route.nextAction') }}</span><div class="next-text">{{ nextAction }}</div><p class="muted small" style="margin: 4px 0 0">{{ doctor.explanation }}</p></div>
           <template v-if="doctor.shap">
@@ -122,7 +128,7 @@ watch(() => props.patientRef, r.load)
 
           <AppCard :title="t('route.whereFaster')" :origin="r.data.value.alternativesModel ? 'ml' : undefined">
             <template #header><span class="caption">{{ t('route.sameRegionProfile') }}</span></template>
-            <RouteAlternatives :items="r.data.value.alternatives" audience="doctor" :acting="r.acting.value" :action-label="t('route.referHere')" @act="redirect($event)" />
+            <RouteAlternatives :items="r.data.value.alternatives" audience="doctor" :acting="r.acting.value" :action-label="t('route.referHere')" :baseline-days="r.data.value.forecast.p50Days" @act="redirect($event)" />
             <div class="row current-row">
               <div class="row-main" :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }} · {{ t('route.current') }}</div>
               <div class="row-value muted">{{ days(r.data.value.forecast.p50Days) }} / {{ days(r.data.value.forecast.p90Days) }} {{ t('common.days') }}</div>
@@ -144,7 +150,7 @@ watch(() => props.patientRef, r.load)
         <InputText v-model="reason" :placeholder="t('route.reason')" class="reason-inline" data-testid="redirect-reason" />
         <label class="severe-check"><Checkbox v-model="severe" binary input-id="severe" data-testid="redirect-severe" /> <span>{{ t('route.severeCheckbox') }}</span></label>
         <RouterLink :to="{ name: 'referral', query: { moCode: r.data.value.organization.moCode, profileCode: r.data.value.organization.profileCode } }">
-          <Button :label="t('route.openReferral')" />
+          <Button :label="t('route.openReferral')" severity="secondary" />
         </RouterLink>
         <Button :label="t('route.keepCurrent')" severity="secondary" :loading="r.acting.value === 'keep'" :disabled="r.acting.value !== null" data-testid="keep" @click="keep()" />
         <Button v-if="r.openSig.value && r.requestedAlternative.value" :label="t('route.referHere')" severity="secondary" :loading="r.acting.value === r.requestedAlternative.value.mo.moCode" :disabled="r.acting.value !== null" @click="redirect(r.requestedAlternative.value.mo.moCode)" />
@@ -157,21 +163,38 @@ watch(() => props.patientRef, r.load)
 </template>
 
 <style scoped>
-.progress { padding-top: 4px; }
-.main-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.stepper-card { padding: 24px 40px; }
+.steps { display: flex; }
+.step { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+.step + .step::before { content: ''; position: absolute; top: 22px; right: 50%; width: 100%; height: 4px; background: var(--border); z-index: 0; }
+.step.done + .step::before, .step.current::before { background: var(--success-line); }
+.step-dot { position: relative; z-index: 1; width: 48px; height: 48px; border-radius: 50%; background: var(--surface-muted); color: var(--text-muted); display: grid; place-items: center; font-size: var(--fs-lg); font-weight: var(--fw-extrabold); }
+.step.done .step-dot { background: var(--success-bg); color: var(--success-text); }
+.step.done .step-dot i { font-size: 15px; }
+.step.current .step-dot { background: var(--accent); color: var(--text-on-accent); box-shadow: 0 0 0 6px var(--accent-soft); }
+.step-label { font-size: 13px; font-weight: var(--fw-semibold); color: var(--text-secondary); text-align: center; max-width: 100%; padding: 0 6px; box-sizing: border-box; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.step.current .step-label { font-size: var(--fs-md); font-weight: var(--fw-extrabold); color: var(--accent-strong); }
+.step.upcoming .step-label { color: var(--text-muted); font-weight: 400; }
+.forecast-card { border-top: 4px solid var(--accent); }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
-.org-line { font-size: var(--dm-text-lg); font-weight: 500; letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
+.org-line { font-size: var(--dm-text-lg); font-weight: var(--fw-bold); letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
 .hero-line { margin: 10px 0 2px; }
+.hero-line :deep(.hero-value .number) { font-size: 42px; }
 .hero-line :deep(.hero-label) { display: none; }
-.facts-line { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: var(--dm-text-base); padding-bottom: 8px; }
-.facts-line .ink { color: var(--dm-ink); font-weight: 500; }
-.next-step { border-top: 1px solid var(--dm-hairline); padding-top: 12px; margin-top: 4px; }
-.next-text { font-size: var(--dm-text-base); font-weight: 500; margin-top: 4px; }
+.stat-rows { margin-top: 6px; }
+.stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.stat-row > span { color: var(--text-secondary); }
+.stat-row b { font-size: var(--dm-text-md); }
+.stat-row .stat-danger { color: var(--danger-text); }
+.stat-row .stat-ok { color: var(--success-text); }
+.next-step { background: var(--surface-info); border-radius: var(--radius-lg); padding: 14px 16px; margin-top: 12px; }
+.next-text { font-size: var(--dm-text-base); font-weight: var(--fw-bold); margin-top: 4px; }
 .why-title { padding: 12px 0 4px; border-top: 1px solid var(--dm-hairline); margin-top: 12px; }
 .signal-banner { background: var(--dm-accent-soft); display: flex; align-items: center; gap: 12px; padding: 16px 24px; }
 .signal-banner i { font-size: 1.3rem; }
 .signal-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.signal-title { font-size: var(--dm-text-md); font-weight: 500; }
+.signal-title { font-size: var(--dm-text-md); font-weight: var(--fw-semibold); }
 .current-row { color: var(--dm-muted); border-top: 1px solid var(--dm-hairline); }
 .sticky-actions { gap: 12px; }
 .reason-inline { flex: 1 1 280px; }

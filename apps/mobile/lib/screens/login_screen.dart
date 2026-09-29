@@ -16,6 +16,7 @@ import '../widgets/circle_button.dart';
 import '../widgets/darumen_mark.dart';
 import '../widgets/error_box.dart';
 import '../widgets/external_link.dart';
+import '../widgets/section.dart';
 import 'otp_screen.dart';
 
 /// Вход по доске M-Auth-Login: круглая кнопка языка справа, знак и «darumen», «Вход» и «Кабинет врача» (если на
@@ -152,9 +153,13 @@ class _LoginScreenState extends State<LoginScreen> {
     final colors = AppPalette.of(context);
     final lastShell = context.select<Session, ShellKind?>((x) => x.lastShell);
     final egov = ServiceStatusNotifier.watch(context).egov;
-    final fieldStyle = theme.textTheme.bodyMedium?.copyWith(fontSize: 15);
-    return Scaffold(
-      body: SafeArea(
+    final fieldStyle = theme.textTheme.bodyLarge;
+    // Стартовый экран входа — единственный, кроме главной гражданина, с голубым градиентом (m-welcome-new).
+    return Container(
+      decoration: BoxDecoration(gradient: heroGradient(context)),
+      child: Scaffold(
+        backgroundColor: ColorTokens.transparent,
+        body: SafeArea(
         child: Column(
           children: [
             const Padding(
@@ -269,6 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -302,7 +308,7 @@ class _EgovButton extends StatelessWidget {
   }
 }
 
-/// Знак 28 и «darumen» 20/600, «Вход» 24/500, подпись кабинета 15 ink-2 — по центру.
+/// Знак 28 и «darumen» 19/800, «Вход» 22/800, подпись кабинета 13.5 text-secondary — по центру.
 class _Heading extends StatelessWidget {
   const _Heading({required this.subtitle});
 
@@ -321,13 +327,13 @@ class _Heading extends StatelessWidget {
             children: [
               const DarumenMark(size: 28),
               const SizedBox(width: 10),
-              Text('darumen', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, letterSpacing: -0.4)),
+              Text('darumen', style: theme.textTheme.titleLarge),
             ],
           ),
           const SizedBox(height: 6),
           Semantics(header: true, child: Text(s.loginTitle, style: theme.textTheme.headlineSmall)),
           const SizedBox(height: 6),
-          Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(fontSize: 15)),
+          Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(fontSize: 13.5)),
         ],
       ),
     );

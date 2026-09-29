@@ -143,7 +143,7 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-        <div class="actions"><Button :label="t('common.apply')" :loading="busy" :disabled="!region || !profile" data-testid="simulate-run" @click="run" /></div>
+        <div class="actions"><Button :label="t('common.apply')" class="run-btn" :loading="busy" :disabled="!region || !profile" data-testid="simulate-run" @click="run" /></div>
         <p class="caption">{{ t('gov.simulator.leversNote') }}</p>
       </AppCard>
 
@@ -208,20 +208,21 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.split { grid-template-columns: minmax(280px, 380px) 1fr; }
+.split { grid-template-columns: minmax(300px, 1fr) 1.4fr; }
 .levers { display: flex; flex-direction: column; gap: 12px; }
+.levers :deep(.run-btn) { width: 100%; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
 .control-row { display: grid; grid-template-columns: 1fr 120px; gap: 10px; align-items: center; }
 .slider { margin: 0 6px; }
 .control :deep(.num-input) { width: 100%; text-align: right; }
 .pair-block { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
 .pair { display: flex; flex-direction: column; gap: 4px; }
-.big { font-size: var(--dm-text-kpi); font-weight: 500; letter-spacing: -0.02em; line-height: 1; }
-.arrow { font-size: 1.6rem; color: var(--dm-danger); }
-.delta-text { margin: 10px 0 0; font-size: var(--dm-text-lg); font-weight: 500; }
+.big { font-size: 28px; font-weight: var(--fw-extrabold); letter-spacing: -0.02em; line-height: 1; }
+.arrow { font-size: 1.6rem; color: var(--text-muted); }
+.delta-text { margin: 10px 0 0; font-size: var(--dm-text-md); font-weight: var(--fw-bold); }
 .mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
 .mini { background: var(--dm-surface-2); border-radius: var(--dm-radius-md); padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
-.mini-value { font-size: var(--dm-text-lg); font-weight: 500; }
+.mini-value { font-size: var(--dm-text-lg); font-weight: var(--fw-bold); }
 .assumptions { margin: 12px 0 0; padding-left: 18px; }
 .clip { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .save-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; }

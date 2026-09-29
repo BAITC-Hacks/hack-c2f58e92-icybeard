@@ -132,7 +132,7 @@ onMounted(() => load())
       <KpiTile :value="kpis.requests" :label="t('gov.audit.kpiRequests', { days: period })" :loading="loading && items.length === 0" />
       <KpiTile :value="kpis.actors" :label="t('gov.audit.kpiActors')" :loading="loading && items.length === 0" />
       <KpiTile :value="kpis.persona" :label="t('gov.audit.kpiPersona')" :chip="kpis.persona === 0 ? t('gov.audit.kpiPersonaNorm') : undefined" chip-tone="ok" :tone="kpis.persona ? 'danger' : undefined" :loading="loading && items.length === 0" />
-      <KpiTile :value="kpis.denied" :label="t('gov.audit.kpiDenied')" :loading="loading && items.length === 0" />
+      <KpiTile :value="kpis.denied" :label="t('gov.audit.kpiDenied')" :tone="kpis.denied ? 'danger' : undefined" :loading="loading && items.length === 0" />
     </KpiRow>
 
     <AppCard>
@@ -181,7 +181,7 @@ onMounted(() => load())
 
 <style scoped>
 .nowrap { white-space: nowrap; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .path { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .object { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .break { word-break: break-all; }

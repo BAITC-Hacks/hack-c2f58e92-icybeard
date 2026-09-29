@@ -192,7 +192,7 @@ watch(profile, () => {
 
 <style scoped>
 .profile-select { min-width: 220px; }
-.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: var(--dm-space-4); align-items: start; }
+.two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
 .note { margin: 12px 0 0; }
 .reason-row td { height: 40px; }

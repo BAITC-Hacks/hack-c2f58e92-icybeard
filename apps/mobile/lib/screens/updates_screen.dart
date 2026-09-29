@@ -16,12 +16,13 @@ import '../widgets/day_groups.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/format.dart';
 import '../widgets/load_state_view.dart';
+import '../widgets/notice_card.dart';
 import '../widgets/route_events.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 
 /// Уведомления по доске M-Updates — только события маршрута (как Messages в NHS App) внутри одной карточки,
-/// группами по дням: label «Сегодня · Вчера · 22 сентября», строки 56 px с фиолетовой точкой у нового, заголовком 15,
+/// группами по дням: label «Сегодня · Вчера · 22 сентября», строки 56 px с синей точкой у нового, заголовком 14,
 /// подстрокой 13 и временем справа; предложение врача открывает маршрут. Пока push-сервис не подключён
 /// (`GET /public/service-status`), внизу честная подпись: push не приходят, новые события — здесь.
 class UpdatesScreen extends StatefulWidget {
@@ -102,7 +103,7 @@ class _UpdatesScreenState extends State<UpdatesScreen> {
             );
           },
         ),
-        if (!push.isUp) Text(s.pushDownNote(push.reason), style: theme.textTheme.labelSmall),
+        if (!push.isUp) NoticeCard(icon: Icons.info_outline, body: s.pushDownNote(push.reason)),
       ],
     );
   }

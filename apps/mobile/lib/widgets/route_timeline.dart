@@ -8,8 +8,8 @@ import '../theme/typography.dart';
 import 'format.dart';
 import 'stage_stepper.dart';
 
-/// Этапы Стандарта строками 56 px внутри карточки: слева галочка (пройдено), фиолетовый маркер (текущий) или пустой
-/// круг (впереди); подпись 15 (500 у текущего); справа дата dd.MM, у предстоящих — нормативный срок или «—».
+/// Этапы Стандарта строками 56 px внутри карточки: слева синяя галочка (пройдено), синий маркер (текущий) или
+/// пустой круг (впереди); подпись 14 (800 у текущего); справа дата dd.MM, у предстоящих — нормативный срок или «—».
 class RouteTimeline extends StatelessWidget {
   const RouteTimeline({super.key, required this.stages});
 
@@ -51,7 +51,7 @@ class _StageRow extends StatelessWidget {
             width: 20,
             height: 20,
             child: Center(
-              child: done ? Icon(Icons.check, size: 18, color: colors.ink) : StageMarker(active: current),
+              child: done ? Icon(Icons.check, size: 18, color: colors.accent) : StageMarker(active: current),
             ),
           ),
           const SizedBox(width: AppSpacing.md),

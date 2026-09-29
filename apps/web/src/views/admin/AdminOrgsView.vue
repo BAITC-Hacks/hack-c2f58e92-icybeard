@@ -144,7 +144,7 @@ onMounted(async () => {
 .with-panel { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
 .panel-col { display: flex; flex-direction: column; gap: 16px; }
 .hint { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 32px 24px; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .clip { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nowrap { white-space: nowrap; }
 @media (max-width: 1500px) { .col-type { display: none; } }

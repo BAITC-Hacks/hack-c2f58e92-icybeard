@@ -139,18 +139,24 @@ onMounted(load)
 </template>
 
 <style scoped>
-.public-page { flex: 1; display: flex; justify-content: center; padding: 32px 16px 16px; }
-.public-card { width: min(480px, 100%); padding: 32px; }
+/* публичная карточка (public-invite-new): 460, radius 20, padding 28; заголовок без плашки */
+.public-page { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 36px 16px 16px; }
+.public-card { width: min(460px, 100%); padding: 28px; border-radius: var(--radius-card-lg); }
 .form-col { gap: 14px; }
-.invite-head { background: var(--dm-accent-soft); border-radius: var(--dm-radius-md); padding: 16px; display: flex; flex-direction: column; gap: 6px; }
-.invite-head h1 { font-size: var(--dm-text-lg); margin: 0; }
-.org { font-size: var(--dm-text-md); }
+.invite-head { display: flex; flex-direction: column; gap: 6px; }
+.invite-head h1 { font-size: var(--fs-xl); margin: 0; }
+.org { font-size: var(--fs-base); font-weight: var(--fw-bold); }
 .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.meta :deep(.status) { background: var(--dm-surface); }
-.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.error-text { color: var(--dm-danger); font-size: var(--dm-text-sm); }
+.meta :deep(.status) { background: var(--accent-soft); color: var(--accent-strong); }
+.field > label, .field :deep(label) { font-size: 12px; font-weight: var(--fw-bold); text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
+.field.checkbox > label { font-size: 12px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.error-text { color: var(--danger-text); font-size: var(--fs-sm); }
 .wide { width: 100%; justify-content: center; }
-.decline { border: 0; background: none; color: var(--dm-danger); font: inherit; font-size: var(--dm-text-md); font-weight: 500; cursor: pointer; }
+/* danger-ссылка по components.md: --danger-strong 12.5/700 */
+.decline { border: 0; background: none; color: var(--danger-strong); font: inherit; font-size: var(--fs-base-sm); font-weight: var(--fw-bold); cursor: pointer; align-self: center; }
+.decline:disabled { opacity: 0.45; cursor: default; }
 .center { text-align: center; margin: 0; }
+.center.caption { color: var(--text-faint); }
 @media (max-width: 520px) { .pair { grid-template-columns: 1fr; } .public-card { padding: 20px; } }
 </style>

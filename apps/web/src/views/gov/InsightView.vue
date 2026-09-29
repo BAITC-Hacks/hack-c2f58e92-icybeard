@@ -123,7 +123,7 @@ onBeforeUnmount(() => window.clearInterval(stepTimer))
     </template>
     <Message v-if="status && !status.available" severity="warn" :closable="false">{{ t('gov.insight.unavailable', { provider: status.provider, model: status.model }) }}</Message>
 
-    <div class="ask-block">
+    <div class="ask-block card">
       <div class="field">
         <label>{{ t('gov.insight.question') }}</label>
         <div class="ask-row">
@@ -202,10 +202,10 @@ onBeforeUnmount(() => window.clearInterval(stepTimer))
 .ask-block { display: flex; flex-direction: column; gap: 12px; }
 .ask-row { display: flex; gap: 12px; align-items: center; }
 .ask-row :deep(.p-inputtext) { flex: 1; background: var(--dm-surface); }
-.main-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
 .question-echo { margin: 0 0 8px; font-size: var(--dm-text-md); color: var(--dm-muted); }
-.a-number { font-size: var(--dm-text-kpi); font-weight: 500; letter-spacing: -0.02em; line-height: 1; margin: 4px 0 8px; }
+.a-number { font-size: var(--dm-text-kpi); font-weight: var(--fw-extrabold); letter-spacing: -0.02em; line-height: 1; margin: 4px 0 8px; }
 .a-number .unit { font-size: var(--dm-text-base); color: var(--dm-muted); font-weight: 400; }
 .a-text { white-space: pre-wrap; margin: 0 0 12px; font-size: var(--dm-text-base); }
 .a-chart { height: 260px; }
@@ -213,7 +213,7 @@ onBeforeUnmount(() => window.clearInterval(stepTimer))
 .tool-row { min-height: 40px; }
 .guarantees { margin: 12px 0; }
 .steps { display: flex; gap: 16px; flex-wrap: wrap; color: var(--dm-muted); }
-.step.active { color: var(--dm-ink); font-weight: 500; }
+.step.active { color: var(--dm-ink); font-weight: var(--fw-bold); }
 .step.done { color: var(--dm-ok); }
 .row-button { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--dm-hairline); font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 12px 0; }
 .row-button:last-child { border-bottom: 0; }

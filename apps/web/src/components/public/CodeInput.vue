@@ -3,9 +3,9 @@ import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CODE_LENGTH } from '@/lib/validation'
 
-/** Ввод 6-значного кода из письма (W-Auth-Verify): шесть ячеек 52 px на inset, фокус — фиолетовая рамка; цифра
- * переводит фокус дальше, Backspace на пустой — назад, вставка всего кода раскладывается по ячейкам. По шестой цифре —
- * событие complete. */
+/** Ввод 6-значного кода из письма (components.md «Код (OTP)»): шесть белых ячеек 48×56 с рамкой --border,
+ * фокус — синяя рамка с кольцом; цифра переводит фокус дальше, Backspace на пустой — назад, вставка всего кода
+ * раскладывается по ячейкам. По шестой цифре — событие complete. */
 defineProps<{ disabled?: boolean; invalid?: boolean }>()
 const model = defineModel<string>({ default: '' })
 const emit = defineEmits<{ complete: [string] }>()
@@ -90,8 +90,8 @@ defineExpose({ focus: () => focus(digits.value.findIndex((d) => !d) === -1 ? COD
 
 <style scoped>
 .code { display: flex; gap: 10px; justify-content: space-between; }
-.cell { width: 52px; height: 60px; border: 2px solid transparent; border-radius: var(--dm-radius-md); background: var(--dm-surface-2); color: var(--dm-ink); text-align: center; font: inherit; font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; outline: none; box-sizing: border-box; }
-.cell:focus { border-color: var(--dm-primary); background: var(--dm-surface); }
-.cell.invalid { border-color: var(--dm-danger); }
-@media (max-width: 420px) { .cell { width: 44px; height: 52px; font-size: 22px; } }
+.cell { width: 48px; height: 56px; border: 1.5px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); text-align: center; font: inherit; font-size: 22px; font-weight: var(--fw-extrabold); font-variant-numeric: tabular-nums; outline: none; box-sizing: border-box; }
+.cell:focus { border-color: var(--accent); box-shadow: var(--focus-ring); }
+.cell.invalid { border-color: var(--danger-strong); }
+@media (max-width: 420px) { .cell { width: 42px; height: 50px; font-size: 20px; } }
 </style>

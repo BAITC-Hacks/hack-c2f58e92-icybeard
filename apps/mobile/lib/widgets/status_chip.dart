@@ -29,19 +29,20 @@ class StatusChip extends StatelessWidget {
   }
 }
 
-/// Базовый чип для статусов и меток происхождения.
+/// Базовый чип для статусов (radius 8) и меток происхождения (pill).
 class ToneChip extends StatelessWidget {
-  const ToneChip({super.key, required this.label, required this.fg, required this.bg, this.icon});
+  const ToneChip({super.key, required this.label, required this.fg, required this.bg, this.icon, this.radius = AppRadius.sm});
 
   final String label;
   final Color fg;
   final Color bg;
   final IconData? icon;
+  final double radius;
 
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.xs),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppRadius.sm)),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(radius)),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

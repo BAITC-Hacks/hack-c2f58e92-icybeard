@@ -193,10 +193,10 @@ watch([moCode, profile], () => {
 .main-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
 .links { display: grid; grid-template-columns: 1fr 1fr; gap: var(--dm-space-4); }
-.link-card { display: flex; align-items: center; gap: 12px; padding: 16px 24px; text-decoration: none; color: var(--dm-ink); font-weight: 500; font-size: var(--dm-text-md); }
-.link-card i { color: var(--dm-danger); }
-.link-card:hover { box-shadow: inset 0 0 0 2px var(--dm-ink); }
-.strong { font-weight: 500; }
-.verdict { margin: 12px 0 0; font-weight: 500; }
+.link-card { display: flex; align-items: center; gap: 12px; padding: 16px 24px; text-decoration: none; color: var(--accent-strong); font-weight: var(--fw-bold); font-size: var(--dm-text-sm); }
+.link-card i { color: var(--accent); }
+.link-card:hover { box-shadow: inset 0 0 0 2px var(--accent); color: var(--accent-strong); }
+.strong { font-weight: var(--fw-bold); }
+.verdict { margin: 12px 0 0; font-weight: var(--fw-bold); }
 @media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } .links { grid-template-columns: 1fr; } }
 </style>

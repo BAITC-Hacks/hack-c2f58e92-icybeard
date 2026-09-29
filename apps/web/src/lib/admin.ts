@@ -4,9 +4,9 @@ import { MATRIX_PERMISSIONS, normalizeRoles, ORG_ASSIGNABLE_ROLES, ROLE_KEYS, RO
 
 /** Тона статусов администрирования по доскам: активен — good, приглашён / ожидает / настройка — info, заблокирован /
  * нет данных — нейтральный, отклонён — attention. */
-export const USER_STATUS_TONE: Record<UserStatus, StatusTone> = { active: 'ok', invited: 'info', blocked: 'neutral' }
-export const VERIFICATION_TONE: Record<Verification, StatusTone> = { verified: 'ok', pending: 'info', rejected: 'warn' }
-export const ORG_STATUS_TONE: Record<OrgStatus, StatusTone> = { connected: 'ok', setup: 'info', no_data: 'neutral' }
+export const USER_STATUS_TONE: Record<UserStatus, StatusTone> = { active: 'ok', invited: 'neutral', blocked: 'danger' }
+export const VERIFICATION_TONE: Record<Verification, StatusTone> = { verified: 'ok', pending: 'warn', rejected: 'danger' }
+export const ORG_STATUS_TONE: Record<OrgStatus, StatusTone> = { connected: 'ok', setup: 'warn', no_data: 'neutral' }
 
 /** Задержка загрузки набора дольше этого числа дней — чип «задержка N дн.» вместо «в норме». */
 export const FRESH_DAYS = 3

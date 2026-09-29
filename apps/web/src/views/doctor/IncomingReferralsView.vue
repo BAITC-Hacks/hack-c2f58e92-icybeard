@@ -26,7 +26,7 @@ const toast = useToast()
 const refdata = useRefdataStore()
 const r = useIncomingReferrals()
 
-const CONSENT_TONES: Record<string, 'ok' | 'neutral' | 'accent'> = { accepted: 'ok', declined: 'neutral', pending: 'accent' }
+const CONSENT_TONES: Record<string, 'ok' | 'neutral' | 'accent' | 'warn'> = { accepted: 'ok', declined: 'neutral', pending: 'warn' }
 const severeCount = computed(() => r.items.value.filter((i) => i.severe).length)
 const discharging = ref<IncomingReferral | null>(null)
 const summary = ref('')
@@ -65,16 +65,17 @@ onMounted(async () => {
 <template>
   <PageShell :title="t('doctor.incoming.title')">
     <template #subtitle>{{ t('doctor.incoming.subtitle') }} · {{ t('doctor.incoming.total', { n: r.items.value.length }) }}</template>
-    <template #actions>
-      <Button :label="t('doctor.incoming.refresh')" icon="pi pi-refresh" size="small" severity="secondary" text :loading="r.loading.value" @click="r.load" />
-    </template>
-    <div class="chips">
-      <button type="button" class="chip-filter" :class="{ active: r.severeOnly.value }" data-testid="filter-severe" @click="toggleSevere">
-        {{ t('doctor.incoming.severeOnly') }} · {{ severeCount }}
-      </button>
-      <button type="button" class="chip-filter" :class="{ active: r.showConfirmed.value }" data-testid="filter-confirmed" @click="toggleConfirmed">
-        {{ t('doctor.incoming.includeConfirmed') }}
-      </button>
+    <div class="toolbar">
+      <div class="chips">
+        <button type="button" class="chip-filter" :class="{ active: r.severeOnly.value }" data-testid="filter-severe" @click="toggleSevere">
+          {{ t('doctor.incoming.severeOnly') }} · {{ severeCount }}
+        </button>
+        <button type="button" class="chip-filter" :class="{ active: r.showConfirmed.value }" data-testid="filter-confirmed" @click="toggleConfirmed">
+          {{ t('doctor.incoming.includeConfirmed') }}
+        </button>
+      </div>
+      <span class="spacer" />
+      <Button :label="t('doctor.incoming.refresh')" icon="pi pi-refresh" size="small" severity="secondary" :loading="r.loading.value" @click="r.load" />
     </div>
 
     <AppCard>
@@ -94,17 +95,17 @@ onMounted(async () => {
                 <td :title="i.fromMoName">{{ shortOrgName(i.fromMoName) }}<div class="caption">{{ i.fromMoCode }}</div></td>
                 <td class="nowrap muted">{{ dateTime(i.recordedAt) }}</td>
                 <td><StatusTag :value="t('route.consentStatus.' + i.patientConsent)" :tone="CONSENT_TONES[i.patientConsent]" /></td>
-                <td><StatusTag v-if="i.severe" :value="t('route.severeFlag')" tone="danger" /><span v-else class="muted">—</span></td>
+                <td><StatusTag v-if="i.severe" :value="t('route.severeFlag')" tone="danger" /><span v-else class="cell-pill disabled">—</span></td>
                 <td>
-                  <StatusTag v-if="i.confirmed" :value="t('doctor.incoming.alreadyConfirmed')" tone="ok" />
-                  <Button v-else :label="t('doctor.incoming.confirm')" size="small" :disabled="i.patientConsent !== 'accepted' || r.acting.value !== null"
+                  <span v-if="i.confirmed" class="cell-pill done"><i class="pi pi-check" aria-hidden="true" /> {{ t('doctor.incoming.alreadyConfirmed') }}</span>
+                  <Button v-else :label="t('doctor.incoming.confirm')" size="small" severity="secondary" class="cell-btn" :disabled="i.patientConsent !== 'accepted' || r.acting.value !== null"
                     :loading="r.acting.value === i.decisionId" data-testid="confirm-referral" @click="confirm(i.decisionId, i.patientRef)" />
                 </td>
                 <td>
-                  <StatusTag v-if="i.discharged" :value="t('doctor.incoming.alreadyDischarged')" tone="ok" />
-                  <Button v-else-if="i.confirmed" :label="t('doctor.incoming.discharge')" size="small" severity="secondary"
+                  <span v-if="i.discharged" class="cell-pill done"><i class="pi pi-check" aria-hidden="true" /> {{ t('doctor.incoming.alreadyDischarged') }}</span>
+                  <Button v-else-if="i.confirmed" :label="t('doctor.incoming.discharge')" size="small" class="cell-btn"
                     :disabled="r.acting.value !== null" data-testid="discharge-referral" @click="discharging = i; summary = ''" />
-                  <span v-else class="muted">—</span>
+                  <span v-else class="cell-pill disabled">—</span>
                 </td>
               </tr>
             </tbody>
@@ -129,6 +130,12 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .nowrap { white-space: nowrap; }
+.cell-pill { display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: 148px; height: 30px; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: var(--fw-bold); box-sizing: border-box; white-space: nowrap; padding: 0 6px; }
+.cell-pill.disabled { background: var(--surface-sunken); color: var(--text-faint); }
+.cell-pill.done { background: var(--success-bg); color: var(--success-text); }
+.cell-pill.done i { font-size: 10px; }
+:deep(.cell-btn.p-button) { width: 148px; height: 30px; min-height: 30px; padding: 0 6px; font-size: var(--fs-sm); justify-content: center; }
+:deep(.cell-btn.p-button:disabled) { background: var(--surface-sunken); border-color: var(--surface-sunken); color: var(--text-faint); opacity: 1; }
 </style>

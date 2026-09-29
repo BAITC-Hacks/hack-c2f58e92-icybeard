@@ -71,7 +71,7 @@ function send() {
 
 <style scoped>
 .feed-row { align-items: flex-start; }
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .head { row-gap: 4px; }
 .answer { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
 .answer .p-inputtext { flex: 1 1 220px; }

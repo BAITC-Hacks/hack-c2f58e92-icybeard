@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-/** Вкладки аккаунта (W-Account-*): пилюли «Профиль · Безопасность · Уведомления · Данные и согласия», активная —
- * фиолетовая с белым текстом, остальные белые. */
+/** Вкладки аккаунта (components.md «Таб .tab»): пилюли 9px 18px 13.5/700 на --surface-sunken, активная —
+ * синяя --accent с белым текстом. */
 const { t } = useI18n()
 const tabs = [
   { to: '/account/profile', key: 'profile' },
@@ -20,5 +20,6 @@ const tabs = [
 
 <style scoped>
 .account-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
-.account-tabs .chip-filter { text-decoration: none; }
+.account-tabs .chip-filter { text-decoration: none; height: auto; padding: 9px 18px; font-size: var(--fs-base); }
+.account-tabs .chip-filter.active { background: var(--accent); color: var(--text-on-accent); }
 </style>

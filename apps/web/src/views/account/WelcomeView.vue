@@ -73,44 +73,52 @@ onMounted(async () => {
       </section>
 
       <div class="grid cols-2">
-        <AppCard :title="t('welcome.canTitle')">
+        <AppCard :title="t('welcome.canTitle')" label>
           <div class="caps">
             <RouterLink v-for="c in capabilities" :key="c.key" class="cap" :to="c.to || '/'">
               <i :class="c.icon" aria-hidden="true" />
-              <span><span class="cap-title">{{ t(`welcome.can.${c.key}.title`) }}</span><span class="muted small">{{ t(`welcome.can.${c.key}.text`) }}</span></span>
+              <span><span class="cap-title">{{ t(`welcome.can.${c.key}.title`) }}</span><span class="muted cap-text">{{ t(`welcome.can.${c.key}.text`) }}</span></span>
             </RouterLink>
           </div>
         </AppCard>
-        <AppCard :title="t('welcome.forecastTitle')" origin="ml">
+        <AppCard :title="t('welcome.forecastTitle')" label origin="ml">
           <p class="text"><strong>p50</strong> — {{ t('welcome.p50') }}</p>
           <p class="text"><strong>p90</strong> — {{ t('welcome.p90') }}</p>
-          <p class="text muted">{{ t('welcome.recalc') }}</p>
+          <p class="text faint">{{ t('welcome.recalc') }}</p>
         </AppCard>
       </div>
-      <RouterLink class="link-arrow skip" :to="auth.roleHome()" data-testid="welcome-skip">{{ t('welcome.skip') }}</RouterLink>
+      <RouterLink class="skip" :to="auth.roleHome()" data-testid="welcome-skip">{{ t('welcome.skip') }} <span aria-hidden="true">→</span></RouterLink>
     </div>
   </PageShell>
 </template>
 
 <style scoped>
-.welcome-col { display: flex; flex-direction: column; gap: 16px; max-width: 880px; }
+/* аккаунт (account-welcome-new): колонка 880 по центру, карточки padding 24 */
+.page { max-width: 880px; }
+.card { padding: 24px; }
+.welcome-col { display: flex; flex-direction: column; gap: 16px; }
 .checklist { display: flex; flex-direction: column; }
-.step { display: flex; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--dm-hairline); }
-.num { width: 32px; height: 32px; border-radius: 50%; background: var(--dm-neutral-soft); color: var(--dm-ink); display: grid; place-items: center; font-size: var(--dm-text-sm); font-weight: 500; flex: none; }
-.step:not(.done) .num { background: var(--dm-primary); color: var(--dm-primary-contrast); }
-.step:not(.done) ~ .step:not(.done) .num { background: var(--dm-neutral-soft); color: var(--dm-ink); }
-.step.done .num { background: var(--dm-ok-soft); color: var(--dm-ok); }
+.step { display: flex; align-items: center; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+.num { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-sunken); color: var(--text); display: grid; place-items: center; font-size: 13px; font-weight: var(--fw-extrabold); flex: none; }
+.step:not(.done) .num { background: var(--accent); color: var(--text-on-accent); }
+.step:not(.done) ~ .step:not(.done) .num { background: var(--surface-sunken); color: var(--text); }
+.step.done .num { background: var(--success-bg); color: var(--success-text); }
+.step.done .num i { font-size: 12px; }
 .step-main { flex: 1; min-width: 0; }
-.step-title { font-size: var(--dm-text-base); font-weight: 500; }
+.step-title { font-size: var(--fs-md); font-weight: var(--fw-bold); }
+.step-main .small { font-size: 12px; }
 .progress { display: flex; align-items: center; gap: 16px; padding-top: 16px; }
-.track { flex: 1; height: 4px; border-radius: 2px; background: var(--dm-neutral-soft); overflow: hidden; }
-.fill { display: block; height: 100%; background: var(--dm-primary); }
-.caps { display: flex; flex-direction: column; gap: 14px; }
-.cap { display: flex; gap: 12px; text-decoration: none; color: var(--dm-ink); }
-.cap i { margin-top: 3px; color: var(--dm-muted); }
+.track { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-muted); overflow: hidden; }
+.fill { display: block; height: 100%; background: var(--accent); }
+.caps { display: flex; flex-direction: column; gap: 4px; }
+.cap { display: flex; gap: 12px; text-decoration: none; color: var(--text); padding: 10px 0; }
+.cap i { margin-top: 3px; color: var(--text-muted); font-size: 15px; }
 .cap span { display: flex; flex-direction: column; }
-.cap-title { font-weight: 500; }
-.cap:hover .cap-title { color: var(--dm-accent-hover); }
-.text { margin: 0 0 10px; font-size: var(--dm-text-md); }
-.skip { align-self: flex-start; }
+.cap-title { font-weight: var(--fw-bold); font-size: var(--fs-base); }
+.cap-text { font-size: 12px; }
+.cap:hover .cap-title { color: var(--accent-strong); }
+.text { margin: 0 0 10px; font-size: 13px; line-height: 1.5; }
+.text.faint { font-size: 12px; }
+.skip { align-self: flex-start; font-size: 13px; font-weight: var(--fw-bold); color: var(--link); text-decoration: none; }
+.skip:hover { color: var(--accent-strong); }
 </style>

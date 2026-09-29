@@ -6,8 +6,8 @@ import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
-/// Круглая кнопка-иконка 40 px — «назад», «поиск», «закрыть», язык в шапке экрана. Фон selected (#E7ECFF, доски
-/// M-Home/M-Route/M-Wait), на экранах входа и аккаунта — inset (#EAECF2, доски M-Auth-*, M-Account-Security).
+/// Круглая кнопка-иконка 40 px — «назад», «поиск», «закрыть», язык в шапке экрана. Фон surface-muted (#E8EEFA)
+/// на всех досках m-* синей гаммы.
 class CircleIconButton extends StatelessWidget {
   const CircleIconButton({super.key, required this.icon, required this.label, this.onTap, this.child, this.neutral = false});
 
@@ -20,7 +20,7 @@ class CircleIconButton extends StatelessWidget {
   /// Вместо иконки — произвольное содержимое (текст «ҚАЗ»).
   final Widget? child;
 
-  /// true — inset-фон вместо selected.
+  /// Исторический флаг «inset-фон»: в синей гамме оба варианта — surface-muted.
   final bool neutral;
 
   @override
@@ -32,7 +32,7 @@ class CircleIconButton extends StatelessWidget {
       child: Tooltip(
         message: label,
         child: Material(
-          color: neutral ? colors.neutralSoft : colors.accentSoft,
+          color: colors.neutralSoft,
           shape: const CircleBorder(),
           clipBehavior: Clip.antiAlias,
           child: InkWell(

@@ -2,9 +2,9 @@
 import type { RouteStage } from '@/api/types'
 import { dateShort } from '@/lib/route'
 
-/** Этапы маршрута. Горизонтальный прогресс (W-Patient): полосы 3 px (пройдено ink, впереди hairline) с точкой 14 px
- * coral и обводкой ink на текущем, под ними подписи 12 ink-2. Вертикальная лента (W-Route, `vertical`): точки 10 px
- * ink / coral / hairline и линия между ними, справа название 15 / 500 и дата 13 ink-3. `chevrons` оставлен как псевдоним
+/** Этапы маршрута («синяя гамма»). Горизонтальный прогресс: полосы 3 px (пройдено --accent, впереди --border) с синей
+ * точкой 14 px в кольце --accent-soft на текущем, под ними подписи 11 --text-muted. Вертикальная лента (`vertical`):
+ * точки 10 px --accent / --border и линия между ними, справа название и дата. `chevrons` оставлен как псевдоним
  * горизонтального варианта для прежних вызовов. */
 defineProps<{ stages: RouteStage[]; chevrons?: boolean; norms?: boolean; vertical?: boolean }>()
 </script>
@@ -38,7 +38,7 @@ defineProps<{ stages: RouteStage[]; chevrons?: boolean; norms?: boolean; vertica
 .bar { display: flex; align-items: center; gap: 4px; height: 14px; }
 .bar .track { flex: 1; height: 3px; border-radius: 2px; background: var(--dm-hairline); }
 .bar.done .track { background: var(--dm-primary); }
-.bar .marker { width: 14px; height: 14px; border-radius: 50%; background: var(--dm-accent); border: 2px solid var(--dm-ink); box-sizing: border-box; flex: none; }
+.bar .marker { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); box-sizing: border-box; flex: none; }
 .labels { font-size: var(--dm-text-xs); color: var(--dm-muted); letter-spacing: 0.02em; }
 .stage-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stage-label.current { color: var(--dm-ink); font-weight: 500; }
@@ -50,7 +50,7 @@ defineProps<{ stages: RouteStage[]; chevrons?: boolean; norms?: boolean; vertica
 .rail .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dm-hairline); flex: none; margin-top: 6px; box-sizing: border-box; }
 .rail .line { flex: 1; width: 3px; border-radius: 2px; background: var(--dm-hairline); margin-top: 4px; }
 li.done .rail .dot, li.done .rail .line { background: var(--dm-primary); }
-li.current .rail .dot { width: 14px; height: 14px; background: var(--dm-accent); border: 2px solid var(--dm-ink); margin-top: 4px; }
+li.current .rail .dot { width: 14px; height: 14px; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); margin-top: 4px; }
 .text { display: flex; flex-direction: column; gap: 2px; padding-bottom: 16px; min-width: 0; }
 li:last-child .text { padding-bottom: 0; }
 .title { font-size: var(--dm-text-md); font-weight: 500; }

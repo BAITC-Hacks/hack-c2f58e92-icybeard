@@ -23,7 +23,7 @@ import { useRefdataStore } from '@/stores/refdata'
  * срезы по регионам/профилям и остальные отчёты — свёрнутой секцией. Ряда ошибки по неделям в отчёте нет. */
 interface ModelRow { key: string; metric: string; model: number | null; baseline: number | null; lowerIsBetter: boolean; period: string; status: 'prod' | 'check' | 'draft'; format: (v: number) => string }
 const STREAM_IDS = ['admissions_monthly', 'er_visits_daily', 'rx_weekly', 'vac_monthly', 'onco_monthly', 'lab_estimate_monthly']
-const STATUS_TONES = { prod: 'ok', check: 'neutral', draft: 'accent' } as const
+const STATUS_TONES = { prod: 'ok', check: 'warn', draft: 'accent' } as const
 const { t } = useI18n()
 const { num } = useLocaleFormat()
 const refdata = useRefdataStore()
@@ -141,11 +141,11 @@ onMounted(async () => {
           </table>
         </div>
         <p class="caption" style="margin: 12px 0 0">{{ t('gov.quality.weeklyMissing') }} {{ t('gov.quality.waitTrained', { through: report.wait.trainedThrough, rows: num(report.wait.trainRows) }) }}</p>
-      </AppCard>
-
-      <AppCard :title="t('gov.quality.labelsTitle')">
-        <div class="labels"><OriginTag kind="ml" /><OriginTag kind="formula" /><OriginTag kind="ai" /></div>
-        <p class="muted small" style="margin: 12px 0 0">{{ t('gov.quality.labelsRule') }}</p>
+        <div class="labels-block">
+          <div class="eyebrow">{{ t('gov.quality.labelsTitle') }}</div>
+          <div class="labels"><OriginTag kind="ml" /><OriginTag kind="formula" /><OriginTag kind="ai" /></div>
+          <p class="muted small" style="margin: 10px 0 0">{{ t('gov.quality.labelsRule') }}</p>
+        </div>
       </AppCard>
     </template>
 
@@ -204,9 +204,10 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.strong { font-weight: 500; }
+.strong { font-weight: var(--fw-bold); }
 .pair { display: flex; margin-top: 4px; max-width: 120px; }
-.labels { display: flex; gap: 10px; flex-wrap: wrap; }
+.labels-block { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; }
+.labels { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .sub h3 { margin: 0 0 4px; }
 .bar-cell { min-width: 180px; }
 </style>

@@ -13,9 +13,10 @@ class Tone {
 }
 
 /// Единственный источник цвета для OriginTag (ml / formula / ai), StatusChip (ok / warn / danger / neutral /
-/// accent / bench) и состояний экрана (info). Палитра C (доска C-Tokens): «ML-модель» — infoSoft/ink, «формула» —
-/// inset/ink-2, «AI» — lavender/#4646B8, «текущая» (accent) — selected/#4646B8, good — зелёный, attention (риск,
-/// аномалии) — янтарный, critical — красный; внешний ориентир — benchSoft/ink. Экраны не обращаются к `Colors.*`.
+/// accent / bench) и состояний экрана (info). Синяя гамма (handoff/components.md): метки происхождения (ML /
+/// формула / AI) — нейтральная пилюля surface-muted/text-secondary (бирюзовый и лавандовый упразднены), «инфо» и
+/// «текущая» (accent) — accent-soft/accent-strong, good — зелёный, attention (риск, аномалии) — янтарный,
+/// critical — красный; нейтральный статус — surface-sunken/text-secondary. Экраны не обращаются к `Colors.*`.
 class AppTones extends ThemeExtension<AppTones> {
   const AppTones({
     required this.ml,
@@ -31,15 +32,15 @@ class AppTones extends ThemeExtension<AppTones> {
   });
 
   factory AppTones.from(ColorTokens c) => AppTones(
-        ml: Tone(c.ink, c.infoSoft),
+        ml: Tone(c.muted, c.neutralSoft),
         formula: Tone(c.muted, c.neutralSoft),
         ai: Tone(c.ai, c.aiSoft),
         ok: Tone(c.ok, c.okSoft),
         warn: Tone(c.warn, c.warnSoft),
         danger: Tone(c.danger, c.dangerSoft),
-        neutral: Tone(c.muted, c.neutralSoft),
+        neutral: Tone(c.muted, c.surfaceSunken),
         accent: Tone(c.accentHover, c.accentSoft),
-        bench: Tone(c.ink, c.benchSoft),
+        bench: Tone(c.muted, c.benchSoft),
         info: Tone(c.info, c.infoSoft),
       );
 

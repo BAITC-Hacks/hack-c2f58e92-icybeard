@@ -8,8 +8,9 @@ import 'status_chip.dart';
 /// Откуда число: прогноз модели, расчёт по формуле/справочнику или черновик языковой модели.
 enum Origin { ml, formula, ai }
 
-/// Метка происхождения — та же конвенция, что в вебе: «каждое число подписано». Чип radius 8 («ML-модель» —
-/// infoSoft/ink, «формула» — inset/ink-2, «AI» — lavender/#4646B8); тап открывает пояснение.
+/// Метка происхождения — та же конвенция, что в вебе: «каждое число подписано». Нейтральная пилюля
+/// surface-muted/text-secondary для всех трёх видов (бирюзовый «ML» и лавандовый «AI» упразднены —
+/// handoff/components.md «Происхождение числа»); тап открывает пояснение.
 class OriginTag extends StatelessWidget {
   const OriginTag(this.kind, {super.key});
 
@@ -28,7 +29,7 @@ class OriginTag extends StatelessWidget {
       button: true,
       label: '$label. $note',
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadius.sm),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
         onTap: () => showModalBottomSheet<void>(
           context: context,
           showDragHandle: true,
@@ -45,7 +46,7 @@ class OriginTag extends StatelessWidget {
             ),
           ),
         ),
-        child: ToneChip(label: label, fg: tone.fg, bg: tone.bg),
+        child: ToneChip(label: label, fg: tone.fg, bg: tone.bg, radius: AppRadius.pill),
       ),
     );
   }

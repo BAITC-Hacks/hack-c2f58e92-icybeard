@@ -122,15 +122,20 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.public-page { flex: 1; display: flex; justify-content: center; padding: 32px 16px 16px; }
-.public-card { width: min(520px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 32px; }
-.public-card h1 { font-size: var(--dm-text-xl); margin: 0; }
-.lead { margin: -6px 0 4px; color: var(--dm-muted); }
-.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.divider { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
-.divider::after { content: ''; flex: 1; height: 1px; background: var(--dm-hairline); }
-.consent-error { margin-top: -8px; color: var(--dm-danger); font-size: 0.8rem; }
+/* публичная карточка (public-signup-new): 560, radius 20, padding 28; подписи полей 12/700 без капса */
+.public-page { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 26px 16px 16px; }
+.public-card { width: min(560px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: var(--radius-card-lg); }
+.public-card h1 { font-size: 22px; margin: 0; }
+.lead { margin: -8px 0 2px; color: var(--text-secondary); font-size: var(--fs-base-sm); }
+.field > label { font-size: 12px; font-weight: var(--fw-bold); text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
+.field.checkbox > label { font-size: 12px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.divider { display: flex; align-items: center; gap: 10px; margin: 4px 0 0; }
+.divider .eyebrow { color: var(--text-faint); }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.consent-error { margin-top: -8px; color: var(--danger-text); font-size: var(--fs-sm); }
 .submit { width: 100%; justify-content: center; }
 .center { text-align: center; margin: 0; }
+.center.caption { color: var(--text-faint); }
 @media (max-width: 520px) { .pair { grid-template-columns: 1fr; } .public-card { padding: 20px; } }
 </style>

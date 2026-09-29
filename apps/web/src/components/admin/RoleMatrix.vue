@@ -64,20 +64,20 @@ function cellLabel(role: string, permission: string): string {
 <style scoped>
 .matrix { width: 100%; border-collapse: collapse; font-size: var(--dm-text-sm); }
 .matrix th, .matrix td { border-bottom: 1px solid var(--dm-hairline); }
-.perm-col { text-align: left; vertical-align: bottom; font-size: var(--dm-text-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dm-muted); padding: 8px 12px 10px 0; }
+.perm-col { text-align: left; vertical-align: bottom; font-size: 10.5px; font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.06em; color: var(--dm-muted); padding: 8px 12px 10px 0; }
 .role-col { vertical-align: bottom; padding: 8px 4px 10px; min-width: 76px; }
 .role-col.selected, .cell.selected { background: var(--dm-neutral-soft); }
 .role-col.selected { border-radius: var(--dm-radius-sm) var(--dm-radius-sm) 0 0; }
-.role-head { border: 0; background: none; font: inherit; font-size: var(--dm-text-xs); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dm-muted); cursor: pointer; text-align: center; width: 100%; hyphens: auto; }
+.role-head { border: 0; background: none; font: inherit; font-size: 10.5px; font-weight: var(--fw-bold); text-transform: uppercase; letter-spacing: 0.04em; color: var(--dm-muted); cursor: pointer; text-align: center; width: 100%; hyphens: auto; }
 .role-col.selected .role-head { color: var(--dm-ink); }
 .perm { text-align: left; font-weight: 400; padding: 8px 12px 8px 0; min-width: 180px; }
 .cell { text-align: center; padding: 0; height: 40px; }
 .cell-btn { border: 0; background: none; width: 100%; height: 100%; min-height: 40px; cursor: pointer; display: grid; place-items: center; padding: 4px; }
 .cell.locked .cell-btn { cursor: not-allowed; }
 .cell.changed .cell-btn { box-shadow: inset 0 0 0 2px var(--dm-accent); border-radius: var(--dm-radius-sm); }
-.mark { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; }
-.mark.all { background: var(--dm-ok-soft); color: var(--dm-ok); }
-.mark.part { background: var(--dm-info-soft); color: var(--dm-info); }
+.mark { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 10px; }
+.mark.all { background: var(--success-bg); color: var(--success-text); }
+.mark.part { background: var(--warning-bg); color: var(--warning-text); }
 .own { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .own-label { font-size: 11px; color: var(--dm-muted); white-space: nowrap; }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dm-dot-idle); }

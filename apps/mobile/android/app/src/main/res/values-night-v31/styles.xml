@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Android 12+: системный сплэш рисует иконку приложения сам, и знак показывался дважды (иконка, потом заставка
-         Flutter). Иконку сплэша делаем прозрачной, фон — холст Палитры C (#16171D); знак собирает DarumenIntro. -->
+         Flutter). Иконку сплэша делаем прозрачной, фон — ночной холст синей гаммы (#0D1526); знак собирает DarumenIntro. -->
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowSplashScreenBackground">@color/darumen_canvas</item>
         <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>

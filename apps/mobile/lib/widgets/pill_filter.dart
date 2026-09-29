@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
-/// Пилюли-фильтры 44 px radius 999: активная ink/белый, остальные белые/ink; 14/500.
+/// Пилюли-фильтры 44 px radius 999 (доски m-worklist/m-decisions): активная — accent-soft/accent-strong,
+/// остальные — surface-sunken/text-secondary; 12/700.
 class PillFilter<T> extends StatelessWidget {
   const PillFilter({super.key, required this.items, required this.selected, required this.onChanged});
 
@@ -38,18 +39,18 @@ class Pill extends StatelessWidget {
       button: true,
       selected: selected,
       child: Material(
-        color: selected ? colors.accent : colors.card,
+        color: selected ? colors.accentSoft : colors.surfaceSunken,
         shape: const StadiumBorder(),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: Container(
             height: AppSizes.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             alignment: Alignment.center,
             child: Text(
               label,
-              style: theme.textTheme.labelMedium?.copyWith(fontSize: 14, letterSpacing: 0, color: selected ? colors.onAccent : colors.ink),
+              style: theme.textTheme.labelMedium?.copyWith(color: selected ? colors.accentHover : colors.muted),
             ),
           ),
         ),

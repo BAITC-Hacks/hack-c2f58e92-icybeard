@@ -19,11 +19,11 @@ const value = computed({ get: () => model.value ?? '', set: (v: string) => (mode
 </template>
 
 <style scoped>
-.filter-pill { background: var(--dm-surface) !important; border-radius: var(--dm-radius-pill) !important; min-height: 36px; max-width: 320px; }
-.filter-pill :deep(.p-select-label) { padding: 6px 2px 6px 16px; font-size: var(--dm-text-sm); font-weight: 500; }
+.filter-pill { background: var(--surface) !important; border: 1.5px solid var(--border) !important; border-radius: var(--radius-pill) !important; min-height: 36px; max-width: 320px; }
+.filter-pill :deep(.p-select-label) { padding: 5px 2px 5px 16px; font-size: var(--fs-base-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); }
 .filter-pill :deep(.p-select-dropdown) { width: 30px; padding-right: 6px; }
 .filter-pill :deep(.p-select-dropdown svg) { width: 11px; height: 11px; }
 .filter-pill.locked { opacity: 1; }
 .pill-value { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-.pill-current { font-weight: 500; }
+.pill-current { font-weight: var(--fw-bold); color: var(--text); }
 </style>

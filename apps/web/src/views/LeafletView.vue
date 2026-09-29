@@ -99,7 +99,7 @@ onMounted(async () => {
       </div>
       <div class="doc-actions no-print">
         <Button :label="t('shell.copyLink')" icon="pi pi-link" size="small" severity="secondary" @click="copyLink" />
-        <Button :label="t('shell.print')" icon="pi pi-print" size="small" severity="secondary" text @click="print" />
+        <Button :label="t('shell.print')" icon="pi pi-print" size="small" severity="secondary" @click="print" />
       </div>
       <ErrorBox :error="error" />
       <Skeleton v-if="loading" :lines="6" />
@@ -120,7 +120,7 @@ onMounted(async () => {
           <p class="caption">{{ t('leaflet.footer') }}</p>
         </section>
         <footer class="doc-foot">
-          <img v-if="qrDataUrl" :src="qrDataUrl" :alt="t('leaflet.qrCaption')" width="120" height="120" class="qr" />
+          <img v-if="qrDataUrl" :src="qrDataUrl" :alt="t('leaflet.qrCaption')" width="80" height="80" class="qr" />
           <div class="foot-text">
             <a :href="link" class="mono link">{{ link.replace(/^https?:\/\//, '') }}</a>
             <span class="caption">{{ t('leaflet.audioDeleted') }}</span>
@@ -134,30 +134,33 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* памятка (public-leaflet-new): документ radius 20 padding 32, номерные шаги 24 на --accent-soft */
 .leaflet { padding-block: 24px; }
-.doc { padding: 40px; display: flex; flex-direction: column; gap: 20px; font-size: var(--dm-text-base); line-height: 1.55; }
-.doc-brand { display: flex; align-items: center; gap: 12px; }
-.brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; letter-spacing: -0.02em; color: var(--dm-ink); }
+.doc { padding: 32px; border-radius: var(--radius-card-lg); display: flex; flex-direction: column; gap: 18px; font-size: 13px; line-height: 1.55; }
+.doc-brand { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.brand { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: var(--fw-extrabold); letter-spacing: -0.02em; color: var(--text); }
 .spacer { flex: 1; }
-.doc-head h1 { font-size: 29px; }
-.doc-head p { margin: 4px 0 0; font-size: var(--dm-text-md); }
-.doc-actions { display: flex; gap: 8px; }
-.what-next { background: var(--dm-ok-soft); color: var(--dm-ink); border-radius: var(--dm-radius-md); padding: 14px 16px; }
-.strong { font-weight: 500; }
-.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+.doc-brand .caption { color: var(--text-muted); }
+.doc-head h1 { font-size: 21px; }
+.doc-head p { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
+.doc-actions { display: flex; gap: 10px; }
+.what-next { background: var(--surface-info); color: var(--text); border-radius: var(--radius-lg); padding: 14px 16px; }
+.strong { font-weight: var(--fw-bold); }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .step { display: flex; gap: 14px; }
-.step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--dm-primary); color: var(--dm-primary-contrast); display: grid; place-items: center; font-size: var(--dm-text-sm); font-weight: 500; flex: none; }
-.step-body { display: flex; flex-direction: column; gap: 4px; }
-.step-title { font-weight: 500; }
-.step-text { white-space: pre-wrap; }
-.talked { border-top: 1px solid var(--dm-hairline); padding-top: 16px; }
-.talked-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.doc-foot { display: flex; gap: 20px; align-items: flex-start; border-top: 1px solid var(--dm-hairline); padding-top: 20px; }
-.qr { flex: none; border-radius: var(--dm-radius-sm); }
-.foot-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.link { word-break: break-all; font-size: var(--dm-text-sm); }
+.step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); display: grid; place-items: center; font-size: var(--fs-sm); font-weight: var(--fw-extrabold); flex: none; }
+.step-body { display: flex; flex-direction: column; gap: 2px; }
+.step-title { font-weight: var(--fw-bold); font-size: var(--fs-base); }
+.step-text { white-space: pre-wrap; color: var(--text-secondary); }
+.talked { border-top: 1px solid var(--border); padding-top: 14px; }
+.talked-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: var(--fw-bold); font-size: 13px; }
+.talked .caption { color: var(--text-muted); line-height: 1.5; }
+.doc-foot { display: flex; gap: 16px; align-items: flex-start; border-top: 1px solid var(--border); padding-top: 14px; }
+.qr { flex: none; border-radius: var(--radius-sm); }
+.foot-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.6; }
+.link { word-break: break-all; font-size: var(--fs-xs); }
 @media print {
   .no-print { display: none; }
-  .doc { padding: 0; }
+  .doc { padding: 0; box-shadow: none; border: 0; }
 }
 </style>

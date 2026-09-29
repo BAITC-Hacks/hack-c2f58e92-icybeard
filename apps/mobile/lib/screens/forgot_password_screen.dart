@@ -133,7 +133,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 }
 
-/// «Проверьте почту»: конверт в lavender-круге, заголовок 17/500, адрес и подсказка про «Спам». Пока почтовый сервер
+/// «Проверьте почту»: конверт в accent-soft круге, заголовок 15/800, адрес и подсказка про «Спам». Пока почтовый сервер
 /// недоступен — «Запрос принят», письмо на адрес не отправится, сменить пароль поможет администратор организации.
 class _SentCard extends StatelessWidget {
   const _SentCard({required this.email, required this.mailDown});
@@ -158,8 +158,8 @@ class _SentCard extends StatelessWidget {
                 Container(
                   width: AppSizes.iconButton,
                   height: AppSizes.iconButton,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: colors.aiSoft),
-                  child: Icon(Icons.mail_outline, size: 20, color: colors.ai),
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: colors.accentSoft),
+                  child: Icon(Icons.mail_outline, size: 20, color: colors.accentHover),
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(

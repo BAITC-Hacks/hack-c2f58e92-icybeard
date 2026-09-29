@@ -93,7 +93,7 @@ onMounted(() => Promise.all([consents.run(), log.run()]))
   <PageShell :title="t('account.consents.title')" :lead="subtitle">
     <AccountTabs />
     <div class="account-col">
-      <AppCard :title="t('account.consents.consentsTitle')">
+      <AppCard :title="t('account.consents.consentsTitle')" label>
         <template #header><span class="caption">{{ t('account.consents.revokeNote') }}</span></template>
         <AsyncState :loading="consents.loading.value" :error="consents.error.value" :empty="!consents.data.value?.items.length" skeleton="lines" :lines="3" :empty-title="t('account.consents.empty')" @retry="consents.run">
           <div class="rows">
@@ -111,7 +111,7 @@ onMounted(() => Promise.all([consents.run(), log.run()]))
         </AsyncState>
       </AppCard>
 
-      <AppCard :title="t('account.consents.logTitle')">
+      <AppCard :title="t('account.consents.logTitle')" label>
         <template v-if="auth.can('admin.users')" #header><RouterLink class="link-arrow small" to="/gov/audit">{{ t('account.consents.fullLog') }}</RouterLink></template>
         <AsyncState :loading="log.loading.value" :error="log.error.value" :empty="!log.data.value?.items.length" :lines="4" :empty-title="t('account.consents.logEmpty')" empty-icon="pi pi-eye" @retry="log.run">
           <div class="table-wrap">
@@ -127,12 +127,12 @@ onMounted(() => Promise.all([consents.run(), log.run()]))
         </AsyncState>
       </AppCard>
 
-      <AppCard :title="t('account.consents.myData')">
+      <AppCard :title="t('account.consents.myData')" label>
         <div class="buttons">
           <Button :label="t('account.consents.export')" severity="secondary" :loading="exporting" data-testid="export-csv" @click="exportCopy" />
           <Button :label="t('account.consents.requestDeletion')" severity="danger" data-testid="request-deletion" @click="confirmDelete = true" />
         </div>
-        <p class="caption">{{ t('account.consents.deletionNote') }}</p>
+        <p class="caption deletion-note">{{ t('account.consents.deletionNote') }}</p>
         <ErrorBox :error="actionError" />
       </AppCard>
     </div>
@@ -148,13 +148,21 @@ onMounted(() => Promise.all([consents.run(), log.run()]))
 </template>
 
 <style scoped>
-.account-col { display: flex; flex-direction: column; gap: 16px; max-width: 880px; }
+/* аккаунт (account-consents-new): колонка 880 по центру, карточки padding 24 */
+.page { max-width: 880px; }
+.card { padding: 24px; }
+.account-col { display: flex; flex-direction: column; gap: 16px; }
 .row-value { gap: 12px; }
-/* обязательное согласие: включено и заблокировано — фиолетовый ползунок, как на доске, а не «выключенный» серый */
+.row :deep(.row-sub) { color: var(--text-muted); }
+/* обязательное согласие: включено и заблокировано — синий ползунок с приглушением, как на доске */
 .row-value :deep(.p-toggleswitch.p-disabled.p-toggleswitch-checked) { opacity: 0.7; }
-.row-value :deep(.p-toggleswitch.p-disabled.p-toggleswitch-checked .p-toggleswitch-slider) { background: var(--dm-primary); border-color: var(--dm-primary); }
-.row-value :deep(.p-toggleswitch.p-disabled.p-toggleswitch-checked .p-toggleswitch-handle) { background: var(--dm-primary-contrast); }
+.row-value :deep(.p-toggleswitch.p-disabled.p-toggleswitch-checked .p-toggleswitch-slider) { background: var(--accent); border-color: var(--accent); }
+.row-value :deep(.p-toggleswitch.p-disabled.p-toggleswitch-checked .p-toggleswitch-handle) { background: var(--text-on-accent); }
 .nowrap { white-space: nowrap; }
 .buttons { display: flex; flex-wrap: wrap; gap: 12px; }
+/* danger-кнопка по components.md: мягкий фон --danger-bg и текст --danger-text */
+.buttons :deep(.p-button.p-button-danger) { background: var(--danger-bg); border-color: var(--danger-bg); color: var(--danger-text); }
+.buttons :deep(.p-button.p-button-danger:not(:disabled):hover) { background: var(--danger-bg); border-color: var(--danger-strong); color: var(--danger-text); }
+.deletion-note { margin: 12px 0 0; color: var(--text-faint); line-height: 1.5; }
 .dialog-text { margin: 0; line-height: 1.5; }
 </style>

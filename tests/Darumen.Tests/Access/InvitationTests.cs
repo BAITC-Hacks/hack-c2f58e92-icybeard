@@ -24,7 +24,7 @@ public sealed partial class InvitationTests(TestApp app) : IClassFixture<TestApp
         Assert.Equal([Roles.Doctor], app.Identity.RolesOf(created.UserId));
 
         var mail = app.Mail.LastTo("aigerim@clinic.kz");
-        Assert.Contains("#5B5BD6", mail.Html);
+        Assert.Contains("#2F6FE4", mail.Html);
         Assert.Contains("Принять приглашение", mail.Html);
         var token = TokenPattern().Match(mail.Text).Groups[1].Value;
 
