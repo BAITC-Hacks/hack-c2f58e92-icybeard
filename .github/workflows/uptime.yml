@@ -18,6 +18,8 @@ concurrency:
 
 jobs:
   check:
+    # только в основном репозитории: зеркало icybeard/gov-tech-camp-case не тратит минуты на те же проверки
+    if: github.repository == 'BAITC-Hacks/hack-c2f58e92-icybeard'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
