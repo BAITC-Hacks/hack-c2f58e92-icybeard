@@ -39,22 +39,77 @@ public sealed class AnalyticsEndpointTests(TestApp app) : IClassFixture<TestApp>
     [Fact]
     public async Task Anomalies_default_to_open_and_ack_changes_status()
     {
-        // кабинет организации (org.cabinet, scope own): только сигналы своей организации
+        // кабинет организации (org.cabinet, scope own): видит только сигналы своей организации, но закрыть не может —
+        // закрытие (ack) с 28.09.2026 доступно только регулятору (bug fix, было доступно любому с gov.map/org.cabinet).
         var client = app.CreateClient("org_admin", "chief-75", "75", "028B");
         var open = await client.GetFromJsonAsync<Paged<AnomalyDto>>("/api/v1/anomalies?regionKato=75");
         Assert.Single(open!.Items);
         Assert.Equal("a1", open.Items[0].Id);
         Assert.Equal("org a", open.Items[0].Entity["mo_key"]);
 
-        var ack = await client.PostAsJsonAsync("/api/v1/anomalies/a1/ack", new AckRequestDto("проверено, вспышка ОРВИ", null));
+        var regulator = app.CreateClient("regulator");
+        var ack = await regulator.PostAsJsonAsync("/api/v1/anomalies/a1/ack", new AckRequestDto("проверено, вспышка ОРВИ", null));
         Assert.Equal(HttpStatusCode.NoContent, ack.StatusCode);
         var after = await client.GetFromJsonAsync<Paged<AnomalyDto>>("/api/v1/anomalies?regionKato=75&status=acknowledged");
         Assert.Single(after!.Items);
         Assert.Equal("проверено, вспышка ОРВИ", after.Items[0].Comment);
         Assert.Contains(app.Analytics.Published.OfType<Darumen.Contracts.V1.DecisionRecorded>(), e => e.Subject == "anomaly" && e.DecisionId == "a1" && e.Chosen == "acknowledged");
-        Assert.Contains(app.Analytics.Commands, c => c.AnomalyId == "a1" && c.Actor == "chief-75" && c.Role == "org_admin" && c.RegionScope == "75" && c.MoScope == "028B");
+        Assert.Contains(app.Analytics.Commands, c => c.AnomalyId == "a1" && c.Role == "regulator");
 
-        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/v1/anomalies/zzz/ack", new AckRequestDto(null, null))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await regulator.PostAsJsonAsync("/api/v1/anomalies/zzz/ack", new AckRequestDto(null, null))).StatusCode);
+    }
+
+    /// <summary>Регрессия: раньше закрыть сигнал мог любой с gov.map/org.cabinet (в т.ч. org_admin своей же организации),
+    /// теперь — только регулятор. Просмотр (GET) у org_admin по-прежнему работает, меняется только ack.</summary>
+    [Fact]
+    public async Task Only_regulator_can_close_an_anomaly_even_in_its_own_organization()
+    {
+        var chief = app.CreateClient("org_admin", "chief-75", "75", "028B");
+        var response = await chief.PostAsJsonAsync("/api/v1/anomalies/a1/ack", new AckRequestDto("проверено", null));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.DoesNotContain(app.Analytics.Commands, c => c.AnomalyId == "a1");
+    }
+
+    /// <summary>Задача 9 плана прозрачности: регулятор с клеймом region_kato — региональный, тот же охват, что у
+    /// org_admin/doctor (RegionAccess.RegionScope). Без клейма (обычные тесты выше) регулятор по-прежнему национальный.
+    /// Заводит собственный сигнал ("a9", регион 75) и удаляет его в finally: a1/a2/a3 мутируют/читают соседние тесты
+    /// этого класса через общий InMemoryAnalytics (IClassFixture, один экземпляр на весь класс), а добавление ещё
+    /// одного "open"-сигнала в регион 75 насовсем сломало бы Assert.Single в Anomalies_default_to_open_and_ack_changes_status
+    /// и Anomalies_filter_by_mo_code_for_the_organisation_cabinet — поэтому сигнал существует только на время теста.</summary>
+    [Fact]
+    public async Task A_regional_regulator_is_scoped_to_their_own_region_like_org_admin_and_doctor()
+    {
+        var scratch = new AnomalyDto("a9", "er_visits_daily", new Dictionary<string, string> { ["region_kato"] = "75", ["mo_key"] = "org a9" },
+            "2025-03-17", 90, 35, 4.0, 3.5, "warning", "entity", "open", "75", null, "099Z");
+        app.Analytics.Anomalies.Add(scratch);
+        try
+        {
+            var regional = app.CreateClient("regulator", "regulator-75", "75");
+
+            // видит сигналы своего региона (в т.ч. свежедобавленный a9), даже если явно не фильтровать по региону в запросе
+            var seen = await regional.GetFromJsonAsync<Paged<AnomalyDto>>("/api/v1/anomalies");
+            Assert.All(seen!.Items, a => Assert.Equal("75", a.RegionKato));
+            Assert.Contains(seen.Items, a => a.Id == "a9");
+            Assert.DoesNotContain(seen.Items, a => a.Id is "a2" or "a3");
+
+            // запрос чужого региона в query не подменяет региональный клейм (тот же принцип, что в баге 1.1)
+            var foreignQuery = await regional.GetFromJsonAsync<Paged<AnomalyDto>>("/api/v1/anomalies?regionKato=10");
+            Assert.DoesNotContain(foreignQuery!.Items, a => a.Id is "a2" or "a3");
+
+            // закрыть сигнал чужого региона нельзя — 403, не 204 (не мутирует состояние — безопасно для других тестов)
+            var outOfScope = await regional.PostAsJsonAsync("/api/v1/anomalies/a2/ack", new AckRequestDto("проверено", null));
+            Assert.Equal(HttpStatusCode.Forbidden, outOfScope.StatusCode);
+            Assert.DoesNotContain(app.Analytics.Commands, c => c.AnomalyId == "a2");
+
+            // свой регион — можно
+            var inScope = await regional.PostAsJsonAsync("/api/v1/anomalies/a9/ack", new AckRequestDto("проверено регионально", null));
+            Assert.Equal(HttpStatusCode.NoContent, inScope.StatusCode);
+            Assert.Contains(app.Analytics.Commands, c => c.AnomalyId == "a9" && c.RegionScope == "75");
+        }
+        finally
+        {
+            app.Analytics.Anomalies.Remove(scratch);
+        }
     }
 
     [Fact]

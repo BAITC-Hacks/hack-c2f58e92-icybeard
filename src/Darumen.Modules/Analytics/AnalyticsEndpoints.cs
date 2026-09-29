@@ -95,6 +95,14 @@ public static class AnalyticsEndpoints
                 }
 
                 var user = CurrentUser.From(http);
+                // просматривать сигналы могут gov.map/org.cabinet, но закрывать (ack) — только регулятор (bug fix: раньше
+                // мог закрыть любой с этими правами, включая org_admin своей организации).
+                if (user.Role != Roles.Regulator)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Только регулятор",
+                        detail: "закрыть сигнал аномалии может только регулятор");
+                }
+
                 var command = new AnomalyAckCommand(id, status, body?.Comment, user.Actor, user.Role, RegionScope(user), scope.IsOwn ? scope.MoCode : null);
                 var outcome = await repository.AcknowledgeAsync(command,
                     () => new DecisionRecorded
