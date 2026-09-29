@@ -7,14 +7,15 @@
 | Ключ (realm role) | RU | KK | Особенности |
 |---|---|---|---|
 | `citizen` | Гражданин | Азамат | свой маршрут, клейм `iin` |
-| `doctor` | Врач ПМСП | МСАК дәрігері | клеймы `region_kato`, `mo_code` (если задан) |
+| `doctor` | Врач ПМСП | МСАК дәрігері | клеймы `region_kato`, `mo_code` (если задан), `profile_code` (задача 10 плана прозрачности, необязателен — привязка к отделению/профилю: с ним `/journal/worklist` сужен до одной очереди своей организации, без него — все профили организации, как раньше) |
 | `org_admin` | Администратор организации | Ұйым әкімшісі | обязателен клейм `mo_code`; заменяет прежнюю роль `chief` (главврач). Роль `chief` в токене трактуется как `org_admin` (legacy-алиас в `KeycloakRolesTransformation`) |
-| `regulator` | Регулятор (Минздрав) | Реттеуші (ДСМ) | вся страна |
-| `steward` | Стюард данных | Деректер стюарды | загрузки и качество данных |
+| `regulator` | Регулятор (Минздрав) | Реттеуші (ДСМ) | вся страна по умолчанию; с клеймом `region_kato` — региональный регулятор (тот же охват, что у `org_admin`/`doctor`: `/journal/worklist`, `/anomalies`, закрытие аномалии вне своего региона — 403) |
+| `steward` | Оператор данных | Деректер операторы | загрузки и качество данных (роль `steward` — прежнее название «Стюард данных»/«Деректер стюарды», переименовано в задаче 12 плана прозрачности; ключ роли и код разрешения `data.steward` не менялись) |
 | `auditor` | Аудитор | Аудитор | новая роль: журналы и аудит |
 | `admin` | Администратор системы | Жүйе әкімшісі | все разрешения, строка матрицы не редактируется |
+| `bed_manager` | Менеджер по койкам | Төсек-орын менеджері | задача 8 плана прозрачности: урезанная версия `org_admin` — только `worklist.view` (own) и `referral.confirm` (own), без кабинета организации/пользователей. **Не сидируется миграцией** — заводится администратором через `POST /admin/roles` + `PUT /admin/roles/bed_manager/permissions` (тот же общий механизм создания ролей, что и любая произвольная роль); `org_admin` затем может назначать её в своей организации (`PermissionCatalog.OrgAssignableRoles`). Существующих `org_admin` роль не трогает — это дополнительная, а не заменяющая роль |
 
-Демо-пользователи realm (пароль `darumen`): `citizen1`, `doctor1`, `chief1` (роль `org_admin`, `mo_code=028B`, имя пользователя сохранено для документации), `regulator1`, `steward1`, `auditor1`, `admin1`.
+Демо-пользователи realm (пароль `darumen`): `citizen1`, `doctor1` (`mo_code=028B`), `doctor2` (`mo_code=22GN` — второй врач другой организации, нужен, чтобы вживую пройти весь цикл направления: `doctor1`/`doctor2` отправляет — принимающая сторона подтверждает и выписывает — колокольчик отправившей стороне; без второго врача цепочка не проходит целиком, потому что `confirm`/`discharge` требует mo_code именно принимающей организации), `chief1` (роль `org_admin`, `mo_code=028B`, имя пользователя сохранено для документации), `regulator1`, `steward1`, `auditor1`, `admin1`. `bed_manager` — не в этом списке: её нужно один раз создать через `admin.roles`, затем через `admin.users` пригласить/назначить нужного сотрудника.
 
 ## Разрешения
 
@@ -25,7 +26,7 @@
 | `route.own` | Просмотр своего маршрута | all | all | own | — | — | — | all |
 | `wait.public` | Просмотр сроков ожидания (публично) | all | all | all | all | all | all | all |
 | `medicines.check` | Проверка рецепта | all | all | — | — | — | — | all |
-| `worklist.view` | Рабочий список пациентов | — | all | own | — | — | — | all |
+| `worklist.view` | Рабочий список пациентов | — | own | own | — | — | — | all |
 | `referral.assist` | Ассистент направления | — | all | — | — | — | — | all |
 | `referral.confirm` | Подтверждение направления | — | all | own | — | — | — | all |
 | `scribe.use` | AI-скрайб | — | all | — | — | — | — | all |
@@ -37,7 +38,9 @@
 | `org.cabinet` | Кабинет организации (обзор, направления и отказы) | — | — | own | all | — | — | all |
 | `admin.users` | Аудит и управление пользователями (пользователи, врачи, журнал аудита) | — | — | own | — | — | all | all |
 
-Системные разрешения — не показываются в матрице и не редактируются: `data.steward` (консоль стюарда, загрузка партий: steward, admin), `admin.orgs` (организации и заявки на регистрацию: regulator, admin), `admin.roles` (матрица ролей, создание ролей: admin). `wait.public` не снимается ни с одной роли; анонимные агрегаты ожидания остаются анонимными.
+`bed_manager` в этой таблице не показан — роль не сидируется миграцией и появляется в матрице только после того, как её создали через `admin.roles` (см. раздел «Роли» выше); тогда же в её строке появятся `worklist.view: own` и `referral.confirm: own`.
+
+Системные разрешения — не показываются в матрице и не редактируются: `data.steward` (консоль оператора данных, загрузка партий: steward, admin), `admin.orgs` (организации и заявки на регистрацию: regulator, admin), `admin.roles` (матрица ролей, создание ролей: admin). `wait.public` не снимается ни с одной роли; анонимные агрегаты ожидания остаются анонимными.
 
 Хранение: таблицы схемы `auth` (миграция EF): `roles(key, title_ru, title_kk, description_ru, description_kk, builtin, created_at)`, `role_permissions(role, permission, scope)`, `role_permission_changes(id, at, actor, role, permission, old_scope, new_scope, comment)`. Сид — матрица выше. Кэш разрешений в API — 30 с, сбрасывается при изменении. Каждое изменение пишется в `role_permission_changes` и в `journal.audit`.
 
@@ -62,7 +65,7 @@
 - `GET /me/notifications`, `PUT /me/notifications` `{ events: [{ code, inApp, email, sms, push }], quietFrom, quietTo, quietExceptRegulator, digest }` (событие `security` всегда включено).
 - `GET /me/consents`, `PUT /me/consents/{code}` `{ granted }` (коды `forecasts` — обязательное, `anonymized_stats`, `research_exports`); `GET /me/access-log` — кто и что смотрел по мне (из аудита); `GET /me/export` — CSV; `POST /me/deletion-request`.
 
-**Администрирование** (`admin.users` — пользователи, врачи; при `own` — только своя организация и назначение только `doctor`/`org_admin` в ней)
+**Администрирование** (`admin.users` — пользователи, врачи; при `own` — только своя организация и назначение только `doctor`/`org_admin`/`bed_manager` в ней — `PermissionCatalog.OrgAssignableRoles`)
 - `GET /admin/users?role&moCode&status&q&page&size` → строки `{ id, username, displayName, email, roles, moCode, moName, regionKato, lastActivity, status: active|invited|blocked, via: egov|password }` + сводка `{ active, invitedStale, blocked }`.
 - `GET /admin/users/{id}`; `PUT /admin/users/{id}` `{ role, moCode?, regionKato? }`; `POST /admin/users/{id}/block`; `POST /admin/users/{id}/unblock`.
 - `POST /admin/users/invite` `{ email, displayName, role, moCode?, regionKato? }` → пользователь в Keycloak (выключен до принятия), токен приглашения на 7 дней, письмо со ссылкой `/invite/{token}`; без SMTP ответ содержит `inviteUrl` для ручной передачи и `emailSent: false`.
@@ -88,7 +91,7 @@
 
 ## Клиенты
 
-- **Веб**: `useAuth().can(code)`, мета маршрута `permission`, меню строится из разрешений; при отказе — состояние «Нет доступа к разделу» с кнопкой «Запросить доступ» (`POST /me/access-requests`). Домашний экран — первый доступный: `admin.roles` → пользователи; `org.cabinet` + `mo_code` → кабинет своей организации; `worklist.view` → рабочий список; `data.steward` → консоль стюарда; `admin.users` → журнал аудита; `gov.map` → карта; `route.own` → «Мой путь».
+- **Веб**: `useAuth().can(code)`, мета маршрута `permission`, меню строится из разрешений; при отказе — состояние «Нет доступа к разделу» с кнопкой «Запросить доступ» (`POST /me/access-requests`). Домашний экран — первый доступный: `admin.roles` → пользователи; `org.cabinet` + `mo_code` → кабинет своей организации; `worklist.view` → рабочий список; `data.steward` → консоль оператора данных; `admin.users` → журнал аудита; `gov.map` → карта; `route.own` → «Мой путь».
 - **Мобилка**: тот же `/me`; shell врача при `worklist.view`, гражданина при `route.own`; остальные роли — экран «Кабинет доступен в веб-версии».
 - Проверки на клиенте — только UX: любое действие перепроверяется API, 403 от API показывается как «Нет доступа».
 - Гостевого режима нет: без входа открыты только страница входа, регистрация организации, приглашение и памятка по QR. Ссылка «Сроки ожидания без входа» с досок входа не переносится (гость убран 27.09.2026).
