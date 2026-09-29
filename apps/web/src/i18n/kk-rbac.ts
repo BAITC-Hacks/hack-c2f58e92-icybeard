@@ -2,15 +2,15 @@
 export const kkRbac = {
   roles: {
     citizen: 'Азамат', doctor: 'МСАК дәрігері', org_admin: 'Ұйым әкімшісі', regulator: 'Реттеуші (ДСМ)',
-    steward: 'Деректер стюарды', auditor: 'Аудитор', admin: 'Жүйе әкімшісі',
-    short: { citizen: 'Азамат', doctor: 'МСАК дәрігері', org_admin: 'Ұйым әкімшісі', regulator: 'Реттеуші', steward: 'Деректер стюарды', auditor: 'Аудитор', admin: 'Жүйе әкімшісі' },
+    steward: 'Деректер операторы', auditor: 'Аудитор', admin: 'Жүйе әкімшісі',
+    short: { citizen: 'Азамат', doctor: 'МСАК дәрігері', org_admin: 'Ұйым әкімшісі', regulator: 'Реттеуші', steward: 'Деректер операторы', auditor: 'Аудитор', admin: 'Жүйе әкімшісі' },
   },
   permissions: {
     route_own: 'Өз маршрутын қарау', wait_public: 'Күту мерзімдерін қарау (жария)', medicines_check: 'Рецептті тексеру',
     worklist_view: 'Пациенттердің жұмыс тізімі', referral_assist: 'Жолдама көмекшісі', referral_confirm: 'Жолдаманы растау',
     scribe_use: 'AI-скрайб', decisions_own: 'Шешімдер журналы (өзінікі)', decisions_all: 'Шешімдер журналы (барлығы)', gov_map: 'Өңірлер картасы және болжамдар',
     gov_simulator: '«Егер де» симуляторы', insight_ask: 'Деректерге сұрақтар (AI)', org_cabinet: 'Ұйым кабинеті',
-    admin_users: 'Аудит және пайдаланушыларды басқару', data_steward: 'Деректер стюардының консолі', admin_orgs: 'Ұйымдар және тіркелуге өтінімдер',
+    admin_users: 'Аудит және пайдаланушыларды басқару', data_steward: 'Деректер операторының консолі', admin_orgs: 'Ұйымдар және тіркелуге өтінімдер',
     admin_roles: 'Рөлдер мен қолжетімділік',
   },
   access: {

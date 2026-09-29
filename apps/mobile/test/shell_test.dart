@@ -91,7 +91,7 @@ void main() {
   });
 
   testWidgets('regulator, steward and auditor see «Кабинет доступен в веб-версии» with «Открыть веб» and «Выйти», no tabs', (tester) async {
-    for (final (role, title) in [('regulator', 'Регулятор (Минздрав)'), ('steward', 'Стюард данных'), ('auditor', 'Аудитор')]) {
+    for (final (role, title) in [('regulator', 'Регулятор (Минздрав)'), ('steward', 'Оператор данных'), ('auditor', 'Аудитор')]) {
       final router = await pumpApp(tester, roles: [role]);
       expect(router.routerDelegate.currentConfiguration.uri.path, '/web', reason: role);
       expect(find.text('Кабинет доступен в веб-версии'), findsOneWidget);

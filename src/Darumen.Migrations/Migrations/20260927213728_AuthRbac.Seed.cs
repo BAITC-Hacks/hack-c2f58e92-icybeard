@@ -14,7 +14,7 @@ public partial class AuthRbac
         ("doctor", "Врач ПМСП", "МСАК дәрігері", "Рабочий список, направления, AI-скрайб", "Жұмыс тізімі, жолдамалар, AI-скрайб"),
         ("org_admin", "Администратор организации", "Ұйым әкімшісі", "Кабинет и пользователи своей организации", "Өз ұйымының кабинеті мен пайдаланушылары"),
         ("regulator", "Регулятор (Минздрав)", "Реттеуші (ДСМ)", "Карта, прогнозы и симулятор по всей стране", "Бүкіл ел бойынша карта, болжамдар және симулятор"),
-        ("steward", "Стюард данных", "Деректер стюарды", "Загрузки и качество данных", "Деректерді жүктеу және сапасы"),
+        ("steward", "Оператор данных", "Деректер операторы", "Загрузки и качество данных", "Деректерді жүктеу және сапасы"),
         ("auditor", "Аудитор", "Аудитор", "Журналы решений и аудита", "Шешімдер мен аудит журналдары"),
         ("admin", "Администратор системы", "Жүйе әкімшісі", "Все разрешения; строка матрицы не редактируется", "Барлық рұқсаттар; матрица жолы өзгертілмейді"),
     ];
@@ -24,7 +24,7 @@ public partial class AuthRbac
         ("citizen", "route.own", "all"), ("citizen", "wait.public", "all"), ("citizen", "medicines.check", "all"),
 
         ("doctor", "route.own", "all"), ("doctor", "wait.public", "all"), ("doctor", "medicines.check", "all"),
-        ("doctor", "worklist.view", "all"), ("doctor", "referral.assist", "all"), ("doctor", "referral.confirm", "all"),
+        ("doctor", "worklist.view", "own"), ("doctor", "referral.assist", "all"), ("doctor", "referral.confirm", "all"),
         ("doctor", "scribe.use", "all"), ("doctor", "decisions.own", "all"),
 
         ("org_admin", "route.own", "own"), ("org_admin", "wait.public", "all"), ("org_admin", "worklist.view", "own"),

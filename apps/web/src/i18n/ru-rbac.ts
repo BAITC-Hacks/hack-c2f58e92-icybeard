@@ -2,15 +2,15 @@
 export const ruRbac = {
   roles: {
     citizen: 'Гражданин', doctor: 'Врач ПМСП', org_admin: 'Администратор организации', regulator: 'Регулятор (Минздрав)',
-    steward: 'Стюард данных', auditor: 'Аудитор', admin: 'Администратор системы',
-    short: { citizen: 'Гражданин', doctor: 'Врач ПМСП', org_admin: 'Админ. организации', regulator: 'Регулятор', steward: 'Стюард данных', auditor: 'Аудитор', admin: 'Админ. системы' },
+    steward: 'Оператор данных', auditor: 'Аудитор', admin: 'Администратор системы',
+    short: { citizen: 'Гражданин', doctor: 'Врач ПМСП', org_admin: 'Админ. организации', regulator: 'Регулятор', steward: 'Оператор данных', auditor: 'Аудитор', admin: 'Админ. системы' },
   },
   permissions: {
     route_own: 'Просмотр своего маршрута', wait_public: 'Просмотр сроков ожидания (публично)', medicines_check: 'Проверка рецепта',
     worklist_view: 'Рабочий список пациентов', referral_assist: 'Ассистент направления', referral_confirm: 'Подтверждение направления',
     scribe_use: 'AI-скрайб', decisions_own: 'Журнал решений (свои)', decisions_all: 'Журнал решений (все)', gov_map: 'Карта регионов и прогнозы',
     gov_simulator: 'Симулятор «что если»', insight_ask: 'Вопросы к данным (AI)', org_cabinet: 'Кабинет организации',
-    admin_users: 'Аудит и управление пользователями', data_steward: 'Консоль стюарда данных', admin_orgs: 'Организации и заявки на регистрацию',
+    admin_users: 'Аудит и управление пользователями', data_steward: 'Консоль оператора данных', admin_orgs: 'Организации и заявки на регистрацию',
     admin_roles: 'Роли и доступ',
   },
   access: {
