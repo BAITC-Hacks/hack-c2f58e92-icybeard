@@ -57,3 +57,6 @@ key.properties
 # Секреты стендов: по env-файлу на цель деплоя (infra/deploy/targets/*.env ссылаются на них) — только локально
 infra/deploy/.env.*
 !infra/deploy/.env.*.example
+
+# Демо-видео: материалы съёмки и монтажа живут только локально, в репозиторий не попадают
+docs/demo-video/
