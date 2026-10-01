@@ -140,35 +140,76 @@ public static class MeDataEndpoints
     {
         var user = CurrentUser.From(http);
         var settings = await account.SettingsAsync(user.UserId, ct);
-        var csv = new StringBuilder("section,field,value\n");
-        void Row(string section, string field, object? value) =>
-            csv.Append(Csv(section)).Append(',').Append(Csv(field)).Append(',').Append(Csv(Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture))).Append('\n');
+        var kk = settings?.Language == "kk";
+        string L(string ru, string kz) => kk ? kz : ru;
+        var zone = Zone(settings?.TimeZone);
+        string When(DateTimeOffset at) => TimeZoneInfo.ConvertTime(at, zone).ToString("dd.MM.yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture);
 
-        Row("profile", "actor", user.Actor);
-        Row("profile", "displayName", MeEndpoints.DisplayName(http.User, user.Actor));
-        Row("profile", "roles", string.Join(' ', user.Roles));
-        Row("profile", "moCode", user.MoCode);
-        Row("profile", "regionKato", user.RegionKato);
-        Row("profile", "iin", IinMask.Mask(user.Iin));
-        Row("profile", "phone", settings?.Phone);
-        Row("profile", "language", settings?.Language);
-        Row("profile", "timeZone", settings?.TimeZone);
+        // разделитель «;» и BOM: русский/казахский Excel открывает файл сразу по колонкам и в UTF-8
+        var csv = new StringBuilder();
+        void Row(string section, string field, string? value) =>
+            csv.Append(Csv(section)).Append(';').Append(Csv(field)).Append(';').Append(Csv(value)).Append("\r\n");
+
+        Row(L("Раздел", "Бөлім"), L("Поле", "Өріс"), L("Значение", "Мәні"));
+        var profile = L("Профиль", "Профиль");
+        Row(profile, L("Логин", "Логин"), user.Actor);
+        Row(profile, L("Имя", "Аты-жөні"), MeEndpoints.DisplayName(http.User, user.Actor));
+        Row(profile, L("Роли", "Рөлдер"), string.Join(", ", user.Roles));
+        Row(profile, L("Код организации", "Ұйым коды"), user.MoCode);
+        Row(profile, L("Регион (код КАТО)", "Өңір (ҚАТО коды)"), user.RegionKato);
+        Row(profile, L("ИИН (скрыт частично)", "ЖСН (ішінара жасырылған)"), IinMask.Mask(user.Iin));
+        Row(profile, L("Телефон", "Телефон"), settings?.Phone);
+        Row(profile, L("Язык интерфейса", "Интерфейс тілі"), (settings?.Language ?? AccountCatalog.Languages[0]) == "kk" ? "қазақша" : L("русский", "орысша"));
+        Row(profile, L("Часовой пояс", "Уақыт белдеуі"), settings?.TimeZone ?? AccountCatalog.DefaultTimeZone);
+
+        var consentSection = L("Согласие", "Келісім");
         foreach (var consent in Consents(await account.ConsentsAsync(user.UserId, ct)))
         {
-            Row("consent", consent.Code, consent.Granted);
+            var title = kk && !string.IsNullOrEmpty(consent.TitleKk) ? consent.TitleKk : consent.TitleRu;
+            Row(consentSection, title, consent.Granted ? L("да", "иә") : L("нет", "жоқ"));
         }
 
+        var decisionSection = L("Решение", "Шешім");
         foreach (var decision in (await decisions.ListAsync(user.Actor, null, null, 1, ExportLimit, ct)).Items)
         {
-            Row("decision", $"{decision.RecordedAt:O} {decision.Subject}", $"{decision.SubjectId}: {decision.Chosen?.GetRawText()} ({decision.Reason})");
+            var chosen = decision.Chosen?.GetRawText();
+            var text = string.Join("; ", new[]
+            {
+                $"{decision.Subject} {decision.SubjectId}".Trim(),
+                string.IsNullOrWhiteSpace(chosen) || chosen == "null" ? null : $"{L("выбор", "таңдау")}: {chosen}",
+                string.IsNullOrWhiteSpace(decision.Reason) ? null : $"{L("причина", "себебі")}: {decision.Reason}",
+            }.Where(x => !string.IsNullOrEmpty(x)));
+            Row(decisionSection, When(decision.RecordedAt), text);
         }
 
+        var requestSection = L("Действие в системе", "Жүйедегі әрекет");
         foreach (var entry in await activity.ByActorAsync(user.Actor, ExportLimit, ct))
         {
-            Row("request", entry.At.ToString("O"), $"{entry.Method} {entry.Path} {entry.Status}");
+            var verb = entry.Method.ToUpperInvariant() switch
+            {
+                "GET" => L("просмотр", "қарау"),
+                "POST" => L("отправка", "жіберу"),
+                "PUT" or "PATCH" => L("изменение", "өзгерту"),
+                "DELETE" => L("удаление", "жою"),
+                _ => entry.Method,
+            };
+            var result = entry.Status < 400 ? L("успешно", "сәтті") : L($"ошибка {entry.Status}", $"қате {entry.Status}");
+            Row(requestSection, When(entry.At), $"{verb}: {entry.Path} — {result}");
         }
 
         return csv.ToString();
+    }
+
+    private static TimeZoneInfo Zone(string? id)
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(string.IsNullOrWhiteSpace(id) ? AccountCatalog.DefaultTimeZone : id);
+        }
+        catch (Exception e) when (e is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.Utc;
+        }
     }
 
     private static string Csv(string? value)
@@ -180,7 +221,7 @@ public static class MeDataEndpoints
             text = "'" + text;
         }
 
-        return text.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? $"\"{text.Replace("\"", "\"\"")}\"" : text;
+        return text.IndexOfAny([';', ',', '"', '\n', '\r']) >= 0 ? $"\"{text.Replace("\"", "\"\"")}\"" : text;
     }
 
     private static string? Normalize(string? phone) => string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();

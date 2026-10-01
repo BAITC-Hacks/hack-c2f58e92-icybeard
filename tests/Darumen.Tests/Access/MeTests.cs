@@ -122,8 +122,9 @@ public sealed class MeTests(TestApp app) : IClassFixture<TestApp>
         var export = await Doctor.GetAsync("/api/v1/me/export");
         Assert.Equal("text/csv", export.Content.Headers.ContentType!.MediaType);
         var csv = await export.Content.ReadAsStringAsync();
-        Assert.Contains("profile,actor,doctor1", csv);
-        Assert.Contains("consent,forecasts,True", csv);
+        Assert.Contains("Раздел;Поле;Значение", csv);
+        Assert.Contains("Профиль;Логин;doctor1", csv);
+        Assert.Contains("Согласие;Использование моих данных для прогноза сроков ожидания (обязательное);да", csv);
 
         Assert.Equal(HttpStatusCode.Accepted, (await Doctor.PostAsJsonAsync("/api/v1/me/deletion-request", new DeletionRequestDto("больше не работаю"))).StatusCode);
         Assert.Contains(app.Accounts.Requests, r => r.Kind == AccountRequestKinds.Deletion && r.Actor == "doctor1");
