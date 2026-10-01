@@ -180,3 +180,157 @@ def test_llm_drafter_falls_back_to_empty_spans_for_old_plain_string_sections(mon
     assert draft.model == "deepseek/deepseek-chat"
     by_name = {s.name: s for s in draft.sections}
     assert by_name["Жалобы"].text == "Кашель." and by_name["Жалобы"].spans == []
+
+
+class _Silent:
+    name = "silent"
+    state = "ready"
+    error = None
+
+    def transcribe(self, audio, language):
+        return []
+
+
+class _Loading:
+    name = "loading"
+    state = "loading"
+    error = None
+
+    def transcribe(self, audio, language):
+        from darumen.scribe.transcribe import TranscriberUnavailable
+
+        raise TranscriberUnavailable("модель распознавания речи ещё загружается")
+
+
+class _Broken:
+    name = "broken"
+    state = "ready"
+    error = None
+
+    def transcribe(self, audio, language):
+        raise ValueError("Invalid data found when processing input")
+
+
+def _upload(api):
+    session_id = api.post("/scribe/sessions", json={"consent": True, "language": "ru", "patientRef": "SYN-75-028B-381-03"}).json()["sessionId"]
+    return session_id, api.post(f"/scribe/sessions/{session_id}/audio", files={"file": ("a.webm", b"\x1a\x45\xdf\xa3x", "audio/webm")})
+
+
+def test_audio_errors_are_explained_and_audio_is_not_kept(tmp_path):
+    for transcriber, status, words in ((_Silent(), 422, "речь не распознана"), (_Loading(), 503, "загружается"), (_Broken(), 422, "не удалось распознать запись")):
+        store = SessionStore(tmp_path / transcriber.name)
+        api = TestClient(create_app(store, transcriber, RuleDrafter()))
+        _, response = _upload(api)
+        assert response.status_code == status
+        body = response.json()
+        assert body["title"] == "Скрайб" and words in body["detail"]
+        assert not list((store.root / "audio").iterdir())  # неудачная запись не остаётся на диске
+    assert TestClient(create_app(SessionStore(tmp_path / "h"), _Loading(), RuleDrafter())).get("/scribe/health").json()["transcriberState"] == "loading"
+
+
+def test_typed_transcript_splits_sentences_on_any_ending_and_keeps_decimals(tmp_path):
+    api, _ = client(tmp_path)
+    session_id = api.post("/scribe/sessions", json={"consent": True}).json()["sessionId"]
+    result = api.post(f"/scribe/sessions/{session_id}/transcript", json={"text": "Болит голова? Температура 37.5 два дня!\nНазначаю парацетамол 500 мг"}).json()
+    assert [s["text"] for s in result["transcript"]] == ["Болит голова?", "Температура 37.5 два дня!", "Назначаю парацетамол 500 мг."]
+
+
+def test_session_survives_a_restart_and_can_be_resumed(tmp_path):
+    store = SessionStore(tmp_path / "scribe")
+    api = TestClient(create_app(store, FakeTranscriber(), RuleDrafter()))
+    session_id = api.post("/scribe/sessions", json={"consent": True, "patientRef": "SYN-75-028B-381-03"}).json()["sessionId"]
+    api.post(f"/scribe/sessions/{session_id}/transcript", json={"text": "Жалобы на кашель. Назначаю обильное питьё."})
+    api.post(f"/scribe/sessions/{session_id}/draft")
+
+    # новый процесс сервиса: сессия читается с диска, стенограмма и черновик на месте
+    restarted = TestClient(create_app(SessionStore(tmp_path / "scribe"), FakeTranscriber(), RuleDrafter()))
+    state = restarted.get(f"/scribe/sessions/{session_id}").json()
+    assert state["approved"] is False and len(state["transcript"]) == 2
+    assert state["draft"]["sections"] and state["draft"]["patientLeaflet"]["text"]
+    assert restarted.get("/scribe/sessions/nope").status_code == 404
+
+
+class _Corrector(RuleDrafter):
+    """Черновик по правилам и исправление терминов без сети: правдоподобная и непохожая (пересказ) правки."""
+
+    def __init__(self):
+        self.terms = None
+
+    def correct(self, texts, terms, language):
+        self.terms = terms
+        return {0: "Назначаю амлодипин 5 мг."}
+
+
+def test_doctor_edits_a_phrase_and_can_revert_it(tmp_path):
+    api, store = client(tmp_path)
+    session_id = api.post("/scribe/sessions", json={"consent": True}).json()["sessionId"]
+    api.post(f"/scribe/sessions/{session_id}/transcript", json={"text": "Назначаю амла дипин 5 мг. Контроль через неделю."})
+
+    edited = api.post(f"/scribe/sessions/{session_id}/segments/0", json={"text": "Назначаю амлодипин 5 мг."}).json()["transcript"]
+    assert edited[0] == {"t0": 0.0, "t1": 4.0, "text": "Назначаю амлодипин 5 мг.", "original": "Назначаю амла дипин 5 мг.", "source": "doctor"}
+    assert "original" not in edited[1]
+    assert SessionStore(store.root).get(session_id).transcript[0]["source"] == "doctor"  # правка сохранена на диск
+
+    reverted = api.post(f"/scribe/sessions/{session_id}/segments/0", json={"text": "Назначаю амла дипин 5 мг."}).json()["transcript"]
+    assert reverted[0] == {"t0": 0.0, "t1": 4.0, "text": "Назначаю амла дипин 5 мг."}
+    assert api.post(f"/scribe/sessions/{session_id}/segments/9", json={"text": "x"}).status_code == 404
+
+
+def test_ai_correction_marks_fixed_phrases_and_uses_dictionary_candidates(tmp_path):
+    from darumen.scribe.vocabulary import Vocabulary
+
+    corrector, vocab = _Corrector(), Vocabulary(tmp_path / "scribe")
+    api = TestClient(create_app(SessionStore(tmp_path / "scribe"), FakeTranscriber(), corrector, vocab))
+    session_id = api.post("/scribe/sessions", json={"consent": True}).json()["sessionId"]
+    assert api.post(f"/scribe/sessions/{session_id}/correct").status_code == 409
+    api.post(f"/scribe/sessions/{session_id}/transcript", json={"text": "Назначаю амладипин 5 мг. Гипертоническая болесь."})
+
+    result = api.post(f"/scribe/sessions/{session_id}/correct").json()
+    assert result["changed"] == 1
+    assert result["transcript"][0] == {"t0": 0.0, "t1": 4.0, "text": "Назначаю амлодипин 5 мг.", "original": "Назначаю амладипин 5 мг.", "source": "ai"}
+    assert "амлодипин" in corrector.terms and "гипертоническая болезнь" in corrector.terms
+
+    # без языковой модели исправляет словарь и честно говорит, что ИИ недоступен
+    plain = TestClient(create_app(SessionStore(tmp_path / "other"), FakeTranscriber(), RuleDrafter()))
+    sid = plain.post("/scribe/sessions", json={"consent": True}).json()["sessionId"]
+    plain.post(f"/scribe/sessions/{sid}/transcript", json={"text": "Диагноз острый бронхит. Назначаю амоксицелин."})
+    fixed = plain.post(f"/scribe/sessions/{sid}/correct").json()
+    assert fixed["changed"] == 1 and fixed["aiError"]
+    assert fixed["transcript"][1] == {"t0": 4.0, "t1": 8.0, "text": "Назначаю амоксициллин.", "original": "Назначаю амоксицелин.", "source": "dictionary"}
+
+
+def test_dictionary_fixes_misspelled_terms_but_keeps_word_endings():
+    from darumen.scribe.vocabulary import Vocabulary
+
+    v = Vocabulary()
+    fixes = v.fix_by_dictionary(["Назначаю амоксицелин и метаформин.", "Острого бронхита и гипертонической болезни нет.", "Пациент пришёл утром."], "ru")
+    assert fixes == {0: "Назначаю амоксициллин и метформин."}
+    groups = v.builtin_groups()
+    assert any(g["name"] == "Лекарства" and "амлодипин" in g["terms"] for g in groups)
+    assert sum(len(g["terms"]) for g in groups) == v.builtin_count()
+
+
+def test_llm_correction_keeps_only_plausible_fixes(monkeypatch):
+    from darumen.scribe.draft import LlmDrafter, plausible_fix
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    _mock_llm_response(monkeypatch, '{"segments": [{"i": 0, "text": "Назначаю амлодипин 5 мг."}, '
+                                    '{"i": 1, "text": "Совершенно другой пересказ всего приёма врачом целиком"}, {"i": 7, "text": "x"}]}')
+    fixes = LlmDrafter(provider="deepseek").correct(["Назначаю амладипин 5 мг.", "Контроль через неделю."], ["амлодипин"], "ru")
+    assert fixes == {0: "Назначаю амлодипин 5 мг."}
+    assert plausible_fix("гипертоническая болесь", "гипертоническая болезнь")
+    assert not plausible_fix("Контроль через неделю.", "Пациент здоров, наблюдение не требуется, всё хорошо.")
+
+
+def test_clinic_vocabulary_is_saved_and_goes_into_the_speech_prompt(tmp_path):
+    from darumen.scribe.vocabulary import Vocabulary
+
+    api = TestClient(create_app(SessionStore(tmp_path / "scribe"), FakeTranscriber(), RuleDrafter(), Vocabulary(tmp_path / "scribe")))
+    assert api.get("/scribe/vocabulary").json()["builtIn"] > 300
+    saved = api.post("/scribe/vocabulary", json={"words": [" Нолипрел ", "нолипрел", "", "Конкор"]}).json()
+    assert saved["words"] == ["Нолипрел", "Конкор"]
+
+    again = Vocabulary(tmp_path / "scribe")  # после перезапуска
+    assert again.custom == ["Нолипрел", "Конкор"]
+    assert "Нолипрел" in again.prompt("ru") and len(again.prompt("ru")) <= 600
+    assert "амлодипин" in again.candidates(["назначаю амладипин"], "ru")

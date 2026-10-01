@@ -2,6 +2,7 @@
 uses DeepSeek (or another OpenAI-compatible API) when its key is set and falls back to the rules on any failure."""
 from __future__ import annotations
 
+import difflib
 import json
 import os
 import re
@@ -69,6 +70,17 @@ class RuleDrafter:
         return Draft(sections, leaflet, self.name)
 
 
+class CorrectionUnavailable(RuntimeError):
+    """Исправить стенограмму через ИИ сейчас нельзя: модель не настроена или не ответила."""
+
+
+def plausible_fix(old: str, new: str) -> bool:
+    """Правка похожа на исправление терминов, а не на пересказ: длина почти та же, текст в основном совпадает."""
+    if not new or not (0.6 <= len(new) / max(len(old), 1) <= 1.6):
+        return False
+    return difflib.SequenceMatcher(None, old.lower(), new.lower()).ratio() >= 0.55
+
+
 class LlmDrafter:
     """A chat model structures the transcript through an OpenAI-compatible API (DeepSeek by default);
     output is validated JSON, otherwise the rules take over. Nothing is sent without an API key."""
@@ -119,23 +131,54 @@ class LlmDrafter:
             return Section(name, text, spans)
         return Section(name, str(raw).strip())
 
+    def _chat(self, system: str, user: str, max_tokens: int) -> dict:
+        """Один запрос к модели с ответом-JSON; исключение — если модель недоступна или ответ не JSON."""
+        from openai import OpenAI
+
+        client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=float(os.environ.get("DARUMEN_LLM_TIMEOUT", "180")), max_retries=0)
+        effort = os.environ.get("DARUMEN_LLM_REASONING", "none" if self._provider == "ollama" else "")
+        completion = client.chat.completions.create(
+            model=self._model, temperature=0, max_tokens=max_tokens, response_format={"type": "json_object"},
+            messages=[{"role": "system", "content": system + ("\n/no_think" if self._provider == "ollama" else "")},
+                      {"role": "user", "content": user}],
+            **({"extra_body": {"reasoning_effort": effort}} if effort else {}))
+        content = self.THINK.sub("", completion.choices[0].message.content or "")
+        return json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
+
+    CORRECT_PROMPT = (
+        "Ты проверяешь стенограмму приёма врача, распознанную из речи. Исправь только слова, которые распознавание "
+        "исказило: названия лекарств, болезней, анализов, анатомии, медицинские термины — и явные опечатки рядом с ними. "
+        "Если подходит, бери написание из списка терминов. Не меняй смысл, не пересказывай, не добавляй и не удаляй "
+        "фразы, не трогай фрагменты без ошибок. Стенограмма дана построчно с индексом фрагмента в квадратных скобках. "
+        'Ответь только JSON вида {"segments": [{"i": 0, "text": "исправленный фрагмент целиком"}]} — только '
+        'изменённые фрагменты; если ошибок нет, {"segments": []}.'
+    )
+
+    def correct(self, texts: list[str], terms: list[str], language: str) -> dict[int, str]:
+        """Исправленные фрагменты {индекс: текст}; только правдоподобные правки (см. plausible_fix)."""
+        if not self.available():
+            raise CorrectionUnavailable("исправление через ИИ не настроено: нет доступа к языковой модели")
+        transcript = "\n".join(f"[{i}] {t}" for i, t in enumerate(texts))
+        user = (f"Язык: {language}.\nТермины: {', '.join(terms) if terms else '—'}\nСтенограмма:\n{transcript}")
+        try:
+            payload = self._chat(self.CORRECT_PROMPT, user, max_tokens=200 + 2 * sum(len(t) for t in texts))
+        except Exception as exc:  # noqa: BLE001 - модель не запущена, таймаут, не JSON
+            raise CorrectionUnavailable(f"языковая модель не ответила ({type(exc).__name__}) — исправьте фразы вручную") from exc
+        fixes: dict[int, str] = {}
+        for item in payload.get("segments") or []:
+            if not isinstance(item, dict):
+                continue
+            i, text = item.get("i"), str(item.get("text", "")).strip()
+            if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(texts) and text != texts[i] and plausible_fix(texts[i], text):
+                fixes[i] = text
+        return fixes
+
     def draft(self, segments: list[Segment], language: str) -> Draft:
         if not self.available():
             return self._fallback.draft(segments, language)
         try:
-            from openai import OpenAI
-
             transcript = "\n".join(f"[{i}] [{s.t0:.0f}-{s.t1:.0f}] {s.text}" for i, s in enumerate(segments))
-            client = OpenAI(api_key=self._api_key, base_url=self._base_url, timeout=float(os.environ.get("DARUMEN_LLM_TIMEOUT", "180")), max_retries=0)
-            system = self.PROMPT + ("\n/no_think" if self._provider == "ollama" else "")
-            effort = os.environ.get("DARUMEN_LLM_REASONING", "none" if self._provider == "ollama" else "")
-            completion = client.chat.completions.create(
-                model=self._model, temperature=0, max_tokens=1200, response_format={"type": "json_object"},
-                messages=[{"role": "system", "content": system},
-                          {"role": "user", "content": f"Язык памятки: {language}. Стенограмма:\n{transcript}"}],
-                **({"extra_body": {"reasoning_effort": effort}} if effort else {}))
-            content = self.THINK.sub("", completion.choices[0].message.content or "")
-            payload = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
+            payload = self._chat(self.PROMPT, f"Язык памятки: {language}. Стенограмма:\n{transcript}", max_tokens=1200)
             sections = [self._section(name, payload["sections"].get(name, ""), segments) for name in SECTIONS[:-1]]
             return Draft([s for s in sections if s.text], str(payload["leaflet"]).strip(), self.name)
         except Exception:  # noqa: BLE001 - демо: любая ошибка модели означает черновик по правилам
