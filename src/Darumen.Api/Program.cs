@@ -24,7 +24,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 builder.Services.AddDarumenForwardedHeaders(builder.Configuration); // адрес клиента за Caddy и nginx стенда
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgres");
 builder.Services.AddOutputCache();
 builder.Services.AddReverseProxy().LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>

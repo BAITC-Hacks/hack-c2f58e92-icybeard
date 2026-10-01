@@ -17,6 +17,12 @@ public static class AuthSetup
     {
         var options = configuration.GetSection(AuthOptions.Section).Get<AuthOptions>() ?? new AuthOptions();
         var headers = string.Equals(options.Mode, AuthOptions.HeadersMode, StringComparison.OrdinalIgnoreCase);
+        if (headers && string.Equals(configuration["ASPNETCORE_ENVIRONMENT"] ?? configuration["DOTNET_ENVIRONMENT"], "Production", StringComparison.OrdinalIgnoreCase))
+        {
+            // в проде доверять заголовкам X-Actor/X-Role нельзя: любой клиент назвался бы администратором
+            throw new InvalidOperationException("Auth:Mode=headers недопустим в Production — используйте keycloak");
+        }
+
         var authentication = services.AddAuthentication(headers ? HeaderAuthenticationHandler.Scheme : JwtBearerDefaults.AuthenticationScheme);
         if (headers)
         {

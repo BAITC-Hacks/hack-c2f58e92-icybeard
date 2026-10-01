@@ -138,11 +138,13 @@ class WhisperTranscriber:
 
 
 class FakeTranscriber:
-    """Returns a fixed transcript; used in tests and when faster-whisper is not installed."""
+    """Фиксированная стенограмма для тестов и демонстрации интерфейса без модели. Включается только явно
+    (DARUMEN_SCRIBE_FAKE=1): раньше подставлялась молча, когда faster-whisper не установлен, и любое аудио
+    превращалось в заготовленный текст без предупреждения врачу."""
 
     name = "fake"
     state = "ready"
-    error = None
+    error = "DARUMEN_SCRIBE_FAKE=1: стенограмма — заготовка, а не распознавание"
 
     def __init__(self, text: str = "Пациент жалуется на боль в груди при нагрузке. Давление 150 на 95. Диагноз гипертоническая болезнь. Назначаю амлодипин 5 мг утром."):
         self._text = text
@@ -152,12 +154,26 @@ class FakeTranscriber:
         return [Segment(float(i * 4), float(i * 4 + 4), s + ".") for i, s in enumerate(sentences)]
 
 
+class MissingTranscriber:
+    """faster-whisper не установлен: статус «error» в /scribe/status и понятная ошибка вместо подмены текста."""
+
+    name = "missing"
+    state = "error"
+    error = "faster-whisper не установлен (make venv-scribe или образ с SCRIBE_EXTRAS); для демонстрации без модели — DARUMEN_SCRIBE_FAKE=1"
+
+    def transcribe(self, audio: Path, language: str) -> list[Segment]:
+        raise TranscriberUnavailable(self.error)
+
+
 def default_transcriber() -> Transcriber:
+    import os
+
+    if os.environ.get("DARUMEN_SCRIBE_FAKE") == "1":
+        return FakeTranscriber()
     try:
         import faster_whisper  # noqa: F401
     except ImportError:
-        return FakeTranscriber()
+        return MissingTranscriber()
     # в контейнере GPU нет: CPU и int8 явно, без автоопределения устройства; размер модели — DARUMEN_WHISPER_MODEL
-    import os
 
     return WhisperTranscriber(os.environ.get("DARUMEN_WHISPER_MODEL", "large-v3-turbo"), os.environ.get("DARUMEN_WHISPER_DEVICE", "cpu"))
