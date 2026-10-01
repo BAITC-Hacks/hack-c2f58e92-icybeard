@@ -44,9 +44,10 @@ Darumen закрывает эти разрывы одним ML‑ядром на
 |---|---|---|
 | `citizen1` | Гражданин | Мой путь |
 | `doctor1` | Врач ПМСП, МО 028B | Рабочий список |
+| `doctor2` | Врач ПМСП, МО 22GN — принимающая сторона для проверки перевода | Рабочий список |
 | `chief1` | Администратор организации, МО 028B | Кабинет организации |
 | `regulator1` | Регулятор | Карта регионов |
-| `steward1` | Стюард данных | Консоль загрузки |
+| `steward1` | Оператор данных | Консоль оператора данных |
 | `auditor1` | Аудитор | Журнал аудита |
 | `admin1` | Администратор платформы | Пользователи и роли |
 
@@ -232,6 +233,8 @@ make up                                         # API :8000, модели :50051
 
 Веб — http://localhost:3000 (вход через Keycloak, пользователи выше). Письма Keycloak в dev ловит Mailpit — http://localhost:8025. Документация API — http://localhost:8000/scalar. Логи — `make logs`, остановка — `make down`.
 
+**Windows** (нет `make`, Python из `ml/.venv/bin`): те же шаги прямыми командами `docker compose --env-file .env -f infra/docker-compose.yml …` — пошагово, с переустановкой с нуля, малым набором данных (`--max-parts 1`, сотни МБ вместо ~113 ГБ), тестовыми маршрутами (`scripts/dev/seed_routes.py`) и сценариями проверки — в [docs/test-scenarios.md](docs/test-scenarios.md). Тесты на Windows — `test.cmd` (всё в контейнере SDK).
+
 ## Разработка
 
 | Команда | Что делает |
@@ -295,7 +298,7 @@ make publish         # витрины gold и refdata в Postgres и ClickHouse,
 
 - **Без диагнозов и медицинских советов** (ТЗ §11): только логистика госпитализации — сроки, стадии, чек-лист по датам.
 - **Человек принимает решение** (ТЗ §10.1): модель подсказывает, врач решает, каждое решение пишется в журнал.
-- **Персональные данные** (ТЗ §10.2): ИИН показывается маской и хранится хэшем, в журналы не пишется.
+- **Персональные данные** (ТЗ §10.2): ИИН показывается маской и в журналы не пишется; в учётной записи Keycloak и в клейме токена он лежит открытым — для внедрения нужен хэш в токене и eGov-вход (см. [test-scenarios §5](docs/test-scenarios.md)).
 - **Честные статусы внешних сервисов:** почта (SMTP), push и SMS пока не подключены, адрес eGov mobile (Smart Bridge) не предоставлен — интерфейсы показывают это по `GET /api/v1/public/service-status`.
 - **Каждое число с меткой происхождения:** ML‑модель, формула или AI‑черновик.
 
@@ -326,6 +329,6 @@ DataSets/       локальные данные (в .gitignore)
 | Данные | [data-catalog](docs/data-catalog.md), [data-intake](docs/data-intake.md), [gold-schemas](docs/gold-schemas.md), [data-requests](docs/data-requests.md), [access-index](docs/access-index.md), [model-cards](docs/model-cards/) |
 | Архитектура | [architecture](docs/architecture.md), [tech-stack](docs/tech-stack.md), [api](docs/api.md), [rbac](docs/rbac.md), [egov-auth](docs/egov-auth.md) |
 | Дизайн | [design-system](docs/design-system.md), [screen-design](docs/screen-design.md), [design-references](docs/design-references.md) |
-| Демо и защита | [demo-pages](docs/demo-pages.md), [demo-script](docs/demo-script.md), [presentation](docs/presentation.md), [pre-defense-checklist](docs/pre-defense-checklist.md) |
+| Демо и защита | [demo-pages](docs/demo-pages.md), [demo-script](docs/demo-script.md), [presentation](docs/presentation.md), [pre-defense-checklist](docs/pre-defense-checklist.md), [test-scenarios](docs/test-scenarios.md) — переустановка, тестовые данные, сценарии врача и гражданина, итоги ревью |
 | Эксплуатация | [deploy](docs/deploy.md) |
 | Исходные | [tz](docs/tz.md) — техническое задание организаторов |

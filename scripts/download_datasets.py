@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import argparse
 import csv
-import fcntl
+try:
+    import fcntl  # POSIX: защита от второго скачивания в ту же папку
+except ImportError:  # Windows
+    fcntl = None
 import hashlib
 import json
 import subprocess
@@ -141,6 +144,8 @@ def fetch(title: str, url: str, base: Path, verify_only: bool) -> str:
 
 def acquire_lock(base: Path):
     lock = (base / ".download.lock").open("w")
+    if fcntl is None:
+        return lock
     try:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
@@ -155,6 +160,8 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--max-parts", type=int, default=0,
+                        help="скачать только первые N частей каждого набора (малый стенд: --max-parts 1 — сотни МБ вместо ~113 ГБ)")
     args = parser.parse_args()
     if args.list or not args.datasets:
         for alias, dataset_id in DATASETS.items():
@@ -166,6 +173,8 @@ def main() -> int:
     for name in args.datasets:
         dataset_id = DATASETS.get(name, name)
         title, urls = registry(dataset_id)
+        if args.max_parts > 0:
+            urls = urls[: args.max_parts]
         print(f"### {title}: {len(urls)} parts", flush=True)
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
             for line in pool.map(lambda u: fetch(title, u, base, args.verify_only), urls):
