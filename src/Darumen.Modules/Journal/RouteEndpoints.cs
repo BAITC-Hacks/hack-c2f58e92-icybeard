@@ -377,12 +377,20 @@ public static class RouteEndpoints
     /// такой врач решает за больницу пациента, после — за принимающую. Без referral.confirm — только просмотр.</summary>
     private static async Task<RouteSide> DoctorSideAsync(HttpContext http, RouteProgress progress)
     {
-        var side = progress.SideOf(RouteAudience.Doctor, CurrentUser.From(http).MoCode);
+        var user = CurrentUser.From(http);
+        var side = progress.SideOf(RouteAudience.Doctor, user.MoCode);
         if (side != RouteSide.None)
         {
             return await OrgAccess.CheckAsync(http, null, Permissions.ReferralConfirm) is null ? side : RouteSide.None;
         }
 
+        if (!string.IsNullOrWhiteSpace(user.MoCode))
+        {
+            // сотрудник другой больницы — не сторона этого маршрута, даже если его разрешение referral.confirm без ограничений
+            return RouteSide.None;
+        }
+
+        // без своей организации (администратор системы) — действует за ответственную больницу
         var responsible = progress.TransferConfirmed ? progress.ResponsibleMoCode : progress.OriginMoCode;
         if (await OrgAccess.CheckAsync(http, responsible, Permissions.ReferralConfirm) is not null)
         {
@@ -418,8 +426,11 @@ public static class RouteEndpoints
         }
 
         var states = await worklist.QueueStatesAsync(region, ct);
+        // закрепление только по собственным действиям гражданина (роль citizen): решения врача по чужим пациентам
+        // не должны делать «Моим путём» чужой маршрут
         if (http.RequestServices.GetService<IDecisionRepository>() is { } decisions
-            && (await decisions.ListAsync(user.Actor, DecisionSubjects.Route, null, 1, 1, ct)).Items.FirstOrDefault() is { } last
+            && (await decisions.ListAsync(user.Actor, DecisionSubjects.Route, null, 1, 5, ct)).Items
+                .FirstOrDefault(d => string.Equals(d.Role, RouteAudience.Citizen, StringComparison.OrdinalIgnoreCase)) is { } last
             && RoutePatientRef.TryParse(last.SubjectId, out var pinned) && pinned!.RegionKato == region && Exists(pinned, states))
         {
             return (pinned, states, null);

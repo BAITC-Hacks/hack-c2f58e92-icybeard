@@ -69,14 +69,23 @@ public static class RouteEvents
         }
 
         var moCode = Text(chosen, "moCode");
+        // Сигнал и согласие — голос пациента: запись от любой другой роли (врач, открывший «Мой путь» после своего
+        // решения, администратор) проекция не считает согласием — иначе согласие можно было бы дать за пациента.
+        var citizen = string.Equals(decision.Role, RouteAudience.Citizen, StringComparison.OrdinalIgnoreCase);
         if (Text(chosen, "signal") is { } signal)
         {
-            return new RouteEvent(decision, RouteEventKind.Signal, moCode, Value: signal);
+            return citizen ? new RouteEvent(decision, RouteEventKind.Signal, moCode, Value: signal) : new RouteEvent(decision, RouteEventKind.Unknown);
         }
 
         if (Text(chosen, "consent") is { } consent && Id(chosen, "decisionId") is { } consentTarget)
         {
-            return new RouteEvent(decision, RouteEventKind.Consent, Target: consentTarget, Value: consent);
+            return citizen ? new RouteEvent(decision, RouteEventKind.Consent, Target: consentTarget, Value: consent) : new RouteEvent(decision, RouteEventKind.Unknown);
+        }
+
+        if (citizen)
+        {
+            // решения сторон маршрута (перевод, подтверждение, выписка…) гражданин записать не может
+            return new RouteEvent(decision, RouteEventKind.Unknown);
         }
 
         if (Id(chosen, "confirms") is { } confirms)

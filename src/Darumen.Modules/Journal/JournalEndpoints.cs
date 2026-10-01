@@ -13,6 +13,12 @@ public static class JournalEndpoints
         group.MapPost("/decisions", async (DecisionRequestDto body, HttpContext http, IDecisionRepository repository, CancellationToken ct) =>
             {
                 var errors = new ValidationErrors().Require("subject", body.Subject).Require("subjectId", body.SubjectId);
+                if (!errors.Any && body.Subject == DecisionSubjects.Route)
+                {
+                    // машина состояний маршрута (согласие, подтверждение, даты) проверяется только в /route/* и /journal/referrals/*
+                    errors.Add("subject", "события маршрута записываются через /route/{ref}/… и /journal/referrals/{id}/…, а не напрямую");
+                }
+
                 if (errors.Any)
                 {
                     return errors.Problem();
@@ -135,6 +141,8 @@ public static class JournalEndpoints
                 // перевод в эту организацию — по проекции маршрута: отменённые, отклонённые и отказы пациента сюда не попадают
                 var routes = await RouteJournal.AllAsync(decisions, ct);
                 var today = RouteJournal.Today(http);
+                // действия (подтвердить, отказать…) доступны только сотруднику этой больницы; администратор без mo_code лишь смотрит
+                var canAct = !string.IsNullOrWhiteSpace(CurrentUser.From(http).MoCode);
                 var loadedRegions = new HashSet<string>(StringComparer.Ordinal);
                 var names = new Dictionary<string, string>(StringComparer.Ordinal);
                 var rows = new List<IncomingReferralDto>();
@@ -181,7 +189,7 @@ public static class JournalEndpoints
                         transfer.Reason, transfer.ProposedAt, transfer.Severe, consent, transfer.ConfirmedAt is not null, transfer.ConfirmedAt,
                         progress.ClosedReason == RouteCloseReasons.Discharged, progress.ClosedReason == RouteCloseReasons.Discharged ? progress.ClosedAt : null,
                         progress.Status, transfer.PlannedAt is { } planned ? RouteEvents.Format(planned) : null, transfer.AdmittedAt is not null,
-                        progress.Overdue(today), progress.Allowed(RouteSide.Receiving, today).OrderBy(x => x, StringComparer.Ordinal).ToList(),
+                        progress.Overdue(today), canAct ? progress.Allowed(RouteSide.Receiving, today).OrderBy(x => x, StringComparer.Ordinal).ToList() : new List<string>(),
                         progress.ClosedReason));
                 }
 

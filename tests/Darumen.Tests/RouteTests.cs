@@ -23,20 +23,49 @@ public sealed class RouteTests : IDisposable
     /// <summary>«Сегодня» по Казахстану — дата госпитализации при подтверждении (сегодня..+30 дней).</summary>
     private static string Today => RouteJournal.TodayAt(DateTimeOffset.UtcNow).ToString("yyyy-MM-dd");
 
-    /// <summary>Маршрут пациента читает решения по своему рефу: фильтр subjectId возвращает только их.</summary>
+    /// <summary>Маршрут пациента читает решения по своему рефу: фильтр subjectId возвращает только их. События маршрута
+    /// пишутся только через /route/{ref}/…: прямая запись subject=route в /journal/decisions — 422, иначе машину
+    /// состояний (согласие, подтверждение, даты) можно было бы обойти одним запросом.</summary>
     [Fact]
     public async Task Decisions_can_be_filtered_by_subject_id()
     {
-        var client = app.CreateClient("doctor", "doctor-3", "75");
+        var client = app.CreateClient("doctor", "doctor-3", "75", "027O");
         var moCode = JsonDocument.Parse("{\"moCode\":\"22GN\"}").RootElement;
-        await client.PostAsJsonAsync("/api/v1/journal/decisions", new DecisionRequestDto(DecisionSubjects.Route, "SYN-75-027O-021-01", moCode, moCode, "короче ожидание"));
-        await client.PostAsJsonAsync("/api/v1/journal/decisions", new DecisionRequestDto(DecisionSubjects.Route, "SYN-75-027O-021-02", moCode, moCode, null));
+        var direct = await client.PostAsJsonAsync("/api/v1/journal/decisions", new DecisionRequestDto(DecisionSubjects.Route, "SYN-75-027O-021-01", moCode, moCode, "в обход"));
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, direct.StatusCode);
+
+        foreach (var reference in new[] { "SYN-75-027O-021-01", "SYN-75-027O-021-02" })
+        {
+            var response = await client.PostAsJsonAsync($"/api/v1/route/{reference}/redirect", new RouteRedirectRequestDto("22GN", "короче ожидание"));
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
 
         var one = await client.GetFromJsonAsync<Paged<DecisionDto>>("/api/v1/journal/decisions?subject=route&subjectId=SYN-75-027O-021-01");
         var item = Assert.Single(one!.Items);
         Assert.Equal("SYN-75-027O-021-01", item.SubjectId);
         Assert.Equal("22GN", item.Chosen!.Value.GetProperty("moCode").GetString());
         Assert.True((await client.GetFromJsonAsync<Paged<DecisionDto>>("/api/v1/journal/decisions?subject=route"))!.Items.Count >= 2);
+    }
+
+    /// <summary>Согласие на перевод — только голос пациента: та же запись от врача (у него тоже есть «Мой путь») проекция
+    /// игнорирует, и перевод остаётся в ожидании согласия; врач третьей больницы — не сторона маршрута (403).</summary>
+    [Fact]
+    public async Task Consent_counts_only_from_a_citizen_and_outsiders_are_not_a_side()
+    {
+        var citizen = app.CreateClient("citizen", "c-consent-guard");
+        var route = (await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me"))!;
+        var receiving = route.Organization.MoCode == "22GN" ? "028B" : "22GN";
+        var origin = app.CreateClient("doctor", "d-consent-guard", "75", route.Organization.MoCode);
+        var created = await origin.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/redirect", new RouteRedirectRequestDto(receiving, "короче"));
+        var decision = (await created.Content.ReadFromJsonAsync<DecisionCreatedDto>())!;
+
+        var outsider = app.CreateClient("doctor", "d-outsider", "75", "ZZZZ");
+        Assert.Equal(HttpStatusCode.Forbidden, (await outsider.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/keep", new RouteKeepRequestDto("чужой"))).StatusCode);
+
+        var consent = (await origin.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decision.DecisionId, true, null))).StatusCode;
+        Assert.NotEqual(HttpStatusCode.InternalServerError, consent);
+        var after = (await origin.GetFromJsonAsync<RouteDto>($"/api/v1/route/{route.PatientRef}"))!;
+        Assert.Equal(RouteStatuses.TransferPendingConsent, after.Progress!.Status);
     }
 
     /// <summary>Персона гражданина — из первых десяти «застрявших» строк списка врача (врач видит её на первом

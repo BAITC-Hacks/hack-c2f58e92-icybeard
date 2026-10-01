@@ -252,10 +252,13 @@ class _ReferralScreenState extends State<ReferralScreen> {
       final String id;
       if (patientRef != null && chosen != _moCode) {
         id = await session.api.redirectRoute(patientRef, toMoCode: chosen, reason: reason, idempotencyKey: _decisionKey);
+      } else if (patientRef != null) {
+        // решение по маршруту — только через /route/{ref}/keep: сервер проверяет состояние и сторону
+        id = await session.api.keepRoute(patientRef, reason: reason, idempotencyKey: _decisionKey);
       } else {
         id = await session.api.recordDecision({
-          'subject': patientRef != null ? 'route' : 'referral',
-          'subjectId': patientRef ?? '${session.region}.$_moCode.$_profile.mobile',
+          'subject': 'referral',
+          'subjectId': '${session.region}.$_moCode.$_profile.mobile',
           'recommended': {'moCode': recommended(options).moCode},
           'chosen': {'moCode': chosen},
           'reason': reason,
