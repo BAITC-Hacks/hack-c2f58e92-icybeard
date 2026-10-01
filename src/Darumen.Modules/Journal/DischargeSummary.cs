@@ -4,8 +4,8 @@ namespace Darumen.Modules.Journal;
 
 /// <summary>Выписка/эпикриз обратно направившему врачу (задача 11 плана прозрачности): ещё одна запись в том же
 /// journal.decisions (subject = route, тот же subject_id — реф маршрута отправителя), chosen = {"moCode": принимающая
-/// организация, "discharges": id решения redirect, "summary": текст эпикриза}. Как и ReferralConfirmation — ответ
-/// принимающей стороны, а не пациента; возможна только после подтверждения приёма (<see cref="ReferralConfirmation"/>),
+/// организация, "discharges": id решения redirect, "summary": текст эпикриза}. Как и подтверждение приёма — ответ
+/// принимающей стороны, а не пациента; возможна только после подтверждения приёма (событие Confirm в RouteEvents),
 /// иначе будет выписка без факта госпитализации.</summary>
 public static class DischargeSummary
 {
@@ -30,9 +30,4 @@ public static class DischargeSummary
         && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
-
-    /// <summary>Запись выписки по этому редиректу, если есть (для определения decisionId самой записи выписки,
-    /// времени и текста эпикриза) — последняя, если их почему-то несколько.</summary>
-    public static DecisionDto? RecordFor(Guid redirectDecisionId, IReadOnlyList<DecisionDto> decisions) =>
-        decisions.Where(d => Discharges(d.Chosen) == redirectDecisionId).OrderByDescending(d => d.RecordedAt).FirstOrDefault();
 }

@@ -60,22 +60,6 @@ public static class RouteSignals
     public static bool ValidationDue(IReadOnlyList<RouteSignalDto> signals, DateTimeOffset now) =>
         !signals.Any(s => Confirmations.Contains(s.Kind) && s.RecordedAt > now.AddDays(-ValidationIntervalDays));
 
-    /// <summary>Открытые сигналы по всем маршрутам региона для рабочего списка: реф → самый свежий сигнал без ответа врача.</summary>
-    public static IReadOnlyDictionary<string, PatientSignalDto> Open(IReadOnlyList<DecisionDto> routeDecisions, IReadOnlyDictionary<string, string> names)
-    {
-        var result = new Dictionary<string, PatientSignalDto>(StringComparer.Ordinal);
-        foreach (var group in routeDecisions.GroupBy(d => d.SubjectId))
-        {
-            var latest = FromDecisions(group.ToList(), names).FirstOrDefault(s => s.Open);
-            if (latest is not null)
-            {
-                result[group.Key] = new PatientSignalDto(latest.Kind, latest.ToMoCode, latest.ToMoName, latest.Comment, latest.RecordedAt);
-            }
-        }
-
-        return result;
-    }
-
     public static string? MoCode(JsonElement? json) =>
         json is { ValueKind: JsonValueKind.Object } element && element.TryGetProperty("moCode", out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()

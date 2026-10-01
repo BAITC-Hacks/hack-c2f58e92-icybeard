@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteDecision, RouteSignal } from '@/api/types'
-import { NEXT_ACTION_CODES, STAGE_CODES, addDays, almatyToday, checklistTone, dateShort, nextActionKey, openRequest, openSignal, outcomeTone, pendingConsent, routeEntries, stageIndex, stageTone } from '@/lib/route'
+import { NEXT_ACTION_CODES, STAGE_CODES, addDays, almatyToday, checklistTone, dateShort, nextActionKey, openRequest, openSignal, outcomeTone, routeEntries, stageIndex, stageTone } from '@/lib/route'
 
 const signal = (over: Partial<RouteSignal>): RouteSignal => ({
   decisionId: 'a', recordedAt: '2026-09-25T10:00:00+00:00', kind: 'still_waiting', toMoCode: null, toMoName: null, comment: null, open: false, ...over,
@@ -26,14 +26,6 @@ describe('route signals', () => {
       signals: [signal({ decisionId: 's1', recordedAt: '2026-09-25T10:00:00+00:00' }), signal({ decisionId: 's0', recordedAt: '2026-09-20T10:00:00+00:00' })],
     })
     expect(entries.map((e) => (e.kind === 'decision' ? e.decision.decisionId : e.signal.decisionId))).toEqual(['s1', 'd1', 's0'])
-  })
-
-  it('finds a redirect still waiting for the patient to answer, ignoring keep and already-answered redirects', () => {
-    const waiting = decision({ decisionId: 'pending', kind: 'redirect', patientConsent: 'pending' })
-    const answered = decision({ decisionId: 'answered', kind: 'redirect', patientConsent: 'accepted' })
-    const kept = decision({ decisionId: 'kept', kind: 'keep', patientConsent: null })
-    expect(pendingConsent({ decisions: [answered, kept, waiting] })?.decisionId).toBe('pending')
-    expect(pendingConsent({ decisions: [answered, kept] })).toBeNull()
   })
 })
 

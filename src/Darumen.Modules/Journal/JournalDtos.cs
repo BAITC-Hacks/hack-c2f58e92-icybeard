@@ -21,7 +21,7 @@ public sealed record NewDecision(
 /// <summary>Входящее направление (redirect) в организацию, ещё не подтверждённое ею (или подтверждённое, если
 /// includeConfirmed=true в запросе): FromMoCode/FromMoName — организация-отправитель (из рефа маршрута), ProfileCode —
 /// профиль очереди; PatientConsent — pending | accepted | declined (<see cref="RouteConsent"/>); подтвердить приём
-/// можно только когда PatientConsent == accepted (<see cref="ReferralConfirmation"/>).
+/// можно только когда PatientConsent == accepted (событие Confirm в RouteEvents).
 /// Status — состояние маршрута (<see cref="RouteStatuses"/>), PlannedAt — назначенная дата, Allowed — что принимающая
 /// организация может сделать сейчас (подтвердить, отказать, перенести, госпитализация, неявка, выписка, снять с очереди).</summary>
 public sealed record IncomingReferralDto(
