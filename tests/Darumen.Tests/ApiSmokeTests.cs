@@ -15,6 +15,18 @@ public sealed class ApiSmokeTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
+    public async Task Health_reports_unavailable_when_the_database_is_down()
+    {
+        using var down = new TestApp();
+        down.Database.Up = false;
+        using var client = down.CreateClient();
+
+        var response = await client.GetAsync("/health");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Root_returns_product_name()
     {
         var body = await _client.GetStringAsync("/api/v1/");

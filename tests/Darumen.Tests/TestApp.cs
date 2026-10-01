@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Darumen.Tests;
 
@@ -60,6 +61,9 @@ public sealed class TestApp : WebApplicationFactory<Program>
     public InMemoryAccountStore Accounts { get; } = new();
 
     public InMemoryActivity Activity { get; } = new();
+
+    /// <summary>Состояние базы для /health: тесты идут без Postgres, «упавшую» базу задаёт сам тест.</summary>
+    public FakeDatabaseHealth Database { get; } = new();
 
     /// <summary>Клиент с ролью для схемы заголовков; moCode — клейм mo_code (scope own), session — клейм sid,
     /// profileCode — клейм profile_code (задача 10, привязка врача к отделению/профилю).</summary>
@@ -116,6 +120,12 @@ public sealed class TestApp : WebApplicationFactory<Program>
             services.AddSingleton<IScribeService>(Scribe);
             services.RemoveAll<IIntakeRepository>();
             services.AddSingleton<IIntakeRepository, InMemoryIntake>();
+            // /health в приложении спрашивает Postgres; в тестах базы нет, её состояние задаёт заглушка
+            services.Configure<HealthCheckServiceOptions>(options =>
+            {
+                options.Registrations.Clear();
+                options.Registrations.Add(new HealthCheckRegistration("postgres", Database, failureStatus: null, tags: null));
+            });
             ReplaceAccess(services);
         });
     }
