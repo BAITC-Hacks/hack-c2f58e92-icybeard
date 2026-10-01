@@ -1,8 +1,18 @@
+// Модели ответов REST API Darumen (docs/api.md) — только то, что нужно мобильным экранам. Единственная точка импорта:
+// экраны, состояние и тесты импортируют models.dart, а файлы ниже — его части по разделам контракта. Списки никогда не
+// null, незнакомые коды сохраняются как есть; модели нового контракта (маршрут, колокольчики, входящие, скрайб, журнал)
+// разбираются терпимо — отсутствующее поле получает значение по умолчанию.
 export 'account_models.dart';
+export 'decision_models.dart';
+export 'notification_models.dart';
+export 'referral_models.dart';
+export 'route_codes.dart';
 export 'route_models.dart';
+export 'route_progress_models.dart';
+export 'scribe_models.dart';
 export 'service_status.dart';
 
-/// Модели ответов REST API Darumen (docs/api.md). Только то, что нужно мобильным экранам.
+/// Модель, посчитавшая прогноз: имя, версия и по какую дату данные обучения.
 class ModelInfo {
   const ModelInfo({required this.name, required this.version, required this.trainedThrough});
   final String name;
@@ -85,6 +95,7 @@ class Alternative {
     required this.pRefusal,
     required this.distanceKm,
     this.isNeighborRegion = false,
+    this.regionKato,
   });
   final String moCode;
   final String name;
@@ -93,6 +104,10 @@ class Alternative {
   final double pRefusal;
   final double distanceKm;
   final bool isNeighborRegion;
+
+  /// КАТО региона организации (`mo.regionKato`) — для подписи «сосед: {регион}» у больницы соседнего региона;
+  /// null, если сервер его не прислал.
+  final String? regionKato;
   factory Alternative.fromJson(Map<String, dynamic> json) {
     final mo = json['mo'] as Map<String, dynamic>;
     return Alternative(
@@ -103,6 +118,7 @@ class Alternative {
       pRefusal: (json['pRefusal'] as num).toDouble(),
       distanceKm: (json['distanceKm'] as num).toDouble(),
       isNeighborRegion: json['isNeighborRegion'] as bool? ?? false,
+      regionKato: mo['regionKato'] as String?,
     );
   }
 }
@@ -142,6 +158,9 @@ class IndexItem {
       );
 }
 
+/// Строка рабочего списка врача (`GET /journal/worklist`, до 60 строк; сервер сортирует по priority, затем по
+/// daysWaiting — клиент порядок не меняет). Закрытые маршруты из списка уходят; пациент, переведённый в мою больницу,
+/// добавляется строкой с флагом transferred_in.
 class WorklistItem {
   const WorklistItem({
     required this.patientRef,
@@ -161,29 +180,45 @@ class WorklistItem {
     this.synthetic = true,
     this.patientSignal,
   });
+
+  /// Реф с больницей, где пациент встал в очередь; у переведённого ко мне — больница-отправитель, поэтому больницу
+  /// строки брать из [moCode], а не из рефа.
   final String patientRef;
 
   /// Русская подпись стадии от API (старый контракт); для локализации используется [stageCode].
   final String stage;
 
-  /// registered | waiting | called — см. WorklistBuilder.Stage* в API.
+  /// registered | waiting | called — см. WorklistBuilder.Stage* в API; у transferred всегда called.
   final String stageCode;
+
+  /// `yyyy-MM-dd`; у transferred — дата, назначенная принимающей больницей.
   final String? expectedDate;
+
+  /// Коды из `RouteCodes.riskFlags` (8 флагов, с поправкой на сторону); незнакомый — запасная подпись.
   final List<String> riskFlags;
+
+  /// Фиксированная шкала 0…10: 7–10 — высокий, 4–6 — средний, 0–3 — низкий.
   final int priority;
 
-  /// Русская подпись следующего шага от API; для локализации — [nextActionCode] (redirect_faster | review_before_call | clarify_date | wait_for_call).
+  /// Русская подпись следующего шага от API — только запасная; для локализации — [nextActionCode].
   final String nextAction;
+
+  /// Один из `RouteCodes.nextActions` (в списке — 13 кодов, closed бывает только на маршруте) или '' у старого сервера.
   final String nextActionCode;
   final String explanation;
+
+  /// Больница строки; у переведённого ко мне пациента — моя (принимающая), не та, что в рефе.
   final String moCode;
   final String moName;
   final String profileCode;
   final String regionKato;
+
+  /// Дней в очереди; после перевода не обнуляется.
   final int daysWaiting;
   final bool synthetic;
 
-  /// Открытый сигнал гражданина (в riskFlags при этом есть RouteCodes.patientSignalFlag).
+  /// Открытый сигнал гражданина (в riskFlags при этом есть RouteCodes.patientSignalFlag): только request_redirect,
+  /// withdraw или treated_elsewhere — still_waiting и prefer_current открытыми не бывают.
   final PatientSignal? patientSignal;
   factory WorklistItem.fromJson(Map<String, dynamic> json) => WorklistItem(
         patientRef: json['patientRef'] as String,
@@ -205,7 +240,8 @@ class WorklistItem {
       );
 }
 
-/// Открытый сигнал гражданина в строке рабочего списка: вид, организация из просьбы «быстрее», комментарий, время.
+/// Открытый сигнал гражданина в строке рабочего списка: вид (request_redirect | withdraw | treated_elsewhere),
+/// организация из просьбы «быстрее», комментарий, время.
 class PatientSignal {
   const PatientSignal({required this.kind, this.toMoCode, this.toMoName, this.comment, required this.recordedAt});
   final String kind;
@@ -324,143 +360,4 @@ class VaccinationEstimate {
         source: json['source'] as String? ?? '',
         note: json['note'] as String?,
       );
-}
-
-class DecisionRecord {
-  const DecisionRecord({required this.decisionId, required this.subject, this.subjectId, this.recommendedMoCode, this.chosenMoCode, this.reason, required this.recordedAt});
-  final String decisionId;
-  final String subject;
-  final String? subjectId;
-  final String? recommendedMoCode;
-  final String? chosenMoCode;
-  final String? reason;
-  final String recordedAt;
-  factory DecisionRecord.fromJson(Map<String, dynamic> json) => DecisionRecord(
-        decisionId: json['decisionId'] as String,
-        subject: json['subject'] as String? ?? '',
-        subjectId: json['subjectId'] as String?,
-        recommendedMoCode: (json['recommended'] as Map<String, dynamic>?)?['moCode'] as String?,
-        chosenMoCode: (json['chosen'] as Map<String, dynamic>?)?['moCode'] as String?,
-        reason: json['reason'] as String?,
-        recordedAt: json['recordedAt'] as String? ?? '',
-      );
-}
-
-class ScribeSession {
-  const ScribeSession({required this.sessionId});
-  final String sessionId;
-  factory ScribeSession.fromJson(Map<String, dynamic> json) => ScribeSession(sessionId: json['sessionId'] as String);
-}
-
-class TranscriptSegment {
-  const TranscriptSegment({required this.t0, required this.t1, required this.text});
-  final double t0;
-  final double t1;
-  final String text;
-  factory TranscriptSegment.fromJson(Map<String, dynamic> json) =>
-      TranscriptSegment(t0: (json['t0'] as num).toDouble(), t1: (json['t1'] as num).toDouble(), text: json['text'] as String);
-}
-
-class DraftSection {
-  const DraftSection({required this.name, required this.text});
-  final String name;
-  final String text;
-  factory DraftSection.fromJson(Map<String, dynamic> json) => DraftSection(name: json['name'] as String, text: json['text'] as String? ?? '');
-}
-
-class ScribeDraft {
-  const ScribeDraft({required this.sections, required this.leaflet});
-  final List<DraftSection> sections;
-  final String leaflet;
-  factory ScribeDraft.fromJson(Map<String, dynamic> json) => ScribeDraft(
-        sections: (json['sections'] as List<dynamic>? ?? []).map((s) => DraftSection.fromJson(s as Map<String, dynamic>)).toList(),
-        leaflet: json['leaflet'] as String? ?? '',
-      );
-}
-
-class ApproveResult {
-  const ApproveResult({required this.leafletToken, required this.leafletUrl});
-  final String leafletToken;
-  final String leafletUrl;
-  factory ApproveResult.fromJson(Map<String, dynamic> json) =>
-      ApproveResult(leafletToken: json['leafletToken'] as String, leafletUrl: json['leafletUrl'] as String);
-}
-
-/// Витрина «сегодня и завтра» на главной: погода по столице региона, бытовые советы по погоде и новости о здравоохранении.
-class WeatherDay {
-  const WeatherDay({required this.date, required this.tMin, required this.tMax, required this.precipitationProbability, required this.windMax, required this.uvIndex, required this.code});
-
-  factory WeatherDay.fromJson(Map<String, dynamic> json) => WeatherDay(
-        date: json['date'] as String,
-        tMin: (json['tMin'] as num).toDouble(),
-        tMax: (json['tMax'] as num).toDouble(),
-        precipitationProbability: (json['precipitationProbability'] as num).toInt(),
-        windMax: (json['windMax'] as num).toDouble(),
-        uvIndex: (json['uvIndex'] as num).toDouble(),
-        code: json['code'] as String,
-      );
-
-  final String date;
-  final double tMin;
-  final double tMax;
-  final int precipitationProbability;
-  final double windMax;
-  final double uvIndex;
-  /// clear · cloudy · fog · rain · snow · thunder
-  final String code;
-}
-
-class WeatherTip {
-  const WeatherTip({required this.code, required this.day, required this.text});
-
-  factory WeatherTip.fromJson(Map<String, dynamic> json) => WeatherTip(code: json['code'] as String, day: (json['day'] as num).toInt(), text: json['text'] as String);
-
-  final String code;
-  /// 0 — сегодня, 1 — завтра.
-  final int day;
-  final String text;
-}
-
-class NewsItem {
-  const NewsItem({required this.title, required this.url, required this.publishedAt, required this.source});
-
-  factory NewsItem.fromJson(Map<String, dynamic> json) =>
-      NewsItem(title: json['title'] as String, url: json['url'] as String, publishedAt: json['publishedAt'] as String?, source: json['source'] as String);
-
-  final String title;
-  final String url;
-  final String? publishedAt;
-  final String source;
-}
-
-class Daily {
-  const Daily({required this.regionKato, required this.regionName, required this.capital, required this.weatherAvailable, required this.weatherSource, required this.days, required this.tips, required this.newsAvailable, required this.newsSource, required this.news});
-
-  factory Daily.fromJson(Map<String, dynamic> json) {
-    final weather = json['weather'] as Map<String, dynamic>;
-    final news = json['news'] as Map<String, dynamic>;
-    return Daily(
-      regionKato: json['regionKato'] as String,
-      regionName: json['regionName'] as String,
-      capital: json['capital'] as String,
-      weatherAvailable: weather['available'] as bool,
-      weatherSource: weather['source'] as String,
-      days: (weather['days'] as List<dynamic>).map((d) => WeatherDay.fromJson(d as Map<String, dynamic>)).toList(),
-      tips: (json['tips'] as List<dynamic>).map((t) => WeatherTip.fromJson(t as Map<String, dynamic>)).toList(),
-      newsAvailable: news['available'] as bool,
-      newsSource: news['source'] as String,
-      news: (news['items'] as List<dynamic>).map((n) => NewsItem.fromJson(n as Map<String, dynamic>)).toList(),
-    );
-  }
-
-  final String regionKato;
-  final String regionName;
-  final String capital;
-  final bool weatherAvailable;
-  final String weatherSource;
-  final List<WeatherDay> days;
-  final List<WeatherTip> tips;
-  final bool newsAvailable;
-  final String newsSource;
-  final List<NewsItem> news;
 }

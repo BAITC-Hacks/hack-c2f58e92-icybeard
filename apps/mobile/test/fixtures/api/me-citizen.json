@@ -1,0 +1,34 @@
+{
+ "actor": "citizen1",
+ "userId": "164881a3-5857-4702-8a8d-e27fed989551",
+ "displayName": "Ерлан Жумабеков",
+ "email": "citizen1@darumen.local",
+ "emailVerified": true,
+ "roles": [
+  "citizen"
+ ],
+ "permissions": [
+  {
+   "code": "route.own",
+   "scope": "all"
+  },
+  {
+   "code": "wait.public",
+   "scope": "all"
+  },
+  {
+   "code": "medicines.check",
+   "scope": "all"
+  }
+ ],
+ "moCode": null,
+ "moName": null,
+ "regionKato": "75",
+ "iinMasked": "00••••••••01",
+ "onboarding": {
+  "emailVerified": true,
+  "otpConfigured": false,
+  "profileChecked": false,
+  "colleaguesInvited": false
+ }
+}

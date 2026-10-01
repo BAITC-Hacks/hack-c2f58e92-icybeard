@@ -1,0 +1,7 @@
+{
+ "type": "https://tools.ietf.org/html/rfc4918#section-11.2",
+ "title": "Нужна организация",
+ "status": 422,
+ "detail": "укажите moCode: без организации список входящих направлений не имеет смысла",
+ "traceId": "00-fe17ca1e7e2eea923448030999f8a2c1-03fda06a21ced42d-00"
+}

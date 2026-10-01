@@ -1,0 +1,95 @@
+{
+ "items": [
+  {
+   "patientRef": "SYN-75-224E-171-01",
+   "synthetic": true,
+   "stage": "вызов на госпитализацию",
+   "stageCode": "called",
+   "expectedDate": "2025-03-31",
+   "riskFlags": [
+    "stuck_over_30",
+    "refusal_risk",
+    "faster_alternative"
+   ],
+   "priority": 9,
+   "nextAction": "предложить перенаправление в организацию с меньшим ожиданием",
+   "nextActionCode": "redirect_faster",
+   "explanation": "очередь 37 направлений, прогноз ожидания 23 дн., прогноз риска отказа 39 %",
+   "moCode": "224E",
+   "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Городская больница скорой неотложной помощи\" Управления общественного здравоохранения города Алматы",
+   "profileCode": "171",
+   "regionKato": "75",
+   "daysWaiting": 89,
+   "patientSignal": null
+  },
+  {
+   "patientRef": "SYN-75-225T-251-01",
+   "synthetic": true,
+   "stage": "вызов на госпитализацию",
+   "stageCode": "called",
+   "expectedDate": "2025-03-31",
+   "riskFlags": [
+    "stuck_over_30",
+    "refusal_risk",
+    "transfer_pending"
+   ],
+   "priority": 8,
+   "nextAction": "ждём согласия пациента на перевод",
+   "nextActionCode": "await_consent",
+   "explanation": "очередь 5 направлений, прогноз ожидания 7 дн., прогноз риска отказа 33 %",
+   "moCode": "225T",
+   "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Центр перинатологии и детской кардиохирургии\" Управления общественного здравоохранения города Алматы",
+   "profileCode": "251",
+   "regionKato": "75",
+   "daysWaiting": 52,
+   "patientSignal": null
+  },
+  {
+   "patientRef": "SYN-75-08IV-121-01",
+   "synthetic": true,
+   "stage": "вызов на госпитализацию",
+   "stageCode": "called",
+   "expectedDate": "2025-03-31",
+   "riskFlags": [
+    "stuck_over_30",
+    "refusal_risk",
+    "transfer_pending"
+   ],
+   "priority": 8,
+   "nextAction": "ждём согласия пациента на перевод",
+   "nextActionCode": "await_consent",
+   "explanation": "очередь 5 направлений, прогноз ожидания 2 дн., прогноз риска отказа 39 %",
+   "moCode": "08IV",
+   "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Алматинский онкологический центр\" Управления общественного здравоохранения города Алматы",
+   "profileCode": "121",
+   "regionKato": "75",
+   "daysWaiting": 49,
+   "patientSignal": null
+  },
+  {
+   "patientRef": "SYN-75-233U-152-01",
+   "synthetic": true,
+   "stage": "вызов на госпитализацию",
+   "stageCode": "called",
+   "expectedDate": "2025-03-31",
+   "riskFlags": [
+    "stuck_over_30",
+    "refusal_risk"
+   ],
+   "priority": 8,
+   "nextAction": "проверить показания и документы до вызова",
+   "nextActionCode": "review_before_call",
+   "explanation": "очередь 1 направлений, прогноз ожидания 27 дн., прогноз риска отказа 91 %",
+   "moCode": "233U",
+   "moName": "Товарищество с ограниченной ответственностью «MEDITERRA» (МЕДИТЕРРА)",
+   "profileCode": "152",
+   "regionKato": "75",
+   "daysWaiting": 85,
+   "patientSignal": null
+  }
+ ],
+ "synthetic": true,
+ "asOf": "2025-03-31",
+ "regionKato": "75",
+ "modelBacked": true
+}

@@ -1,0 +1,170 @@
+{
+ "meta": {
+  "source": "Стандарт организации оказания медицинской помощи в стационарных условиях в РК, приказ МЗ РК от 24.03.2022 № ҚР-ДСМ-27 (ред. от 15.09.2025 № 94)",
+  "sourceUrl": "https://adilet.zan.kz/rus/docs/V2200027218",
+  "sourceDate": "2025-09-15"
+ },
+ "available": true,
+ "stages": [
+  {
+   "code": "referral_issued",
+   "order": 1,
+   "title": "Направление выдано",
+   "norm": "Организация ПМСП выдаёт направление на плановую госпитализацию: госуслуга, 1 рабочий день",
+   "normWorkingDays": null,
+   "rescheduleMaxDays": null,
+   "noShowDays": null
+  },
+  {
+   "code": "examination",
+   "order": 2,
+   "title": "Обследование",
+   "norm": "Направляющая организация проводит исследования по приложению 5; сроки давности — в чек-листе",
+   "normWorkingDays": null,
+   "rescheduleMaxDays": null,
+   "noShowDays": null
+  },
+  {
+   "code": "waitlisted",
+   "order": 3,
+   "title": "Внесено в лист ожидания",
+   "norm": "Ответственный специалист ПМСП регистрирует направление в Портале бюро госпитализации и отслеживает его ежедневно",
+   "normWorkingDays": null,
+   "rescheduleMaxDays": null,
+   "noShowDays": null
+  },
+  {
+   "code": "date_assigned",
+   "order": 4,
+   "title": "Дата госпитализации назначена",
+   "norm": "Планируемая дата определяется в течение 2 рабочих дней после регистрации; перенос по просьбе пациента — не более чем на 2 календарных дня",
+   "normWorkingDays": 2,
+   "rescheduleMaxDays": 2,
+   "noShowDays": null
+  },
+  {
+   "code": "hospitalized",
+   "order": 5,
+   "title": "Госпитализация",
+   "norm": "Приём через приёмное отделение стационара в назначенную дату",
+   "normWorkingDays": null,
+   "rescheduleMaxDays": null,
+   "noShowDays": null
+  },
+  {
+   "code": "refused",
+   "order": 5,
+   "title": "Отказ в госпитализации",
+   "norm": "Только по причинам из Стандарта; неявка в течение 2 календарных дней снимает направление с листа ожидания",
+   "normWorkingDays": null,
+   "rescheduleMaxDays": null,
+   "noShowDays": 2
+  }
+ ],
+ "refusalReasons": [
+  {
+   "code": "contraindications",
+   "title": "Противопоказания на момент госпитализации"
+  },
+  {
+   "code": "no_indications",
+   "title": "Отсутствие показаний к госпитализации"
+  },
+  {
+   "code": "non_core_profile",
+   "title": "Непрофильная госпитализация"
+  },
+  {
+   "code": "no_show_2_days",
+   "title": "Неявка в течение 2 календарных дней"
+  }
+ ],
+ "checklist": [
+  {
+   "code": "biochemistry",
+   "title": "Биохимия крови (креатинин, общий белок, АЛТ, АСТ)",
+   "validityDays": 14,
+   "validityLabel": "14 дней"
+  },
+  {
+   "code": "cbc",
+   "title": "Общий анализ крови",
+   "validityDays": 14,
+   "validityLabel": "14 дней"
+  },
+  {
+   "code": "coagulogram",
+   "title": "Коагулограмма",
+   "validityDays": 14,
+   "validityLabel": "14 дней"
+  },
+  {
+   "code": "ecg",
+   "title": "ЭКГ",
+   "validityDays": 14,
+   "validityLabel": "14 дней"
+  },
+  {
+   "code": "therapist_consultation",
+   "title": "Консультация терапевта",
+   "validityDays": 14,
+   "validityLabel": "14 дней"
+  },
+  {
+   "code": "urinalysis",
+   "title": "Общий анализ мочи",
+   "validityDays": 14,
+   "validityLabel": "14 дней"
+  },
+  {
+   "code": "syphilis_microreaction",
+   "title": "Микрореакция на сифилис",
+   "validityDays": 30,
+   "validityLabel": "1 месяц"
+  },
+  {
+   "code": "hepatitis_markers",
+   "title": "Маркеры гепатитов B и C",
+   "validityDays": 180,
+   "validityLabel": "6 месяцев"
+  },
+  {
+   "code": "hiv",
+   "title": "Анализ на ВИЧ",
+   "validityDays": 180,
+   "validityLabel": "6 месяцев"
+  },
+  {
+   "code": "fluorography",
+   "title": "Флюорография",
+   "validityDays": 365,
+   "validityLabel": "12 месяцев"
+  }
+ ],
+ "benchmarks": [
+  {
+   "code": "moh_avg_wait_days",
+   "value": 30,
+   "unit": "days",
+   "title": "Средний срок ожидания плановой госпитализации по стране",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  },
+  {
+   "code": "moh_share_over_20_days",
+   "value": 0.17,
+   "unit": "share",
+   "title": "Доля плановых пациентов, ожидающих дольше 20 дней",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  },
+  {
+   "code": "moh_target_wait_days",
+   "value": 20,
+   "unit": "days",
+   "title": "Целевой срок ожидания (МЗ РК)",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  }
+ ]
+}

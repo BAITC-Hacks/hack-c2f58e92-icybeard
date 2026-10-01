@@ -167,11 +167,31 @@ class NotificationEvent {
 class NotificationSettings {
   const NotificationSettings({required this.events, this.quietFrom, this.quietTo, this.quietExceptRegulator = false, this.digest = 'off'});
 
+  /// Код события «Изменения моего маршрута»: его канал inApp решает, что гражданин видит в колокольчике (пункты,
+  /// которые ждут ответа, приходят всегда).
+  static const routeUpdates = 'route_updates';
+
+  /// Код события «Безопасность» — закреплено (`locked`), не отключается.
+  static const security = 'security';
+
   final List<NotificationEvent> events;
   final String? quietFrom;
   final String? quietTo;
   final bool quietExceptRegulator;
   final String digest;
+
+  /// Событие с кодом [code]; null — сервер такого не прислал.
+  NotificationEvent? event(String code) => events.where((e) => e.code == code).firstOrNull;
+
+  /// Копия, где у одного события [code] канал [c] включён или выключен; закреплённое или отсутствующее событие не
+  /// меняется, тихие часы и дайджест уходят обратно как были.
+  NotificationSettings withEventChannel(String code, NotificationChannel c, bool value) => NotificationSettings(
+        events: List.unmodifiable([for (final e in events) e.code == code && !e.locked ? e.withChannel(c, value) : e]),
+        quietFrom: quietFrom,
+        quietTo: quietTo,
+        quietExceptRegulator: quietExceptRegulator,
+        digest: digest,
+      );
 
   /// Канал включён хотя бы для одного события, которое пользователь может менять (у `security` почта включена
   /// всегда — она не в счёт); если таких событий нет — по всем.

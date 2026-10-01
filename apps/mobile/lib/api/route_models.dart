@@ -1,169 +1,25 @@
 import 'models.dart';
 
-// Маршрут пациента (docs/api.md, раздел Route) — вынесен из models.dart, чтобы файлы оставались < 800 строк;
-// models.dart реэкспортирует этот файл, импорты экранов не меняются.
+// Маршрут пациента (docs/api.md, раздел Route) — вынесен из models.dart, чтобы файлы оставались < 600 строк; коды —
+// в route_codes.dart, машина состояний и журнал — в route_progress_models.dart. models.dart реэкспортирует все три,
+// импорты экранов не меняются.
 
-/// Коды стадий и статусов маршрута — те же, что в API (RouteStages, RouteChecklistStatus, RouteOutcomes,
-/// RouteProgress, RouteJournal, Worklist). Группы ниже совпадают с разделами контракта; значение-строка может
-/// совпадать у разных групп (kind=redirect и action=redirect — буквально один и тот же код сервера), но названы
-/// раздельно ради понятного места использования на вызывающей стороне.
-abstract final class RouteCodes {
-  static const referralIssued = 'referral_issued';
-  static const examination = 'examination';
-  static const waitlisted = 'waitlisted';
-  static const dateAssigned = 'date_assigned';
-  static const hospitalized = 'hospitalized';
-  static const refused = 'refused';
-
-  /// Новая стадия timeline: вставляется после waitlisted, пока перевод ожидает согласия/подтверждения (§3.3).
-  static const transferStage = 'transfer';
-
-  static const done = 'done';
-  static const current = 'current';
-  static const upcoming = 'upcoming';
-
-  static const valid = 'valid';
-  static const expiring = 'expiring';
-  static const expired = 'expired';
-
-  // decisions[].kind и действия врача — те же строки, что и progress.allowed ниже
-  static const redirect = 'redirect';
-  static const keep = 'keep';
-
-  // сигналы гражданина по маршруту (RouteSignals в API) и флаг открытого сигнала в рабочем списке
-  static const stillWaiting = 'still_waiting';
-  static const treatedElsewhere = 'treated_elsewhere';
-  static const withdraw = 'withdraw';
-  static const requestRedirect = 'request_redirect';
-  static const preferCurrent = 'prefer_current';
-  static const patientSignalFlag = 'patient_signal';
-
-  // progress.status — состояние маршрута как явной машины состояний (§3.1)
-  static const statusWaiting = 'waiting';
-  static const statusKept = 'kept';
-  static const statusTransferPendingConsent = 'transfer_pending_consent';
-  static const statusTransferPendingConfirmation = 'transfer_pending_confirmation';
-  static const statusTransferred = 'transferred';
-  static const statusAdmitted = 'admitted';
-  static const statusWithdrawalRequested = 'withdrawal_requested';
-  static const statusClosed = 'closed';
-
-  // progress.allowed — что эта сторона может сделать прямо сейчас (16 кодов, §3.1)
-  static const actionRequestTransfer = 'request_transfer';
-  static const actionPreferCurrent = 'prefer_current';
-  static const actionStillWaiting = 'still_waiting';
-  static const actionWithdraw = 'withdraw';
-  static const actionAcceptTransfer = 'accept_transfer';
-  static const actionDeclineTransfer = 'decline_transfer';
-  static const actionKeep = 'keep';
-  static const actionRedirect = 'redirect';
-  static const actionCancelTransfer = 'cancel_transfer';
-  static const actionClose = 'close';
-  static const actionConfirm = 'confirm';
-  static const actionReject = 'reject';
-  static const actionReschedule = 'reschedule';
-  static const actionAdmit = 'admit';
-  static const actionNoShow = 'no_show';
-  static const actionDischarge = 'discharge';
-
-  // progress.side — кто сейчас действует по этому маршруту
-  static const sideNone = 'none';
-  static const sideCitizen = 'citizen';
-  static const sideOrigin = 'origin';
-  static const sideReceiving = 'receiving';
-
-  // progress.closedReason
-  static const closedDischarged = 'discharged';
-  static const closedNoShow = 'no_show';
-  static const closedWithdrawn = 'withdrawn';
-  static const closedTreatedElsewhere = 'treated_elsewhere';
-
-  // progress.lastAttempt.outcome (docs/web также упоминают no_show — сервер его не шлёт, см. §6)
-  static const attemptDeclined = 'declined';
-  static const attemptConsentWithdrawn = 'consent_withdrawn';
-  static const attemptCancelled = 'cancelled';
-  static const attemptRejected = 'rejected';
-  static const attemptPatientWithdrew = 'patient_withdrew';
-
-  // decisions[].patientConsent (только для kind == redirect)
-  static const consentPending = 'pending';
-  static const consentAccepted = 'accepted';
-  static const consentDeclined = 'declined';
-
-  // journal[].kind — полная упорядоченная история маршрута (§3.2); request — не requestRedirect из сигналов
-  static const journalRequest = 'request';
-  static const journalConsentAccepted = 'consent_accepted';
-  static const journalConsentDeclined = 'consent_declined';
-  static const journalCancel = 'cancel';
-  static const journalClose = 'close';
-
-  // worklist riskFlags — добавлены к уже существующему patientSignalFlag
-  static const flagStuckOver30 = 'stuck_over_30';
-  static const flagRefusalRisk = 'refusal_risk';
-  static const flagFasterAlternative = 'faster_alternative';
-  static const flagTransferPending = 'transfer_pending';
-  static const flagTransferredIn = 'transferred_in';
-  static const flagPrefersCurrent = 'prefers_current';
-  static const flagDateOverdue = 'date_overdue';
-
-  // worklist/doctor nextActionCode — 14 кодов (Worklist.cs:84-100)
-  static const nextRedirectFaster = 'redirect_faster';
-  static const nextReviewBeforeCall = 'review_before_call';
-  static const nextClarifyDate = 'clarify_date';
-  static const nextWaitForCall = 'wait_for_call';
-  static const nextDecisionMade = 'decision_made';
-  static const nextAwaitConsent = 'await_consent';
-  static const nextAwaitConfirmation = 'await_confirmation';
-  static const nextConfirmAdmission = 'confirm_admission';
-  static const nextTransferredOut = 'transferred_out';
-  static const nextAdmitOnDate = 'admit_on_date';
-  static const nextDateOverdue = 'date_overdue';
-  static const nextDischargeWhenDone = 'discharge_when_done';
-  static const nextConfirmWithdrawal = 'confirm_withdrawal';
-  static const nextClosed = 'closed';
-
-  // виды уведомлений гражданина сверх journal[].kind (§3.7)
-  static const notificationTestsExpiring = 'tests_expiring';
-  static const notificationScribeConsent = 'scribe_consent';
-  static const notificationScribeLeaflet = 'scribe_leaflet';
-
-  // "вид" в POST /journal/notifications/bell/{kind}/{id}/read
-  static const bellReferralConfirmed = 'referral-confirmed';
-  static const bellReferralDischarged = 'referral-discharged';
-  static const bellPatientSignal = 'patient-signal';
-
-  // patientSignals[].kind сверх journal[].kind (PatientSignals.cs:12-24)
-  static const patientEventScribeGranted = 'scribe_granted';
-  static const patientEventScribeDeclined = 'scribe_declined';
-  static const patientEventScribeWithdrawn = 'scribe_withdrawn';
-
-  // статус согласия на запись приёма (ScribeConsents.cs:7-36)
-  static const scribePending = 'pending';
-  static const scribeGranted = 'granted';
-  static const scribeDeclined = 'declined';
-  static const scribeWithdrawn = 'withdrawn';
-  static const scribeCancelled = 'cancelled';
-  static const scribeExpired = 'expired';
-  static const scribeRecording = 'recording';
-  static const scribeDiscarded = 'discarded';
-  static const scribeCompleted = 'completed';
-
-  // источник правки фразы стенограммы (§3.10.5)
-  static const sourceDoctor = 'doctor';
-  static const sourceAi = 'ai';
-  static const sourceDictionary = 'dictionary';
-}
-
-/// Сигнал гражданина по своему маршруту: подтверждение ожидания, «уже лечился в другом месте», «больше не нужно»
-/// или просьба рассмотреть организацию быстрее (toMoCode). open — врач ещё не ответил решением.
+/// Сигнал гражданина по своему маршруту: подтверждение ожидания, «уже лечился в другом месте», «больше не нужно»,
+/// «хочу остаться в своей больнице» или просьба рассмотреть организацию быстрее (toMoCode). Полная история —
+/// в [PatientRoute.journal]; signals[] остаётся для «Вы ещё ждёте?» и открытой просьбы.
 class RouteSignal {
   const RouteSignal({required this.decisionId, required this.recordedAt, required this.kind, this.toMoCode, this.toMoName, this.comment, required this.open});
   final String decisionId;
   final String recordedAt;
+
+  /// still_waiting | treated_elsewhere | withdraw | request_redirect | prefer_current ([RouteCodes.signalKinds]).
   final String kind;
   final String? toMoCode;
   final String? toMoName;
   final String? comment;
+
+  /// true — маршрут ещё ждёт ответа на этот сигнал; бывает только у request_redirect, withdraw и treated_elsewhere
+  /// (still_waiting и prefer_current открытыми не бывают).
   final bool open;
   factory RouteSignal.fromJson(Map<String, dynamic> json) => RouteSignal(
         decisionId: json['decisionId'] as String,
@@ -176,6 +32,7 @@ class RouteSignal {
       );
 }
 
+/// Больница и профиль маршрута; после подтверждённого перевода — принимающая больница, а не больница из рефа.
 class RouteOrganization {
   const RouteOrganization({required this.moCode, required this.moName, required this.profileCode, required this.profileName});
   final String moCode;
@@ -190,15 +47,25 @@ class RouteOrganization {
       );
 }
 
+/// Этап timeline: 5 или 6 штук, этап «Перевод» вставляется после waitlisted, пока перевод ждёт согласия или
+/// подтверждения либо уже подтверждён.
 class RouteStage {
   const RouteStage({required this.code, required this.order, required this.title, this.date, required this.status, this.norm});
+
+  /// Один из [RouteCodes.stages] (в том числе transfer); title — локализованная подпись сервера.
   final String code;
+
+  /// Позиционный номер 1…N — не идентификатор этапа: date_assigned бывает и 4-м, и 5-м.
   final int order;
   final String title;
+
+  /// Дата этапа; у transfer — дата подтверждения, иначе предложения; у hospitalized — дата госпитализации.
   final String? date;
 
-  /// done | current | upcoming
+  /// done | current | upcoming ([RouteCodes.stageStatuses]); у маршрута, закрытого выпиской, все этапы done.
   final String status;
+
+  /// Норматив Стандарта словами; у transfer — null.
   final String? norm;
   factory RouteStage.fromJson(Map<String, dynamic> json) => RouteStage(
         code: json['code'] as String,
@@ -214,6 +81,8 @@ class RouteDates {
   const RouteDates({required this.issuedAt, required this.registeredAt, this.plannedAt, required this.expectedAt});
   final String issuedAt;
   final String registeredAt;
+
+  /// `yyyy-MM-dd`; после подтверждённого перевода — дата, назначенная принимающей больницей.
   final String? plannedAt;
   final String expectedAt;
   factory RouteDates.fromJson(Map<String, dynamic> json) => RouteDates(
@@ -288,6 +157,8 @@ class ChecklistItem {
       );
 }
 
+/// Решение врача по маршруту — только keep и redirect; ответы пациента и принимающей больницы — в
+/// [PatientRoute.journal]. redirect — это предложение: состояние перевода берётся из `progress.transfer`/`status`.
 class RouteDecision {
   const RouteDecision({
     required this.decisionId,
@@ -309,14 +180,14 @@ class RouteDecision {
   final String toMoName;
   final String? reason;
 
-  /// redirect | keep
+  /// redirect | keep ([RouteCodes.redirect], [RouteCodes.keep]).
   final String kind;
 
-  /// pending | accepted | declined — только для kind == redirect; null для keep (теперь это предложение, а не
-  /// свершившийся факт, см. §2.8, §3.3).
+  /// pending | accepted | declined ([RouteCodes.patientConsents]) — только для kind == redirect; null для keep.
+  /// redirect — предложение, ждущее согласия пациента, а не свершившийся перевод (§2.8, §3.3).
   final String? patientConsent;
 
-  /// Клиническая отметка врача; видна только принимающей организации, для гражданина всегда false (§3.1).
+  /// «Тяжёлый случай» — клиническая отметка врача; видна только персоналу, для гражданина всегда false; у keep — false.
   final bool severe;
   factory RouteDecision.fromJson(Map<String, dynamic> json) => RouteDecision(
         decisionId: json['decisionId'] as String,
@@ -365,7 +236,8 @@ class RouteHistoryItem {
       );
 }
 
-/// Служебная панель врача; у гражданина всегда null.
+/// Служебная панель врача; у гражданина всегда null. Флаги, код следующего шага и приоритет — те же, что в строке
+/// рабочего списка, но с поправкой на сторону вызывающего (origin / receiving).
 class RouteDoctorPanel {
   const RouteDoctorPanel({
     required this.priority,
@@ -377,9 +249,17 @@ class RouteDoctorPanel {
     this.nextActionCode = '',
     this.shap,
   });
+
+  /// Фиксированная шкала 0…10: 7–10 — высокий, 4–6 — средний, 0–3 — низкий.
   final int priority;
+
+  /// Коды из [RouteCodes.riskFlags] (8 флагов); незнакомый код показывается запасной подписью.
   final List<String> riskFlags;
+
+  /// Русский текст следующего шага от API — только запасная подпись; для локализации — [nextActionCode].
   final String nextAction;
+
+  /// Один из [RouteCodes.nextActions] (14 кодов, включая closed) или '' у старого сервера.
   final String nextActionCode;
   final String explanation;
   final double pRefusal;
@@ -440,12 +320,20 @@ class PatientRoute {
     this.progress,
     this.journal = const [],
   });
+
+  /// SYN-{регион}-{больница очереди}-{профиль}-{NN}; больницу пациента брать из [organization] / `progress`, не из рефа.
   final String patientRef;
   final bool synthetic;
+
+  /// citizen | doctor.
   final String audience;
   final String asOf;
   final String regionKato;
+
+  /// После подтверждённого перевода — принимающая больница.
   final RouteOrganization organization;
+
+  /// Код текущего этапа: waitlisted | transfer | date_assigned | hospitalized; stageTitle — его подпись из timeline.
   final String stage;
   final String stageTitle;
   final List<RouteStage> timeline;
@@ -454,16 +342,25 @@ class PatientRoute {
   final RouteForecast forecast;
   final List<RouteBenchmark> benchmarks;
   final List<ChecklistItem> checklist;
+
+  /// Больницы того же профиля, где ждать меньше; пусто после подтверждённого перевода и у закрытого маршрута. Для
+  /// показа и выбора — [offeredAlternatives].
   final List<Alternative> alternatives;
   final ModelInfo? alternativesModel;
+
+  /// Решения врача keep/redirect, свежие первыми.
   final List<RouteDecision> decisions;
   final List<RouteHistoryItem> history;
+
+  /// Служебная панель; у гражданина null.
   final RouteDoctorPanel? doctor;
   final String basis;
   final RouteStandardRef standard;
 
-  /// Сигналы гражданина, свежие первыми; validationDue — нет подтверждения ожидания за 30 дней, показать «Вы ещё ждёте?».
+  /// Сигналы гражданина, свежие первыми.
   final List<RouteSignal> signals;
+
+  /// true — нет подтверждения ожидания за 30 дней и маршрут в waiting/kept: показать «Вы ещё ждёте?».
   final bool validationDue;
 
   /// Машина состояний маршрута (§3.1): кто сейчас сторона, что ей можно и каков открытый перевод. Объявлено
@@ -473,11 +370,17 @@ class PatientRoute {
   /// Полная история маршрута, свежие записи первыми (§3.2) — надмножество decisions[]/signals[].
   final List<RouteJournalEntry> journal;
 
+  /// Сигнал, на который маршрут ещё ждёт ответа: request_redirect, withdraw или treated_elsewhere.
   RouteSignal? get openSignal => signals.where((s) => s.open).firstOrNull;
+
+  /// Открытая просьба гражданина рассмотреть другую больницу.
   RouteSignal? get openRequest => signals.where((s) => s.open && s.kind == RouteCodes.requestRedirect).firstOrNull;
   RouteBenchmark? get targetBenchmark => benchmarks.where((b) => b.code == 'moh_target_wait_days').firstOrNull;
   int get expiredChecklistCount => checklist.where((c) => c.status == RouteCodes.expired).length;
   int get validChecklistCount => checklist.length - expiredChecklistCount;
+
+  /// Самое свежее предложение перевода из decisions[] — только история: оно может быть уже отклонено, отменено или
+  /// отказано. Идёт ли перевод сейчас и куда — `progress.transfer` и `progress.status`.
   RouteDecision? get latestRedirect => decisions.where((d) => d.kind == RouteCodes.redirect).firstOrNull;
 
   /// true — [action] сейчас разрешено этой стороне (`progress.allowed`); экраны должны показывать действия
@@ -494,7 +397,8 @@ class PatientRoute {
     return alternatives.where((a) => !blocked.contains(a.moCode)).toList();
   }
 
-  /// Самое свежее решение врача (ISO-даты сравниваются как строки) — «ответ врача» на главной и в «Что сейчас».
+  /// Самое свежее решение врача keep/redirect (ISO-даты сравниваются как строки). Это история, а не состояние:
+  /// для карточки «что сейчас» — `progress.status` и `progress.transfer`.
   RouteDecision? get latestDecision =>
       decisions.isEmpty ? null : decisions.reduce((a, b) => a.recordedAt.compareTo(b.recordedAt) >= 0 ? a : b);
 
@@ -529,195 +433,7 @@ class PatientRoute {
         signals: (json['signals'] as List<dynamic>? ?? []).map((x) => RouteSignal.fromJson(x as Map<String, dynamic>)).toList(),
         validationDue: json['validationDue'] as bool? ?? false,
         progress: json['progress'] == null ? null : RouteProgress.fromJson(json['progress'] as Map<String, dynamic>),
-        journal: (json['journal'] as List<dynamic>? ?? const []).map((j) => RouteJournalEntry.fromJson(j as Map<String, dynamic>)).toList(),
-      );
-}
-
-/// Состояние маршрута как машины состояний (§3.1) — что с ним сейчас происходит и что эта сторона может сделать.
-class RouteProgress {
-  const RouteProgress({
-    required this.status,
-    required this.originMoCode,
-    required this.responsibleMoCode,
-    required this.responsibleMoName,
-    this.transfer,
-    this.lastAttempt,
-    this.prefersCurrent = false,
-    this.closedReason,
-    this.closedAt,
-    this.overdue = false,
-    this.allowed = const [],
-    this.blockedMoCodes = const [],
-    this.side = RouteCodes.sideNone,
-  });
-
-  /// waiting | kept | transfer_pending_consent | transfer_pending_confirmation | transferred | admitted |
-  /// withdrawal_requested | closed (RouteCodes.status*).
-  final String status;
-
-  /// Больница, закодированная в patientRef — откуда пациент встал в очередь.
-  final String originMoCode;
-
-  /// origin, пока перевод не подтверждён, иначе — принимающая больница (transfer.toMoCode).
-  final String responsibleMoCode;
-  final String responsibleMoName;
-
-  /// Текущий перевод; null — нет активного перевода, или он уже завершился (отказ/отзыв/отмена/перевод закрыт).
-  final RouteTransfer? transfer;
-
-  /// Последний неудавшийся перевод — для подсказки «уже отказали» (null, если такого не было).
-  final RouteTransferAttempt? lastAttempt;
-
-  /// Гражданин попросил остаться в своей больнице; сбрасывается следующим request_redirect.
-  final bool prefersCurrent;
-
-  /// discharged | no_show | withdrawn | treated_elsewhere — только когда status == closed.
-  final String? closedReason;
-  final String? closedAt;
-
-  /// true — маршрут в статусе transferred и сегодня позже plannedAt + 3 дня (Asia/Almaty).
-  final bool overdue;
-
-  /// Что может сделать именно этот вызывающий прямо сейчас — единственный источник для показа действий (§4.11).
-  final List<String> allowed;
-
-  /// Больницы, которые нельзя предложить этому маршруту (отказали или их отклонил пациент).
-  final List<String> blockedMoCodes;
-
-  /// none | citizen | origin | receiving.
-  final String side;
-
-  factory RouteProgress.fromJson(Map<String, dynamic> json) => RouteProgress(
-        status: json['status'] as String? ?? RouteCodes.statusWaiting,
-        originMoCode: json['originMoCode'] as String? ?? '',
-        responsibleMoCode: json['responsibleMoCode'] as String? ?? '',
-        responsibleMoName: json['responsibleMoName'] as String? ?? json['responsibleMoCode'] as String? ?? '',
-        transfer: json['transfer'] == null ? null : RouteTransfer.fromJson(json['transfer'] as Map<String, dynamic>),
-        lastAttempt: json['lastAttempt'] == null ? null : RouteTransferAttempt.fromJson(json['lastAttempt'] as Map<String, dynamic>),
-        prefersCurrent: json['prefersCurrent'] as bool? ?? false,
-        closedReason: json['closedReason'] as String?,
-        closedAt: json['closedAt'] as String?,
-        overdue: json['overdue'] as bool? ?? false,
-        allowed: (json['allowed'] as List<dynamic>? ?? const []).cast<String>(),
-        blockedMoCodes: (json['blockedMoCodes'] as List<dynamic>? ?? const []).cast<String>(),
-        side: json['side'] as String? ?? RouteCodes.sideNone,
-      );
-}
-
-/// Перевод, который сейчас определяет маршрут — предложен, ждёт согласия/подтверждения или уже подтверждён (§3.1).
-class RouteTransfer {
-  const RouteTransfer({
-    required this.decisionId,
-    required this.toMoCode,
-    required this.toMoName,
-    this.severe = false,
-    this.reason,
-    required this.proposedAt,
-    this.consentAt,
-    this.confirmedAt,
-    this.plannedAt,
-    this.admittedAt,
-  });
-
-  /// Id решения-redirect — ключ для `POST /route/me/consent` и для `/journal/referrals/{id}/…`.
-  final String decisionId;
-  final String toMoCode;
-  final String toMoName;
-
-  /// Клиническая отметка врача; для гражданина всегда false.
-  final bool severe;
-  final String? reason;
-  final String proposedAt;
-  final String? consentAt;
-  final String? confirmedAt;
-
-  /// `yyyy-MM-dd`; появляется при confirm, меняется при reschedule.
-  final String? plannedAt;
-  final String? admittedAt;
-
-  factory RouteTransfer.fromJson(Map<String, dynamic> json) => RouteTransfer(
-        decisionId: json['decisionId'] as String? ?? '',
-        toMoCode: json['toMoCode'] as String? ?? '',
-        toMoName: json['toMoName'] as String? ?? json['toMoCode'] as String? ?? '',
-        severe: json['severe'] as bool? ?? false,
-        reason: json['reason'] as String?,
-        proposedAt: json['proposedAt'] as String? ?? '',
-        consentAt: json['consentAt'] as String?,
-        confirmedAt: json['confirmedAt'] as String?,
-        plannedAt: json['plannedAt'] as String?,
-        admittedAt: json['admittedAt'] as String?,
-      );
-}
-
-/// Последняя неудавшаяся попытка перевода — подсказка «эта больница уже отказала» (§3.1).
-class RouteTransferAttempt {
-  const RouteTransferAttempt({required this.outcome, required this.toMoCode, required this.toMoName, required this.at, this.reason});
-
-  /// declined | consent_withdrawn | cancelled | rejected | patient_withdrew (RouteCodes.attempt*).
-  final String outcome;
-  final String toMoCode;
-  final String toMoName;
-  final String at;
-  final String? reason;
-
-  factory RouteTransferAttempt.fromJson(Map<String, dynamic> json) => RouteTransferAttempt(
-        outcome: json['outcome'] as String? ?? '',
-        toMoCode: json['toMoCode'] as String? ?? '',
-        toMoName: json['toMoName'] as String? ?? json['toMoCode'] as String? ?? '',
-        at: json['at'] as String? ?? '',
-        reason: json['reason'] as String?,
-      );
-}
-
-/// Одна строка полной истории маршрута (§3.2) — надмножество decisions[]/signals[], самые новые первыми.
-class RouteJournalEntry {
-  const RouteJournalEntry({
-    required this.id,
-    required this.at,
-    required this.kind,
-    required this.role,
-    this.moCode,
-    this.moName,
-    this.reason,
-    this.plannedAt,
-    this.severe = false,
-  });
-
-  /// Id записи журнала; для kind == redirect равен progress.transfer.decisionId, пока этот перевод актуален.
-  final String id;
-  final String at;
-
-  /// request | prefer_current | still_waiting | withdraw | treated_elsewhere | keep | redirect | consent_accepted |
-  /// consent_declined | confirm | reject | reschedule | admit | no_show | discharge | cancel | close.
-  final String kind;
-
-  /// Роль автора записи: citizen | doctor | org_admin | …
-  final String role;
-
-  /// Целевая/своя больница — смысл зависит от kind (§3.2); null для close, still_waiting, prefer_current, withdraw,
-  /// treated_elsewhere.
-  final String? moCode;
-  final String? moName;
-
-  /// Причина врача / комментарий гражданина; для discharge — эпикриз персоналу и null гражданину.
-  final String? reason;
-
-  /// Только для confirm и reschedule, `yyyy-MM-dd`.
-  final String? plannedAt;
-
-  /// Только для redirect; для гражданина всегда false.
-  final bool severe;
-
-  factory RouteJournalEntry.fromJson(Map<String, dynamic> json) => RouteJournalEntry(
-        id: json['id'] as String? ?? '',
-        at: json['at'] as String? ?? '',
-        kind: json['kind'] as String? ?? '',
-        role: json['role'] as String? ?? '',
-        moCode: json['moCode'] as String?,
-        moName: json['moName'] as String?,
-        reason: json['reason'] as String?,
-        plannedAt: json['plannedAt'] as String?,
-        severe: json['severe'] as bool? ?? false,
+        journal: List.unmodifiable((json['journal'] as List<dynamic>? ?? const []).map((j) => RouteJournalEntry.fromJson(j as Map<String, dynamic>))),
       );
 }
 

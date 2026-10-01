@@ -1,0 +1,450 @@
+{
+ "patientRef": "SYN-75-08IV-121-01",
+ "synthetic": true,
+ "audience": "citizen",
+ "asOf": "2025-03-31",
+ "regionKato": "75",
+ "organization": {
+  "moCode": "08IV",
+  "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Алматинский онкологический центр\" Управления общественного здравоохранения города Алматы",
+  "profileCode": "121",
+  "profileName": "Хирургические для взрослых"
+ },
+ "stage": "transfer",
+ "stageTitle": "Перевод",
+ "timeline": [
+  {
+   "code": "referral_issued",
+   "order": 1,
+   "title": "Направление выдано",
+   "date": "2025-02-03",
+   "status": "done",
+   "norm": "Организация ПМСП выдаёт направление на плановую госпитализацию: госуслуга, 1 рабочий день"
+  },
+  {
+   "code": "examination",
+   "order": 2,
+   "title": "Обследование",
+   "date": "2025-02-10",
+   "status": "done",
+   "norm": "Направляющая организация проводит исследования по приложению 5; сроки давности — в чек-листе"
+  },
+  {
+   "code": "waitlisted",
+   "order": 3,
+   "title": "Внесено в лист ожидания",
+   "date": "2025-02-10",
+   "status": "done",
+   "norm": "Ответственный специалист ПМСП регистрирует направление в Портале бюро госпитализации и отслеживает его ежедневно"
+  },
+  {
+   "code": "transfer",
+   "order": 4,
+   "title": "Перевод",
+   "date": "2026-09-22",
+   "status": "current",
+   "norm": null
+  },
+  {
+   "code": "date_assigned",
+   "order": 5,
+   "title": "Дата госпитализации назначена",
+   "date": null,
+   "status": "upcoming",
+   "norm": "Планируемая дата определяется в течение 2 рабочих дней после регистрации; перенос по просьбе пациента — не более чем на 2 календарных дня"
+  },
+  {
+   "code": "hospitalized",
+   "order": 6,
+   "title": "Госпитализация",
+   "date": null,
+   "status": "upcoming",
+   "norm": "Приём через приёмное отделение стационара в назначенную дату"
+  }
+ ],
+ "dates": {
+  "issuedAt": "2025-02-03",
+  "registeredAt": "2025-02-10",
+  "plannedAt": "2025-03-31",
+  "expectedAt": "2025-03-31"
+ },
+ "daysWaiting": 49,
+ "forecast": {
+  "p50Days": 1.5055755104098425,
+  "p90Days": 20.695363364980256,
+  "pWithin30Days": 0.5598637320056166,
+  "fromModel": true,
+  "model": {
+   "name": "wait_quantile",
+   "version": "1.0.0",
+   "trainedThrough": "2025-02-28"
+  }
+ },
+ "benchmarks": [
+  {
+   "code": "moh_avg_wait_days",
+   "value": 30,
+   "unit": "days",
+   "title": "Средний срок ожидания плановой госпитализации по стране",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  },
+  {
+   "code": "moh_share_over_20_days",
+   "value": 0.17,
+   "unit": "share",
+   "title": "Доля плановых пациентов, ожидающих дольше 20 дней",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  },
+  {
+   "code": "moh_target_wait_days",
+   "value": 20,
+   "unit": "days",
+   "title": "Целевой срок ожидания (МЗ РК)",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  }
+ ],
+ "checklist": [
+  {
+   "code": "biochemistry",
+   "title": "Биохимия крови (креатинин, общий белок, АЛТ, АСТ)",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2025-02-10",
+   "validUntil": "2025-02-24",
+   "status": "expired"
+  },
+  {
+   "code": "cbc",
+   "title": "Общий анализ крови",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2025-02-06",
+   "validUntil": "2025-02-20",
+   "status": "expired"
+  },
+  {
+   "code": "coagulogram",
+   "title": "Коагулограмма",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2025-02-05",
+   "validUntil": "2025-02-19",
+   "status": "expired"
+  },
+  {
+   "code": "ecg",
+   "title": "ЭКГ",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2025-02-03",
+   "validUntil": "2025-02-17",
+   "status": "expired"
+  },
+  {
+   "code": "therapist_consultation",
+   "title": "Консультация терапевта",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2025-02-08",
+   "validUntil": "2025-02-22",
+   "status": "expired"
+  },
+  {
+   "code": "urinalysis",
+   "title": "Общий анализ мочи",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2025-02-09",
+   "validUntil": "2025-02-23",
+   "status": "expired"
+  },
+  {
+   "code": "syphilis_microreaction",
+   "title": "Микрореакция на сифилис",
+   "validityDays": 30,
+   "validityLabel": "1 месяц",
+   "doneAt": "2025-02-09",
+   "validUntil": "2025-03-11",
+   "status": "expired"
+  },
+  {
+   "code": "hepatitis_markers",
+   "title": "Маркеры гепатитов B и C",
+   "validityDays": 180,
+   "validityLabel": "6 месяцев",
+   "doneAt": "2025-02-07",
+   "validUntil": "2025-08-06",
+   "status": "valid"
+  },
+  {
+   "code": "hiv",
+   "title": "Анализ на ВИЧ",
+   "validityDays": 180,
+   "validityLabel": "6 месяцев",
+   "doneAt": "2025-02-09",
+   "validUntil": "2025-08-08",
+   "status": "valid"
+  },
+  {
+   "code": "fluorography",
+   "title": "Флюорография",
+   "validityDays": 365,
+   "validityLabel": "12 месяцев",
+   "doneAt": "2025-02-08",
+   "validUntil": "2026-02-08",
+   "status": "valid"
+  }
+ ],
+ "alternatives": [
+  {
+   "mo": {
+    "moCode": "031N",
+    "name": "Государственное учреждение \"Региональный военный госпиталь с поликлиникой Комитета национальной безопасности Республики Казахстан в городе Алматы\"",
+    "regionKato": "75"
+   },
+   "p50Days": 2.2768362136347244,
+   "p90Days": 10.399114858953418,
+   "pRefusal": 0.5110051859684308,
+   "distanceKm": 0,
+   "isNeighborRegion": false
+  },
+  {
+   "mo": {
+    "moCode": "22GN",
+    "name": "Товарищество с ограниченной ответственностью \"Достар Мед\"",
+    "regionKato": "75"
+   },
+   "p50Days": 3.6507239242440073,
+   "p90Days": 14.6560748353502,
+   "pRefusal": 0.40898177884188436,
+   "distanceKm": 0,
+   "isNeighborRegion": false
+  },
+  {
+   "mo": {
+    "moCode": "227G",
+    "name": "Товарищество с ограниченной ответственностью \"Медцентр - Рахат\"",
+    "regionKato": "75"
+   },
+   "p50Days": 6.372806902471538,
+   "p90Days": 21.368153349689003,
+   "pRefusal": 0.5471247901152622,
+   "distanceKm": 0,
+   "isNeighborRegion": false
+  }
+ ],
+ "alternativesModel": {
+  "name": "wait_quantile",
+  "version": "1.0.0",
+  "trainedThrough": "2025-02-28"
+ },
+ "decisions": [
+  {
+   "decisionId": "34dc8035-192c-4cee-8eb2-68e8e1cba559",
+   "role": "doctor",
+   "recordedAt": "2026-09-25T19:26:38.487527+00:00",
+   "fromMoCode": "031N",
+   "toMoCode": "22GN",
+   "toMoName": "Товарищество с ограниченной ответственностью \"Достар Мед\"",
+   "reason": "ozhidanie_koroche",
+   "kind": "redirect",
+   "patientConsent": "pending",
+   "severe": false
+  },
+  {
+   "decisionId": "df3238d3-f033-4070-b444-3d61773e7422",
+   "role": "doctor",
+   "recordedAt": "2026-09-25T19:14:39.387079+00:00",
+   "fromMoCode": "031N",
+   "toMoCode": "08IV",
+   "toMoName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Алматинский онкологический центр\" Управления общественного здравоохранения города Алматы",
+   "reason": "профиль требует именно этой клиники",
+   "kind": "keep",
+   "patientConsent": null,
+   "severe": false
+  },
+  {
+   "decisionId": "d2a6afd6-c158-49ab-96ef-385974a9fe4a",
+   "role": "doctor",
+   "recordedAt": "2026-09-22T07:14:48.883134+00:00",
+   "fromMoCode": "031N",
+   "toMoCode": "031N",
+   "toMoName": "Государственное учреждение \"Региональный военный госпиталь с поликлиникой Комитета национальной безопасности Республики Казахстан в городе Алматы\"",
+   "reason": "ozhidanie koroche, profil sovpadaet",
+   "kind": "redirect",
+   "patientConsent": "pending",
+   "severe": false
+  }
+ ],
+ "history": [
+  {
+   "moCode": "028L",
+   "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Городская клиническая больница № 5\" Управления общественного здравоохранения города Алматы",
+   "profileCode": "600",
+   "profileName": "Для восстановительного лечения и медицинской реабилитации: кардиологические для взрослых",
+   "registeredAt": "2025-01-24",
+   "outcome": "hospitalized",
+   "outcomeAt": "2025-02-11",
+   "waitDays": 18
+  },
+  {
+   "moCode": "ZJ48",
+   "moName": "Товарищество с ограниченной ответственностью \"Диабетический центр\"",
+   "profileCode": "081",
+   "profileName": "Эндокринологические для взрослых",
+   "registeredAt": "2024-10-07",
+   "outcome": "hospitalized",
+   "outcomeAt": "2024-11-29",
+   "waitDays": 53
+  },
+  {
+   "moCode": "233U",
+   "moName": "Товарищество с ограниченной ответственностью «MEDITERRA» (МЕДИТЕРРА)",
+   "profileCode": "151",
+   "profileName": "Кардиохирургические для взрослых",
+   "registeredAt": "2024-04-29",
+   "outcome": "hospitalized",
+   "outcomeAt": "2024-04-29",
+   "waitDays": 0
+  }
+ ],
+ "doctor": null,
+ "basis": "Синтетический маршрут: пациент выдуман, а сроки, очередь и исходы взяты из реального состояния очередей региона на 31.03.2025. Причины отказов в открытых данных отсутствуют и пациенту не приписываются.",
+ "standard": {
+  "source": "Стандарт организации оказания медицинской помощи в стационарных условиях в РК, приказ МЗ РК от 24.03.2022 № ҚР-ДСМ-27 (ред. от 15.09.2025 № 94)",
+  "sourceUrl": "https://adilet.zan.kz/rus/docs/V2200027218",
+  "sourceDate": "2025-09-15",
+  "available": true
+ },
+ "signals": [
+  {
+   "decisionId": "2dfbbbc0-1b84-43de-aea9-b4bfe9e1c53b",
+   "recordedAt": "2026-09-25T19:22:33.355275+00:00",
+   "kind": "request_redirect",
+   "toMoCode": "22GN",
+   "toMoName": "Товарищество с ограниченной ответственностью \"Достар Мед\"",
+   "comment": "zhakyn",
+   "open": false
+  },
+  {
+   "decisionId": "c01e3f9d-c05f-4824-9942-58cb70388b0f",
+   "recordedAt": "2026-09-25T19:14:32.79191+00:00",
+   "kind": "request_redirect",
+   "toMoCode": "031N",
+   "toMoName": "Государственное учреждение \"Региональный военный госпиталь с поликлиникой Комитета национальной безопасности Республики Казахстан в городе Алматы\"",
+   "comment": "живу рядом, могу приехать в любой день",
+   "open": false
+  },
+  {
+   "decisionId": "cc0f88c0-947f-41e2-b2b6-648d66a48429",
+   "recordedAt": "2026-09-25T19:14:30.350524+00:00",
+   "kind": "still_waiting",
+   "toMoCode": null,
+   "toMoName": null,
+   "comment": null,
+   "open": false
+  }
+ ],
+ "validationDue": false,
+ "progress": {
+  "status": "transfer_pending_consent",
+  "originMoCode": "08IV",
+  "responsibleMoCode": "08IV",
+  "responsibleMoName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Алматинский онкологический центр\" Управления общественного здравоохранения города Алматы",
+  "transfer": {
+   "decisionId": "d2a6afd6-c158-49ab-96ef-385974a9fe4a",
+   "toMoCode": "031N",
+   "toMoName": "Государственное учреждение \"Региональный военный госпиталь с поликлиникой Комитета национальной безопасности Республики Казахстан в городе Алматы\"",
+   "severe": false,
+   "reason": "ozhidanie koroche, profil sovpadaet",
+   "proposedAt": "2026-09-22T07:14:48.883134+00:00",
+   "consentAt": null,
+   "confirmedAt": null,
+   "plannedAt": null,
+   "admittedAt": null
+  },
+  "lastAttempt": null,
+  "prefersCurrent": false,
+  "closedReason": null,
+  "closedAt": null,
+  "overdue": false,
+  "allowed": [
+   "accept_transfer",
+   "decline_transfer",
+   "withdraw"
+  ],
+  "blockedMoCodes": [],
+  "side": "citizen"
+ },
+ "journal": [
+  {
+   "id": "34dc8035-192c-4cee-8eb2-68e8e1cba559",
+   "at": "2026-09-25T19:26:38.487527+00:00",
+   "kind": "redirect",
+   "role": "doctor",
+   "moCode": "22GN",
+   "moName": "Товарищество с ограниченной ответственностью \"Достар Мед\"",
+   "reason": "ozhidanie_koroche",
+   "plannedAt": null,
+   "severe": false
+  },
+  {
+   "id": "2dfbbbc0-1b84-43de-aea9-b4bfe9e1c53b",
+   "at": "2026-09-25T19:22:33.355275+00:00",
+   "kind": "request",
+   "role": "citizen",
+   "moCode": "22GN",
+   "moName": "Товарищество с ограниченной ответственностью \"Достар Мед\"",
+   "reason": "zhakyn",
+   "plannedAt": null,
+   "severe": false
+  },
+  {
+   "id": "df3238d3-f033-4070-b444-3d61773e7422",
+   "at": "2026-09-25T19:14:39.387079+00:00",
+   "kind": "keep",
+   "role": "doctor",
+   "moCode": "08IV",
+   "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Алматинский онкологический центр\" Управления общественного здравоохранения города Алматы",
+   "reason": "профиль требует именно этой клиники",
+   "plannedAt": null,
+   "severe": false
+  },
+  {
+   "id": "c01e3f9d-c05f-4824-9942-58cb70388b0f",
+   "at": "2026-09-25T19:14:32.79191+00:00",
+   "kind": "request",
+   "role": "citizen",
+   "moCode": "031N",
+   "moName": "Государственное учреждение \"Региональный военный госпиталь с поликлиникой Комитета национальной безопасности Республики Казахстан в городе Алматы\"",
+   "reason": "живу рядом, могу приехать в любой день",
+   "plannedAt": null,
+   "severe": false
+  },
+  {
+   "id": "cc0f88c0-947f-41e2-b2b6-648d66a48429",
+   "at": "2026-09-25T19:14:30.350524+00:00",
+   "kind": "still_waiting",
+   "role": "citizen",
+   "moCode": null,
+   "moName": null,
+   "reason": null,
+   "plannedAt": null,
+   "severe": false
+  },
+  {
+   "id": "d2a6afd6-c158-49ab-96ef-385974a9fe4a",
+   "at": "2026-09-22T07:14:48.883134+00:00",
+   "kind": "redirect",
+   "role": "doctor",
+   "moCode": "031N",
+   "moName": "Государственное учреждение \"Региональный военный госпиталь с поликлиникой Комитета национальной безопасности Республики Казахстан в городе Алматы\"",
+   "reason": "ozhidanie koroche, profil sovpadaet",
+   "plannedAt": null,
+   "severe": false
+  }
+ ]
+}

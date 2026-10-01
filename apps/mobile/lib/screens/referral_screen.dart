@@ -262,7 +262,8 @@ class _ReferralScreenState extends State<ReferralScreen> {
           'recommended': {'moCode': recommended(options).moCode},
           'chosen': {'moCode': chosen},
           'reason': reason,
-        }, _decisionKey);
+          // MOBILE-REFACTOR-SHIM: Idempotency-Key стал именованным параметром recordDecision
+        }, idempotencyKey: _decisionKey);
       }
       if (mounted) {
         setState(() => _recorded = id);

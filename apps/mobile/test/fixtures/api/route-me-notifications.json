@@ -1,0 +1,49 @@
+{
+ "unread": 4,
+ "items": [
+  {
+   "id": "d2a6afd6-c158-49ab-96ef-385974a9fe4a",
+   "kind": "redirect",
+   "at": "2026-09-22T07:14:48.883134+00:00",
+   "moName": "Государственное учреждение \"Региональный военный госпиталь с поликлиникой Комитета национальной безопасности Республики Казахстан в городе Алматы\"",
+   "plannedAt": null,
+   "reason": "ozhidanie koroche, profil sovpadaet",
+   "needsAction": true,
+   "read": false,
+   "count": null
+  },
+  {
+   "id": "733d41f7-fa74-164e-b0f5-6fe56cf7d470",
+   "kind": "tests_expiring",
+   "at": "2026-10-01T17:59:38.2107175+00:00",
+   "moName": null,
+   "plannedAt": "2025-03-31",
+   "reason": null,
+   "needsAction": false,
+   "read": false,
+   "count": 7
+  },
+  {
+   "id": "34dc8035-192c-4cee-8eb2-68e8e1cba559",
+   "kind": "redirect",
+   "at": "2026-09-25T19:26:38.487527+00:00",
+   "moName": "Товарищество с ограниченной ответственностью \"Достар Мед\"",
+   "plannedAt": null,
+   "reason": "ozhidanie_koroche",
+   "needsAction": false,
+   "read": false,
+   "count": null
+  },
+  {
+   "id": "df3238d3-f033-4070-b444-3d61773e7422",
+   "kind": "keep",
+   "at": "2026-09-25T19:14:39.387079+00:00",
+   "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Алматинский онкологический центр\" Управления общественного здравоохранения города Алматы",
+   "plannedAt": null,
+   "reason": "профиль требует именно этой клиники",
+   "needsAction": false,
+   "read": false,
+   "count": null
+  }
+ ]
+}

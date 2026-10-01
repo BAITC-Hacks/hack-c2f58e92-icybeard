@@ -1,0 +1,80 @@
+{
+ "items": [
+  {
+   "decisionId": "34dc8035-192c-4cee-8eb2-68e8e1cba559",
+   "actor": "doctor1",
+   "role": "doctor",
+   "subject": "route",
+   "subjectId": "SYN-75-08IV-121-01",
+   "recommended": {
+    "moCode": "031N"
+   },
+   "chosen": {
+    "moCode": "22GN"
+   },
+   "reason": "ozhidanie_koroche",
+   "recordedAt": "2026-09-25T19:26:38.487527+00:00"
+  },
+  {
+   "decisionId": "df3238d3-f033-4070-b444-3d61773e7422",
+   "actor": "doctor1",
+   "role": "doctor",
+   "subject": "route",
+   "subjectId": "SYN-75-08IV-121-01",
+   "recommended": {
+    "moCode": "031N"
+   },
+   "chosen": {
+    "moCode": "08IV"
+   },
+   "reason": "профиль требует именно этой клиники",
+   "recordedAt": "2026-09-25T19:14:39.387079+00:00"
+  },
+  {
+   "decisionId": "d2a6afd6-c158-49ab-96ef-385974a9fe4a",
+   "actor": "doctor1",
+   "role": "doctor",
+   "subject": "route",
+   "subjectId": "SYN-75-08IV-121-01",
+   "recommended": {
+    "moCode": "031N"
+   },
+   "chosen": {
+    "moCode": "031N"
+   },
+   "reason": "ozhidanie koroche, profil sovpadaet",
+   "recordedAt": "2026-09-22T07:14:48.883134+00:00"
+  },
+  {
+   "decisionId": "326b47c7-0106-486d-876d-e787ae8cdc71",
+   "actor": "doctor1",
+   "role": "doctor",
+   "subject": "route",
+   "subjectId": "SYN-75-225T-251-01",
+   "recommended": {
+    "moCode": "0290"
+   },
+   "chosen": {
+    "moCode": "0290"
+   },
+   "reason": "ожидание короче, профиль совпадает",
+   "recordedAt": "2026-09-22T05:39:43.225494+00:00"
+  },
+  {
+   "decisionId": "edc3c328-0c9c-42be-a746-106e79bf8e1a",
+   "actor": "doctor1",
+   "role": "doctor",
+   "subject": "referral",
+   "subjectId": "75.028B.381.11",
+   "recommended": null,
+   "chosen": {
+    "moCode": "028B"
+   },
+   "reason": "kc",
+   "recordedAt": "2026-09-10T21:07:20.090004+00:00"
+  }
+ ],
+ "page": 1,
+ "size": 5,
+ "total": 5
+}

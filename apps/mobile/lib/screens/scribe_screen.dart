@@ -107,7 +107,9 @@ class _ScribeScreenState extends State<ScribeScreen> {
       error = null;
     });
     try {
-      final created = await session.api.createScribeSession(_sessionLanguage);
+      // MOBILE-REFACTOR-SHIM: запись начинается только по согласию пациента (consentId), а у этого экрана его нет —
+      // сервер откажет; экран со шагом согласия придёт на смену этому
+      final created = await session.api.createScribeSession(consentId: '', language: _sessionLanguage);
       if (!mounted) {
         return;
       }
@@ -181,7 +183,8 @@ class _ScribeScreenState extends State<ScribeScreen> {
     }
     try {
       final file = File(path);
-      final text = await context.read<Session>().api.uploadScribeAudio(sessionId!, await file.readAsBytes(), 'consult.m4a');
+      // MOBILE-REFACTOR-SHIM: загрузка аудио теперь возвращает фразы стенограммы; старому экрану нужен только текст
+      final text = (await context.read<Session>().api.uploadScribeAudio(sessionId!, await file.readAsBytes(), 'consult.m4a')).text;
       await file.delete();
       if (mounted) {
         // тишина или шум дают пустую стенограмму — говорим об этом прямо, а не оставляем пустое поле без объяснения

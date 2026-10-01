@@ -1,0 +1,322 @@
+{
+ "patientRef": "SYN-75-224E-171-01",
+ "synthetic": true,
+ "audience": "doctor",
+ "asOf": "2025-03-31",
+ "regionKato": "75",
+ "organization": {
+  "moCode": "224E",
+  "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Городская больница скорой неотложной помощи\" Управления общественного здравоохранения города Алматы",
+  "profileCode": "171",
+  "profileName": "Травматологические для взрослых"
+ },
+ "stage": "date_assigned",
+ "stageTitle": "Дата госпитализации назначена",
+ "timeline": [
+  {
+   "code": "referral_issued",
+   "order": 1,
+   "title": "Направление выдано",
+   "date": "2024-12-24",
+   "status": "done",
+   "norm": "Организация ПМСП выдаёт направление на плановую госпитализацию: госуслуга, 1 рабочий день"
+  },
+  {
+   "code": "examination",
+   "order": 2,
+   "title": "Обследование",
+   "date": "2025-01-01",
+   "status": "done",
+   "norm": "Направляющая организация проводит исследования по приложению 5; сроки давности — в чек-листе"
+  },
+  {
+   "code": "waitlisted",
+   "order": 3,
+   "title": "Внесено в лист ожидания",
+   "date": "2025-01-01",
+   "status": "done",
+   "norm": "Ответственный специалист ПМСП регистрирует направление в Портале бюро госпитализации и отслеживает его ежедневно"
+  },
+  {
+   "code": "date_assigned",
+   "order": 4,
+   "title": "Дата госпитализации назначена",
+   "date": "2025-03-31",
+   "status": "current",
+   "norm": "Планируемая дата определяется в течение 2 рабочих дней после регистрации; перенос по просьбе пациента — не более чем на 2 календарных дня"
+  },
+  {
+   "code": "hospitalized",
+   "order": 5,
+   "title": "Госпитализация",
+   "date": null,
+   "status": "upcoming",
+   "norm": "Приём через приёмное отделение стационара в назначенную дату"
+  }
+ ],
+ "dates": {
+  "issuedAt": "2024-12-24",
+  "registeredAt": "2025-01-01",
+  "plannedAt": "2025-03-31",
+  "expectedAt": "2025-03-31"
+ },
+ "daysWaiting": 89,
+ "forecast": {
+  "p50Days": 23.03904982602468,
+  "p90Days": 53.61990480681515,
+  "pWithin30Days": 0.3933799556606525,
+  "fromModel": true,
+  "model": {
+   "name": "wait_quantile",
+   "version": "1.0.0",
+   "trainedThrough": "2025-02-28"
+  }
+ },
+ "benchmarks": [
+  {
+   "code": "moh_avg_wait_days",
+   "value": 30,
+   "unit": "days",
+   "title": "Средний срок ожидания плановой госпитализации по стране",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  },
+  {
+   "code": "moh_share_over_20_days",
+   "value": 0.17,
+   "unit": "share",
+   "title": "Доля плановых пациентов, ожидающих дольше 20 дней",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  },
+  {
+   "code": "moh_target_wait_days",
+   "value": 20,
+   "unit": "days",
+   "title": "Целевой срок ожидания (МЗ РК)",
+   "source": "МЗ РК, расширенная коллегия 19.02.2026 (kapital.kz/gosudarstvo/145156)",
+   "sourceDate": "2026-02-19"
+  }
+ ],
+ "checklist": [
+  {
+   "code": "biochemistry",
+   "title": "Биохимия крови (креатинин, общий белок, АЛТ, АСТ)",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2025-01-01",
+   "validUntil": "2025-01-15",
+   "status": "expired"
+  },
+  {
+   "code": "cbc",
+   "title": "Общий анализ крови",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2025-01-01",
+   "validUntil": "2025-01-15",
+   "status": "expired"
+  },
+  {
+   "code": "coagulogram",
+   "title": "Коагулограмма",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2024-12-30",
+   "validUntil": "2025-01-13",
+   "status": "expired"
+  },
+  {
+   "code": "ecg",
+   "title": "ЭКГ",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2024-12-29",
+   "validUntil": "2025-01-12",
+   "status": "expired"
+  },
+  {
+   "code": "therapist_consultation",
+   "title": "Консультация терапевта",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2024-12-31",
+   "validUntil": "2025-01-14",
+   "status": "expired"
+  },
+  {
+   "code": "urinalysis",
+   "title": "Общий анализ мочи",
+   "validityDays": 14,
+   "validityLabel": "14 дней",
+   "doneAt": "2024-12-29",
+   "validUntil": "2025-01-12",
+   "status": "expired"
+  },
+  {
+   "code": "syphilis_microreaction",
+   "title": "Микрореакция на сифилис",
+   "validityDays": 30,
+   "validityLabel": "1 месяц",
+   "doneAt": "2024-12-27",
+   "validUntil": "2025-01-26",
+   "status": "expired"
+  },
+  {
+   "code": "hepatitis_markers",
+   "title": "Маркеры гепатитов B и C",
+   "validityDays": 180,
+   "validityLabel": "6 месяцев",
+   "doneAt": "2024-12-31",
+   "validUntil": "2025-06-29",
+   "status": "valid"
+  },
+  {
+   "code": "hiv",
+   "title": "Анализ на ВИЧ",
+   "validityDays": 180,
+   "validityLabel": "6 месяцев",
+   "doneAt": "2024-12-31",
+   "validUntil": "2025-06-29",
+   "status": "valid"
+  },
+  {
+   "code": "fluorography",
+   "title": "Флюорография",
+   "validityDays": 365,
+   "validityLabel": "12 месяцев",
+   "doneAt": "2024-12-24",
+   "validUntil": "2025-12-24",
+   "status": "valid"
+  }
+ ],
+ "alternatives": [
+  {
+   "mo": {
+    "moCode": "031N",
+    "name": "Государственное учреждение \"Региональный военный госпиталь с поликлиникой Комитета национальной безопасности Республики Казахстан в городе Алматы\"",
+    "regionKato": "75"
+   },
+   "p50Days": 3.599967224188033,
+   "p90Days": 11.835526955577588,
+   "pRefusal": 0.3579441062682349,
+   "distanceKm": 0,
+   "isNeighborRegion": false
+  },
+  {
+   "mo": {
+    "moCode": "028S",
+    "name": "Акционерное общество \"Казахский научно-исследовательский институт онкологии и радиологии\"",
+    "regionKato": "75"
+   },
+   "p50Days": 4.500179704187667,
+   "p90Days": 18.746661628743187,
+   "pRefusal": 0.8331507466673407,
+   "distanceKm": 0,
+   "isNeighborRegion": false
+  },
+  {
+   "mo": {
+    "moCode": "08UM",
+    "name": "Товарищество с ограниченной ответственностью \"Private clinic Almaty\" / \"Приват клиник Алматы\"",
+    "regionKato": "75"
+   },
+   "p50Days": 4.9358041798545065,
+   "p90Days": 16.37051228669578,
+   "pRefusal": 0.7712197655779504,
+   "distanceKm": 0,
+   "isNeighborRegion": false
+  }
+ ],
+ "alternativesModel": {
+  "name": "wait_quantile",
+  "version": "1.0.0",
+  "trainedThrough": "2025-02-28"
+ },
+ "decisions": [],
+ "history": [
+  {
+   "moCode": "027M",
+   "moName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Городская клиническая больница №4\" Управления общественного здравоохранения города Алматы\"",
+   "profileCode": "606",
+   "profileName": "Для восстановительного лечения и медицинской реабилитации: нейрохирургические для взрослых",
+   "registeredAt": "2024-12-28",
+   "outcome": "hospitalized",
+   "outcomeAt": "2025-03-02",
+   "waitDays": 64
+  },
+  {
+   "moCode": "0297",
+   "moName": "Акционерное общество \"Научно-исследовательский институт кардиологии и внутренних болезней\"",
+   "profileCode": "151",
+   "profileName": "Кардиохирургические для взрослых",
+   "registeredAt": "2024-09-04",
+   "outcome": "hospitalized",
+   "outcomeAt": "2024-09-16",
+   "waitDays": 12
+  }
+ ],
+ "doctor": {
+  "priority": 9,
+  "riskFlags": [
+   "stuck_over_30",
+   "refusal_risk",
+   "faster_alternative"
+  ],
+  "nextAction": "предложить перенаправление в организацию с меньшим ожиданием",
+  "nextActionCode": "redirect_faster",
+  "explanation": "очередь 37 направлений, прогноз ожидания 23 дн., прогноз риска отказа 39 %",
+  "pRefusal": 0.3871867467060371,
+  "refusalOrgInTraining": false,
+  "shap": {
+   "summary": "Базовое ожидание 14 дн., ключевые факторы: организация: 224E (−9.5 дн.); направление внутри своей организации: False (+7.9 дн.)",
+   "factors": [
+    {
+     "name": "mo_code",
+     "contribution": -9.502356480575939,
+     "text": "организация: 224E (−9.5 дн.)"
+    },
+    {
+     "name": "same_mo",
+     "contribution": 7.8749086229312555,
+     "text": "направление внутри своей организации: False (+7.9 дн.)"
+    },
+    {
+     "name": "queue_age_p50",
+     "contribution": 6.872986477648298,
+     "text": "медианный возраст очереди: 27.0 (+6.9 дн.)"
+    },
+    {
+     "name": "icd_block",
+     "contribution": -3.9987239829492416,
+     "text": "группа диагноза: None (−4.0 дн.)"
+    }
+   ]
+  }
+ },
+ "basis": "Синтетический маршрут: пациент выдуман, а сроки, очередь и исходы взяты из реального состояния очередей региона на 31.03.2025. Причины отказов в открытых данных отсутствуют и пациенту не приписываются.",
+ "standard": {
+  "source": "Стандарт организации оказания медицинской помощи в стационарных условиях в РК, приказ МЗ РК от 24.03.2022 № ҚР-ДСМ-27 (ред. от 15.09.2025 № 94)",
+  "sourceUrl": "https://adilet.zan.kz/rus/docs/V2200027218",
+  "sourceDate": "2025-09-15",
+  "available": true
+ },
+ "signals": [],
+ "validationDue": true,
+ "progress": {
+  "status": "waiting",
+  "originMoCode": "224E",
+  "responsibleMoCode": "224E",
+  "responsibleMoName": "Коммунальное государственное предприятие на праве хозяйственного ведения \"Городская больница скорой неотложной помощи\" Управления общественного здравоохранения города Алматы",
+  "transfer": null,
+  "lastAttempt": null,
+  "prefersCurrent": false,
+  "closedReason": null,
+  "closedAt": null,
+  "overdue": false,
+  "allowed": [],
+  "blockedMoCodes": [],
+  "side": "none"
+ },
+ "journal": []
+}

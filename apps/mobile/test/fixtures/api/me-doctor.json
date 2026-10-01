@@ -1,0 +1,54 @@
+{
+ "actor": "doctor1",
+ "userId": "074fba23-fbe0-4915-a0a0-3757e2930e4e",
+ "displayName": "Айгерим Сейткали",
+ "email": "doctor1@darumen.local",
+ "emailVerified": true,
+ "roles": [
+  "doctor"
+ ],
+ "permissions": [
+  {
+   "code": "route.own",
+   "scope": "all"
+  },
+  {
+   "code": "wait.public",
+   "scope": "all"
+  },
+  {
+   "code": "medicines.check",
+   "scope": "all"
+  },
+  {
+   "code": "worklist.view",
+   "scope": "all"
+  },
+  {
+   "code": "referral.assist",
+   "scope": "all"
+  },
+  {
+   "code": "referral.confirm",
+   "scope": "all"
+  },
+  {
+   "code": "scribe.use",
+   "scope": "all"
+  },
+  {
+   "code": "decisions.own",
+   "scope": "all"
+  }
+ ],
+ "moCode": "028B",
+ "moName": "Товарищество с ограниченной ответственностью \"Казахский ордена \"Знак Почета\" научно-исследовательский институт глазных болезней\"",
+ "regionKato": "75",
+ "iinMasked": null,
+ "onboarding": {
+  "emailVerified": true,
+  "otpConfigured": false,
+  "profileChecked": true,
+  "colleaguesInvited": false
+ }
+}
