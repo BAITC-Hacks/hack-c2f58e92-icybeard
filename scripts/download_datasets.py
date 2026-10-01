@@ -65,16 +65,22 @@ def registry(dataset_id: str) -> tuple[str, list[str]]:
     return title, urls
 
 
-def head(url: str) -> tuple[int | None, str | None]:
+def head(url: str) -> tuple[int | None, str | None, int | None]:
     out = subprocess.run(["curl", "-sIL", encoded(url)], capture_output=True, text=True).stdout
-    size = etag = None
+    size = etag = code = None
     for line in out.splitlines():
+        if line.upper().startswith("HTTP/"):
+            # после редиректов остаётся код последнего ответа; 404 от сервера — не данные
+            parts = line.split()
+            code = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else None
+            size = etag = None
+            continue
         key, _, value = line.partition(":")
         if key.lower() == "content-length":
             size = int(value.strip())
         elif key.lower() == "etag":
             etag = value.strip().strip('"')
-    return size, etag
+    return size, etag, code
 
 
 def multipart_etag(path: Path) -> str:
@@ -99,6 +105,10 @@ def csv_is_consistent(path: Path) -> bool:
 def verify(path: Path, size: int | None, etag: str | None) -> str:
     if not path.exists():
         return "missing"
+    with path.open("rb") as fh:
+        start = fh.read(64).lstrip(b"\xef\xbb\xbf").lstrip().lower()
+    if start.startswith(b"<"):
+        return "not-csv"  # страница ошибки сервера (404 и т. п.), а не CSV
     if size is None or path.stat().st_size != size:
         return "bad-size"
     if etag and multipart_etag(path) == etag:
@@ -110,7 +120,11 @@ def fetch(title: str, url: str, base: Path, verify_only: bool) -> str:
     folder = base / title
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / unquote(url.rsplit("/", 1)[-1])
-    size, etag = head(url)
+    size, etag, code = head(url)
+    if code is not None and code != 200:
+        if path.exists() and verify(path, None, None) == "not-csv":
+            path.unlink()  # не оставлять страницу ошибки под именем CSV
+        return f"FAILED http {code}  {path.name[-48:]}"
     status = verify(path, size, etag)
     if status in ("verified", "ok-structural") or verify_only:
         return f"{status:14s} {path.name[-48:]}"
