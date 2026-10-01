@@ -29,20 +29,22 @@ public sealed class RouteTests : IDisposable
     [Fact]
     public async Task Decisions_can_be_filtered_by_subject_id()
     {
-        var client = app.CreateClient("doctor", "doctor-3", "75", "027O");
+        // пациенты 028B/381: в этой очереди фикстуры их шесть (в 027O/021 — один), а /route/{ref}/redirect отвечает 404
+        // на номер пациента, которого в очереди нет
+        var client = app.CreateClient("doctor", "doctor-3", "75", "028B");
         var moCode = JsonDocument.Parse("{\"moCode\":\"22GN\"}").RootElement;
-        var direct = await client.PostAsJsonAsync("/api/v1/journal/decisions", new DecisionRequestDto(DecisionSubjects.Route, "SYN-75-027O-021-01", moCode, moCode, "в обход"));
+        var direct = await client.PostAsJsonAsync("/api/v1/journal/decisions", new DecisionRequestDto(DecisionSubjects.Route, "SYN-75-028B-381-01", moCode, moCode, "в обход"));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, direct.StatusCode);
 
-        foreach (var reference in new[] { "SYN-75-027O-021-01", "SYN-75-027O-021-02" })
+        foreach (var reference in new[] { "SYN-75-028B-381-01", "SYN-75-028B-381-02" })
         {
             var response = await client.PostAsJsonAsync($"/api/v1/route/{reference}/redirect", new RouteRedirectRequestDto("22GN", "короче ожидание"));
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         }
 
-        var one = await client.GetFromJsonAsync<Paged<DecisionDto>>("/api/v1/journal/decisions?subject=route&subjectId=SYN-75-027O-021-01");
+        var one = await client.GetFromJsonAsync<Paged<DecisionDto>>("/api/v1/journal/decisions?subject=route&subjectId=SYN-75-028B-381-01");
         var item = Assert.Single(one!.Items);
-        Assert.Equal("SYN-75-027O-021-01", item.SubjectId);
+        Assert.Equal("SYN-75-028B-381-01", item.SubjectId);
         Assert.Equal("22GN", item.Chosen!.Value.GetProperty("moCode").GetString());
         Assert.True((await client.GetFromJsonAsync<Paged<DecisionDto>>("/api/v1/journal/decisions?subject=route"))!.Items.Count >= 2);
     }
@@ -89,7 +91,9 @@ public sealed class RouteTests : IDisposable
             [("22GN", "381")] = new(9, 20, 0.02, true),
         };
         var population = WorklistBuilder.Build(states, predictions);
-        Assert.Contains(population[0].ProfileCode, new[] { "251", "142" });   // «пережидают» прогноз в разы — вершина списка врача
+        // «пережидают» прогноз в разы и помечены как застрявшие: без исключения персона могла бы попасть на них
+        // (на вершине списка их больше нет: просрочка на шкале 0…10 ограничена, выше — риск отказа и «есть быстрее»)
+        Assert.Contains(population, i => i.ProfileCode is "251" or "142" && i.RiskFlags.Contains(WorklistBuilder.StuckOver30));
 
         var excluded = RouteBuilder.ExcludedProfiles(new[]
         {
