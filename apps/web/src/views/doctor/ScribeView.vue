@@ -461,6 +461,7 @@ const transcriberNote = computed(() => {
     return t('doctor.scribe.modelLoading')
   }
   if (state === 'error') return t('doctor.scribe.modelError')
+  if (health.value?.transcriber === 'fake') return t('doctor.scribe.modelFake')
   return null
 })
 /** Пока модель не готова, запись и файл не распознать — кнопки неактивны, остаётся «Вставить текст». */

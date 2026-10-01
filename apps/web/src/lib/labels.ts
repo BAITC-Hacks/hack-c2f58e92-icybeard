@@ -32,6 +32,12 @@ export function permissionTitle(code: string, catalog?: Record<string, Titled>):
   return i18n.global.te(path) ? i18n.global.t(path) : code
 }
 
+/** Пояснение к разрешению одной строкой (permissionHints.* — что именно открывает разрешение); пусто, если нет в словаре. */
+export function permissionHint(code: string): string {
+  const path = `permissionHints.${code.replace('.', '_')}`
+  return i18n.global.te(path) ? i18n.global.t(path) : ''
+}
+
 /** Инициалы для аватара: «А. Сейткали» → «АС», «a.seitkali» → «AS». */
 export function initials(name: string | null | undefined): string {
   const parts = (name ?? '').replace(/[._@-]+/g, ' ').trim().split(/\s+/).filter(Boolean)

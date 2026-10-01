@@ -17,10 +17,11 @@ import { useLocaleFormat } from '@/composables/useLocaleFormat'
 import { permissionTitle, roleTitle, type Titled } from '@/lib/labels'
 import { MATRIX_PERMISSIONS, nextScope, ROLE_KEYS, supportsOwnScope } from '@/lib/permissions'
 
-/** Роли и доступ (W-Admin-Roles, admin.roles): матрица 14 разрешений × роли, выбранная роль подсвечена, клик по её
- * ячейке переключает нет → своя орг. → разрешено (у ролей без mo_code — нет ⇄ разрешено); строка admin не
- * редактируется. Справа — панель роли, «Сохранить» (PUT /admin/roles/{key}/permissions), «Дублировать роль»;
- * сверху — «История изменений» и «Создать роль». */
+/** Роли и доступ (W-Admin-Roles, admin.roles): матрица 14 разрешений × роли на всю ширину. Клик по названию роли
+ * открывает панель роли справа (описание, что может, последние изменения, «Сохранить», «Дублировать»); клик по
+ * ячейке другой роли — выбирает её, по ячейке выбранной — переключает нет → своя орг. → разрешено (у ролей без
+ * mo_code — нет ⇄ разрешено); строка admin не редактируется. Пока есть несохранённые изменения, внизу липкая
+ * панель «Сохранить (n)» / «Отменить» (PUT /admin/roles/{key}/permissions). Сверху — «История изменений» и «Создать роль». */
 const DEFAULT_ROLE = 'org_admin'
 const { t } = useI18n()
 const toast = useToast()
@@ -32,6 +33,7 @@ const selected = ref<string | null>(null)
 const draft = ref<Record<string, PermissionScope | null>>({})
 const saving = ref(false)
 const saveError = ref<unknown>(null)
+const roleOpen = ref(false)
 const historyOpen = ref(false)
 const createOpen = ref(false)
 const copyFrom = ref<string | null>(null)
@@ -50,6 +52,7 @@ const orderedRoles = computed(() => {
   return [...(data.data.value?.roles ?? [])].sort((a, b) => rank(a.key) - rank(b.key) || a.key.localeCompare(b.key))
 })
 const role = computed(() => data.data.value?.roles.find((r) => r.key === selected.value) ?? null)
+const roleHistory = computed(() => (history.data.value?.items ?? []).filter((h) => h.role === selected.value))
 const lockedPermissions = computed(() => (data.data.value?.permissions ?? []).filter((p) => p.editable === false).map((p) => p.code))
 const pendingChanges = computed(() => Object.keys(draft.value).length)
 const lead = computed(() => (data.data.value ? t('admin.roles.lead', { roles: data.data.value.roles.length, permissions: permissions.value.length }) : t('admin.roles.leadShort')))
@@ -73,11 +76,16 @@ function toggle(roleKey: string, permission: string) {
   draft.value = copy
 }
 
-function select(roleKey: string) {
-  if (roleKey === selected.value) return
-  if (pendingChanges.value && !window.confirm(t('admin.roles.discardConfirm'))) return
+/** Выбор роли; при несохранённых изменениях другой роли — подтверждение. Возвращает false, если пользователь отказался. */
+function select(roleKey: string): boolean {
+  if (roleKey === selected.value) return true
+  if (pendingChanges.value && !window.confirm(t('admin.roles.discardConfirm'))) return false
   draft.value = {}
   selected.value = roleKey
+  return true
+}
+function open(roleKey: string) {
+  if (select(roleKey)) roleOpen.value = true
 }
 
 async function save() {
@@ -98,6 +106,7 @@ async function save() {
 
 function openCreate(from: string | null) {
   copyFrom.value = from
+  roleOpen.value = false
   createOpen.value = true
 }
 
@@ -106,6 +115,7 @@ async function created(key: string) {
   await Promise.all([data.run(), history.run()])
   draft.value = {}
   selected.value = key
+  roleOpen.value = true
 }
 
 watch(() => data.data.value, (value) => {
@@ -120,30 +130,37 @@ onMounted(() => Promise.all([data.run(), history.run()]))
       <Button :label="t('admin.roles.history')" icon="pi pi-clock" severity="secondary" data-testid="roles-history" @click="historyOpen = true" />
       <Button :label="t('admin.roles.create')" icon="pi pi-plus" data-testid="roles-create" @click="openCreate(null)" />
     </template>
-    <div class="legend">
-      <span class="legend-item"><span class="mark all"><i class="pi pi-check" /></span>{{ t('admin.roles.allowed') }}</span>
-      <span class="legend-item"><span class="mark part"><i class="pi pi-check" /></span>{{ t('admin.roles.partial') }}</span>
-      <span class="legend-item"><span class="dot" />{{ t('admin.roles.none') }}</span>
+    <section class="card matrix-card">
+      <div class="legend">
+        <span class="legend-item"><span class="mark all"><i class="pi pi-check" /></span>{{ t('admin.roles.allowed') }}</span>
+        <span class="legend-item"><span class="mark part"><i class="pi pi-check" /></span>{{ t('admin.roles.partial') }}</span>
+        <span class="legend-item"><span class="dot" />{{ t('admin.roles.none') }}</span>
+        <span class="spacer" />
+        <button v-if="role" type="button" class="link-arrow small" @click="open(role.key)">{{ t('admin.roles.selected', { role: roleTitle(role.key, roleCatalog) }) }}</button>
+      </div>
+      <p class="caption how-to">{{ t('admin.roles.howTo') }}</p>
+      <ErrorBox :error="saveError" />
+      <AsyncState :loading="data.loading.value" :error="data.error.value" :empty="!data.data.value?.roles.length" :lines="14" :empty-title="t('admin.roles.empty')" empty-icon="pi pi-shield" @retry="data.run">
+        <RoleMatrix :roles="orderedRoles" :permissions="permissions" :selected="selected" :scope-of="scopeOf" :changed="changed" :role-catalog="roleCatalog" :permission-catalog="permissionCatalog" :locked-permissions="lockedPermissions" @select="select" @open="open" @toggle="toggle" />
+      </AsyncState>
+    </section>
+
+    <div v-if="pendingChanges && role" class="sticky-actions pending" data-testid="roles-pending">
+      <span class="pending-text">{{ t('admin.roles.pendingBar', { role: roleTitle(role.key, roleCatalog), n: pendingChanges }) }}</span>
       <span class="spacer" />
-      <span v-if="role" class="caption">{{ t('admin.roles.selected', { role: roleTitle(role.key, roleCatalog) }) }}</span>
+      <Button :label="t('admin.roles.discard')" severity="secondary" @click="draft = {}" />
+      <Button :label="t('admin.roles.saveN', { n: pendingChanges })" icon="pi pi-check" :loading="saving" data-testid="role-save" @click="save" />
     </div>
-    <div class="with-panel">
-      <section class="card">
-        <AsyncState :loading="data.loading.value" :error="data.error.value" :empty="!data.data.value?.roles.length" :lines="14" :empty-title="t('admin.roles.empty')" empty-icon="pi pi-shield" @retry="data.run">
-          <RoleMatrix :roles="orderedRoles" :permissions="permissions" :selected="selected" :scope-of="scopeOf" :changed="changed" :role-catalog="roleCatalog" :permission-catalog="permissionCatalog" :locked-permissions="lockedPermissions" @select="select" @toggle="toggle" />
-        </AsyncState>
-      </section>
-      <aside class="panel-col">
-        <RolePanel v-if="role" :role="role" :users="data.data.value?.usersByRole[role.key] ?? null" :history="(history.data.value?.items ?? []).filter((h) => h.role === role!.key)" :pending-changes="pendingChanges" :saving="saving" :role-catalog="roleCatalog" :permission-catalog="permissionCatalog" @save="save" @discard="draft = {}" @duplicate="openCreate(role.key)" />
-        <ErrorBox :error="saveError" />
-      </aside>
-    </div>
+
+    <SidePanel v-model:visible="roleOpen" :title="role ? roleTitle(role.key, roleCatalog) : ''" :subtitle="t('admin.roles.roleLabel')">
+      <RolePanel v-if="role" :role="role" :users="data.data.value?.usersByRole[role.key] ?? null" :history="roleHistory" :permissions="permissions" :scope-of="scopeOf" :changed="changed" :pending-changes="pendingChanges" :saving="saving" :role-catalog="roleCatalog" :permission-catalog="permissionCatalog" @save="save" @discard="draft = {}" @duplicate="openCreate(role.key)" />
+    </SidePanel>
 
     <SidePanel v-model:visible="historyOpen" :title="t('admin.roles.history')" :subtitle="t('admin.roles.historyNote')">
       <AsyncState :loading="history.loading.value" :error="history.error.value" :empty="!history.data.value?.items.length" skeleton="lines" :empty-title="t('admin.roles.noChanges')" empty-icon="pi pi-clock" @retry="history.run">
         <div class="rows">
-          <div v-for="c in history.data.value!.items" :key="c.id" class="row">
-            <span class="row-main">{{ roleTitle(c.role, roleCatalog) }} · {{ permissionTitle(c.permission, permissionCatalog) }}<div class="row-sub">{{ date(c.at) }} · {{ c.actor }}<template v-if="c.comment"> · «{{ c.comment }}»</template></div></span>
+          <div v-for="c in history.data.value!.items" :key="c.id" class="row history-row">
+            <span class="row-main"><b>{{ roleTitle(c.role, roleCatalog) }}</b> · {{ permissionTitle(c.permission, permissionCatalog) }}<span class="row-sub">{{ date(c.at) }} · {{ c.actor }}<template v-if="c.comment"> · «{{ c.comment }}»</template></span></span>
             <span class="row-value small">{{ c.oldScope ? t(`admin.roles.scope.${c.oldScope}`) : t('admin.roles.none') }} → {{ c.newScope ? t(`admin.roles.scope.${c.newScope}`) : t('admin.roles.none') }}</span>
           </div>
         </div>
@@ -154,6 +171,7 @@ onMounted(() => Promise.all([data.run(), history.run()]))
 </template>
 
 <style scoped>
+.matrix-card { display: flex; flex-direction: column; gap: 12px; }
 .legend { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: var(--dm-text-sm); color: var(--dm-muted); }
 .legend-item { display: inline-flex; align-items: center; gap: 8px; }
 .spacer { flex: 1; }
@@ -161,7 +179,8 @@ onMounted(() => Promise.all([data.run(), history.run()]))
 .mark.all { background: var(--success-bg); color: var(--success-text); }
 .mark.part { background: var(--warning-bg); color: var(--warning-text); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dm-dot-idle); }
-.with-panel { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
-.panel-col { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }
-@media (max-width: 1200px) { .with-panel { grid-template-columns: 1fr; } .panel-col { position: static; } }
+.how-to { margin: -4px 0 4px; line-height: 1.5; max-width: 900px; }
+.pending { justify-content: flex-start; }
+.pending-text { font-weight: var(--fw-bold); }
+.history-row .row-main { display: flex; flex-direction: column; gap: 2px; }
 </style>

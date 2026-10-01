@@ -9,15 +9,18 @@ import Textarea from 'primevue/textarea'
 import { computed, onMounted, ref } from 'vue'
 import { useToast } from 'primevue/usetoast'
 import { useI18n } from 'vue-i18n'
-import type { IncomingReferral } from '@/api/types'
+import type { IncomingReferral, OrganizationItem } from '@/api/types'
 import AsyncState from '@/components/states/AsyncState.vue'
 import AppCard from '@/components/ui/AppCard.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
 import PageShell from '@/components/ui/PageShell.vue'
+import SearchSelect from '@/components/ui/SearchSelect.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useIncomingReferrals } from '@/composables/useIncomingReferrals'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
 import { shortOrgName } from '@/lib/format'
 import { addDays, almatyToday, dateShort } from '@/lib/route'
+import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
 /** Входящие направления (W-Incoming): переводы из других больниц в свою. Порядок: пациент соглашается → больница
@@ -27,7 +30,13 @@ const { t } = useI18n()
 const { dateTime } = useLocaleFormat()
 const toast = useToast()
 const refdata = useRefdataStore()
+const auth = useAuthStore()
 const r = useIncomingReferrals()
+/** У врача и администратора организации больница своя (mo_code); администратор системы и регулятор выбирают её из списка. */
+const ownOrg = computed(() => !!auth.moCode)
+const organizations = ref<OrganizationItem[]>([])
+const orgLabel = (o: OrganizationItem) => `${shortOrgName(o.name)} · ${refdata.regionName(o.regionKato)}`
+const orgTitle = (o: OrganizationItem) => `${o.name} · ${o.moCode}`
 
 type Mode = 'confirm' | 'reject' | 'reschedule' | 'discharge'
 const CONSENT_TONES: Record<string, 'ok' | 'neutral' | 'accent' | 'warn'> = { accepted: 'ok', declined: 'neutral', pending: 'warn' }
@@ -104,16 +113,29 @@ function resetFilters() {
   search.value = ''
 }
 
+async function pickOrg(code: string | null) {
+  r.moCode.value = code
+  if (code) await r.load()
+  else r.items.value = []
+}
+
 onMounted(async () => {
   await refdata.load()
-  await r.load()
+  if (ownOrg.value) await r.load()
+  else organizations.value = await refdata.allOrganizations().catch(() => [])
 })
 </script>
 
 <template>
   <PageShell :title="t('doctor.incoming.title')">
-    <template #subtitle>{{ t('doctor.incoming.subtitle') }} · {{ t('doctor.incoming.total', { n: r.items.value.length }) }}</template>
-    <AppCard>
+    <template #subtitle>{{ ownOrg ? t('doctor.incoming.subtitle') : t('doctor.incoming.subtitlePick') }}<template v-if="ownOrg || r.moCode.value"> · {{ t('doctor.incoming.total', { n: r.items.value.length }) }}</template></template>
+    <template v-if="!ownOrg" #actions>
+      <SearchSelect :model-value="r.moCode.value" :options="organizations" :option-label="orgLabel" option-value="moCode" :option-title="orgTitle" :placeholder="t('doctor.incoming.pickOrg')" class="org-pick" data-testid="incoming-org" @update:model-value="pickOrg" />
+    </template>
+    <AppCard v-if="!ownOrg && !r.moCode.value">
+      <EmptyState :title="t('doctor.incoming.noOrgTitle')" :text="t('doctor.incoming.noOrgText')" icon="pi pi-building" />
+    </AppCard>
+    <AppCard v-else>
       <div class="toolbar list-toolbar">
         <span class="caption">{{ t('doctor.worklist.shown', { shown: visible.length, total: r.items.value.length }) }}</span>
         <span class="spacer" />
@@ -203,6 +225,7 @@ onMounted(async () => {
 <style scoped>
 .list-toolbar { margin-bottom: var(--gap-cabinet, 16px); row-gap: 8px; }
 .f-select { min-width: 220px; }
+.org-pick { min-width: 340px; }
 .search-field { flex: 0 1 340px; min-width: 260px; }
 .search-field :deep(.p-inputtext) { width: 100%; }
 @media (max-width: 900px) { .f-select, .search-field { flex: 1 1 100%; } }

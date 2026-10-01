@@ -5,9 +5,13 @@ import type { IncomingReferral } from '@/api/types'
 
 /** Входящие направления в свою организацию: список из /journal/referrals/incoming и действия принимающей больницы —
  * подтвердить с датой, отказать, перенести дату, отметить госпитализацию или неявку, выписать. Какие кнопки показать —
- * только из item.allowed (сервер считает по журналу и отклонит остальное 409). */
+ * только из item.allowed (сервер считает по журналу и отклонит остальное 409). Для ролей без своей организации
+ * (администратор системы, регулятор) больница задаётся через moCode — без него список не запрашивается
+ * (сервер ответил бы 422 «нужна организация»). */
 export function useIncomingReferrals() {
   const items = ref<IncomingReferral[]>([])
+  /** Организация, чьи входящие смотрим: null — своя (клейм mo_code пользователя). */
+  const moCode = ref<string | null>(null)
   const error = ref<unknown>(null)
   const loading = ref(false)
   const acting = ref<string | null>(null)
@@ -19,7 +23,7 @@ export function useIncomingReferrals() {
     loading.value = true
     error.value = null
     try {
-      items.value = await journal.referralsIncoming({ includeConfirmed: showConfirmed.value || undefined, severe: severeOnly.value || undefined })
+      items.value = await journal.referralsIncoming({ moCode: moCode.value || undefined, includeConfirmed: showConfirmed.value || undefined, severe: severeOnly.value || undefined })
     } catch (e) {
       error.value = e
     } finally {
@@ -58,5 +62,5 @@ export function useIncomingReferrals() {
   const discharge = (i: IncomingReferral, summary: string) =>
     run(i.decisionId, (key) => journal.dischargeReferral(i.decisionId, { patientRef: i.patientRef, summary: summary.trim() }, key))
 
-  return { items, error, loading, acting, showConfirmed, severeOnly, load, confirm, reject, reschedule, admit, noShow, discharge }
+  return { items, error, loading, acting, moCode, showConfirmed, severeOnly, load, confirm, reject, reschedule, admit, noShow, discharge }
 }
