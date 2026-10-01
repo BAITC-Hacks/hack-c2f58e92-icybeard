@@ -2,32 +2,32 @@
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { useForecastFactors } from '@/composables/useForecastFactors'
 import { ApiError } from '@/api/client'
-import { analytics, journal, queue } from '@/api/endpoints'
-import type { AlternativesResponse, OrganizationItem, PredictResponse, QualitySplit } from '@/api/types'
+import { journal, queue } from '@/api/endpoints'
+import type { AlternativesResponse, OrganizationItem, PredictResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
-import AppCard from '@/components/ui/AppCard.vue'
-import CollapsibleSection from '@/components/ui/CollapsibleSection.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
-import HeroNumber from '@/components/ui/HeroNumber.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import SearchSelect from '@/components/ui/SearchSelect.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { referralSubjectId, SUBJECT_REFERRAL } from '@/lib/decision'
-import { days, pct, refusalWords, shortOrgName, signed } from '@/lib/format'
+import { days, pct, refusalWords, shortOrgName } from '@/lib/format'
 import { FINANCE_DEFAULT, PURPOSE_VALUES, TERRITORIAL_VALUES } from '@/lib/referralContract'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
-/** Ассистент направления (W-Referral): регион пилюлей в шапке; слева карточка формы — профиль и цель · территория,
- * организации карточками-опциями (выбранная врачом + альтернативы с дельтой к выбранной), МКБ-10 и причина; справа
- * «Прогноз для выбранной» (hero, строки p90 / за 30 дней / риск отказа, очередь), «Подтвердить» записывает выбор и
- * причину в журнал. Прогноз считается сам при полной форме. */
+/** Ассистент направления (W-Referral): регион пилюлей в шапке, дальше одна карточка из четырёх разделов — «Параметры»
+ * (профиль, цель, территория, МКБ-10, дополнительные — по ссылке), «Куда направить» (выбранная врачом организация и
+ * альтернативы списком с выбором), «Прогноз для …» (четыре цифры, очередь, «Из чего сложился прогноз» простыми
+ * словами) и «Решение» (причина и «Подтвердить»: выбор и причина уходят в журнал). Прогноз считается сам при полной форме. */
 const { t } = useI18n()
 const refdata = useRefdataStore()
 const auth = useAuthStore()
@@ -65,7 +65,6 @@ const recorded = ref<string | null>(null)
 const recording = ref(false)
 // один ключ идемпотентности на расчёт: повторный клик по тому же прогнозу не создаёт вторую запись
 let decisionKey = ''
-const waitQuality = ref<QualitySplit | null>(null)
 
 const complete = computed(() => !!form.regionKato && !!form.moCode && !!form.profileCode)
 const purposes = computed(() => PURPOSE_VALUES.map((value, i) => ({ value, label: t(`doctor.referral.purpose.${i}`) })))
@@ -79,6 +78,11 @@ const chosenName = computed(() => {
   return alt ? shortOrgName(alt.mo.name) : selectedName.value
 })
 const riskText = (p: number, inTraining?: boolean) => (inTraining === false ? refusalWords(p) : pct(p))
+const baseFactors = useForecastFactors(computed(() => prediction.value?.explanation.factors), computed(() => (form.profileCode ? refdata.profileName(form.profileCode) : null)))
+/** Направляющая организация не указана — модель считает направление «со стороны»; говорим это прямо и подсказываем, что изменить. */
+const factors = computed(() =>
+  baseFactors.value.map((f) => (f.name === 'same_mo' && !form.referringMoCode ? { ...f, label: t('doctor.referral.referringUnset'), hint: t('doctor.referral.referringUnsetHint') } : f)),
+)
 
 async function loadOrganizations() {
   if (!form.regionKato || !form.profileCode) {
@@ -164,11 +168,6 @@ onMounted(async () => {
   await refdata.load()
   await Promise.all([loadOrganizations(), loadReferringOrganizations()])
   if (complete.value) await predict()
-  try {
-    waitQuality.value = (await analytics.quality()).wait?.test_time ?? null
-  } catch {
-    waitQuality.value = null // страница работает и без отчёта качества
-  }
 })
 watch(() => [form.regionKato, form.profileCode], async () => {
   await loadOrganizations()
@@ -180,150 +179,172 @@ watch(() => [form.moCode, form.referralPurpose, form.territorialType, form.icd10
 
 <template>
   <PageShell :title="t('doctor.referral.titleShort')">
-    <template #subtitle>{{ refdata.regionName(form.regionKato) }} · {{ t('doctor.referral.leadShort') }}<template v-if="prediction"> · {{ t('shell.asOf', { date: prediction.model.trainedThrough }) }}</template></template>
-    <template #actions>
-      <label class="pill-select">
-        <span class="pill-label">{{ t('common.region') }}</span>
-        <SearchSelect v-model="form.regionKato" :options="refdata.regions" option-label="name" option-value="regionKato" :placeholder="t('common.region')" />
-      </label>
-    </template>
+    <template #subtitle>{{ t('doctor.referral.purposeLead') }}<template v-if="prediction"> · {{ t('shell.asOf', { date: prediction.model.trainedThrough }) }}</template></template>
     <ErrorBox :error="error" />
 
-    <div class="main-grid">
-      <AppCard class="form-card">
-        <div class="pair">
-          <div class="field"><label>{{ t('common.profile') }}</label><SearchSelect v-model="form.profileCode" :options="refdata.profiles" option-label="name" option-value="profileCode" :placeholder="t('common.profile')" /><span v-if="fieldErrors.profileCode" class="error">{{ fieldErrors.profileCode }}</span></div>
-          <div class="field">
-            <label>{{ t('doctor.referral.purposeTerritory') }}</label>
-            <div class="pair tight">
-              <Select v-model="form.referralPurpose" :options="purposes" option-label="label" option-value="value" />
-              <Select v-model="form.territorialType" :options="territorial" option-label="label" option-value="value" />
-            </div>
-          </div>
-        </div>
-
-        <div class="field">
-          <div class="org-head"><label>{{ t('common.organization') }}</label><span class="caption">{{ t('doctor.referral.orgHint') }}</span></div>
-          <SearchSelect v-if="!form.moCode || !prediction" v-model="form.moCode" :options="organizations" :option-label="orgLabel" option-value="moCode" :option-title="orgTitle" :placeholder="t('common.organization')" :disabled="organizations.length === 0" />
-          <div v-else class="options" data-testid="referral-options">
-            <button type="button" class="option" :class="{ selected: chosen === form.moCode }" :disabled="!!recorded" @click="chosen = form.moCode">
-              <span class="radio" aria-hidden="true"><span v-if="chosen === form.moCode" class="radio-dot" /></span>
-              <span class="option-text">
-                <span class="option-title" :title="selectedOrg?.name">{{ selectedName }}</span>
-                <span class="caption">{{ form.moCode }} · {{ t('doctor.referral.chosenByDoctor') }}<template v-if="prediction.queue"> · {{ t('doctor.referral.inQueue', { n: prediction.queue.len }) }}</template></span>
-              </span>
-              <span class="option-wait tabular">{{ days(prediction.p50Days) }} {{ t('common.days') }}</span>
-              <span class="option-risk tabular">{{ riskText(prediction.pRefusal, prediction.refusalOrgInTraining) }}</span>
-            </button>
-            <button v-for="a in alternatives?.items ?? []" :key="a.mo.moCode" type="button" class="option" :class="{ selected: chosen === a.mo.moCode }" :disabled="!!recorded" @click="chosen = a.mo.moCode">
-              <span class="radio" aria-hidden="true"><span v-if="chosen === a.mo.moCode" class="radio-dot" /></span>
-              <span class="option-text">
-                <span class="option-title" :title="a.mo.name">{{ shortOrgName(a.mo.name) }}</span>
-                <span class="caption">{{ a.mo.moCode }} · <span :class="a.p50Days < prediction.p50Days ? 'delta-down' : 'delta-up'">{{ t('doctor.referral.deltaToChosen', { delta: signed(a.p50Days - prediction.p50Days, 0) }) }}</span><template v-if="a.isNeighborRegion"> · {{ t('doctor.referral.neighborRegion', { region: refdata.regionName(a.mo.regionKato) }) }}</template></span>
-              </span>
-              <span class="option-wait tabular">{{ days(a.p50Days) }} {{ t('common.days') }}</span>
-              <span class="option-risk tabular">{{ pct(a.pRefusal) }}</span>
-            </button>
-            <button type="button" class="link-arrow small change" :disabled="!!recorded" @click="form.moCode = ''">{{ t('doctor.referral.changeOrg') }}</button>
-          </div>
-        </div>
-
-        <div class="pair icd-reason">
+    <div class="layout">
+    <section class="card referral">
+      <!-- 1. параметры направления -->
+      <div class="sec">
+        <h2 class="sec-title">{{ t('doctor.referral.secParams') }}</h2>
+        <div class="params">
+          <div class="field wide"><label>{{ t('common.region') }}</label><SearchSelect v-model="form.regionKato" :options="refdata.regions" option-label="name" option-value="regionKato" :placeholder="t('common.region')" /></div>
+          <div class="field wide"><label>{{ t('common.profile') }}</label><SearchSelect v-model="form.profileCode" :options="refdata.profiles" option-label="name" option-value="profileCode" :placeholder="t('common.profile')" /><span v-if="fieldErrors.profileCode" class="error">{{ fieldErrors.profileCode }}</span></div>
+          <div class="field"><label>{{ t('doctor.referral.purposeLabel') }}</label><Select v-model="form.referralPurpose" :options="purposes" option-label="label" option-value="value" /></div>
+          <div class="field"><label>{{ t('doctor.referral.territoryLabel') }}</label><Select v-model="form.territorialType" :options="territorial" option-label="label" option-value="value" /></div>
           <div class="field"><label>{{ t('doctor.referral.icd10') }}</label><InputText v-model="form.icd10" placeholder="H25.1" /></div>
-          <div class="field"><label>{{ t('doctor.referral.reasonLabelShort') }}</label><InputText v-model="reason" :placeholder="t('doctor.referral.reasonPlaceholder')" :disabled="!!recorded" data-testid="referral-reason" /></div>
         </div>
-
-        <CollapsibleSection :title="t('doctor.referral.more')" class="more">
-          <div class="form-col">
+        <details class="more">
+          <summary>{{ t('doctor.referral.more') }} <i class="pi pi-chevron-down" aria-hidden="true" /></summary>
+          <div class="params more-body">
             <div class="field"><label>{{ t('doctor.referral.registrationDate') }}</label><InputText v-model="form.registrationDate" :placeholder="t('doctor.referral.registrationDatePlaceholder')" /><span v-if="fieldErrors.registrationDate" class="error">{{ fieldErrors.registrationDate }}</span></div>
-            <div class="field"><label>{{ t('doctor.referral.referringOrg') }}</label><SearchSelect v-model="form.referringMoCode" :options="referringOrganizations" :option-label="orgLabel" option-value="moCode" :option-title="orgTitle" show-clear :placeholder="t('doctor.referral.notSpecified')" /></div>
-            <div class="field checkbox"><Checkbox v-model="includeNeighbors" binary input-id="includeNeighbors" /><label for="includeNeighbors">{{ t('doctor.referral.includeNeighbors') }}</label></div>
+            <div class="field wide"><label>{{ t('doctor.referral.referringOrg') }}</label><SearchSelect v-model="form.referringMoCode" :options="referringOrganizations" :option-label="orgLabel" option-value="moCode" :option-title="orgTitle" show-clear :placeholder="t('doctor.referral.notSpecified')" /></div>
+            <label class="check wide"><Checkbox v-model="includeNeighbors" binary input-id="includeNeighbors" /> <span>{{ t('doctor.referral.includeNeighbors') }}</span></label>
           </div>
-        </CollapsibleSection>
-      </AppCard>
-
-      <div class="col">
-        <AppCard v-if="busy && !prediction"><Skeleton kind="kpi" /><Skeleton :lines="4" style="margin-top: 12px" /></AppCard>
-        <AppCard v-else-if="!prediction"><EmptyState :title="t('doctor.referral.fillForm')" icon="pi pi-compass" /></AppCard>
-        <AppCard v-else :title="t('doctor.referral.forecastChosen')" label origin="ml" class="forecast-card" data-testid="referral-result">
-          <div class="org-line" :title="selectedOrg?.name">{{ selectedName }} <span class="caption">{{ form.moCode }}</span></div>
-          <HeroNumber :value="days(prediction.p50Days)" :unit="`${t('common.days')} — ${t('hero.half')}`" label="" class="hero-line" />
-          <div class="rows">
-            <div class="row"><span class="row-main muted">{{ t('citizen.wait.p90Label') }}</span><span class="row-value strong">{{ days(prediction.p90Days) }} {{ t('common.days') }}</span></div>
-            <div class="row"><span class="row-main muted">{{ t('doctor.referral.within30Row') }}</span><span class="row-value strong">{{ pct(prediction.pWithin30Days) }}</span></div>
-            <div class="row"><span class="row-main muted">{{ t('doctor.referral.refusalRow') }}</span><span class="row-value strong">{{ riskText(prediction.pRefusal, prediction.refusalOrgInTraining) }}</span></div>
-          </div>
-          <p v-if="prediction.refusalOrgInTraining === false" class="muted small">{{ t('doctor.referral.unseenOrgHint') }}</p>
-          <p v-if="prediction.queue" class="caption" style="margin: 8px 0 0">{{ t('doctor.referral.queueInfo', { len: prediction.queue.len, age: days(prediction.queue.ageP50), throughput: prediction.queue.throughputPerDay.toFixed(1) }) }}</p>
-          <CollapsibleSection :title="t('explanationCard.title')" :summary="`${prediction.explanation.factors.length}`" class="why">
-            <p class="muted small">{{ prediction.explanation.summary }}</p>
-            <div v-for="factor in prediction.explanation.factors" :key="factor.name" class="factor small">
-              <span>{{ factor.text }}</span>
-              <span class="contribution" :class="factor.contribution >= 0 ? 'plus' : 'minus'">{{ signed(factor.contribution) }} {{ t('common.days') }}</span>
-            </div>
-            <p class="caption" style="margin: 8px 0 0">
-              {{ t('explanationCard.model', { name: prediction.model.name, version: prediction.model.version, through: prediction.model.trainedThrough }) }}
-              <template v-if="waitQuality">
-                · {{ t('doctor.referral.qualityNote', {
-                  p50: waitQuality.pinball_p50.toFixed(2), base: waitQuality.pinball_p50_baseline.toFixed(2),
-                  pct: ((1 - waitQuality.pinball_p50 / waitQuality.pinball_p50_baseline) * 100).toFixed(0),
-                  auc: waitQuality.auc_refusal.toFixed(2), aucBase: waitQuality.auc_refusal_baseline.toFixed(2),
-                }) }}
-              </template>
-            </p>
-          </CollapsibleSection>
-          <p class="human-note">{{ t('doctor.referral.humanNote') }}</p>
-          <div class="confirm-row">
-            <Button :label="recorded ? t('doctor.referral.recorded') : t('common.confirm')" :disabled="!!recorded" :loading="recording" data-testid="referral-confirm" @click="record" />
-            <span v-if="!recorded" class="muted small">{{ chosenName }}</span>
-            <RouterLink v-else class="link-arrow small" :to="{ name: 'decisions' }">{{ t('nav.decisions') }}</RouterLink>
-            <span class="spacer" />
-            <RouterLink class="link-arrow small" :to="{ name: 'worklist' }">{{ t('doctor.referral.toWorklist') }}</RouterLink>
-          </div>
-        </AppCard>
+        </details>
       </div>
+
+      <!-- 2. куда направить -->
+      <div class="sec">
+        <div class="sec-head">
+          <h2 class="sec-title">{{ t('doctor.referral.secWhere') }}</h2>
+          <OriginTag v-if="prediction" kind="ml" />
+          <span class="spacer" />
+          <button v-if="form.moCode && prediction" type="button" class="link-arrow small" :disabled="!!recorded" @click="form.moCode = ''">{{ t('doctor.referral.changeOrg') }}</button>
+        </div>
+        <SearchSelect v-if="!form.moCode || !prediction" v-model="form.moCode" :options="organizations" :option-label="orgLabel" option-value="moCode" :option-title="orgTitle" :placeholder="t('doctor.referral.pickOrg')" :disabled="organizations.length === 0" />
+        <div v-else class="options" role="radiogroup" data-testid="referral-options">
+          <label class="option" :class="{ on: chosen === form.moCode }">
+            <input v-model="chosen" type="radio" name="referral-org" :value="form.moCode" :disabled="!!recorded" />
+            <span class="opt-main">
+              <span class="opt-name" :title="selectedOrg?.name">{{ selectedName }}</span>
+              <span class="opt-sub">{{ form.moCode }} · {{ t('doctor.referral.chosenByDoctor') }}<template v-if="prediction.queue"> · {{ t('doctor.referral.inQueue', { n: prediction.queue.len }) }}</template> · <span :class="{ risk: prediction.pRefusal > 0.2 }">{{ t('route.doctorView.altRefusal', { pct: riskText(prediction.pRefusal, prediction.refusalOrgInTraining) }) }}</span></span>
+            </span>
+            <span class="opt-wait"><span class="opt-wait-label">{{ t('route.doctorView.halfShort') }}</span><span class="opt-days">≈ {{ days(prediction.p50Days) }} {{ t('common.days') }}</span></span>
+          </label>
+          <label v-for="a in alternatives?.items ?? []" :key="a.mo.moCode" class="option" :class="{ on: chosen === a.mo.moCode }">
+            <input v-model="chosen" type="radio" name="referral-org" :value="a.mo.moCode" :disabled="!!recorded" />
+            <span class="opt-main">
+              <span class="opt-name" :title="a.mo.name">{{ shortOrgName(a.mo.name) }}</span>
+              <span class="opt-sub">{{ a.mo.moCode }}<template v-if="a.isNeighborRegion"> · {{ t('doctor.referral.neighborRegion', { region: refdata.regionName(a.mo.regionKato) }) }}</template> · <span :class="a.p50Days < prediction.p50Days ? 'faster' : 'slower'">{{ a.p50Days < prediction.p50Days ? t('doctor.referral.fasterBy', { n: Math.round(prediction.p50Days - a.p50Days) }) : t('doctor.referral.slowerBy', { n: Math.round(a.p50Days - prediction.p50Days) }) }}</span> · <span :class="{ risk: a.pRefusal > 0.2 }">{{ t('route.doctorView.altRefusal', { pct: pct(a.pRefusal) }) }}</span></span>
+            </span>
+            <span class="opt-wait"><span class="opt-wait-label">{{ t('route.doctorView.halfShort') }}</span><span class="opt-days" :class="{ faster: a.p50Days < prediction.p50Days }">≈ {{ days(a.p50Days) }} {{ t('common.days') }}</span></span>
+          </label>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="card referral result-col">
+      <!-- 3. прогноз для выбранной врачом организации -->
+      <div v-if="busy && !prediction" class="sec"><Skeleton :lines="4" /></div>
+      <div v-else-if="!prediction" class="sec"><EmptyState :title="t('doctor.referral.fillForm')" icon="pi pi-compass" /></div>
+      <div v-else class="sec" data-testid="referral-result">
+        <h2 class="sec-title">{{ t('doctor.referral.secForecast', { name: selectedName }) }}</h2>
+        <dl class="stats">
+          <div class="stat"><dt>{{ t('route.doctorView.half') }}</dt><dd>≈ {{ days(prediction.p50Days) }} <small>{{ t('common.days') }}</small></dd></div>
+          <div class="stat"><dt>{{ t('route.doctorView.ninety') }}</dt><dd>≈ {{ days(prediction.p90Days) }} <small>{{ t('common.days') }}</small></dd></div>
+          <div class="stat"><dt>{{ t('doctor.referral.within30Row') }}</dt><dd>{{ pct(prediction.pWithin30Days) }}</dd></div>
+          <div class="stat"><dt>{{ t('route.doctorView.refusal') }}</dt><dd :class="{ danger: prediction.pRefusal > 0.2 }">{{ riskText(prediction.pRefusal, prediction.refusalOrgInTraining) }}</dd></div>
+        </dl>
+        <p v-if="prediction.queue" class="note">{{ t('doctor.referral.queueInfo', { len: prediction.queue.len, age: days(prediction.queue.ageP50), throughput: prediction.queue.throughputPerDay.toFixed(1) }) }}</p>
+        <p v-if="prediction.refusalOrgInTraining === false" class="note">{{ t('doctor.referral.unseenOrgHint') }}</p>
+        <details v-if="factors.length" class="more">
+          <summary>{{ t('route.doctorView.whyTitle') }} <i class="pi pi-chevron-down" aria-hidden="true" /></summary>
+          <p class="more-lead">{{ t('route.doctorView.whyLead') }}</p>
+          <div class="rows">
+            <div v-for="f in factors" :key="f.name" class="row">
+              <span class="row-main"><span>{{ f.label }}</span><span v-if="f.hint" class="row-sub">{{ f.hint }}</span></span>
+              <span class="row-value factor-effect" :class="f.dir">{{ f.effect }}</span>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- 4. решение -->
+      <div v-if="prediction" class="sec">
+        <h2 class="sec-title">{{ t('doctor.referral.secDecision') }}</h2>
+        <dl class="summary" data-testid="referral-summary">
+          <div><dt>{{ t('doctor.referral.sumWhere') }}</dt><dd>{{ chosenName }}<span v-if="chosen !== form.moCode" class="muted"> · {{ t('doctor.referral.sumInsteadOf', { name: selectedName }) }}</span></dd></div>
+          <div><dt>{{ t('doctor.referral.sumWhat') }}</dt><dd>{{ refdata.profileName(form.profileCode) }} · {{ purposes.find((p) => p.value === form.referralPurpose)?.label }}<template v-if="form.icd10"> · {{ form.icd10 }}</template></dd></div>
+
+        </dl>
+        <div class="field">
+          <label for="referral-reason">{{ t('doctor.referral.reasonLabelShort') }}</label>
+          <Textarea id="referral-reason" v-model="reason" rows="2" auto-resize :placeholder="t('doctor.referral.reasonExample')" :disabled="!!recorded" data-testid="referral-reason" />
+        </div>
+        <div class="confirm-row">
+          <span class="muted small">{{ t('doctor.referral.saveNote') }}</span>
+          <span class="spacer" />
+          <RouterLink v-if="recorded" class="link-arrow small" :to="{ name: 'decisions' }">{{ t('nav.decisions') }}</RouterLink>
+          <RouterLink class="link-arrow small" :to="{ name: 'worklist' }">{{ t('doctor.referral.toWorklist') }}</RouterLink>
+          <Button :label="recorded ? t('doctor.referral.recorded') : t('doctor.referral.saveChoice')" size="small" :disabled="!!recorded" :loading="recording" data-testid="referral-confirm" @click="record" />
+        </div>
+      </div>
+    </section>
     </div>
   </PageShell>
 </template>
 
 <style scoped>
-.pill-select { display: inline-flex; align-items: center; gap: 4px; background: var(--dm-surface); border-radius: var(--dm-radius-pill); padding: 0 6px 0 16px; min-height: 36px; }
-.pill-label { font-size: var(--dm-text-sm); color: var(--dm-muted); white-space: nowrap; }
-.pill-select :deep(.p-select) { background: transparent; min-height: 32px; min-width: 180px; font-weight: 500; font-size: var(--dm-text-sm); }
-.main-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: var(--dm-space-4); align-items: start; }
-.col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
-.form-card { display: flex; flex-direction: column; gap: var(--dm-space-4); }
-.pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
-.pair.tight { gap: 8px; }
-.pair.tight :deep(.p-select) { width: 100%; min-width: 0; }
-.icd-reason { grid-template-columns: 200px minmax(0, 1fr); }
-.org-head { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
-.options { display: flex; flex-direction: column; gap: 8px; }
-.option { display: flex; align-items: center; gap: 12px; border: 1.5px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 12px 15px; text-align: left; color: var(--text); font: inherit; cursor: pointer; }
-.option.selected { border-color: var(--accent); background: var(--surface-info); }
-.option:disabled { cursor: default; opacity: 0.8; }
-.radio { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border-strong); box-sizing: border-box; flex: none; display: grid; place-items: center; }
-.option.selected .radio { border-color: var(--accent); }
-.radio-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dm-primary); }
-.option-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.option-title { font-size: var(--dm-text-md); font-weight: var(--fw-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.option-wait { font-size: var(--dm-text-base); font-weight: var(--fw-bold); white-space: nowrap; }
-.option-risk { font-size: var(--dm-text-sm); color: var(--dm-muted); width: 64px; text-align: right; }
-.change { align-self: flex-start; margin-top: 4px; }
-.more { background: var(--dm-surface-2); }
-.more :deep(.head) { padding: 12px 16px; }
-.more :deep(.head-title) { font-size: var(--dm-text-md); }
-.checkbox { flex-direction: row; align-items: center; gap: 8px; }
-.org-line { font-size: var(--dm-text-lg); font-weight: var(--fw-bold); letter-spacing: -0.01em; display: flex; align-items: baseline; gap: 8px; }
-.forecast-card { border-top: 4px solid var(--accent); }
-.hero-line { margin: 8px 0 4px; }
-.hero-line :deep(.hero-label) { display: none; }
-.strong { font-weight: var(--fw-bold); }
-.why { margin-top: 12px; background: var(--dm-surface-2); }
-.why :deep(.head) { padding: 12px 16px; }
-.why :deep(.head-title) { font-size: var(--dm-text-md); }
-.human-note { border-top: 1px solid var(--dm-hairline); margin: 12px 0 0; padding-top: 12px; font-size: 13px; color: var(--dm-muted); }
-.confirm-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: var(--gap-cabinet); align-items: start; }
+.referral { padding: 0; min-width: 0; }
+.result-col { position: sticky; top: 16px; }
+.sec { padding: 18px 24px; display: flex; flex-direction: column; gap: 10px; }
+.sec + .sec { border-top: 1px solid var(--border-soft); }
+.sec-head { display: flex; align-items: center; gap: 10px; }
+.sec-title { margin: 0; font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 .spacer { flex: 1; }
-@media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } .pair, .icd-reason { grid-template-columns: 1fr; } }
+.params { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+.params .wide { grid-column: 1 / -1; }
+.params .field { min-width: 0; }
+.params :deep(.p-select), .params :deep(.p-inputtext) { width: 100%; min-width: 0; }
+.more-body { margin-top: 10px; }
+.more-body .check { grid-column: 1 / -1; }
+.check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-base-sm); }
+.more summary { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-base-sm); font-weight: var(--fw-bold); color: var(--link); cursor: pointer; list-style: none; }
+.more summary::-webkit-details-marker { display: none; }
+.more summary i { font-size: 0.6rem; transition: transform .15s; }
+.more[open] summary i { transform: rotate(180deg); }
+.more-lead { margin: 8px 0 4px; font-size: var(--fs-base-sm); color: var(--text-secondary); line-height: 1.5; }
+.options { display: flex; flex-direction: column; }
+.option { display: flex; align-items: center; gap: 12px; padding: 10px 12px; box-shadow: inset 0 -1px 0 var(--border-soft); cursor: pointer; }
+.option:last-child { box-shadow: none; }
+.option:hover { background: var(--surface-hover); }
+.option.on { background: var(--accent-subtle); }
+.option input { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; flex: none; margin: 0; border: 2px solid var(--border); border-radius: 50%; background: var(--surface); box-sizing: border-box; cursor: pointer; }
+.option input:checked { border-color: var(--accent); box-shadow: inset 0 0 0 3px var(--surface), inset 0 0 0 9px var(--accent); }
+.option input:focus { outline: none; }
+.option input:disabled { cursor: default; }
+.opt-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.opt-name { font-size: var(--fs-base); font-weight: var(--fw-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opt-sub { font-size: var(--fs-sm); color: var(--text-muted); }
+.opt-sub .risk { color: var(--danger-text); }
+.opt-sub .faster { color: var(--success-text); }
+.opt-wait { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; }
+.opt-wait-label { font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
+.opt-days { font-weight: var(--fw-bold); white-space: nowrap; }
+.opt-days.faster { color: var(--success-text); }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; }
+.stat { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; border-left: 1px solid var(--border-soft); min-width: 0; }
+.stat:first-child { border-left: 0; padding-left: 0; }
+.stat dt { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.35; }
+.stat dd { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-extrabold); font-variant-numeric: tabular-nums; }
+.stat dd small { font-size: var(--fs-base-sm); font-weight: var(--fw-bold); color: var(--text-muted); }
+.stat dd.danger { color: var(--danger-text); }
+.note { margin: 0; font-size: var(--fs-base-sm); color: var(--text-secondary); line-height: 1.5; }
+.row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.factor-effect { font-weight: var(--fw-bold); white-space: nowrap; }
+.factor-effect.plus { color: var(--danger-text); }
+.factor-effect.minus { color: var(--success-text); }
+.factor-effect.zero { color: var(--text-muted); }
+.field :deep(.p-textarea) { width: 100%; }
+.summary { display: flex; flex-direction: column; margin: 0; border-top: 1px solid var(--border-soft); }
+.summary > div { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); font-size: var(--fs-base-sm); }
+.summary dt { flex: none; width: 110px; color: var(--text-muted); }
+.summary dd { margin: 0; font-weight: var(--fw-semibold); min-width: 0; }
+.confirm-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } .result-col { position: static; } }
+@media (max-width: 1400px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; } .stat:nth-child(3) { border-left: 0; padding-left: 0; } }
+@media (max-width: 640px) { .params, .more-body { grid-template-columns: 1fr; } .sec { padding: 16px; } .confirm-row :deep(.p-button) { width: 100%; } }
 </style>

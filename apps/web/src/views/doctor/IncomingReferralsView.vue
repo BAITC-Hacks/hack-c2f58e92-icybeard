@@ -135,7 +135,7 @@ onMounted(async () => {
 .cell-pill { display: inline-flex; align-items: center; justify-content: center; gap: 5px; width: 148px; height: 30px; border-radius: var(--radius-pill); font-size: var(--fs-sm); font-weight: var(--fw-bold); box-sizing: border-box; white-space: nowrap; padding: 0 6px; }
 .cell-pill.disabled { background: var(--surface-sunken); color: var(--text-faint); }
 .cell-pill.done { background: var(--success-bg); color: var(--success-text); }
-.cell-pill.done i { font-size: 10px; }
+.cell-pill.done i { font-size: 11px; }
 :deep(.cell-btn.p-button) { width: 148px; height: 30px; min-height: 30px; padding: 0 6px; font-size: var(--fs-sm); justify-content: center; }
 :deep(.cell-btn.p-button:disabled) { background: var(--surface-sunken); border-color: var(--surface-sunken); color: var(--text-faint); opacity: 1; }
 </style>
