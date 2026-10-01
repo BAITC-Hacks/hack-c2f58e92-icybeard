@@ -45,7 +45,7 @@ const sub = (stage: RouteStage) => (stage.date ? dateShort(stage.date) : props.n
 .steps { list-style: none; margin: 0; padding: 0; display: flex; align-items: flex-start; position: relative; }
 .step { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; position: relative; text-align: center; }
 .node { border-radius: 50%; display: flex; align-items: center; justify-content: center; box-sizing: border-box; z-index: 1; flex: none; }
-.label { font-size: 12px; font-weight: var(--fw-bold); color: var(--text-secondary); padding: 0 6px; }
+.label { font-size: 13px; font-weight: var(--fw-bold); color: var(--text-secondary); padding: 0 6px; }
 .sub { font-size: var(--fs-xs); color: var(--text-faint); margin-top: -5px; }
 .line { position: absolute; background: var(--border-soft); }
 .line.done { background: var(--accent); }
@@ -69,7 +69,7 @@ const sub = (stage: RouteStage) => (stage.date ? dateShort(stage.date) : props.n
 .doctor .step.done .check { width: 18px; height: 18px; stroke-width: 3; }
 .doctor .step.current .node { background: var(--accent); color: var(--text-on-accent); box-shadow: 0 0 0 6px var(--accent-soft); }
 .doctor .step.current .label { font-size: var(--fs-md); font-weight: var(--fw-extrabold); color: var(--accent-strong); }
-.doctor .label { font-size: 13px; font-weight: var(--fw-regular); color: var(--text-muted); }
+.doctor .label { font-size: 14px; font-weight: var(--fw-regular); color: var(--text-muted); }
 .doctor .step.done .label { color: var(--text-secondary); font-weight: var(--fw-semibold); }
 
 @media (max-width: 720px) {

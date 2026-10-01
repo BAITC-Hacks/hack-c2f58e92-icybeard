@@ -7,8 +7,8 @@ import { useRoute } from 'vue-router'
 import { analytics, queue, refdata as refdataApi, route as routeApi } from '@/api/endpoints'
 import type { AlternativesResponse, IndexItem, PredictResponse, RouteBenchmark, Seasonality } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
+import OriginTag from '@/components/OriginTag.vue'
 import AppCard from '@/components/ui/AppCard.vue'
-import CollapsibleSection from '@/components/ui/CollapsibleSection.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import HeroNumber from '@/components/ui/HeroNumber.vue'
 import PageShell from '@/components/ui/PageShell.vue'
@@ -38,24 +38,30 @@ const includeNeighbors = ref(false)
 const prediction = ref<PredictResponse | null>(null)
 const alternatives = ref<AlternativesResponse | null>(null)
 const indexItem = ref<IndexItem | null>(null)
+const indexTotal = ref(0)
 const target = ref<RouteBenchmark | null>(null)
 const seasonality = ref<Seasonality[]>([])
 const error = ref<unknown>(null)
 const busy = ref(false)
 const requesting = ref<string | null>(null)
 const requested = ref<string | null>(null)
+const howOpen = ref(false)
 const ready = computed(() => !!region.value && !!profile.value)
 const isCitizen = computed(() => auth.can('route.own'))
 const asOf = computed(() => prediction.value?.model.trainedThrough ?? '')
 
-/** Бары «где быстрее»: ширина — доля от самой длинной медианы; самое короткое ожидание — синий --accent,
- * остальные — --bar-neutral; цифра зелёная, если короче медианы региона (prediction.p50Days). */
+/** Бары «где быстрее»: срок читается по длине полосы (доля от самого долгого ожидания в списке), цвет у всех один;
+ * «на N дн. быстрее, чем в среднем по региону» — словами, если больница короче медианы региона. */
 const bars = computed(() => {
   const items = alternatives.value?.items ?? []
   const max = Math.max(1, ...items.map((a) => a.p50Days))
-  const min = Math.min(...items.map((a) => a.p50Days))
   const baseline = prediction.value?.p50Days ?? null
-  return items.map((a) => ({ ...a, width: `${Math.max(2, (a.p50Days / max) * 100)}%`, shortest: a.p50Days === min, faster: baseline !== null && a.p50Days < baseline }))
+  return items.map((a) => {
+    // разница — по округлённым дням, которые видит человек
+    const d = baseline !== null ? Math.round(baseline) - Math.round(a.p50Days) : null
+    const compare = d === null ? '' : d > 0 ? t('citizen.wait.fasterThanAvg', { days: d }) : d < 0 ? t('citizen.wait.slowerThanAvg', { days: -d }) : t('citizen.wait.sameAsAvg')
+    return { ...a, width: `${Math.max(3, (a.p50Days / max) * 100)}%`, fasterBy: d !== null && d > 0 ? d : 0, compare }
+  })
 })
 
 /** Сезонный ориентир: лист ожидания в ближайшие месяцы относительно текущего (форма NHS RTT). */
@@ -92,6 +98,7 @@ async function run() {
     prediction.value = p
     alternatives.value = a
     indexItem.value = idx.items.find((i) => i.regionKato === region.value) ?? null
+    indexTotal.value = idx.items.length
   } catch (e) {
     if (id === runId) error.value = e
   } finally {
@@ -150,24 +157,29 @@ watch([region, profile, includeNeighbors], run)
 
     <AppCard v-if="!ready"><EmptyState :title="t('citizen.wait.pickTitle')" :text="t('citizen.wait.pickText')" icon="pi pi-search" /></AppCard>
     <template v-else>
-      <AppCard :title="t('citizen.wait.regionAverage')" label data-testid="wait-result">
+      <AppCard :title="t('citizen.wait.regionAverage')" label origin="ml" data-testid="wait-result">
         <HeroNumber
           :loading="busy && !prediction"
           :value="prediction ? `≈ ${days(prediction.p50Days)}` : '—'"
           :unit="t('common.days')"
-          :label="prediction ? t('hero.half') : ''"
-          :sub="prediction ? [t('hero.nineOfTen', { days: days(prediction.p90Days) }), t('hero.within30', { pct: pct(prediction.pWithin30Days) })].join(' · ') : ''"
-          origin="ml"
+          :label="t('citizen.wait.heroLead')"
+          :sub="prediction ? [t('citizen.wait.heroNine', { days: days(prediction.p90Days) }), t('citizen.wait.heroWithin30', { pct: pct(prediction.pWithin30Days) })].join('\n') : ''"
+          label-first
         />
         <div class="hero-foot">
-          <span v-if="target" class="small muted">{{ t('route.benchmark', { days: days(target.value), source: target.source }) }}</span>
+          <span v-if="target" class="benchmark">
+            <span class="benchmark-text">{{ t('route.citizen.benchmark', { days: days(target.value) }) }} <OriginTag kind="formula" /></span>
+            <details class="source">
+              <summary>{{ t('route.citizen.sourceToggle') }} <i class="pi pi-chevron-down" aria-hidden="true" /></summary>
+              <span class="caption">{{ t('route.citizen.benchmarkSource', { source: target.source }) }}</span>
+            </details>
+          </span>
           <span class="spacer" />
           <span class="caption">{{ t('citizen.wait.estimateNote') }}<template v-if="asOf"> · {{ t('shell.asOf', { date: dateShort(asOf) }) }}</template></span>
         </div>
       </AppCard>
 
       <AppCard :title="t('citizen.wait.whereFasterRegion')" label data-testid="wait-alternatives">
-        <template #header><span class="caption">{{ t('citizen.wait.medianDays') }}</span></template>
         <Skeleton v-if="busy && !alternatives" :lines="4" />
         <template v-else-if="!alternatives || alternatives.items.length === 0">
           <p class="muted">{{ t('citizen.wait.noOrganizations') }}</p>
@@ -179,8 +191,12 @@ watch([region, profile, includeNeighbors], run)
               <span class="org">{{ shortOrgName(a.mo.name) }}</span>
               <span class="caption">{{ a.mo.moCode }}<template v-if="a.isNeighborRegion"> · {{ t('citizen.wait.neighborRegion', { region: refdata.regionName(a.mo.regionKato) }) }}</template></span>
             </span>
-            <span class="track" aria-hidden="true"><span class="fill" :class="{ shortest: a.shortest }" :style="{ width: a.width }" /></span>
-            <span class="bar-value" :class="{ faster: a.faster }">≈ {{ days(a.p50Days) }}</span>
+            <span class="track" aria-hidden="true"><span class="fill" :style="{ width: a.width }" /></span>
+            <span class="bar-value" :class="{ faster: a.fasterBy }">
+              <span class="bar-lead">{{ t('citizen.wait.columnHalf') }}</span>
+              <span class="bar-days">≈ {{ days(a.p50Days) }} <span class="bar-unit">{{ t('common.days') }}</span></span>
+              <span v-if="a.compare" class="bar-faster">{{ a.compare }}</span>
+            </span>
             <span class="bar-action">
               <StatusTag v-if="requested === a.mo.moCode" :value="t('route.requestPending')" tone="accent" />
               <button v-else-if="isCitizen" type="button" class="ghost-link" :disabled="requesting !== null" data-testid="request" @click="request(a.mo.moCode)">
@@ -189,23 +205,26 @@ watch([region, profile, includeNeighbors], run)
             </span>
           </div>
         </div>
-        <div v-if="alternatives?.items.length" class="legend caption">
-          <span class="legend-item"><span class="swatch accent" />{{ t('citizen.wait.legendShortest') }}</span>
-          <span class="legend-item"><span class="swatch ok" />{{ t('citizen.wait.legendFaster') }}</span>
-          <span class="legend-item"><span class="swatch neutral" />{{ t('citizen.wait.legendOthers') }}</span>
+        <div class="legend caption">
+          <button type="button" class="how-toggle" :aria-expanded="howOpen" aria-controls="wait-how" data-testid="wait-how-toggle" @click="howOpen = !howOpen">
+            {{ t('citizen.wait.howComputed') }}<template v-if="indexItem"> · {{ t('citizen.wait.indexSummary', { rank: indexItem.rank, total: indexTotal }) }}</template>
+            <i class="pi" :class="howOpen ? 'pi-chevron-up' : 'pi-chevron-down'" aria-hidden="true" />
+          </button>
+          <OriginTag kind="formula" />
           <span class="spacer" />
           <span v-if="asOf">{{ t('shell.asOf', { date: dateShort(asOf) }) }}</span>
+        </div>
+        <div v-show="howOpen" id="wait-how" class="how">
+          <p>{{ t('citizen.wait.howIntro') }}</p>
+          <p>{{ t('citizen.wait.indexExplain') }}</p>
+          <p v-if="indexItem" class="how-here">{{ t('citizen.wait.indexHere', { region: refdata.regionName(region ?? ''), value: indexItem.indexValue.toFixed(0), rank: indexItem.rank, total: indexTotal, share: pct(indexItem.shareOver30), p90: days(indexItem.p90Days) }) }}</p>
+          <p v-else-if="prediction" class="muted">{{ t('citizen.wait.indexHiddenPlain') }}</p>
+          <p v-if="seasonalHint" class="muted">{{ t('citizen.wait.seasonalPlain') }} {{ seasonalHint }}. {{ t('citizen.wait.seasonalPlainSuffix') }}</p>
         </div>
         <p v-if="!isCitizen && alternatives?.items.length" class="muted small login-hint">{{ t('citizen.wait.loginToRequest') }}</p>
       </AppCard>
     </template>
 
-    <CollapsibleSection v-if="ready" :title="t('citizen.wait.howComputed')" :summary="indexItem ? t('citizen.wait.indexShort', { value: indexItem.indexValue.toFixed(0), rank: indexItem.rank }) : ''" origin="formula">
-      <p v-if="indexItem" class="muted">{{ t('citizen.wait.indexInfo', { value: indexItem.indexValue.toFixed(1), rank: indexItem.rank }) }}</p>
-      <p v-else-if="prediction" class="muted">{{ t('citizen.wait.indexHidden') }}</p>
-      <p v-if="seasonalHint" class="muted">{{ t('citizen.wait.seasonalHint') }} {{ seasonalHint }} {{ t('citizen.wait.seasonalHintSuffix') }}</p>
-      <p v-if="prediction" class="muted small">{{ t('explanationCard.model', { name: prediction.model.name, version: prediction.model.version, through: prediction.model.trainedThrough }) }}</p>
-    </CollapsibleSection>
   </PageShell>
 </template>
 
@@ -222,29 +241,42 @@ watch([region, profile, includeNeighbors], run)
 .neighbors label { font-weight: var(--fw-bold); font-size: var(--fs-md); }
 .hero-foot { border-top: 1px solid var(--surface-muted); padding-top: 12px; margin-top: 14px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .hero-foot .spacer { flex: 1; }
+.benchmark { display: flex; flex-direction: column; gap: 4px; }
+.source summary { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-muted); cursor: pointer; list-style: none; }
+.source summary::-webkit-details-marker { display: none; }
+.source summary i { font-size: 0.6rem; transition: transform .15s; }
+.source[open] summary i { transform: rotate(180deg); }
+.source .caption { display: block; margin-top: 4px; }
+.benchmark-text { font-size: var(--fs-base); font-weight: var(--fw-semibold); }
+.faster-lead { margin: -4px 0 8px; line-height: 1.45; }
+.how { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 16px 18px; border-radius: var(--radius-lg); background: var(--surface-hover); font-size: var(--fs-base); color: var(--text); }
+.how-toggle { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0; font: inherit; font-size: var(--fs-base); font-weight: var(--fw-bold); color: var(--link); cursor: pointer; }
+.how-toggle:hover { color: var(--accent-strong); }
+.how-toggle i { font-size: 0.7rem; }
+.legend :deep(.origin) { margin-left: 4px; }
+.how p { margin: 0; line-height: 1.55; }
+.how-here { font-weight: var(--fw-semibold); }
 /* бары: трек 10px, лучшая — accent, остальные — bar-neutral; цифра зелёная — короче медианы региона */
 .bars { display: flex; flex-direction: column; }
-.bar-row { display: grid; grid-template-columns: 220px minmax(0, 1fr) 56px auto; align-items: center; gap: 16px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+.bar-row { display: grid; grid-template-columns: minmax(220px, 1.1fr) minmax(0, 1fr) 200px 170px; align-items: center; gap: 18px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.bar-lead { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.3; }
 .bar-row:last-child { border-bottom: 0; }
 .bar-label { display: flex; flex-direction: column; min-width: 0; }
-.org { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-base); font-weight: var(--fw-bold); }
+.org { font-size: var(--fs-base); font-weight: var(--fw-bold); line-height: 1.35; overflow-wrap: anywhere; }
 .track { height: 10px; border-radius: 5px; background: var(--surface-muted); overflow: hidden; }
-.fill { display: block; height: 100%; background: var(--bar-neutral); border-radius: 5px; }
-.fill.shortest { background: var(--accent); }
-.bar-value { text-align: right; font-size: var(--fs-md); font-weight: var(--fw-extrabold); white-space: nowrap; }
-.bar-value.faster { color: var(--success-text); }
+.fill { display: block; height: 100%; background: var(--accent); opacity: .75; border-radius: 5px; }
+.bar-value { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 2px; }
+.bar-days { font-size: var(--fs-md); font-weight: var(--fw-extrabold); white-space: nowrap; }
+.bar-unit { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--text-muted); }
+.bar-faster { font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.3; }
+.bar-value.faster .bar-days { color: var(--success-text); }
 .bar-action { min-width: 0; display: flex; justify-content: flex-end; }
 .ghost-link { border: 0; background: none; padding: 0; font: inherit; font-size: var(--fs-base-sm); font-weight: var(--fw-bold); color: var(--link); cursor: pointer; white-space: nowrap; }
 .ghost-link:hover:not(:disabled) { color: var(--accent-strong); }
 .ghost-link:disabled { opacity: 0.45; cursor: default; }
 .ghost-link i { font-size: 0.7rem; }
 .legend { display: flex; align-items: center; gap: 16px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
-.legend-item { display: inline-flex; align-items: center; gap: 6px; }
-.swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.swatch.accent { background: var(--accent); }
-.swatch.ok { background: var(--success-text); }
-.swatch.neutral { background: var(--bar-neutral); }
 .spacer { flex: 1; }
 .login-hint { margin: 8px 0 0; }
-@media (max-width: 900px) { .bar-row { grid-template-columns: 1fr 56px; } .track { grid-column: 1 / -1; } .bar-action { grid-column: 1 / -1; justify-content: flex-start; } }
+@media (max-width: 900px) { .bar-row { grid-template-columns: 1fr auto; } .track { grid-column: 1 / -1; } .bar-action { grid-column: 1 / -1; justify-content: flex-start; } }
 </style>

@@ -16,8 +16,15 @@ import SearchSelect from '@/components/ui/SearchSelect.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { days, num, pct } from '@/lib/format'
+import { dateShort } from '@/lib/route'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
+
+/** Строка-основание с сервера («по 457 обеспеченным рецептам…») — законченным предложением с подписью. */
+function sentence(label: string, text: string): string {
+  const body = text.trim().replace(/[.\s]+$/, '')
+  return `${label} ${body}.`
+}
 
 /** «Проверка рецепта» (W-Medicines): поля нозологии и МНН на soft, регион пилюлей, «Проверить»; слева карточка
  * результата (МНН крупно, чип покрытия, строки сроков, «Как считается»), справа «Другие МНН при этой нозологии».
@@ -183,10 +190,16 @@ watch(forecastMnnId, loadDemandForecast)
             </span>
           </div>
         </div>
-        <div class="how">
-          <span class="how-title">{{ t('citizen.wait.howComputed') }}</span>
-          <span>{{ t('medicines.howComputed', { model: result.model.name, version: result.model.version, through: result.model.trainedThrough }) }} {{ result.basis }}<template v-if="result.shortage.basis"> · {{ result.shortage.basis }}</template></span>
-        </div>
+        <details class="how">
+          <summary class="how-title">{{ t('citizen.wait.howComputed') }} <i class="pi pi-chevron-down" aria-hidden="true" /></summary>
+          <div class="how-body">
+            <p>{{ t('medicines.howPlain', { through: dateShort(result.model.trainedThrough) }) }}</p>
+            <ul class="how-list">
+              <li v-if="result.basis">{{ sentence(t('medicines.basisFill'), result.basis) }}</li>
+              <li v-if="result.shortage.basis">{{ sentence(t('medicines.basisShortage'), result.shortage.basis) }}</li>
+            </ul>
+          </div>
+        </details>
       </AppCard>
 
       <AppCard :title="t('medicines.otherMnn')" label class="other-card">
@@ -226,7 +239,7 @@ watch(forecastMnnId, loadDemandForecast)
 .searchbar .region-field { flex: 0 1 220px; }
 .searchbar :deep(.p-select) { min-height: 44px; border-radius: var(--radius-lg); font-weight: var(--fw-bold); }
 .searchbar :deep(.p-button) { min-height: 44px; }
-.result-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+.result-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 .result-grid > .card { display: flex; flex-direction: column; }
 .status-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .mnn-title { font-size: 19px; font-weight: var(--fw-extrabold); letter-spacing: -0.01em; }
@@ -238,8 +251,14 @@ watch(forecastMnnId, loadDemandForecast)
 .within14 .track { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; max-width: 260px; }
 .within14 .fill { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
 .accent-num { color: var(--accent); }
-.how { border-top: 1px solid var(--border); margin-top: auto; padding-top: 12px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--text-muted); }
-.how-title { font-weight: var(--fw-bold); color: var(--text); }
+.how { border-top: 1px solid var(--border); margin-top: auto; padding-top: 12px; font-size: var(--fs-base-sm); color: var(--text-secondary); }
+.how-title { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-base); font-weight: var(--fw-bold); color: var(--link); cursor: pointer; list-style: none; }
+.how-title::-webkit-details-marker { display: none; }
+.how-title i { font-size: 0.7rem; transition: transform .15s; }
+.how[open] .how-title i { transform: rotate(180deg); }
+.how-body { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; line-height: 1.5; }
+.how-body p { margin: 0; }
+.how-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .other-rows { flex: 1; }
 .other-name { font-size: var(--fs-base); font-weight: var(--fw-bold); }
 .row-button { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border); font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 12px 0; }

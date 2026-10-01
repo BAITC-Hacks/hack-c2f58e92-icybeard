@@ -19,15 +19,18 @@ defineProps<{
   tone?: 'ok' | 'warn' | 'danger'
   /** компактный вариант для колонок */
   compact?: boolean
+  /** формулировка над числом: сначала «что это», потом цифра (экраны гражданина) */
+  labelFirst?: boolean
 }>()
 </script>
 
 <template>
   <div class="hero" :class="[tone, { compact }]">
     <div v-if="caption" class="hero-caption"><span class="eyebrow">{{ caption }}</span><span class="spacer" /><OriginTag v-if="origin" :kind="origin" :note="originNote" /></div>
+    <div v-if="labelFirst" class="hero-label first">{{ label }} <OriginTag v-if="origin && !caption" :kind="origin" :note="originNote" /></div>
     <Skeleton v-if="loading" kind="kpi" />
     <div v-else class="hero-value tabular"><span class="number">{{ value }}</span><span v-if="unit" class="unit">{{ unit }}</span></div>
-    <div class="hero-label">{{ label }} <OriginTag v-if="origin && !caption" :kind="origin" :note="originNote" /></div>
+    <div v-if="!labelFirst" class="hero-label">{{ label }} <OriginTag v-if="origin && !caption" :kind="origin" :note="originNote" /></div>
     <div v-if="sub" class="hero-sub muted tabular">{{ sub }}</div>
     <div v-if="$slots.default" class="hero-extra"><slot /></div>
   </div>
@@ -42,7 +45,8 @@ defineProps<{
 .compact .number { font-size: var(--dm-text-kpi); font-weight: var(--fw-extrabold); }
 .unit { font-size: var(--dm-text-base); color: var(--dm-muted); }
 .hero-label { font-size: var(--dm-text-md); }
-.hero-sub { font-size: var(--dm-text-sm); }
+.hero-label.first { font-weight: var(--fw-semibold); line-height: 1.4; }
+.hero-sub { font-size: var(--dm-text-sm); white-space: pre-line; line-height: 1.55; }
 .hero-extra { margin-top: 4px; }
 .hero.ok .number { color: var(--dm-ok); }
 .hero.warn .number, .hero.danger .number { color: var(--dm-danger); }

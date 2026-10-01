@@ -2,7 +2,7 @@
 import Button from 'primevue/button'
 import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SignalKind } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
@@ -21,7 +21,7 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useRouteData } from '@/composables/useRouteData'
 import { days, pct, shortOrgName } from '@/lib/format'
-import { dateShort, stageTone, type Tone } from '@/lib/route'
+import { dateShort } from '@/lib/route'
 
 /** «Мой путь» (route-new): чип стадии справа от заголовка; во всю ширину карточка «Этапы маршрута» горизонтальным
  * степпером (узлы 40); ниже две колонки — слева «Сколько ждать» (крупный срок 34) и «Что дальше», справа
@@ -31,6 +31,16 @@ const { t } = useI18n()
 const toast = useToast()
 const r = useRouteData(() => undefined)
 const requestComment = ref('')
+const commentOpen = ref(false)
+/** «Посмотреть» у строки про анализы: раскрыть свёрнутый раздел «Анализы» и прокрутить к нему. */
+const testsOpen = ref(false)
+const testsKey = ref(0)
+async function openTests() {
+  testsOpen.value = true
+  testsKey.value++
+  await nextTick()
+  document.getElementById('route-tests')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 const SEEN_KEY = 'darumen.route.seenDecision'
 const seenDecision = ref(readSeen())
 
@@ -52,8 +62,6 @@ function dismissAnswer(id: string) {
   }
 }
 
-const STATUS_TONES = { success: 'ok', warn: 'warn', danger: 'danger', info: 'accent', secondary: 'neutral' } as const satisfies Record<Tone, string>
-const tone = (severity: Tone) => STATUS_TONES[severity]
 
 /** Ответ врача показывается, если он новее последнего сигнала гражданина и его ещё не закрыли «Понятно». */
 const doctorAnswer = computed(() => {
@@ -71,9 +79,9 @@ const validItems = computed(() => r.data.value?.checklist.filter((c) => c.status
 const heroSub = computed(() => {
   const f = r.data.value?.forecast
   if (!f) return ''
-  const parts = [t('hero.nineOfTen', { days: days(f.p90Days) })]
-  if (f.pWithin30Days !== null) parts.push(t('hero.within30', { pct: pct(f.pWithin30Days) }))
-  return parts.join(' · ')
+  const parts = [t('route.citizen.forecastNine', { days: days(f.p90Days) })]
+  if (f.pWithin30Days !== null) parts.push(t('route.citizen.forecastWithin30', { pct: pct(f.pWithin30Days) }))
+  return parts.join('\n')
 })
 
 async function signal(kind: SignalKind, toMoCode?: string) {
@@ -95,13 +103,6 @@ onMounted(r.load)
 
 <template>
   <PageShell :title="t('route.myTitle')">
-    <template v-if="r.data.value" #subtitle>
-      <span :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }}</span> · {{ r.data.value.organization.profileName }} ·
-      {{ t('route.since', { date: dateShort(r.data.value.dates.registeredAt), days: r.data.value.daysWaiting }) }} · {{ t('shell.asOf', { date: dateShort(r.data.value.asOf) }) }}
-    </template>
-    <template v-if="r.data.value" #actions>
-      <StatusTag :value="t('route.stage.' + r.data.value.stage)" :tone="tone(stageTone(r.data.value.stage))" data-testid="route-stage" />
-    </template>
     <ErrorBox :error="r.error.value" />
     <EmptyState v-if="r.notFound.value" :title="t('route.notFound')" icon="pi pi-map">
       <RouterLink class="link-arrow" to="/wait">{{ t('nav.wait') }}</RouterLink>
@@ -112,19 +113,33 @@ onMounted(r.load)
     </div>
 
     <template v-if="r.data.value">
-      <AppCard :title="t('route.stagesTitle')" label class="stages-card">
-        <template #header><span class="caption">{{ t('route.stagesCount', { total: r.data.value.timeline.length, done: doneCount }) }}</span></template>
-        <RouteTimeline :stages="r.data.value.timeline" variant="citizen" norms />
-      </AppCard>
+      <!-- одна карточка: больница и сроки сверху, под чертой — этапы маршрута (текущий этап виден на степпере) -->
+      <section class="card route-card">
+      <div class="who" data-testid="route-who">
+          <div class="who-main">
+            <span class="who-label">{{ t('route.citizen.yourHospital') }}</span>
+            <span class="who-name" :title="r.data.value.organization.moName">{{ shortOrgName(r.data.value.organization.moName) }}</span>
+            <span class="who-profile">{{ r.data.value.organization.profileName }}</span>
+          </div>
+          <dl class="who-facts">
+            <div class="fact"><dt>{{ t('route.citizen.factSince') }}</dt><dd class="tabular">{{ dateShort(r.data.value.dates.registeredAt) }}</dd></div>
+            <div class="fact"><dt>{{ t('route.citizen.factWaiting') }}</dt><dd class="tabular">{{ t('route.citizen.factDays', { days: r.data.value.daysWaiting }) }}</dd></div>
+            <div class="fact"><dt>{{ t('route.citizen.factAsOf') }}</dt><dd class="tabular">{{ dateShort(r.data.value.asOf) }}</dd></div>
+          </dl>
+        </div>
+        <div class="stages-block">
+          <div class="stages-title">
+            <span class="eyebrow">{{ t('route.stagesTitle') }}</span>
+            <span class="caption" data-testid="route-stage" :data-stage="r.data.value.stage">{{ t('route.stagesCount', { total: r.data.value.timeline.length, done: doneCount }) }}</span>
+          </div>
+          <RouteTimeline :stages="r.data.value.timeline" variant="citizen" norms />
+        </div>
+      </section>
 
+      <!-- две колонки: слева «Что дальше» и прогноз, справа ответ врача / «вы ещё ждёте?» и «Где быстрее» -->
       <div class="cols">
         <div class="col">
-          <AppCard :title="t('route.forecast')" label :origin="r.data.value.forecast.fromModel ? 'ml' : 'formula'">
-            <HeroNumber :value="`≈ ${days(r.data.value.forecast.p50Days)}`" :unit="t('common.days')" :label="t('hero.half')" :sub="heroSub" />
-            <p v-if="r.target.value" class="caption benchmark">{{ t('route.benchmark', { days: days(r.target.value.value), source: r.target.value.source }) }} <OriginTag kind="formula" /></p>
-          </AppCard>
-
-          <AppCard :title="t('route.whatNext')" label class="grow" data-testid="what-now">
+          <AppCard :title="t('route.whatNext')" label class="what-next" data-testid="what-now">
             <div class="rows">
               <div class="row">
                 <span class="row-main"><span class="row-title">{{ r.data.value.dates.plannedAt ? t('route.dates.planned') : t('route.dates.expected') }}</span><span class="row-sub">{{ shortOrgName(r.data.value.organization.moName) }} · {{ r.data.value.organization.moCode }}</span></span>
@@ -132,7 +147,7 @@ onMounted(r.load)
               </div>
               <div v-if="r.expired.value" class="row">
                 <span class="row-main"><span class="row-title">{{ t('route.updateTests', { n: r.expired.value }) }}</span><span class="row-sub">{{ expiredTitles }}</span></span>
-                <span class="row-value"><StatusTag :value="t('route.status.expired')" tone="danger" /></span>
+                <span class="row-value"><button type="button" class="link-btn" @click="openTests">{{ t('route.citizen.seeTests') }}</button></span>
               </div>
               <div v-if="validItems.length" class="row">
                 <span class="row-main"><span class="row-title">{{ t('route.validTests', { n: validItems.length }) }}</span><span class="row-sub">{{ validItems[0]!.title }} · {{ t('route.validUntil', { date: dateShort(validItems[0]!.validUntil) }) }}</span></span>
@@ -148,8 +163,17 @@ onMounted(r.load)
               </div>
             </div>
           </AppCard>
+          <AppCard :title="t('route.forecast')" label class="grow" :origin="r.data.value.forecast.fromModel ? 'ml' : 'formula'">
+            <HeroNumber :value="`≈ ${days(r.data.value.forecast.p50Days)}`" :unit="t('common.days')" :label="t('route.citizen.forecastLead')" :sub="heroSub" label-first />
+            <div v-if="r.target.value" class="benchmark">
+              <p class="benchmark-text">{{ t('route.citizen.benchmark', { days: days(r.target.value.value) }) }} <OriginTag kind="formula" class="benchmark-tag" /></p>
+              <details class="source">
+                <summary>{{ t('route.citizen.sourceToggle') }} <i class="pi pi-chevron-down" aria-hidden="true" /></summary>
+                <p class="caption benchmark-source">{{ t('route.citizen.benchmarkSource', { source: r.target.value.source }) }}</p>
+              </details>
+            </div>
+          </AppCard>
         </div>
-
         <div class="col">
           <!-- ответ врача: карточка-сигнал на accent-soft -->
           <section v-if="doctorAnswer" class="card signal-card" data-testid="doctor-answer">
@@ -178,22 +202,24 @@ onMounted(r.load)
               <button type="button" class="option" :disabled="r.acting.value !== null" @click="signal('withdraw')">{{ t('route.validationWithdraw') }}</button>
             </div>
           </AppCard>
-
           <AppCard :title="t('route.whereFaster')" label :origin="r.data.value.alternativesModel ? 'ml' : undefined" class="grow">
-            <p class="muted small faster-lead">{{ t('route.sameRegionProfile') }}. {{ t('route.doctorOnly') }}.</p>
+            <p class="muted small faster-lead">{{ t('route.citizen.fasterLead') }}</p>
             <RouteAlternatives :items="r.data.value.alternatives" audience="citizen" :acting="r.acting.value" :pending-code="r.pendingRequest.value?.toMoCode" :action-label="t('route.requestConsider')" :baseline-days="r.data.value.forecast.p50Days" @act="signal('request_redirect', $event)" />
-            <div v-if="r.data.value.alternatives.length" class="comment-block">
-              <div class="field">
-                <label>{{ t('route.requestComment') }}</label>
-                <Textarea v-model="requestComment" rows="2" auto-resize data-testid="request-comment" />
+            <div v-if="r.data.value.alternatives.length" class="comment-block" :class="{ open: commentOpen || requestComment }">
+              <button type="button" class="comment-toggle" :aria-expanded="commentOpen || !!requestComment" aria-controls="request-comment-box" data-testid="comment-toggle" @click="commentOpen = !commentOpen">
+                <i class="pi pi-comment" aria-hidden="true" />{{ t('route.citizen.commentToggle') }}
+                <i class="pi chevron" :class="commentOpen || requestComment ? 'pi-chevron-up' : 'pi-chevron-down'" aria-hidden="true" />
+              </button>
+              <div v-show="commentOpen || requestComment" id="request-comment-box" class="comment-box">
+                <p class="comment-note">{{ t('route.citizen.commentHint') }}</p>
+                <Textarea id="request-comment" v-model="requestComment" rows="3" auto-resize :aria-label="t('route.citizen.commentLabel')" data-testid="request-comment" />
               </div>
-              <p class="caption comment-note">{{ t('route.doctorOnly') }}</p>
             </div>
           </AppCard>
         </div>
       </div>
 
-      <CollapsibleSection :title="t('route.checklist')" :summary="t('route.checklistSummary', { expired: r.expired.value, valid: r.valid.value })" :tone="r.expired.value ? 'danger' : undefined" origin="formula">
+      <CollapsibleSection id="route-tests" :key="testsKey" :open="testsOpen" :title="t('route.checklist')" :summary="t('route.checklistSummary', { expired: r.expired.value, valid: r.valid.value })" origin="formula" data-testid="route-tests">
         <RouteChecklist :items="r.data.value.checklist" :standard="r.data.value.standard" />
       </CollapsibleSection>
       <div class="grid cols-2">
@@ -208,11 +234,39 @@ onMounted(r.load)
 <style scoped>
 /* карточки гражданина: padding 22/24 (route-new) */
 .card { padding: 22px 24px; }
-.stages-card { padding: 26px 28px; }
+.route-card { padding: 0; overflow: hidden; }
+.route-card .who { margin: 0; border: 0; border-radius: 0; box-shadow: none; padding: 22px 28px; }
+.stages-block { border-top: 1px solid var(--border-soft); padding: 20px 28px 24px; }
+.stages-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.eyebrow { font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.source summary { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--text-muted); cursor: pointer; list-style: none; }
+.source summary::-webkit-details-marker { display: none; }
+.source summary i { font-size: 0.6rem; transition: transform .15s; }
+.source[open] summary i { transform: rotate(180deg); }
+.source .benchmark-source { margin-top: 4px; }
 .cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--gap-citizen); align-items: stretch; }
 .col { display: flex; flex-direction: column; gap: var(--gap-citizen); min-width: 0; }
 .grow { flex: 1; }
-.benchmark { border-top: 1px solid var(--surface-muted); margin: 14px 0 0; padding-top: 12px; }
+#route-tests { scroll-margin-top: 16px; }
+.link-btn { border: 0; background: none; padding: 0; font: inherit; font-size: var(--fs-base-sm); font-weight: var(--fw-bold); color: var(--link); cursor: pointer; white-space: nowrap; }
+.link-btn:hover { color: var(--accent-strong); }
+.benchmark { border-top: 1px solid var(--surface-muted); margin: 16px 0 0; padding-top: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.benchmark-text { margin: 0; font-size: var(--fs-base); font-weight: var(--fw-semibold); }
+.benchmark-source { margin: 0; color: var(--text-muted); line-height: 1.45; }
+.benchmark-tag { margin-left: 8px; }
+.stages-head { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* шапка: карточка «Ваша больница» — название крупно, профиль ниже; справа три факта «подпись над значением» */
+.who { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-top: 10px; padding: 20px 24px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius-card); box-shadow: var(--shadow-card-citizen); }
+.who-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 380px; }
+.who-label { font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
+.who-name { font-size: 22px; font-weight: var(--fw-extrabold); color: var(--text); line-height: 1.25; letter-spacing: -0.01em; }
+.who-profile { font-size: var(--fs-base); color: var(--text-secondary); line-height: 1.45; }
+.who-facts { display: flex; gap: 0; margin: 0; flex: none; }
+.fact { padding: 2px 22px; border-left: 1px solid var(--border-soft); display: flex; flex-direction: column; gap: 4px; }
+.fact:first-child { border-left: 0; padding-left: 0; }
+.fact dt { font-size: var(--fs-sm); color: var(--text-muted); }
+.fact dd { margin: 0; font-size: 17px; font-weight: var(--fw-extrabold); color: var(--text); white-space: nowrap; }
+@media (max-width: 640px) { .who-facts { flex-wrap: wrap; row-gap: 12px; } .fact { padding: 0 14px; } }
 .row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .row-title { font-weight: var(--fw-bold); }
 .strong { font-weight: var(--fw-extrabold); font-size: var(--fs-md); }
@@ -229,8 +283,12 @@ onMounted(r.load)
 .option:hover:not(:disabled) { background: var(--accent-subtle); color: var(--accent-strong); }
 .option:disabled { opacity: 0.6; cursor: default; }
 .faster-lead { margin: -4px 0 10px; line-height: 1.45; }
-.comment-block { margin-top: auto; padding-top: 14px; }
-.comment-note { margin: 8px 0 0; color: var(--text-faint); }
+.comment-block { margin-top: 14px; border-top: 1px solid var(--border-soft); padding-top: 12px; }
+.comment-toggle { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 4px 0; font: inherit; font-size: var(--fs-base); font-weight: var(--fw-bold); color: var(--link); cursor: pointer; }
+.comment-toggle:hover { color: var(--accent-strong); }
+.comment-toggle .chevron { font-size: 0.7rem; }
+.comment-box { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.comment-note { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; }
 .footnote { color: var(--text-faint); }
 .grid.cols-2 .card { display: flex; flex-direction: column; }
 @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }

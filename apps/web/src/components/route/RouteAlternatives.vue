@@ -2,16 +2,16 @@
 import { useI18n } from 'vue-i18n'
 import type { Alternative } from '@/api/types'
 import StatusTag from '@/components/ui/StatusTag.vue'
-import { days, pct, shortOrgName } from '@/lib/format'
+import { days, shortOrgName } from '@/lib/format'
 import { useRefdataStore } from '@/stores/refdata'
 
 /** «Где быстрее» (route-new / doctor-route-patient-new): гражданину — плитки с рамкой --border-soft radius 14,
- * крупный срок 26/800 зелёным (--success-text), «быстрее на N дн.» и ghost-ссылка «Попросить рассмотреть»;
- * врачу — строки с p90 и риском отказа, срок зелёным, mini-кнопка «Направить сюда». Зелёная цифра — короче,
- * чем `baselineDays` (текущая организация). Риск отказа гражданину не показывается (ТЗ §10.2). */
+ * крупный срок 26/800 зелёным (--success-text), «быстрее на N дн.» и ghost-ссылка «Попросить рассмотреть».
+ * Зелёная цифра — короче, чем `baselineDays` (текущая организация). Риск отказа гражданину не показывается (ТЗ §10.2).
+ * У врача свой список с выбором — в карточке «Оставить или перевести» на странице пациента. */
 const props = defineProps<{
   items: Alternative[]
-  audience: 'citizen' | 'doctor'
+  audience: 'citizen'
   /** код организации, для которой сейчас идёт отправка */
   acting: string | null
   /** открытая просьба гражданина — вместо кнопки чип */
@@ -24,8 +24,16 @@ const props = defineProps<{
 const emit = defineEmits<{ act: [moCode: string] }>()
 const { t } = useI18n()
 const refdata = useRefdataStore()
-const faster = (a: Alternative) => props.baselineDays != null && a.p50Days < props.baselineDays
-const fasterBy = (a: Alternative) => (props.baselineDays != null ? Math.round(props.baselineDays - a.p50Days) : 0)
+/** Разница считается по тем же округлённым дням, что видны на экране (≈ 4 и ≈ 2 → «на 2 дн.»). */
+const diff = (a: Alternative) => (props.baselineDays != null ? Math.round(props.baselineDays) - Math.round(a.p50Days) : null)
+const faster = (a: Alternative) => (diff(a) ?? 0) > 0
+const compare = (a: Alternative) => {
+  const d = diff(a)
+  if (d === null) return ''
+  if (d > 0) return t('route.citizen.fasterThanYours', { days: d })
+  if (d < 0) return t('route.citizen.slowerThanYours', { days: -d })
+  return t('route.citizen.sameAsYours')
+}
 </script>
 
 <template>
@@ -43,58 +51,32 @@ const fasterBy = (a: Alternative) => (props.baselineDays != null ? Math.round(pr
         <button v-else-if="actionLabel" type="button" class="ghost-link tile-action" :disabled="acting !== null" data-testid="request" @click="emit('act', a.mo.moCode)">{{ actionLabel }}</button>
       </div>
       <div class="tile-value" :class="{ faster: faster(a) }">
+        <div class="tile-lead">{{ t('route.citizen.tileLead') }}</div>
         <div class="tile-days tabular">≈ {{ days(a.p50Days) }} <span class="unit">{{ t('common.days') }}</span></div>
-        <div v-if="faster(a)" class="tile-faster">{{ t('route.fasterBy', { days: fasterBy(a) }) }}</div>
+        <div v-if="compare(a)" class="tile-faster">{{ compare(a) }}</div>
       </div>
     </div>
   </div>
 
-  <!-- врач: строки со сроком, p90 и риском отказа -->
-  <div v-else class="rows">
-    <p v-if="items.length === 0" class="muted">{{ t('doctor.referral.noAlternatives') }}</p>
-    <div v-for="a in items" :key="a.mo.moCode" class="row">
-      <div class="row-main">
-        <span :title="a.mo.name">{{ shortOrgName(a.mo.name) }}</span>
-        <div class="row-sub">
-          <span class="mono">{{ a.mo.moCode }}</span>
-          <template v-if="a.isNeighborRegion"> · {{ t('citizen.wait.neighborRegion', { region: refdata.regionName(a.mo.regionKato) }) }}</template>
-          · p90 {{ days(a.p90Days) }} {{ t('common.days') }} · {{ t('doctor.referral.refusalShort') }} {{ pct(a.pRefusal) }}
-        </div>
-      </div>
-      <div class="row-value">
-        <span class="wait tabular" :class="{ faster: faster(a) }">≈ {{ days(a.p50Days) }} {{ t('common.days') }}</span>
-        <StatusTag v-if="pendingCode === a.mo.moCode" :value="t('route.requestPending')" tone="accent" />
-        <button v-else-if="actionLabel" type="button" class="mini-btn" :disabled="acting !== null" data-testid="redirect" @click="emit('act', a.mo.moCode)">
-          <i v-if="acting === a.mo.moCode" class="pi pi-spinner pi-spin" aria-hidden="true" />{{ actionLabel }}
-        </button>
-      </div>
-    </div>
-  </div>
 </template>
 
 <style scoped>
 /* плитки гражданина */
 .tiles { display: flex; flex-direction: column; gap: 10px; }
 .tile { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid var(--border-soft); border-radius: var(--radius-xl); }
-.tile-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tile-main { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .tile-name { font-size: var(--fs-md); font-weight: var(--fw-bold); }
 .tile-sub { font-size: var(--fs-sm); color: var(--text-muted); }
-.tile-action { margin-top: 6px; align-self: flex-start; }
-.tile-value { text-align: right; flex: none; }
+.tile-action { margin-top: 8px; }
+.tile-value { text-align: right; flex: none; max-width: 46%; }
+.tile-lead { font-size: var(--fs-sm); color: var(--text-muted); margin-bottom: 4px; line-height: 1.3; }
 .tile-days { font-size: 26px; font-weight: var(--fw-black); line-height: 1; letter-spacing: -0.01em; }
-.tile-days .unit { font-size: 13px; font-weight: var(--fw-bold); color: var(--text-muted); letter-spacing: 0; }
+.tile-days .unit { font-size: 14px; font-weight: var(--fw-bold); color: var(--text-muted); letter-spacing: 0; }
 .tile-value.faster .tile-days { color: var(--success-text); }
 .tile-value.faster .unit { color: var(--success-soft-text); }
-.tile-faster { font-size: var(--fs-sm); font-weight: var(--fw-bold); color: var(--success-text); margin-top: 3px; }
+.tile-faster { font-size: var(--fs-sm); color: var(--text-muted); margin-top: 3px; }
 .ghost-link { border: 0; background: none; padding: 0; font: inherit; font-size: var(--fs-base-sm); font-weight: var(--fw-bold); color: var(--link); cursor: pointer; white-space: nowrap; }
 .ghost-link:hover:not(:disabled) { color: var(--accent-strong); }
 .ghost-link:disabled { opacity: 0.45; cursor: default; }
 
-/* строки врача */
-.wait { font-weight: var(--fw-extrabold); min-width: 5ch; text-align: right; }
-.wait.faster { color: var(--success-text); }
-.mini-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); color: var(--accent-strong); border: 1.5px solid var(--accent-line); border-radius: var(--radius-pill); padding: 5px 12px; font: inherit; font-size: var(--fs-xs); font-weight: var(--fw-bold); cursor: pointer; white-space: nowrap; }
-.mini-btn:hover:not(:disabled) { background: var(--accent-subtle); }
-.mini-btn:disabled { opacity: 0.45; cursor: default; }
-.mini-btn i { font-size: 0.7rem; }
 </style>
