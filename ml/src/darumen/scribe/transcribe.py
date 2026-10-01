@@ -5,7 +5,7 @@ import logging
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 
 @dataclass(frozen=True)
@@ -74,13 +74,13 @@ class WhisperTranscriber:
                 self._model = WhisperModel(self._model_size, device=self._device, compute_type=self._compute_type)
                 self.state = "ready"
                 return self._model
-            except Exception as exc:  # noqa: BLE001 - нет сети для скачивания, нет места, битый кэш
+            except Exception as exc:  # нет сети для скачивания, нет места, битый кэш
                 log.exception("whisper model failed to load")
                 self.state, self.error = "error", f"{type(exc).__name__}: {exc}"[:300]
                 raise TranscriberUnavailable(f"модель распознавания речи не загрузилась ({self.error})") from exc
 
     # примерный размер модели на диске (МБ) — для прогресса первой загрузки
-    SIZES_MB = {"tiny": 75, "base": 145, "small": 485, "medium": 1530, "large-v3-turbo": 1620, "turbo": 1620, "large-v3": 3090}
+    SIZES_MB: ClassVar[dict[str, int]] = {"tiny": 75, "base": 145, "small": 485, "medium": 1530, "large-v3-turbo": 1620, "turbo": 1620, "large-v3": 3090}
 
     def progress(self) -> dict | None:
         """Сколько модели уже скачано (по файлам в кэше HF), пока она загружается; иначе None."""
@@ -121,7 +121,7 @@ class WhisperTranscriber:
         lang = "kk" if language == "kk" else "ru"
         try:
             result = self._run(model, samples, lang, vad=True)
-        except Exception:  # noqa: BLE001 - VAD (onnxruntime) недоступен или упал: распознаём без него
+        except Exception:  # VAD (onnxruntime) недоступен или упал: распознаём без него
             log.exception("transcription with VAD failed, retrying without VAD")
             result = []
         # VAD может отрезать тихую речь с микрофона ноутбука целиком — тогда пробуем без него

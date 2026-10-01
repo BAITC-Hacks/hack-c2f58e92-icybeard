@@ -1,13 +1,12 @@
 """FastAPI application of the scribe. Mounted behind the .NET API by YARP under /api/v1/scribe."""
 from __future__ import annotations
 
+import logging
 import os
+import re
 import shutil
 from pathlib import Path
 from typing import Annotated
-
-import logging
-import re
 
 from fastapi import FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -107,7 +106,7 @@ def create_app(store: SessionStore, transcriber: Transcriber, drafter: Drafter, 
         except TranscriberUnavailable as exc:
             store.delete_audio(session)
             raise HTTPException(503, str(exc)) from exc
-        except Exception as exc:  # noqa: BLE001 - битый или неподдерживаемый файл: понятный ответ вместо 500
+        except Exception as exc:  # битый или неподдерживаемый файл: понятный ответ вместо 500
             log.exception("transcription failed for %s (%d bytes)", target.name, target.stat().st_size if target.exists() else -1)
             store.delete_audio(session)
             reason = f"{type(exc).__name__}: {exc}".strip()[:160]

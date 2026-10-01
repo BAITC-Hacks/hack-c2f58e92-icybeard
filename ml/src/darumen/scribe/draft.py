@@ -162,7 +162,7 @@ class LlmDrafter:
         user = (f"Язык: {language}.\nТермины: {', '.join(terms) if terms else '—'}\nСтенограмма:\n{transcript}")
         try:
             payload = self._chat(self.CORRECT_PROMPT, user, max_tokens=200 + 2 * sum(len(t) for t in texts))
-        except Exception as exc:  # noqa: BLE001 - модель не запущена, таймаут, не JSON
+        except Exception as exc:  # модель не запущена, таймаут, не JSON
             raise CorrectionUnavailable(f"языковая модель не ответила ({type(exc).__name__}) — исправьте фразы вручную") from exc
         fixes: dict[int, str] = {}
         for item in payload.get("segments") or []:

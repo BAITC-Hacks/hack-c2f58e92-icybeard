@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import difflib
+import itertools
 import json
 import re
 import threading
@@ -147,7 +148,7 @@ class Vocabulary:
                     by_word.setdefault(w, set()).add(t)
         found: list[str] = []
         words = [w for text in texts for w in WORD.findall(text.lower()) if len(w) >= 4]
-        pairs = [f"{a} {b}" for a, b in zip(words, words[1:])]
+        pairs = [f"{a} {b}" for a, b in itertools.pairwise(words)]
         for w in words + pairs:
             for match in difflib.get_close_matches(w, lowered.keys(), n=2, cutoff=0.6):
                 found.append(lowered[match])
