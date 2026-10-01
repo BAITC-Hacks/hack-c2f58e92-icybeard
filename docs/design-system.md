@@ -1,6 +1,6 @@
 # Дизайн-система «Тихая клиника»
 
-> **30.09.2026 — «Синяя гамма».** Действующий дизайн — холст «Darumen Health — макеты» (https://claude.ai/artifact/V4aoFSCsbtjdX8KpHKszFp, `project/handoff/`): светлая тема утверждена, тёмная — предложение оттуда же. Акцент — синий `#2F6FE4`, чернила `#1B2440`, фон рабочих страниц `#F5F6F8`, карточки белые radius 18, кнопки pill, Manrope 400–800; семантика good/attention/critical не менялась — риск и перегрузка только янтарь/красный, никогда синий. Бирюзовый «ML» и лавандовый «AI» упразднены (нейтральная пилюля происхождения). Источник значений — `design/tokens.json` (веб `apps/web/src/styles/tokens.css`, мобилка `apps/mobile/lib/theme/tokens.dart`). Всё ниже описывает снятые палитры и оставлено как история.
+> **30.09.2026 — «Синяя гамма».** Действующий дизайн — холст «Darumen Health — макеты» (https://claude.ai/artifact/V4aoFSCsbtjdX8KpHKszFp, `project/handoff/`): светлая тема утверждена, тёмная — предложение оттуда же. Акцент — синий `#2F6FE4`, чернила `#1B2440`, фон рабочих страниц `#F5F6F8`, карточки белые radius 18, кнопки pill, Manrope 400–800; семантика good/attention/critical не менялась — риск и перегрузка только янтарь/красный, никогда синий. Бирюзовый «ML» и лавандовый «AI» упразднены (нейтральная пилюля происхождения). Источник значений — `design/tokens.json` (веб `apps/web/src/styles/tokens.css`, мобилка `apps/mobile/lib/theme/tokens.dart`). **02.10.2026:** в `design/tokens.json` добавлены шкала кеглей (`type.text` — общий текстовый ярус: тело 14.5, вторичный 13.5, подпись 12, kicker 11.5, заголовок карточки 16.5; `type.web` и `type.mobile` — крупный ярус каждой платформы), раскладка (`layout`) и рамп карты (`scale-ramp`); `font.baseSize` снят. Паритет проверяют `apps/web/src/__tests__/tokens.test.ts` (`--fs-*`, `--radius-*`, `--fw-*`, `--dm-map-*`, раскладка) и `apps/mobile/test/theme_test.dart` (читает сам JSON). Таблица «Типографика» ниже — действующая; остальные таблицы и описания компонентов относятся к снятым палитрам и оставлены как история.
 
 Источник — холст Claude Design «Экраны Darumen» (https://claude.ai/artifact/EiBqCZnsM9QEmqHrWiiHhH, версия 27.09.2026): 13 досок мобилки, 19 досок веба, 15 слайдов питча. Этот файл — сверка для кода: `design/tokens.json` (паритет проверяет `apps/web/src/__tests__/tokens.test.ts`), `apps/mobile/lib/theme/*`, `apps/web/src/styles/tokens.css`, `apps/web/public/pitch.html`. Прежняя система «Clinical Minimal» (бирюза #0F766E, Onest) снята 27.09.2026.
 
@@ -36,22 +36,25 @@
 
 ## Типографика
 
-Manrope 400 / 500 / 600 (Google Fonts, OFL; веб — `@fontsource-variable/manrope`, мобилка — статичные TTF в `apps/mobile/assets/fonts/Manrope-*.ttf`). Табличные цифры везде, где числа в колонках или обновляются.
+Manrope 400 / 600 / 700 / 800 (Google Fonts, OFL; веб — `@fontsource-variable/manrope`, мобилка — статичные TTF в `apps/mobile/assets/fonts/Manrope-*.ttf`). Табличные цифры везде, где числа в колонках или обновляются.
 
-| Стиль | Мобилка | Веб |
-|---|---|---|
-| H1 экрана | 29 / 500, letter-spacing −0.02em, line-height 1.05 | 35 / 500, −0.02em, 1.05 |
-| Hero-число | 50 / 600, −0.02em, 1.0 (единица рядом 17 / 400 ink-2) | 60 / 600 на главной, 42 / 500 в KPI-карточках (+ единица 17 / 400) |
-| Заголовок карточки/секции | 17 / 500 | 20 / 500, −0.01em |
-| Крупный текст в карточке (организация, МНН) | 20–24 / 500, −0.01em | 20 / 500 |
-| Body | 17 / 400, 1.45 | 15–17 / 400 |
-| Строка списка | 15 / 400 (500 — акцент) | 14 / 400 |
-| Подпись | 14 / 400 ink-2 | 14–15 ink-2 |
-| Label над блоком | 12 / 500, uppercase, letter-spacing 0.06em, ink-2 | так же |
-| Чип | 12 / 500, letter-spacing 0.02em | так же |
-| Caption/сноска | 12 / 400, letter-spacing 0.02em, ink-2 или ink-3 | так же |
-| Навигация | 12 / 500 (нижняя), 15 / 500 (сайдбар), 14 / 500 (верхняя пилюля) | |
-| Кнопка | 17 / 500 (primary 52), 15 / 500 (веб 44), 14 / 500 (пилюли 36–44) | |
+| Стиль | `design/tokens.json` | Мобилка (`AppType`, `lib/theme/typography.dart`) | Веб (`tokens.css`) |
+|---|---|---|---|
+| Тело, строка списка | `type.text.base` 14.5 | `bodyMedium` 14.5/400; строка `row` 14.5/600, `rowStrong` 14.5/800; `titleSmall` 14.5/700 (заголовок свёрнутой секции, ссылка-действие) | `--fs-base`: body, `.row`, кнопки, поля |
+| Вторичный текст, подстрока | `type.text.base-sm` 13.5 | `bodySmall` 13.5/400 text-secondary, `rowDetail` 13.5 | `--fs-base-sm`: `.small`, `.row-sub`, подстрока hero |
+| Подпись, чип | `type.text.sm` 12 | `labelSmall` / `caption` 12/400 text-secondary; `labelMedium` 12/700 — чип и пилюля | `--fs-sm`: `.caption`, подпись KPI |
+| Kicker над блоком | `type.text.xs` 11.5 | `overline` 11.5/700, +0.05em, uppercase | `--fs-xs`: `.eyebrow`, метки происхождения и статусы |
+| Ввод, кнопка | `type.text.md` 15 | `bodyLarge` 15/400; `labelLarge` 15/800 (pill h48) | `--fs-md`: имена и значения |
+| Заголовок карточки и состояния | `type.text.lg` 16.5 | `titleMedium` 16.5/800 | `--fs-lg`: `h2` карточки, StateBlock |
+| Организация, заголовок листа | `type.mobile.heading` 19 · `type.text.xl` 20 | `titleLarge` 19/800 | `--fs-xl` 20 |
+| Заголовок экрана | `type.mobile.title` 24 · `type.web.h1-cabinet` 24, `h1-citizen` 28 | `headlineMedium` 24/800, −0.01em | 24 кабинет, 28 гражданин (22 при ширине ≤ 640 px) |
+| Значение KPI | `type.mobile.kpi` 22 · `type.web.kpi` 26 | `headlineSmall` 22/800 (26 не помещается в три колонки на 360 dp) | `--fs-kpi` 26 |
+| Крупный срок | `type.mobile.display` 34 · `type.web.display` 34 | `displaySmall` 34/800 | `--fs-display` 34 (hero-число) |
+| Hero экрана | `type.mobile.hero` 40 | `displayLarge` / `displayMedium` 40/800, −0.02em; компактный hero — `headlineSmall` 22 | — |
+| Подпись вкладки | `type.mobile.nav` 11 | 11/700 (`AppType.navLabelSize`) | — |
+| Мелкая служебная | `type.text.2xs` 10.5 | — | `--fs-2xs`: заголовки групп сайдбара |
+
+Начертания — только `font.weights` 400 / 600 / 700 / 800 (у Manrope нет 900: «чёрное» рендерится как 800). Цифры дней, дат и KPI — табличные (`tnum`).
 
 ## Компоненты — мобилка (390×844)
 

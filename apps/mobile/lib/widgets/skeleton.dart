@@ -51,37 +51,3 @@ class CardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Skeleton(height: height, radius: AppRadius.card);
 }
-
-/// Три плитки KPI в ряд.
-class KpiRowSkeleton extends StatelessWidget {
-  const KpiRowSkeleton({super.key, this.count = 3});
-
-  final int count;
-
-  @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          for (var i = 0; i < count; i++) ...[
-            if (i > 0) const SizedBox(width: AppSpacing.sm),
-            const Expanded(child: Skeleton(height: 72, radius: AppRadius.md)),
-          ],
-        ],
-      );
-}
-
-class ListSkeleton extends StatelessWidget {
-  const ListSkeleton({super.key, this.count = 4, this.itemHeight = 56});
-
-  final int count;
-  final double itemHeight;
-
-  @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          for (var i = 0; i < count; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.sm),
-            Skeleton(height: itemHeight, radius: AppRadius.md),
-          ],
-        ],
-      );
-}

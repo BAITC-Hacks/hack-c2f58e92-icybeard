@@ -4,9 +4,10 @@ import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import 'format.dart';
+import 'picker_sheet.dart';
 
-/// Короткое имя организации в тексте; тап открывает лист с полным юридическим именем. Если сокращать нечего —
-/// обычный текст без действия.
+/// Короткое имя организации в тексте ([shortOrgName]); тап открывает лист с полным юридическим именем. Если
+/// сокращать нечего — обычный текст без действия. Стиль по умолчанию — `bodySmall` (13.5 text-secondary).
 class OrgName extends StatelessWidget {
   const OrgName(this.name, {super.key, this.style, this.maxLines = 1, this.prefix = '', this.suffix = ''});
 
@@ -52,22 +53,20 @@ class OrgName extends StatelessWidget {
   }
 }
 
-/// Лист с полным юридическим именем организации.
-Future<void> showOrgNameSheet(BuildContext context, String name) => showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheet) => Padding(
-        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xxl),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(shortOrgName(name), style: Theme.of(sheet).textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.sm),
-            Text(S.at(sheet).fullNameLabel, style: Theme.of(sheet).textTheme.labelSmall),
-            const SizedBox(height: AppSpacing.xs),
-            SelectableText(name, style: Theme.of(sheet).textTheme.bodyMedium),
-          ],
-        ),
-      ),
-    );
+/// Лист с полным юридическим именем организации: заголовок — короткое имя ([SheetHeader]), ниже подпись
+/// «Полное юридическое название» и само имя с возможностью выделить и скопировать.
+Future<void> showOrgNameSheet(BuildContext context, String name) {
+  final theme = Theme.of(context);
+  return showInfoSheet(
+    context,
+    title: shortOrgName(name),
+    body: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(S.at(context).fullNameLabel, style: theme.textTheme.labelSmall),
+        const SizedBox(height: AppSpacing.xs),
+        SelectableText(name, style: theme.textTheme.bodyMedium),
+      ],
+    ),
+  );
+}

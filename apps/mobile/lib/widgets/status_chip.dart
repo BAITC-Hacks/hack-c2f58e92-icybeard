@@ -2,34 +2,51 @@ import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import 'format.dart';
 
-enum StatusTone { neutral, ok, warn, danger, accent, bench }
+/// Тон чипа статуса — те же восемь, что у веба (`ui/tones.ts`):
+/// - [neutral] — surface-sunken/text-secondary: по умолчанию, «> 30 дней», «Хочет остаться», согласие отклонено;
+/// - [ok] — успех: «Действует», госпитализирован, согласие получено, покрыт, этапы `registered` и `called`;
+/// - [warn] — внимание (янтарь): «Запрос пациента», не покрыт, ждём согласия;
+/// - [danger] — «Риск отказа», «Дата прошла», «Тяжёлый случай», отказ, дефицит;
+/// - [accent] и [info] — accent-soft/accent-strong: «Есть быстрее», «Идёт перевод», «Запрос отправлен», этап, роль;
+/// - [ai] и [bench] — тихая пилюля surface-muted/text-secondary: черновик ИИ, внешний ориентир.
+enum StatusTone { neutral, ok, warn, danger, accent, info, ai, bench }
 
-/// Чип статуса (стадия, исход, срок анализа, флаг риска): radius 8, `padding 4 10`, 12/500; цвета только из
-/// AppTones — никаких `Colors.*` на экранах.
+/// Чип статуса (стадия, исход, срок анализа, флаг риска): radius 8, `padding 4 10`, 12/700. Подпись словаря
+/// хранится строчными — первую букву поднимает сам чип («риск отказа» → «Риск отказа»), как StatusTag веба.
+/// Цвета только из [AppTones].
 class StatusChip extends StatelessWidget {
   const StatusChip(this.label, {super.key, this.tone = StatusTone.neutral, this.icon});
 
+  /// Подпись как в словаре; показывается с заглавной буквы.
   final String label;
   final StatusTone tone;
   final IconData? icon;
 
-  @override
-  Widget build(BuildContext context) {
+  /// Пара «текст / фон» тона из темы.
+  static Tone colors(BuildContext context, StatusTone tone) {
     final tones = AppTones.of(context);
-    final colors = switch (tone) {
+    return switch (tone) {
       StatusTone.neutral => tones.neutral,
       StatusTone.ok => tones.ok,
       StatusTone.warn => tones.warn,
       StatusTone.danger => tones.danger,
       StatusTone.accent => tones.accent,
+      StatusTone.info => tones.info,
+      StatusTone.ai => tones.ai,
       StatusTone.bench => tones.bench,
     };
-    return ToneChip(label: label, fg: colors.fg, bg: colors.bg, icon: icon);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pair = colors(context, tone);
+    return ToneChip(label: capitalizeFirst(label), fg: pair.fg, bg: pair.bg, icon: icon);
   }
 }
 
-/// Базовый чип для статусов (radius 8) и меток происхождения (pill).
+/// Базовый чип для статусов (radius 8) и меток происхождения (pill): подпись как передана, без смены регистра.
 class ToneChip extends StatelessWidget {
   const ToneChip({super.key, required this.label, required this.fg, required this.bg, this.icon, this.radius = AppRadius.sm});
 

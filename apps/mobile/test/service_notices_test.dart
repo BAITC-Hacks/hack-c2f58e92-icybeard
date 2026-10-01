@@ -119,7 +119,7 @@ void main() {
     });
 
     testWidgets('doctor shell shows the same banner; with working or unknown mail there is none', (tester) async {
-      final session = await apiSession(roles: ['doctor'], region: '75', api: const {});
+      final session = await apiSession(roles: ['doctor'], region: '75', api: const {}, claims: const {'mo_code': '028B'});
       await pumpShell(tester, session, await loadedStatus(allDown));
       expect(find.text(emailBanner), findsOneWidget);
       expect(find.text('Пациенты'), findsWidgets);
@@ -142,7 +142,7 @@ void main() {
   group('notification channels', () {
     testWidgets('profile says «только в приложении» and opens the channels screen in both shells', (tester) async {
       for (final (role, profile) in [('citizen', '/profile'), ('doctor', '/doctor/profile')]) {
-        final session = await apiSession(roles: [role], region: '75', api: {'/me/notifications': storedSettings()});
+        final session = await apiSession(roles: [role], region: '75', api: {'/me/notifications': storedSettings()}, claims: const {'mo_code': '028B'});
         final router = await pumpShell(tester, session, await loadedStatus(allDown));
         router.go(profile);
         await settle(tester);
@@ -165,7 +165,7 @@ void main() {
       );
       await tester.pumpWidget(providedApp(session, await loadedStatus(allDown), const NotificationSettingsScreen()));
       await tester.pumpAndSettle();
-      for (final text in ['Уведомления', 'КАНАЛЫ ДОСТАВКИ', 'В приложении', 'работает', 'Почта', 'Почтовый сервер не настроен', 'SMS', 'Push-уведомления',
+      for (final text in ['Уведомления', 'КАНАЛЫ ДОСТАВКИ', 'В приложении', 'Работает', 'Почта', 'Почтовый сервер не настроен', 'SMS', 'Push-уведомления',
         'Сейчас доставляются только уведомления в приложении.', 'Настроить по событиям в веб-кабинете']) {
         expect(find.text(text), findsOneWidget, reason: text);
       }

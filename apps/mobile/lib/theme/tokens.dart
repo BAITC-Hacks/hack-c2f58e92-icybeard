@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 /// `--bg-page`, карточки белые radius 18 с мягкой тенью, текст — тёмно-синие чернила `--text`, единственный
 /// brand-акцент — синий `--accent`; семантика good/attention/critical не менялась. Голубой градиент [heroGradient] —
 /// только стартовый вход и главная гражданина. Светлая тема утверждена, тёмная — предложение из того же handoff.
-/// Паритет значений проверяет `test/theme_test.dart`.
+/// Значения — `design/tokens.json`; паритет проверяет `test/theme_test.dart` (тест читает сам JSON).
 class ColorTokens {
   const ColorTokens({
     required this.surface,
@@ -146,7 +146,8 @@ class ColorTokens {
   /// bar-neutral — серые столбцы в сравнении «где быстрее».
   final Color barNeutral;
 
-  /// Шкала good → mid → bad (--scale-*): выше — хуже; синий в шкале риска запрещён.
+  /// Рамп карты и индекса good → mid → bad (`scale-ramp` в tokens.json, веб `--dm-map-1…5`): выше — хуже; 1, 3, 5 —
+  /// scale-good/mid/bad, 2 и 4 — смесь соседних ступеней. Синий в шкале риска запрещён.
   final Color map1;
   final Color map2;
   final Color map3;
@@ -227,7 +228,7 @@ class ColorTokens {
     benchSoft: Color(0xFFE8EEFA),
     barNeutral: Color(0xFFB4C0D8),
     map1: Color(0xFF8CC152),
-    map2: Color(0xFFBFB546),
+    map2: Color(0xFFBFB547),
     map3: Color(0xFFF2A93B),
     map4: Color(0xFFE4714C),
     map5: Color(0xFFD6395E),
@@ -278,7 +279,7 @@ class ColorTokens {
     map1: Color(0xFF7DB548),
     map2: Color(0xFFB0A83C),
     map3: Color(0xFFE39B30),
-    map4: Color(0xFFE17450),
+    map4: Color(0xFFE1744F),
     map5: Color(0xFFE04D6E),
     onAccent: white,
     heroGradient: [Color(0xFF0F1B34), Color(0xFF0E1830), Color(0xFF0D1526), Color(0xFF0E1A2C)],
@@ -301,10 +302,12 @@ abstract final class AppSpacing {
   static const double page = 16;
 }
 
-/// Радиусы синей гаммы: 4 — полоски, 8 — статус-бейджи, 10 — плашка сигнала и заметка в ленте событий,
+/// Радиусы синей гаммы: 3 — полоски, 8 — статус-бейджи, 10 — плашка сигнала и заметка в ленте событий,
 /// 12 — поля и внутренние блоки, 14 — заметки и строки-плашки, 18 — карточки, pill — кнопки и чипы.
+/// Имена мобильные, значения — `radius` из tokens.json: xs = xs, sm = sm, plate = md, md = lg, lg = xl, card = card
+/// (cardLg 20 — только веб); соответствие проверяет `test/theme_test.dart`.
 abstract final class AppRadius {
-  static const double xs = 4;
+  static const double xs = 3;
   static const double sm = 8;
   static const double plate = 10;
   static const double md = 12;

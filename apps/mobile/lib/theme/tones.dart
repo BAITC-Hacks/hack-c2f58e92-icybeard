@@ -12,11 +12,12 @@ class Tone {
   static Tone lerp(Tone a, Tone b, double t) => Tone(Color.lerp(a.fg, b.fg, t)!, Color.lerp(a.bg, b.bg, t)!);
 }
 
-/// Единственный источник цвета для OriginTag (ml / formula / ai), StatusChip (ok / warn / danger / neutral /
-/// accent / bench) и состояний экрана (info). Синяя гамма (handoff/components.md): метки происхождения (ML /
-/// формула / AI) — нейтральная пилюля surface-muted/text-secondary (бирюзовый и лавандовый упразднены), «инфо» и
-/// «текущая» (accent) — accent-soft/accent-strong, good — зелёный, attention (риск, аномалии) — янтарный,
-/// critical — красный; нейтральный статус — surface-sunken/text-secondary. Экраны не обращаются к `Colors.*`.
+/// Единственный источник цвета для OriginTag (ml / formula / ai), StatusChip (neutral / ok / warn / danger / accent /
+/// info / ai / bench) и состояний экрана (quiet / warn / info / danger). Синяя гамма (handoff/components.md): метки
+/// происхождения, AI и внешний ориентир — нейтральная пилюля surface-muted/text-secondary ([quiet]; бирюзовый и
+/// лавандовый упразднены), «инфо» и «текущая» (accent) — accent-soft/accent-strong, good — зелёный, attention (риск,
+/// аномалии) — янтарный, critical — красный; нейтральный статус-чип — surface-sunken/text-secondary. Экраны не
+/// обращаются к `Colors.*`.
 class AppTones extends ThemeExtension<AppTones> {
   const AppTones({
     required this.ml,
@@ -29,6 +30,7 @@ class AppTones extends ThemeExtension<AppTones> {
     required this.accent,
     required this.bench,
     required this.info,
+    required this.quiet,
   });
 
   factory AppTones.from(ColorTokens c) => AppTones(
@@ -42,6 +44,7 @@ class AppTones extends ThemeExtension<AppTones> {
         accent: Tone(c.accentHover, c.accentSoft),
         bench: Tone(c.muted, c.benchSoft),
         info: Tone(c.info, c.infoSoft),
+        quiet: Tone(c.muted, c.neutralSoft),
       );
 
   final Tone ml;
@@ -54,13 +57,17 @@ class AppTones extends ThemeExtension<AppTones> {
   final Tone accent;
   final Tone bench;
 
-  /// Сервисная информация: «данные устарели».
+  /// Сервисная информация: «данные устарели»; то же, что [accent].
   final Tone info;
+
+  /// Тихая пилюля surface-muted/text-secondary: нейтральный круг состояния экрана (веб StateBlock `neutral`).
+  final Tone quiet;
 
   static AppTones of(BuildContext context) => Theme.of(context).extension<AppTones>() ?? AppTones.from(ColorTokens.light);
 
   @override
-  AppTones copyWith({Tone? ml, Tone? formula, Tone? ai, Tone? ok, Tone? warn, Tone? danger, Tone? neutral, Tone? accent, Tone? bench, Tone? info}) => AppTones(
+  AppTones copyWith({Tone? ml, Tone? formula, Tone? ai, Tone? ok, Tone? warn, Tone? danger, Tone? neutral, Tone? accent, Tone? bench, Tone? info, Tone? quiet}) =>
+      AppTones(
         ml: ml ?? this.ml,
         formula: formula ?? this.formula,
         ai: ai ?? this.ai,
@@ -71,6 +78,7 @@ class AppTones extends ThemeExtension<AppTones> {
         accent: accent ?? this.accent,
         bench: bench ?? this.bench,
         info: info ?? this.info,
+        quiet: quiet ?? this.quiet,
       );
 
   @override
@@ -89,6 +97,7 @@ class AppTones extends ThemeExtension<AppTones> {
       accent: Tone.lerp(accent, other.accent, t),
       bench: Tone.lerp(bench, other.bench, t),
       info: Tone.lerp(info, other.info, t),
+      quiet: Tone.lerp(quiet, other.quiet, t),
     );
   }
 }

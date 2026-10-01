@@ -40,7 +40,7 @@ Future<Session> backendSession({List<String> roles = const [], bool otp = false,
       if (!ok) {
         return http.Response(jsonEncode({'error': 'invalid_grant', 'error_description': 'Invalid user credentials'}), 401);
       }
-      final token = fakeJwt({'preferred_username': body['username'], 'realm_access': {'roles': roles}, 'region_kato': '75', 'email': 'a@clinic.kz'});
+      final token = fakeJwt({'preferred_username': body['username'], 'realm_access': {'roles': roles}, 'region_kato': '75', 'mo_code': '028B', 'email': 'a@clinic.kz'});
       return http.Response(jsonEncode({'access_token': token, 'refresh_token': 'r', 'expires_in': 300}), 200);
     }
     return handler?.call(request) ?? http.Response(jsonEncode({'title': 'Not Found'}), 404, headers: {'content-type': 'application/problem+json'});
@@ -137,7 +137,7 @@ void main() {
     await settle(tester);
     expect(router.routerDelegate.currentConfiguration.matches.last.matchedLocation, '/login/otp');
     for (final text in ['Подтвердите вход', 'Введите 6 цифр из приложения-аутентификатора', 'Код обновляется каждые 30 секунд', 'ДРУГОЙ СПОСОБ', 'Код из приложения',
-      'текущий', 'SMS-код', 'Резервный код', 'Подтвердить']) {
+      'Текущий', 'SMS-код', 'Резервный код', 'Подтвердить']) {
       expect(find.text(text), findsOneWidget, reason: text);
     }
     expect(find.textContaining('Отправить повторно'), findsNothing, reason: 'TOTP не отправляется — таймера нет');
@@ -237,8 +237,8 @@ void main() {
     );
     await tester.pumpWidget(app(session, const SecurityScreen()));
     await tester.pumpAndSettle();
-    for (final text in ['Безопасность', 'ВХОД', 'Пароль', 'изменён 12 дн. назад', 'Сменить', 'SMS-код', 'Сервис ещё не подключён', 'Приложение-аутентификатор', 'не настроено', 'Настроить',
-      'УСТРОЙСТВА', 'Android · Darumen', 'это устройство', 'Рабочий ПК · Chrome', 'Завершить', 'Завершить все, кроме этого']) {
+    for (final text in ['Безопасность', 'ВХОД', 'Пароль', 'изменён 12 дн. назад', 'Сменить', 'SMS-код', 'Сервис ещё не подключён', 'Приложение-аутентификатор', 'Не настроено', 'Настроить',
+      'УСТРОЙСТВА', 'Android · Darumen', 'Это устройство', 'Рабочий ПК · Chrome', 'Завершить', 'Завершить все, кроме этого']) {
       expect(find.text(text), findsOneWidget, reason: text);
     }
     await tester.tap(find.text('Завершить'));
@@ -263,7 +263,7 @@ void main() {
     status = 403;
     await tester.tap(find.text('Повторить'));
     await tester.pumpAndSettle();
-    expect(find.text('Раздел недоступен для вашей роли'), findsOneWidget);
+    expect(find.text('Нет доступа к разделу'), findsOneWidget);
   });
 
   testWidgets('state views: forbidden reasons from rbac.md codes, filtered empty resets, stale data banner', (tester) async {
@@ -281,10 +281,10 @@ void main() {
         ]),
       ),
     ));
-    expect(find.text('Раздел недоступен для вашей роли'), findsNWidgets(2));
-    expect(find.text('Учётная запись не привязана к организации. Доступ выдаёт администратор.'), findsOneWidget);
+    expect(find.text('Нет доступа к разделу'), findsNWidgets(2));
+    expect(find.text('К учётной записи не привязана организация: раздел откроется, когда администратор её укажет.'), findsOneWidget);
     expect(find.text('Пациент другого региона'), findsOneWidget);
-    expect(find.text('Сервер не отвечает. Проверьте подключение и повторите.'), findsOneWidget);
+    expect(find.text('Сервер не отвечает — проверьте соединение.'), findsOneWidget);
     await tester.tap(find.text('Сбросить фильтры'));
     expect(reset, isTrue);
     expect(find.text('Данные на 31.03.2025'), findsOneWidget);

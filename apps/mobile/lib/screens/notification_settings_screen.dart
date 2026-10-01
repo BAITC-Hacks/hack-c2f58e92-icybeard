@@ -94,7 +94,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     final status = ServiceStatusNotifier.watch(context);
     return PageScaffold(
       title: s.notificationsRow,
-      neutralBack: true,
+      // MOBILE-REFACTOR-SHIM (F2a): снят мёртвый флаг PageScaffold.neutralBack (§4.2: обе кнопки «назад» одного цвета); комментарий удалить
       onRefresh: _load,
       children: [
         LoadStateView<NotificationSettings>(

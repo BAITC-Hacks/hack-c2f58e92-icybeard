@@ -9,7 +9,7 @@ import '../theme/tones.dart';
 /// Круглая кнопка-иконка 40 px — «назад», «поиск», «закрыть», язык в шапке экрана. Фон surface-muted (#E8EEFA)
 /// на всех досках m-* синей гаммы.
 class CircleIconButton extends StatelessWidget {
-  const CircleIconButton({super.key, required this.icon, required this.label, this.onTap, this.child, this.neutral = false});
+  const CircleIconButton({super.key, required this.icon, required this.label, this.onTap, this.child});
 
   final IconData icon;
 
@@ -19,9 +19,6 @@ class CircleIconButton extends StatelessWidget {
 
   /// Вместо иконки — произвольное содержимое (текст «ҚАЗ»).
   final Widget? child;
-
-  /// Исторический флаг «inset-фон»: в синей гамме оба варианта — surface-muted.
-  final bool neutral;
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +62,7 @@ class LanguageButton extends StatelessWidget {
       onTap: () => context.read<Session>().setLocale(next),
       child: Text(
         next == 'kk' ? 'ҚАЗ' : 'РУС',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 13, letterSpacing: 0),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 13.5, letterSpacing: 0),
       ),
     );
   }

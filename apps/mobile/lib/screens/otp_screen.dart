@@ -100,7 +100,6 @@ class _OtpScreenState extends State<OtpScreen> {
     final colors = AppPalette.of(context);
     return PageScaffold(
       title: s.otpTitle,
-      neutralBack: true,
       bottom: FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? s.otpChecking : s.otpConfirm)),
       children: [
         AppCard(

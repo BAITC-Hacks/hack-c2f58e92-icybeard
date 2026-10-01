@@ -94,7 +94,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
     final hasOthers = info?.sessions.any((d) => !d.current) ?? false;
     return PageScaffold(
       title: s.securityTitle,
-      neutralBack: true,
+      // MOBILE-REFACTOR-SHIM (F2a): снят мёртвый флаг PageScaffold.neutralBack (§4.2: обе кнопки «назад» одного цвета); комментарий удалить
       onRefresh: _load,
       bottom: hasOthers ? OutlinedButton(onPressed: _busy ? null : _endOthers, child: Text(s.endOtherSessions)) : null,
       children: [

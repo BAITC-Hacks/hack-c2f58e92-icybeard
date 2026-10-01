@@ -176,12 +176,14 @@ abstract final class AppTheme {
         iconColor: c.muted,
         titleTextStyle: text.row,
         subtitleTextStyle: text.rowDetail.copyWith(color: c.muted),
-        selectedColor: c.accentHover,
+        // выбранная опция списка (веб: surface-hover, текст остаётся --text, галочка accent рисуется в строке)
+        selectedColor: c.ink,
+        selectedTileColor: c.surfaceHover,
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: c.ink,
-        contentTextStyle: text.bodyMedium?.copyWith(color: c.surface, fontSize: 14),
+        contentTextStyle: text.bodyMedium?.copyWith(color: c.surface),
         actionTextColor: c.accentSoft,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
       ),

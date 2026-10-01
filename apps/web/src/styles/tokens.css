@@ -173,7 +173,7 @@
   --dm-radius-lg: var(--radius-card);
   --dm-radius-pill: var(--radius-pill);
 
-  /* плотнее прежней: тело 12.5–13.5, заголовки 22/26, KPI 24, крупный срок 34 */
+  /* алиасы средней шкалы --fs-*: тело 13.5–14.5, заголовки 24/28, KPI 26, крупный срок 34; --dm-text-base — корневой кегль 14 */
   --dm-text-xs: var(--fs-xs);
   --dm-text-sm: var(--fs-base-sm);
   --dm-text-md: var(--fs-base);

@@ -7,7 +7,7 @@ import '../theme/tokens.dart';
 import '../theme/tones.dart';
 
 /// Предупреждение в тоне attention (янтарный `--warning-text` на `--warning-bg`): radius 14, иконка 22,
-/// необязательный заголовок 15/500 и текст 14; крестик «скрыть» — если передан [onDismiss]. Для того, что сейчас не
+/// необязательный заголовок 14.5/700 и текст 13.5; крестик «скрыть» — если передан [onDismiss]. Для того, что сейчас не
 /// работает и о чём пользователь должен знать до действия (почта, вход через eGov).
 class NoticeCard extends StatelessWidget {
   const NoticeCard({super.key, required this.body, this.title, this.icon = Icons.warning_amber_rounded, this.onDismiss, this.dismissLabel});

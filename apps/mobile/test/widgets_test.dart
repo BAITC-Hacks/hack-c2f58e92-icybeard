@@ -114,7 +114,7 @@ void main() {
       textScale: 1.3,
     ));
     expect(tester.takeException(), isNull);
-    expect(find.text('ML-модель'), findsNWidgets(2));
+    expect(find.text('модель болжамы'), findsNWidgets(2));
     expect(find.text('Берілді'), findsNWidgets(2), reason: 'степпер и строка таймлайна');
   });
 
@@ -170,10 +170,10 @@ void main() {
 
   testWidgets('origin tag opens an explanation sheet on tap', (tester) async {
     await tester.pumpWidget(host(const OriginTag(Origin.ml)));
-    expect(find.text('ML-модель'), findsOneWidget);
-    await tester.tap(find.text('ML-модель'));
+    expect(find.text('прогноз модели'), findsOneWidget);
+    await tester.tap(find.text('прогноз модели'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('отложенном месяце'), findsOneWidget);
+    expect(find.textContaining('по истории очередей'), findsOneWidget);
   });
 
   testWidgets('reason sheet requires a reason, returns it and survives its exit animation', (tester) async {
@@ -242,12 +242,12 @@ void main() {
     await tester.pumpWidget(host(RouteView(route: route, onSignal: (_) {}, onRequest: (_) {}, seenDecisionId: 'd1')));
     expect(find.byType(SignalCard), findsNothing);
     expect(find.text('Что сейчас'), findsOneWidget);
-    expect(find.text('ждёт ответа врача'), findsOneWidget);
+    expect(find.text('Ждёт ответа врача'), findsOneWidget);
     expect(find.text('Следующий этап: Дата госпитализации назначена'), findsOneWidget);
     await tester.ensureVisible(find.text('Где быстрее'));
     await tester.tap(find.text('Где быстрее'));
     await tester.pumpAndSettle();
-    expect(find.text('запрос отправлен'), findsOneWidget);
+    expect(find.text('Запрос отправлен'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -346,8 +346,8 @@ void main() {
     const expired = ChecklistItem(code: 'cbc', title: 'Общий анализ крови', validityDays: 14, validityLabel: '14 дней', doneAt: '2025-02-07', validUntil: '2025-02-21', status: 'expired');
     const valid = ChecklistItem(code: 'hiv', title: 'Анализ на ВИЧ', validityDays: 180, validityLabel: '6 месяцев', doneAt: '2025-02-07', validUntil: '2025-08-06', status: 'valid');
     await tester.pumpWidget(host(const Column(children: [ChecklistTile(expired), ChecklistTile(valid)])));
-    expect(find.text('истёк'), findsOneWidget);
-    expect(find.text('действует'), findsOneWidget);
+    expect(find.text('Истёк'), findsOneWidget);
+    expect(find.text('Действует'), findsOneWidget);
     expect(find.textContaining('до 21.02.2025'), findsOneWidget);
   });
 }

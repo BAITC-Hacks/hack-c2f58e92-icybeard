@@ -5,40 +5,6 @@ import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
 import 'circle_button.dart';
-import 'origin_tag.dart';
-
-/// Заголовок раздела 17/500 с меткой происхождения справа — для секций вне карточек.
-class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key, this.origin});
-
-  final String text;
-  final Origin? origin;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: AppSpacing.md, bottom: AppSpacing.sm),
-        child: Row(
-          children: [
-            Expanded(child: Text(text, style: Theme.of(context).textTheme.titleMedium)),
-            if (origin != null) OriginTag(origin!),
-          ],
-        ),
-      );
-}
-
-class Section extends StatelessWidget {
-  const Section({super.key, required this.title, this.origin, required this.child});
-
-  final String title;
-  final Origin? origin;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [SectionTitle(title, origin: origin), child],
-      );
-}
 
 /// Каркас экрана: без AppBar — топбар 56 `padding 0 16 12` с круглой кнопкой назад 40 на surface-muted (если есть
 /// куда вернуться) или знаком слева, заголовок 24/800 и круглыми кнопками справа; контент — ListView `padding 4 16`,
@@ -55,7 +21,6 @@ class PageScaffold extends StatelessWidget {
     this.bottom,
     this.showBack,
     this.gap = AppSpacing.md,
-    this.neutralBack = false,
     this.hero = false,
   });
 
@@ -75,9 +40,6 @@ class PageScaffold extends StatelessWidget {
 
   /// Расстояние между детьми контента.
   final double gap;
-
-  /// Кнопка «назад» на inset-фоне (экраны входа и аккаунта) вместо selected.
-  final bool neutralBack;
 
   /// Голубой градиент фона — только стартовый вход и главная гражданина (m-welcome-new, m-home-new).
   final bool hero;
@@ -118,7 +80,7 @@ class PageScaffold extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, AppSpacing.sm),
               child: Row(
                 children: [
-                  if (back) CircleIconButton(icon: Icons.arrow_back, label: s.back, neutral: neutralBack, onTap: () => _pop(context)) else ?leading,
+                  if (back) CircleIconButton(icon: Icons.arrow_back, label: s.back, onTap: () => _pop(context)) else ?leading,
                   if (back || leading != null) const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Text(title, style: theme.textTheme.headlineMedium, maxLines: 2, overflow: TextOverflow.ellipsis),

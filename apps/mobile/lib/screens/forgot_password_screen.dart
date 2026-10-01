@@ -93,7 +93,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final mailDown = ServiceStatusNotifier.watch(context).email.isDown;
     return PageScaffold(
       title: s.forgotTitle,
-      neutralBack: true,
       bottom: sent
           ? OutlinedButton(onPressed: () => context.go('/login'), child: Text(s.backToLogin))
           : FilledButton(onPressed: _busy ? null : _submit, child: Text(_busy ? s.sendingLink : s.sendLink)),

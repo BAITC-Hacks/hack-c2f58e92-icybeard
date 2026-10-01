@@ -16,8 +16,48 @@ class PickerItem<T> {
   bool matches(String query) => label.toLowerCase().contains(query) || (detail?.toLowerCase().contains(query) ?? false);
 }
 
+/// Шапка нижнего листа — один стиль для всех листов (веб SidePanel): заголовок 19/800 (`titleLarge`) и
+/// необязательный подзаголовок 13.5 text-secondary (`bodySmall`). Отступы задаёт лист.
+class SheetHeader extends StatelessWidget {
+  const SheetHeader(this.title, {super.key, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(header: true, child: Text(title, style: theme.textTheme.titleLarge)),
+        if (subtitle != null && subtitle!.isNotEmpty) ...[const SizedBox(height: AppSpacing.xs), Text(subtitle!, style: theme.textTheme.bodySmall)],
+      ],
+    );
+  }
+}
+
+/// Лист-пояснение: [SheetHeader] и содержимое с отступами `0 24 32` под ручкой листа (метка происхождения,
+/// полное имя организации, «Как считается»). Закрывается свайпом или тапом мимо.
+Future<void> showInfoSheet(BuildContext context, {required String title, String? subtitle, required Widget body}) => showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheet) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.xl, 0, AppSpacing.xl, AppSpacing.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [SheetHeader(title, subtitle: subtitle), const SizedBox(height: AppSpacing.sm), body],
+        ),
+      ),
+    );
+
 /// Нижний лист выбора с поиском — вместо DropdownButtonFormField для региона, профиля койки, организации,
-/// нозологии и МНН. Возвращает выбранное значение, null — закрыт без выбора.
+/// нозологии и МНН. Возвращает выбранное значение, null — закрыт без выбора. Выбранная опция — фон surface-hover,
+/// текст остаётся `--text` 800 и галочка accent (как выпадающий список веба).
 class PickerSheet<T> extends StatefulWidget {
   const PickerSheet({super.key, required this.title, required this.items, this.selected, this.search = true});
 
@@ -65,7 +105,7 @@ class _PickerSheetState<T> extends State<PickerSheet<T>> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.sm),
-              child: Text(widget.title, style: theme.textTheme.titleMedium),
+              child: SheetHeader(widget.title),
             ),
             if (widget.search)
               Padding(
@@ -87,7 +127,12 @@ class _PickerSheetState<T> extends State<PickerSheet<T>> {
                         final selected = widget.selected != null && item.value == widget.selected;
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.page, vertical: AppSpacing.xs),
-                          title: Text(item.label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                          title: Text(
+                            item.label,
+                            style: selected ? theme.textTheme.row.copyWith(fontWeight: FontWeight.w800, color: colors.ink) : null,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           subtitle: item.detail == null ? null : Text(item.detail!, maxLines: 1, overflow: TextOverflow.ellipsis),
                           trailing: selected ? Icon(Icons.check, color: colors.accent) : null,
                           selected: selected,
@@ -104,7 +149,7 @@ class _PickerSheetState<T> extends State<PickerSheet<T>> {
 }
 
 /// Кнопка-селектор 48 px radius 12 — белая с рамкой 1.5 px `--border` (доска m-wait-new `.select`):
-/// колонка label 64 px (12/700 text-muted), значение 14/800 и «⌄».
+/// колонка label 64 px (12/700 text-secondary), значение 14.5/800 и «⌄».
 class PickerRow extends StatelessWidget {
   const PickerRow({super.key, required this.label, this.value, this.placeholder, this.detail, required this.onTap, this.enabled = true});
 

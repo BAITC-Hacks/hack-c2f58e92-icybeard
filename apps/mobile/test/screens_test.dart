@@ -112,7 +112,7 @@ void main() {
     expect(find.text('до 106'), findsOneWidget, reason: 'hero — 9 из 10 таких пациентов, p90');
     expect(find.text('дн. до госпитализации'), findsOneWidget);
     expect(find.text('В листе ожидания'), findsOneWidget);
-    expect(find.text('ML-модель'), findsOneWidget);
+    expect(find.text('прогноз модели'), findsOneWidget);
     expect(find.text('Открыть маршрут'), findsOneWidget);
     expect(find.byType(SignalCard), findsOneWidget);
     expect(find.text('Врач предложил Достар Мед'), findsOneWidget);
@@ -168,11 +168,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Пациенты'), findsOneWidget);
     expect(find.text('Данные на 31.03.2025'), findsOneWidget, reason: 'срез старше недели — баннер W-States «данные устарели»');
-    expect(find.text('Обновить'), findsOneWidget);
+    expect(find.text('Обновить'), findsNothing, reason: 'данные обновляет загрузка витрин — ссылки нет, как в вебе');
     expect(find.text('Сегодня'), findsOneWidget);
-    expect(find.text('риск отказа'), findsOneWidget);
-    expect(find.text('есть быстрее'), findsOneWidget);
-    expect(find.text('запрос пациента'), findsOneWidget);
+    expect(find.text('Риск отказа'), findsOneWidget);
+    expect(find.text('Есть быстрее'), findsOneWidget);
+    expect(find.text('Запрос пациента'), findsOneWidget);
     expect(find.text('SYN-75-0290-241-04'), findsNothing, reason: 'без флагов и сигнала — не «сегодня»');
     expect(find.textContaining('ждёт 85 дн. · Городской перинатальный центр'), findsOneWidget);
     // сортировка по приоритету: SYN-…-01 первым
@@ -182,7 +182,7 @@ void main() {
     await tester.tap(find.text('Все'));
     await tester.pumpAndSettle();
     expect(find.text('SYN-75-0290-241-04'), findsOneWidget);
-    expect(find.text('ожидает решения'), findsOneWidget);
+    expect(find.text('Ожидает решения'), findsOneWidget);
     await tester.tap(find.byTooltip('Поиск пациента'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), '241-04');
@@ -235,8 +235,8 @@ void main() {
     expect(find.text('Региональный военный госпиталь → Достар Мед'), findsOneWidget);
     expect(find.text('Направление: 028B'), findsOneWidget, reason: 'организация вне справочника — кодом');
     expect(find.text('Оставлен: Региональный военный госпиталь'), findsOneWidget);
-    expect(find.text('совпало'), findsOneWidget);
-    expect(find.text('иначе'), findsNWidgets(2));
+    expect(find.text('Совпало'), findsOneWidget);
+    expect(find.text('Иначе'), findsNWidgets(2));
     expect(find.textContaining('«ожидание короче»'), findsOneWidget);
     expect(find.text('25 ФЕВРАЛЯ 2025'), findsOneWidget);
     await tester.tap(find.text('Направление'));

@@ -135,7 +135,8 @@ class _WorklistScreenState extends State<WorklistScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (stale) ...[StaleDataBanner(asOf: page.asOf, onRefresh: _load), const SizedBox(height: AppSpacing.md)],
+                // MOBILE-REFACTOR-SHIM (F2a): у StaleDataBanner больше нет onRefresh («Обновить →» снят, как в вебе); D1 проверяет строку при переделке экрана
+                if (stale) ...[StaleDataBanner(asOf: page.asOf), const SizedBox(height: AppSpacing.md)],
                 if (page.items.isEmpty)
                   EmptyState(icon: Icons.people_outline, title: s.worklistNoPatients, body: s.worklistNoPatientsBody)
                 else if (visible.isEmpty)

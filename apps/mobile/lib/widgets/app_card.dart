@@ -45,7 +45,9 @@ class AppCard extends StatelessWidget {
   }
 }
 
-/// Label над блоком внутри карточки: uppercase 12/500 ink-2 слева, чип справа.
+/// Label над блоком внутри карточки: kicker uppercase 11.5/700 text-secondary слева, чип справа. Если чип не
+/// помещается рядом (длинная казахская метка происхождения при крупном шрифте), он переносится строкой ниже, а не
+/// выталкивает kicker за край. Без LayoutBuilder — можно класть в IntrinsicHeight.
 class CardLabel extends StatelessWidget {
   const CardLabel(this.text, {super.key, this.trailing});
 
@@ -56,17 +58,26 @@ class CardLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
-    return Row(
-      children: [
-        Expanded(child: Text(text.toUpperCase(), style: theme.textTheme.overline.copyWith(color: colors.muted), maxLines: 2, overflow: TextOverflow.ellipsis)),
-        if (trailing != null) ...[const SizedBox(width: 10), trailing!],
-      ],
+    final kicker = Text(text.toUpperCase(), style: theme.textTheme.overline.copyWith(color: colors.muted), maxLines: 2, overflow: TextOverflow.ellipsis);
+    if (trailing == null) {
+      return Row(children: [Expanded(child: kicker)]);
+    }
+    return SizedBox(
+      width: double.infinity,
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 10,
+        runSpacing: AppSpacing.xs,
+        children: [kicker, trailing!],
+      ),
     );
   }
 }
 
-/// Строка списка внутри карточки: min-height 56, `padding 12 0`, hairline снизу кроме последней; слева
-/// необязательная точка 6 px (accent — новое) или иконка, справа значение 12–14 ink-2 и шеврон при действии.
+/// Строка списка внутри карточки: min-height 56, `padding 12 0`, hairline снизу кроме последней; заголовок 14.5/600,
+/// подстрока 13.5 text-secondary; слева необязательная точка 6 px (accent — новое) или иконка, справа значение
+/// ([RowValue]) и шеврон при действии.
 class ListRow extends StatelessWidget {
   const ListRow({
     super.key,
@@ -89,7 +100,7 @@ class ListRow extends StatelessWidget {
   final VoidCallback? onTap;
   final bool last;
 
-  /// Заголовок 15/500 вместо 15/400.
+  /// Заголовок 14.5/800 вместо 14.5/600.
   final bool strong;
 
   /// true — синяя точка (новое), false — пустое место под точку, null — без колонки.
@@ -147,9 +158,9 @@ class ListRow extends StatelessWidget {
   }
 }
 
-/// Значение справа в строке списка: 14 ink-2 (500 — акцент), табличные цифры.
+/// Значение справа в строке списка: 14.5 text-secondary (акцент — ink 600), табличные цифры.
 class RowValue extends StatelessWidget {
-  const RowValue(this.text, {super.key, this.strong = false, this.color, this.size = 14});
+  const RowValue(this.text, {super.key, this.strong = false, this.color, this.size = 14.5});
 
   final String text;
   final bool strong;
@@ -164,14 +175,14 @@ class RowValue extends StatelessWidget {
       style: Theme.of(context)
           .textTheme
           .bodySmall
-          ?.copyWith(fontSize: size, color: color ?? (strong ? colors.ink : colors.muted), fontWeight: strong ? FontWeight.w500 : FontWeight.w400)
+          ?.copyWith(fontSize: size, color: color ?? (strong ? colors.ink : colors.muted), fontWeight: strong ? FontWeight.w600 : FontWeight.w400)
           .merge(AppType.numeric),
       textAlign: TextAlign.end,
     );
   }
 }
 
-/// Ссылка-действие 13.5/700 цвета `--link` со стрелкой «→» (ghost-ссылка components.md).
+/// Ссылка-действие 14.5/700 цвета `--link` со стрелкой «→» (ghost-ссылка components.md).
 class ArrowLink extends StatelessWidget {
   const ArrowLink(this.text, {super.key, this.onTap});
 
@@ -197,7 +208,7 @@ class ArrowLink extends StatelessWidget {
   }
 }
 
-/// Label над полем ввода: uppercase 12/500 ink-2.
+/// Label над полем ввода: kicker uppercase 11.5/700 text-secondary.
 class FieldLabel extends StatelessWidget {
   const FieldLabel(this.text, {super.key});
 
