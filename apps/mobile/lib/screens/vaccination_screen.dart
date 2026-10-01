@@ -10,14 +10,16 @@ import '../theme/tones.dart';
 import '../widgets/app_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/hero_number.dart';
+import '../widgets/inline_disclosure.dart';
 import '../widgets/load_state_view.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/status_chip.dart';
 
-/// Оценки охвата WUENIC (ВОЗ/ЮНИСЕФ) по Казахстану, доска M-Vaccination: hero-карточка первой вакцины («86 %» +
-/// «БЦЖ, 2021», чип bench-wash «ВОЗ/ЮНИСЕФ · 2021», динамика по годам, подпись об ориентире), остальные вакцины
-/// строками с динамикой и процентом справа, источник внизу.
+/// Оценки охвата WUENIC (ВОЗ/ЮНИСЕФ) по Казахстану, доска M-Vaccination (решение Q13 — экран мобилки, у веба его
+/// нет): hero-карточка первой вакцины («86 %» + «БЦЖ, 2021», чип bench «ВОЗ/ЮНИСЕФ · 2021», динамика по годам,
+/// подпись об ориентире и тихая раскрывашка «Источник» — внешний ориентир, а не метка происхождения), остальные
+/// вакцины строками с динамикой и процентом справа (ниже 80 % — янтарным).
 class VaccinationScreen extends StatefulWidget {
   const VaccinationScreen({super.key});
 
@@ -52,6 +54,9 @@ List<VaccineGroup> groupVaccines(List<VaccinationEstimate> items, String locale)
   ];
 }
 
+/// Охват ниже этого порога (%) выделяется янтарным.
+const _lowCoverage = 80;
+
 class _VaccinationScreenState extends State<VaccinationScreen> {
   LoadState<List<VaccinationEstimate>> _state = const Loading();
 
@@ -68,7 +73,7 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
       if (mounted) {
         setState(() => _state = Loaded(items));
       }
-    } catch (e) {
+    } on Exception catch (e) {
       if (mounted) {
         setState(() => _state = Failed(e));
       }
@@ -111,6 +116,20 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       Text(s.vaccinationBenchNote, style: theme.textTheme.labelSmall?.copyWith(color: colors.muted)),
+                      InlineDisclosure(
+                        title: s.sourceLabel,
+                        style: DisclosureStyle.quiet,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${s.sourceLabel}: ${source.source}', style: theme.textTheme.labelSmall),
+                            if (source.note != null && source.note!.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              Text(source.note!, style: theme.textTheme.labelSmall),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -128,19 +147,12 @@ class _VaccinationScreenState extends State<VaccinationScreen> {
                             trailing: RowValue(
                               '${g.latest.coveragePct.toStringAsFixed(0)} %',
                               strong: true,
-                              size: 17,
-                              color: g.latest.coveragePct < 80 ? colors.warn : colors.ink,
+                              color: g.latest.coveragePct < _lowCoverage ? colors.warn : colors.ink,
                             ),
                           ),
                       ],
                     ),
                   ),
-                ],
-                const SizedBox(height: AppSpacing.md),
-                Text('${s.sourceLabel}: ${source.source}', style: theme.textTheme.labelSmall),
-                if (source.note != null && source.note!.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(source.note!, style: theme.textTheme.labelSmall),
                 ],
               ],
             );

@@ -9,19 +9,19 @@ import '../state/service_status_notifier.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
-import '../theme/typography.dart';
+import '../widgets/account/personal_data_sheet.dart';
+import '../widgets/account/profile_head.dart';
 import '../widgets/app_card.dart';
 import '../widgets/darumen_mark.dart';
 import '../widgets/format.dart';
-import '../widgets/origin_tag.dart';
 import '../widgets/picker_sheet.dart';
 import '../widgets/section.dart';
-import '../widgets/status_chip.dart';
 
-/// Профиль по доске M-Profile: аватар-круг, имя, «ИИН •••• 4321» (только маской, никогда полностью; без «из eGov» —
-/// вход через eGov недоступен, ИИН приходит из учётной записи), чип роли; строки Язык, Регион, Уведомления
-/// (экран каналов доставки, подпись «только в приложении», пока почта, SMS и push не работают), Данные и согласия
-/// (как считаются прогнозы + подпись о данных), «Безопасность» (M-Account-Security), «Выйти» critical-текстом; внизу версия и подпись данных.
+/// Профиль обоих кабинетов (`/profile`, `/doctor/profile`; веб `ProfileView.vue` и меню аккаунта, IA 13.2): шапка —
+/// имя, роль (у сотрудника с больницей), ИИН только маской, строка о недоступном eGov; строки «Личные данные» (лист,
+/// `PUT /me/profile`), «Язык» (настройка устройства — решение Q11, в учётную запись не пишется), «Регион» (только
+/// без региона в учётной записи), «Уведомления», «Данные и согласия», «Безопасность», «Откуда берутся цифры»,
+/// «Выйти»; внизу версия и подпись данных.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -35,17 +35,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadRegions();
+    if (!context.read<Session>().regionFromAccount) {
+      _loadRegions();
+    }
   }
 
+  /// Справочник регионов — только для строки «Регион»; без него строка показывает код и не открывается.
   Future<void> _loadRegions() async {
     try {
       final regions = await context.read<Session>().api.regions();
       if (mounted) {
         setState(() => _regions = regions);
       }
-    } catch (_) {
-      // регион покажем кодом
+    } on Exception {
+      // строка «Регион» покажет код региона и останется без выбора
     }
   }
 
@@ -75,56 +78,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (chosen != null) {
       await session.setRegion(chosen);
-      if (mounted) {
-        setState(() {});
-      }
     }
   }
 
-  void _sheet(Widget Function(BuildContext sheet) body) => showModalBottomSheet<void>(
-        context: context,
-        showDragHandle: true,
-        builder: (sheet) => Padding(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xxl),
-          child: body(sheet),
-        ),
-      );
-
-  void _showConsents() {
-    final s = S.at(context);
-    _sheet((sheet) {
-      final theme = Theme.of(sheet);
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(s.originsTitle, style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.sm),
-          Text(s.originsBody, style: theme.textTheme.bodySmall),
-          const SizedBox(height: AppSpacing.lg),
-          for (final (origin, note) in [(Origin.ml, s.originMlNote), (Origin.formula, s.originFormulaNote), (Origin.ai, s.originAiNote)])
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  OriginTag(origin),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(child: Text(note, style: theme.textTheme.bodySmall)),
-                ],
-              ),
-            ),
-          Text(s.consentsBody, style: theme.textTheme.bodySmall),
-          const SizedBox(height: AppSpacing.sm),
-          Text(s.dataNote, style: theme.textTheme.labelSmall),
-        ],
-      );
-    });
+  Future<void> _personal() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final saved = S.at(context).savedToast;
+    if (await showPersonalDataSheet(context)) {
+      messenger.showSnackBar(SnackBar(content: Text(saved)));
+    }
   }
 
   Future<void> _logout() async {
-    final session = context.read<Session>();
-    await session.logout();
+    await context.read<Session>().logout();
     if (mounted) {
       context.go('/login');
     }
@@ -136,12 +102,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final s = S.at(context);
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
+    final status = ServiceStatusNotifier.watch(context);
     final regionName = _regions.where((r) => r.kato == session.region).map((r) => r.name).firstOrNull ?? session.region;
     final roleKey = session.primaryRoleKey;
     final role = roleKey == null ? (session.isDoctor ? s.roleDoctor : s.roleCitizen) : s.roleTitle(roleKey);
+    final org = session.organizationName;
+    final roleLine = [role, if (org != null) shortOrgName(org), if (org != null) ?session.moCode].join(' · ');
+    final iin = session.me?.iinMasked ?? (session.iin == null ? null : maskIin(session.iin));
     final profilePath = session.isDoctor ? '/doctor/profile' : '/profile';
-    final onlyInApp = !ServiceStatusNotifier.watch(context).anyExternalChannelUp;
-    final identity = session.iin != null ? '${s.iinLabel} ${maskIin(session.iin)}' : regionName;
     return PageScaffold(
       title: s.profileTitle,
       leading: const DarumenMark(size: 28),
@@ -152,41 +120,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                padding: const EdgeInsets.fromLTRB(0, AppSpacing.xs, 0, AppSpacing.lg),
+                padding: const EdgeInsets.only(bottom: AppSpacing.lg),
                 decoration: BoxDecoration(border: Border(bottom: BorderSide(color: colors.hairline))),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: colors.accentSoft),
-                      child: Icon(Icons.person_outline, color: colors.accentHover),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(session.username ?? '', style: theme.textTheme.titleLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 2),
-                          Text(identity, style: theme.textTheme.bodySmall?.merge(AppType.numeric), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    StatusChip(role, tone: StatusTone.neutral),
-                  ],
-                ),
+                child: ProfileHead(name: session.displayName ?? session.username ?? '', roleLine: roleLine, iinMasked: iin, egovOff: !status.egov.isUp),
               ),
-              ListRow(title: s.languageLabel, trailing: RowValue(s.languageName(session.locale), size: 15), onTap: _pickLanguage),
+              ListRow(title: s.personalTitle, subtitle: session.email, onTap: _personal),
+              ListRow(title: s.languageLabel, trailing: RowValue(s.languageName(session.locale)), onTap: _pickLanguage),
+              if (!session.regionFromAccount)
+                ListRow(title: s.regionLabel, trailing: RowValue(regionName), onTap: _regions.isEmpty ? null : _pickRegion),
               ListRow(
-                title: s.regionLabel,
-                trailing: RowValue(session.regionFromAccount ? '$regionName · ${s.regionFromAccount}' : regionName, size: 15),
-                onTap: session.regionFromAccount || _regions.isEmpty ? null : _pickRegion,
+                title: s.notificationsRow,
+                subtitle: status.anyExternalChannelUp ? null : s.onlyInAppShort,
+                onTap: () => context.go('$profilePath/notifications'),
               ),
-              ListRow(title: s.notificationsRow, subtitle: onlyInApp ? s.onlyInAppShort : null, onTap: () => context.go('$profilePath/notifications')),
-              ListRow(title: s.dataConsents, onTap: _showConsents),
+              ListRow(title: s.consentsTitle, onTap: () => context.go('$profilePath/consents')),
               ListRow(title: s.securityTitle, onTap: () => context.go('$profilePath/security')),
+              ListRow(title: s.forecastsTitle, onTap: () => showForecastsSheet(context)),
               ListRow(
                 title: s.logout,
                 strong: true,

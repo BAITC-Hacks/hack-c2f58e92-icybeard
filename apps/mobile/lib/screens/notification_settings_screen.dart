@@ -1,14 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/models.dart';
 import '../config/env.dart';
 import '../l10n/strings.dart';
+import '../state/citizen_notifications_notifier.dart';
 import '../state/load_state.dart';
 import '../state/service_status_notifier.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import '../widgets/account/route_updates_card.dart';
+import '../widgets/api_error.dart';
 import '../widgets/app_card.dart';
 import '../widgets/external_link.dart';
 import '../widgets/load_state_view.dart';
@@ -21,7 +26,10 @@ import '../widgets/status_chip.dart';
 /// сервис не работает, переключатель выключен и подписан причиной («Сервис ещё не подключён», «Почтовый сервер не
 /// настроен»), а сохранённое значение показывается как есть и не перезаписывается — мобилка ничего не отправляет.
 /// Работающий канал меняется целиком (у всех событий, кроме закреплённого `security`) через `PUT /me/notifications`,
-/// остальные настройки уходят обратно без изменений. Настройка по событиям — в веб-кабинете.
+/// остальные настройки уходят обратно без изменений. Гражданину над каналами — один переключатель события «Изменения
+/// моего маршрута» (канал «в системе», решение Q12): он решает, что показывает колокольчик, и пишется через
+/// `withEventChannel`, не трогая настройки, сделанные в вебе; после сохранения колокольчик перечитывается. Остальная
+/// настройка по событиям — в веб-кабинете. Ошибка сохранения — откат и `showApiError`.
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
 
@@ -49,23 +57,32 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       if (mounted) {
         setState(() => _state = Loaded(settings));
       }
-    } catch (e) {
+    } on Exception catch (e) {
       if (mounted) {
         setState(() => _state = Failed(e));
       }
     }
   }
 
-  /// Переключение работающего канала: сразу на экране, после ответа — то, что записал API; ошибка — откат и сообщение.
-  Future<void> _toggle(NotificationChannel channel, bool value) async {
+  /// Гражданин (роль `citizen` с `route.own`, как у колокольчика — решение API 9) видит переключатель событий маршрута.
+  static bool _citizen(Session session) => session.primaryRoleKey == 'citizen' && session.can(Perm.routeOwn);
+
+  /// Переключение работающего канала у всех изменяемых событий.
+  Future<void> _toggle(NotificationChannel channel, bool value) => _save((before) => before.withChannel(channel, value));
+
+  /// «Изменения моего маршрута»: только канал «в системе» этого события; колокольчик после ответа перечитывается.
+  Future<void> _toggleRoute(bool value) =>
+      _save((before) => before.withEventChannel(NotificationSettings.routeUpdates, NotificationChannel.inApp, value), refreshBell: true);
+
+  /// Изменение сразу на экране, после ответа — то, что записал API; ошибка — откат и сообщение.
+  Future<void> _save(NotificationSettings Function(NotificationSettings before) change, {bool refreshBell = false}) async {
     final before = switch (_state) { Loaded<NotificationSettings>(:final data) => data, _ => null };
     if (before == null || _saving) {
       return;
     }
     final api = context.read<Session>().api;
-    final messenger = ScaffoldMessenger.of(context);
-    final s = S.at(context);
-    final next = before.withChannel(channel, value);
+    final bell = refreshBell ? context.read<CitizenNotificationsNotifier?>() : null;
+    final next = change(before);
     setState(() {
       _saving = true;
       _state = Loaded(next);
@@ -75,11 +92,15 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       if (mounted) {
         setState(() => _state = Loaded(saved));
       }
-    } catch (e) {
+      // колокольчик перечитывается в фоне: его сбой не откатывает уже записанную настройку
+      if (bell != null) {
+        unawaited(bell.refresh());
+      }
+    } on Exception catch (e) {
       if (mounted) {
         setState(() => _state = Loaded(before));
+        await showApiError(context, e);
       }
-      messenger.showSnackBar(SnackBar(content: Text(s.serverUnavailable(e))));
     } finally {
       if (mounted) {
         setState(() => _saving = false);
@@ -92,16 +113,28 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     final s = S.at(context);
     final theme = Theme.of(context);
     final status = ServiceStatusNotifier.watch(context);
+    final citizen = _citizen(context.watch<Session>());
     return PageScaffold(
       title: s.notificationsRow,
-      // MOBILE-REFACTOR-SHIM (F2a): снят мёртвый флаг PageScaffold.neutralBack (§4.2: обе кнопки «назад» одного цвета); комментарий удалить
       onRefresh: _load,
       children: [
         LoadStateView<NotificationSettings>(
           state: _state,
           onRetry: _load,
           skeleton: const CardSkeleton(height: 260),
-          builder: (_, settings) => _ChannelsCard(settings: settings, status: status, busy: _saving, onChanged: _toggle),
+          builder: (_, settings) {
+            final route = citizen ? settings.event(NotificationSettings.routeUpdates) : null;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (route != null) ...[
+                  RouteUpdatesCard(key: const ValueKey('event-route_updates'), event: route, busy: _saving, onChanged: _toggleRoute),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                _ChannelsCard(settings: settings, status: status, busy: _saving, onChanged: _toggle),
+              ],
+            );
+          },
         ),
         if (!status.anyExternalChannelUp) Text(s.onlyInAppNote, key: const ValueKey('only-in-app'), style: theme.textTheme.bodySmall),
         if (!(status.email.isUp && status.sms.isUp && status.push.isUp)) Text(s.storedPrefsKeptNote, style: theme.textTheme.labelSmall),
