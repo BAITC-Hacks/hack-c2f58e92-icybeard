@@ -50,6 +50,34 @@ public sealed class WorklistTests(TestApp app) : IClassFixture<TestApp>
         Assert.DoesNotContain(WorklistBuilder.RefusalRisk, low.RiskFlags);
     }
 
+    /// <summary>Приоритет — фиксированная шкала 0…10: даже пациент, ждущий в сотни раз дольше прогноза при риске
+    /// отказа 100 % и больнице быстрее, не выходит за 9 без сигнала и за 10 с открытым сигналом гражданина; снятие
+    /// сигнала возвращает ровно исходное значение, а пациенты, ждущие много меньше прогноза и без риска, получают 0.</summary>
+    [Fact]
+    public void Priority_stays_on_a_fixed_0_to_10_scale()
+    {
+        var states = new[]
+        {
+            new QueueStateRow(InMemoryWorklist.AsOf, "M1", "Долго", "021", "75", 10, 200, 400, 2.0, 0.0, 200, 400),
+            new QueueStateRow(InMemoryWorklist.AsOf, "M2", "Быстро", "021", "75", 10, 1, 2, 2.0, 0.0, 1, 2),
+        };
+        var extreme = new Dictionary<(string, string), QueuePrediction>
+        {
+            [("M1", "021")] = new QueuePrediction(0.5, 1, 1.0, true),
+            [("M2", "021")] = new QueuePrediction(100, 200, 0.0, true),
+        };
+        var items = WorklistBuilder.Build(states, extreme);
+        Assert.All(items, i => Assert.InRange(i.Priority, 0, WorklistBuilder.PriorityMax - WorklistBuilder.SignalPriorityBonus));
+        var worst = items.First(i => i.MoCode == "M1");
+        Assert.Equal(WorklistBuilder.PriorityMax - WorklistBuilder.SignalPriorityBonus, worst.Priority);
+        var signal = new PatientSignalDto("faster", null, null, null, DateTimeOffset.UtcNow);
+        var withSignal = WorklistBuilder.WithSignal(worst, signal);
+        Assert.Equal(WorklistBuilder.PriorityMax, withSignal.Priority);
+        var progress = RouteProgress.From([], worst.MoCode);
+        Assert.Equal(worst.Priority, WorklistBuilder.Apply(withSignal, progress, RouteSide.Origin, InMemoryWorklist.AsOf, null).Priority);
+        Assert.All(items.Where(i => i.MoCode == "M2"), i => Assert.Equal(0, i.Priority));
+    }
+
     /// <summary>Сервис моделей недоступен для какой-то очереди (её нет в словаре прогнозов) — рабочий список
     /// не падает, а считает эту очередь по агрегатам витрины (QueuePrediction.FromModel = false).</summary>
     [Fact]

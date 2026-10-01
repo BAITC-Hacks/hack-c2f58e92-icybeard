@@ -2,18 +2,19 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-/** Приоритет в строке рабочего списка: цветной кружок с числом. Цвет — относительно максимума в списке:
- * верхняя треть — высокий (danger), середина — средний (warning), нижняя — низкий (success). Только представление. */
-const props = withDefaults(defineProps<{ value: number; max?: number }>(), { max: 100 })
+/** Приоритет в строке рабочего списка: цветной кружок с числом по фиксированной шкале API 0…10 (Worklist.cs):
+ * 7–10 — высокий (danger), 4–6 — средний (warning), 0–3 — низкий (success). Пороги постоянные, а не от максимума
+ * списка, чтобы «8» значила одно и то же в любом регионе и профиле. Только представление. */
+const PRIORITY_MAX = 10
+const props = defineProps<{ value: number }>()
 const { t } = useI18n()
-const level = computed(() => {
-  const ratio = props.value / (props.max || 1)
-  return ratio >= 2 / 3 ? 'high' : ratio < 1 / 3 ? 'low' : 'mid'
-})
+const rounded = computed(() => Math.max(0, Math.min(PRIORITY_MAX, Math.round(props.value))))
+const level = computed(() => (rounded.value >= 7 ? 'high' : rounded.value >= 4 ? 'mid' : 'low'))
+const hint = computed(() => `${t(`doctor.worklist.priorityLevel.${level.value}`)} · ${t('doctor.worklist.priorityOf', { n: rounded.value, max: PRIORITY_MAX })}`)
 </script>
 
 <template>
-  <span class="priority tabular" :class="level" :title="t(`doctor.worklist.priorityLevel.${level}`)" :aria-label="`${t(`doctor.worklist.priorityLevel.${level}`)}: ${Math.round(value)}`">{{ Math.round(value) }}</span>
+  <span class="priority tabular" :class="level" :title="hint" :aria-label="hint">{{ rounded }}</span>
 </template>
 
 <style scoped>

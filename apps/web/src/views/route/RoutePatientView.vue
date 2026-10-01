@@ -155,7 +155,7 @@ watch(() => props.patientRef, r.load)
           <dl class="who-facts">
             <div class="fact"><dt>{{ t('route.citizen.factSince') }}</dt><dd class="tabular">{{ dateShort(r.data.value.dates.registeredAt) }}</dd></div>
             <div class="fact"><dt>{{ t('route.doctorView.waiting') }}</dt><dd class="tabular">{{ t('route.citizen.factDays', { days: r.data.value.daysWaiting }) }}</dd></div>
-            <div class="fact"><dt>{{ t('route.priority') }}</dt><dd class="tabular">{{ Math.round(doctor.priority) }}</dd></div>
+            <div class="fact"><dt>{{ t('route.priority') }}</dt><dd class="tabular">{{ t('doctor.worklist.priorityOf', { n: Math.round(doctor.priority), max: 10 }) }}</dd></div>
             <div class="fact"><dt>{{ t('route.citizen.factAsOf') }}</dt><dd class="tabular">{{ dateShort(r.data.value.asOf) }}</dd></div>
           </dl>
         </div>

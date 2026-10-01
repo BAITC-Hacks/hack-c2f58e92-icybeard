@@ -92,7 +92,6 @@ const filterOptions = computed(() => [
 ])
 
 const counts = computed(() => Object.fromEntries(FLAGS.map((f) => [f, items.value.filter((i) => i.riskFlags.includes(f)).length])) as Record<Flag, number>)
-const maxPriority = computed(() => Math.max(1, ...items.value.map((i) => i.priority)))
 const visible = computed(() => {
   const q = search.value.trim().toLowerCase()
   return items.value
@@ -250,7 +249,7 @@ onMounted(async () => {
                 <td class="clip">{{ refdata.profileName(item.profileCode) }}</td>
                 <td class="clip muted" :title="item.moName">{{ shortOrgName(item.moName) }}</td>
                 <td class="num">{{ item.daysWaiting }}</td>
-                <td class="num"><PriorityBadge :value="item.priority" :max="maxPriority" /></td>
+                <td class="num"><PriorityBadge :value="item.priority" /></td>
                 <td><StatusTag :value="primaryFlag(item).label" :tone="primaryFlag(item).tone" /></td>
                 <td class="next">
                   <div v-if="item.patientSignal" class="signal" data-testid="worklist-signal" :title="item.patientSignal.toMoName ?? ''">

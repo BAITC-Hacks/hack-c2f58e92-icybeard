@@ -68,7 +68,17 @@ public static class WorklistBuilder
     /// <summary>Открытый сигнал гражданина (запрос «быстрее», подтверждение или отказ от ожидания): человек в списке
     /// ждёт ответа врача, поэтому строка получает флаг и +<see cref="SignalPriorityBonus"/> к приоритету.</summary>
     public const string PatientSignal = "patient_signal";
-    public const int SignalPriorityBonus = 3;
+
+    /// <summary>Приоритет — фиксированная шкала 0…<see cref="PriorityMax"/>, одинаковая для всех регионов и профилей
+    /// (см. <see cref="BuildItem"/>): просрочка ожидания относительно прогноза — до <see cref="OverdueMaxPoints"/>,
+    /// предсказанный риск отказа — до <see cref="RefusalMaxPoints"/>, «есть больница быстрее» — <see cref="FasterAlternativeBonus"/>,
+    /// открытый сигнал гражданина — <see cref="SignalPriorityBonus"/>. Сумма без сигнала не превышает
+    /// PriorityMax − SignalPriorityBonus, поэтому бонус сигнала добавляется и снимается без обрезания.</summary>
+    public const int PriorityMax = 10;
+    public const int OverdueMaxPoints = 5;
+    public const int RefusalMaxPoints = 3;
+    public const int FasterAlternativeBonus = 1;
+    public const int SignalPriorityBonus = 1;
 
     /// <summary>Коды следующего шага (NextActionCode) по флагам, от сильного к слабому; подписи RU/KK — на клиентах.</summary>
     public const string ActionRedirectFaster = "redirect_faster";
@@ -200,8 +210,23 @@ public static class WorklistBuilder
 
                 break;
             case RouteStatuses.Kept:
-                code = ActionDecisionMade;
-                priority = Math.Max(0, priority - SignalPriorityBonus);
+                if (progress.OpenSignalId is not null && flags.Contains(PatientSignal))
+                {
+                    // пациент снова попросил после решения — шаг по очереди и бонус сигнала остаются, пока врач не ответит
+                    code = item.NextActionCode;
+                }
+                else if (progress.LastAttempt is { Outcome: TransferOutcomes.Rejected } rejected && progress.LastDecisionAt is { } decidedAt && rejected.At > decidedAt)
+                {
+                    // принимающая отказала после решения врача — пациент снова в очереди, нужно решать заново
+                    code = item.NextActionCode;
+                    priority = Math.Max(0, priority - SignalPriorityBonus);
+                }
+                else
+                {
+                    code = ActionDecisionMade;
+                    priority = Math.Max(0, priority - SignalPriorityBonus);
+                }
+
                 if (progress.PrefersCurrent)
                 {
                     Flag(PrefersCurrent);
@@ -340,10 +365,15 @@ public static class WorklistBuilder
             StageCalled => "вызов на госпитализацию",
             _ => "ожидает",
         };
-        // 3.6: приоритет = насколько пациент уже пережидает прогноз модели (не абсолютные дни) + предсказанный
-        // моделью риск отказа — оба слагаемых из прогноза, а не только число флагов, как было до 3.6
+        // приоритет по шкале 0…10 (3.6: оба главных слагаемых — из прогноза модели, не из числа флагов):
+        // просрочка — во сколько раз пациент уже пережидает прогноз ожидания: в срок — 0, вдвое дольше и больше — 5
+        // (дальше «3× или 30×» для действия врача не различимо); риск отказа — до 3 (30 % и выше); «есть быстрее» — +1;
+        // открытый сигнал гражданина добавляет ещё +1 в Apply. Раньше просрочка не ограничивалась, и число
+        // могло быть любым (сотни), а цвет на клиенте считался относительно максимума списка.
         var overdue = expectedWait > 0 ? daysWaiting / expectedWait : (daysWaiting > 0 ? 2.0 : 0.0);
-        var priority = (int)Math.Round(overdue * 5) + (int)Math.Round(prediction.PRefusal * 10) + (flags.Contains(FasterAlternative) ? 2 : 0);
+        var overduePoints = Math.Min(OverdueMaxPoints, (int)Math.Round(overdue * OverdueMaxPoints / 2, MidpointRounding.AwayFromZero));
+        var refusalPoints = Math.Min(RefusalMaxPoints, (int)Math.Round(prediction.PRefusal * 10, MidpointRounding.AwayFromZero));
+        var priority = overduePoints + refusalPoints + (flags.Contains(FasterAlternative) ? FasterAlternativeBonus : 0);
         var nextActionCode = flags.Contains(FasterAlternative) ? ActionRedirectFaster
             : flags.Contains(RefusalRisk) ? ActionReviewBeforeCall
             : flags.Contains(StuckOver30) ? ActionClarifyDate
