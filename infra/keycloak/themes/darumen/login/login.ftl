@@ -13,7 +13,13 @@
     </#if>
 </#if>
 <#assign dmFieldError = messagesPerField.existsError('username','password')>
-<@layout.registrationLayout displayMessage=(dmState == "" && !dmFieldError) centered=(dmState == "sent"); section>
+<#-- Повторная проверка перед важным действием (смена пароля, настройка второго фактора): Keycloak уже знает
+     пользователя (usernameHidden) и просит только пароль. Показываем это как «Подтвердите, что это вы», а не как
+     обычный вход: без eGov, «Запомнить меня» и регистрации организации. -->
+<#assign dmReauth = usernameHidden??>
+<#-- «Please re-authenticate to continue» от Keycloak дублирует наш подзаголовок — в этом режиме его не показываем -->
+<#assign dmReauthNote = dmReauth && message?has_content && message.summary == msg("reauthenticate")>
+<@layout.registrationLayout displayMessage=(dmState == "" && !dmFieldError && !dmReauthNote) centered=(dmState == "sent"); section>
 <#if dmState == "sent">
     <#if section = "icon">
         <span class="dm-icon"><@layout.icon name="mail"/></span>
@@ -37,9 +43,9 @@
     </#if>
 <#else>
     <#if section = "header">
-        ${msg("loginAccountTitle")}
+        <#if dmReauth>${msg("dmReauthTitle")}<#else>${msg("loginAccountTitle")}</#if>
     <#elseif section = "lead">
-        ${msg("dmLoginLead")}
+        <#if dmReauth>${msg("dmReauthLead")}<#else>${msg("dmLoginLead")}</#if>
     <#elseif section = "form">
         <#if dmState == "blocked">
             <div class="dm-state" role="alert">
@@ -60,12 +66,14 @@
             </div>
         </#if>
 
+        <#if !dmReauth>
         <#-- eGov mobile: адрес сервиса (Smart Bridge) не предоставлен, вход не имитируется — кнопка раскрывает пояснение -->
         <details class="dm-egov">
             <summary class="dm-btn secondary" role="button"><@layout.icon name="qr"/>${msg("dmEgov")}</summary>
             <div class="dm-alert" role="note"><@layout.icon name="info"/><span>${msg("dmEgovSoon")}</span></div>
         </details>
         <div class="dm-divider">${msg("dmOrByLogin")}</div>
+        </#if>
 
         <#if realm.password>
             <form id="kc-form-login" class="dm-form" onsubmit="login.disabled = true; return true;" action="${url.loginAction}" method="post" novalidate>
@@ -99,8 +107,8 @@
                     </#if>
                 </div>
                 <input type="hidden" id="id-hidden-input" name="credentialId"<#if auth.selectedCredential?has_content> value="${auth.selectedCredential}"</#if>/>
-                <button class="dm-btn" name="login" id="kc-login" type="submit">${msg("doLogIn")}</button>
-                <p class="dm-foot-line">${msg("dmNoAccount")} <a href="${layout.site()}signup">${msg("dmRegisterOrg")}</a></p>
+                <button class="dm-btn" name="login" id="kc-login" type="submit"><#if dmReauth>${msg("dmReauthSubmit")}<#else>${msg("doLogIn")}</#if></button>
+                <#if !dmReauth><p class="dm-foot-line">${msg("dmNoAccount")} <a href="${layout.site()}signup" data-dm-site="signup">${msg("dmRegisterOrg")}</a></p></#if>
             </form>
         </#if>
     </#if>

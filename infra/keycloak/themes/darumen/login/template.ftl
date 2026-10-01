@@ -1,5 +1,5 @@
 <#-- Обёртка всех страниц темы входа Darumen (доски W-Auth-*): шапка со знаком и RU/KK, карточка 420 px,
-     под карточкой «О системе · Поддержка» и сноска про синтетические данные. Ссылки «Сроки ожидания без входа»
+     под карточкой «Поддержка» и сноска про синтетические данные. Ссылки «Сроки ожидания без входа»
      с досок здесь нет: гостевой режим убран (docs/rbac.md). -->
 
 <#-- Корень сайта: client.baseUrl клиентов darumen-* (из DARUMEN_WEB_URL при импорте realm); для служебных клиентов
@@ -103,7 +103,7 @@
             </#if>
         </section>
         <nav class="dm-meta" aria-label="${msg("dmMetaNav")}">
-            <a href="${site()}">${msg("dmAbout")}</a><span aria-hidden="true">·</span><span>${msg("dmSupport")}: <a href="mailto:help@darumen.kz">help@darumen.kz</a></span>
+            <span>${msg("dmSupport")}: <a href="mailto:help@darumen.kz">help@darumen.kz</a></span>
         </nav>
         <p class="dm-note">${msg("dmNote")}</p>
     </div>

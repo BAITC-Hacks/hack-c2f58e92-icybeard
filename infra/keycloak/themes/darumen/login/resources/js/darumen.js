@@ -6,7 +6,10 @@
    - [data-dm-countdown]   «Отправить повторно через 0:59» → ссылка
    - [data-dm-if-password] на info-странице: «Пароль изменён», если эта вкладка только что сохранила новый пароль
    - [data-dm-service-status] скрытое предупреждение «Почтовый сервер недоступен»: показывается, только если API сайта
-                           (адрес в атрибуте, GET /api/v1/public/service-status) отвечает email.available === false */
+                           (адрес в атрибуте, GET /api/v1/public/service-status) отвечает email.available === false
+   - [data-dm-site="путь"] ссылка на сайт («Зарегистрировать организацию»): адрес сайта берётся из redirect_uri запроса входа —
+                           его Keycloak уже сверил со списком разрешённых адресов клиента, — поэтому ссылка ведёт туда,
+                           откуда человек пришёл (:3000 в Docker, :5173 при npm run dev, стенд), а не на baseUrl из импорта realm */
 (function () {
   "use strict";
 
@@ -193,6 +196,25 @@
       .catch(function () { /* статус неизвестен */ })
       .then(function () { clearTimeout(timer); });
   });
+
+  // Ссылки на сайт — на тот адрес, с которого начат вход
+  (function () {
+    var key = "darumen.site";
+    var site = null;
+    try {
+      var redirect = new URLSearchParams(window.location.search).get("redirect_uri");
+      if (redirect && /^https?:/i.test(redirect)) {
+        site = new URL(redirect).origin + "/";
+        window.sessionStorage.setItem(key, site);
+      } else {
+        site = window.sessionStorage.getItem(key);
+      }
+    } catch (e) { site = null; }
+    if (!site) return;
+    each("[data-dm-site]", function (link) {
+      link.setAttribute("href", site + (link.getAttribute("data-dm-site") || ""));
+    });
+  })();
 
   // Повторная отправка письма — после паузы
   each("[data-dm-countdown]", function (link) {
