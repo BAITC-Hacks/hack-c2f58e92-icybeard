@@ -3,7 +3,7 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
@@ -28,6 +28,32 @@ const auth = useAuthStore()
 const refdata = useRefdataStore()
 
 const form = reactive({ orgName: '', bin: '', type: 'hospital', regionKato: null as string | null, moCode: '', adminName: '', email: '', phone: '', consent: false })
+
+/** Черновик формы в sessionStorage этой вкладки: «Изменить данные» со страницы подтверждения возвращает сюда
+ * с уже заполненными полями, а не с пустой формой. Живёт до закрытия вкладки. */
+const DRAFT_KEY = 'darumen.signup.draft'
+function restoreDraft() {
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw) as Partial<typeof form>
+    for (const key of Object.keys(form) as (keyof typeof form)[]) {
+      if (key in saved && typeof saved[key] === typeof form[key] || (key === 'regionKato' && typeof saved.regionKato === 'string')) {
+        ;(form as Record<string, unknown>)[key] = saved[key]
+      }
+    }
+  } catch {
+    // черновика нет или он повреждён — пустая форма
+  }
+}
+restoreDraft()
+watch(form, (value) => {
+  try {
+    window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(value))
+  } catch {
+    // приватный режим — без черновика
+  }
+}, { deep: true })
 const touched = ref(false)
 const sending = ref(false)
 const error = ref<unknown>(null)
@@ -127,13 +153,15 @@ onMounted(async () => {
 .public-card { width: min(560px, 100%); display: flex; flex-direction: column; gap: 14px; padding: 28px; border-radius: var(--radius-card-lg); }
 .public-card h1 { font-size: 22px; margin: 0; }
 .lead { margin: -8px 0 2px; color: var(--text-secondary); font-size: var(--fs-base-sm); }
-.field > label { font-size: 12px; font-weight: var(--fw-bold); text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
-.field.checkbox > label { font-size: 12px; }
+.field > label { font-size: 13px; font-weight: var(--fw-bold); text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
+.field.checkbox { align-items: flex-start; gap: 10px; margin-top: 6px; padding: 14px 16px; border: 1px solid var(--border-soft); border-radius: var(--radius-lg); background: var(--surface-hover); }
+.field.checkbox > label { font-size: var(--fs-base-sm); font-weight: var(--fw-semibold); line-height: 1.5; color: var(--text); }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .divider { display: flex; align-items: center; gap: 10px; margin: 4px 0 0; }
 .divider .eyebrow { color: var(--text-faint); }
 .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-.consent-error { margin-top: -8px; color: var(--danger-text); font-size: var(--fs-sm); }
+.consent-error { margin-top: -6px; color: var(--danger-text); font-size: var(--fs-sm); }
+.submit { margin-top: 6px; }
 .submit { width: 100%; justify-content: center; }
 .center { text-align: center; margin: 0; }
 .center.caption { color: var(--text-faint); }

@@ -2,6 +2,7 @@
 import Button from 'primevue/button'
 import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import OriginTag from '@/components/OriginTag.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import { capabilitiesFor } from '@/lib/capabilities'
@@ -81,10 +82,13 @@ onMounted(async () => {
             </RouterLink>
           </div>
         </AppCard>
-        <AppCard :title="t('welcome.forecastTitle')" label origin="ml">
-          <p class="text"><strong>p50</strong> — {{ t('welcome.p50') }}</p>
-          <p class="text"><strong>p90</strong> — {{ t('welcome.p90') }}</p>
-          <p class="text faint">{{ t('welcome.recalc') }}</p>
+        <AppCard :title="t('welcome.forecastTitle')" label>
+          <p class="text">{{ t('welcome.howIntro') }}</p>
+          <ul class="guide">
+            <li><OriginTag kind="ml" /><span>{{ t('welcome.guideMl') }}</span></li>
+            <li><OriginTag kind="formula" /><span>{{ t('welcome.guideFormula') }}</span></li>
+          </ul>
+          <p class="text faint">{{ t('welcome.howNote') }}</p>
         </AppCard>
       </div>
       <RouterLink class="skip" :to="auth.roleHome()" data-testid="welcome-skip">{{ t('welcome.skip') }} <span aria-hidden="true">→</span></RouterLink>
@@ -94,19 +98,19 @@ onMounted(async () => {
 
 <style scoped>
 /* аккаунт (account-welcome-new): колонка 880 по центру, карточки padding 24 */
-.page { max-width: 880px; }
+.page { max-width: 1120px; }
 .card { padding: 24px; }
 .welcome-col { display: flex; flex-direction: column; gap: 16px; }
 .checklist { display: flex; flex-direction: column; }
 .step { display: flex; align-items: center; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--border); }
-.num { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-sunken); color: var(--text); display: grid; place-items: center; font-size: 13px; font-weight: var(--fw-extrabold); flex: none; }
+.num { width: 30px; height: 30px; border-radius: 50%; background: var(--surface-sunken); color: var(--text); display: grid; place-items: center; font-size: 14px; font-weight: var(--fw-extrabold); flex: none; }
 .step:not(.done) .num { background: var(--accent); color: var(--text-on-accent); }
 .step:not(.done) ~ .step:not(.done) .num { background: var(--surface-sunken); color: var(--text); }
 .step.done .num { background: var(--success-bg); color: var(--success-text); }
-.step.done .num i { font-size: 12px; }
+.step.done .num i { font-size: 13px; }
 .step-main { flex: 1; min-width: 0; }
 .step-title { font-size: var(--fs-md); font-weight: var(--fw-bold); }
-.step-main .small { font-size: 12px; }
+.step-main .small { font-size: 13px; }
 .progress { display: flex; align-items: center; gap: 16px; padding-top: 16px; }
 .track { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-muted); overflow: hidden; }
 .fill { display: block; height: 100%; background: var(--accent); }
@@ -115,10 +119,13 @@ onMounted(async () => {
 .cap i { margin-top: 3px; color: var(--text-muted); font-size: 15px; }
 .cap span { display: flex; flex-direction: column; }
 .cap-title { font-weight: var(--fw-bold); font-size: var(--fs-base); }
-.cap-text { font-size: 12px; }
+.cap-text { font-size: 13px; }
 .cap:hover .cap-title { color: var(--accent-strong); }
-.text { margin: 0 0 10px; font-size: 13px; line-height: 1.5; }
-.text.faint { font-size: 12px; }
-.skip { align-self: flex-start; font-size: 13px; font-weight: var(--fw-bold); color: var(--link); text-decoration: none; }
+.text { margin: 0 0 10px; font-size: 14px; line-height: 1.5; }
+.text.faint { font-size: 13px; }
+.guide { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.guide li { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
+.guide li :deep(.origin) { flex: none; margin-top: 1px; }
+.skip { align-self: center; margin-top: 8px; font-size: 14px; font-weight: var(--fw-bold); color: var(--link); text-decoration: none; }
 .skip:hover { color: var(--accent-strong); }
 </style>

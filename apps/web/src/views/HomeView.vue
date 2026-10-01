@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { medicines, pub, queue } from '@/api/endpoints'
 import type { LoginExamples } from '@/api/types'
 import LoginPanel from '@/components/app/LoginPanel.vue'
@@ -18,12 +18,23 @@ const DEFAULT_REGION = '75'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const refdata = useRefdataStore()
 
 const examples = ref<LoginExamples | null>(null)
 
 const denied = computed(() => (typeof route.query.denied === 'string' ? route.query.denied : ''))
-const loginHint = computed(() => (denied.value ? t('home.deniedGuest', { page: denied.value }) : undefined))
+/** Вместо адреса страницы («/me/route») — её название из меню («Мой путь»); без названия — общая фраза. */
+const loginHint = computed(() => {
+  if (!denied.value) return undefined
+  let title: unknown
+  try {
+    title = router.resolve(denied.value).meta.title
+  } catch {
+    title = undefined
+  }
+  return typeof title === 'string' ? t('home.deniedGuest', { page: t(title) }) : t('home.deniedGuestAny')
+})
 
 /** Прежний источник примеров: прогноз очереди и проверка самого частого МНН (публичные эндпоинты). */
 async function legacyExamples(): Promise<LoginExamples> {
@@ -137,7 +148,7 @@ onMounted(async () => {
 .step:not(:last-child)::before { content: ''; position: absolute; left: -39px; top: 36px; bottom: -30px; width: 2px; background: var(--border-strong); }
 .step-title { font-size: var(--fs-lg); font-weight: var(--fw-extrabold); padding-top: 7px; }
 .step-title.future { color: var(--text-faint); font-weight: var(--fw-bold); }
-.step-note { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+.step-note { font-size: 14px; color: var(--text-muted); margin-top: 3px; }
 .step-card { max-width: 400px; display: flex; flex-direction: column; gap: 6px; }
 .step-kicker { font-size: var(--fs-base-sm); font-weight: var(--fw-extrabold); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
 .step-kicker.accent { color: var(--accent-strong); }

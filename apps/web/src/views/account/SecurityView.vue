@@ -18,7 +18,7 @@ import { useAuthStore } from '@/stores/auth'
 /** Безопасность (W-Account-Security): пароль и приложение-аутентификатор меняются в Keycloak (kc_action
  * UPDATE_PASSWORD / CONFIGURE_TOTP), SMS — «после интеграции», резервных кодов в системе входа нет; последние входы и
  * активные сессии — GET /me/security, «Завершить» — DELETE /me/sessions/{id}, «Завершить все, кроме текущей». */
-const { t } = useI18n()
+const { t, te } = useI18n()
 const toast = useToast()
 const auth = useAuthStore()
 const { dateTime } = useLocaleFormat()
@@ -33,6 +33,7 @@ const passwordAge = computed(() => {
   return daysAgo === 0 ? t('account.security.passwordToday') : t('account.security.passwordDaysAgo', { days: daysAgo })
 })
 const otherSessions = computed(() => (security.value?.sessions ?? []).filter((s) => !s.current))
+
 
 async function endSession(session: SessionRecord) {
   ending.value = session.id
@@ -95,9 +96,10 @@ onMounted(run)
       </div>
       <AppCard :title="t('account.security.recentLogins')" label>
         <AsyncState :loading="loading" :error="error" :empty="!security?.recentLogins.length" skeleton="lines" :lines="4" :empty-title="t('account.security.noLogins')" empty-icon="pi pi-sign-in" @retry="run">
-          <div class="rows">
+          <!-- список входов прокручивается внутри карточки: видно около четырёх, остальные — прокруткой -->
+          <div class="rows logins-scroll" tabindex="0" :aria-label="t('account.security.recentLogins')">
             <div v-for="login in security!.recentLogins" :key="login.at + login.method" class="row">
-              <span class="row-main stack"><span class="tabular">{{ dateTime(login.at) }}</span><div class="row-sub">{{ login.method }}<template v-if="login.ip"> · {{ login.ip }}</template></div></span>
+              <span class="row-main stack"><span class="tabular">{{ dateTime(login.at) }}</span><div class="row-sub">{{ te(`account.security.method.${login.method}`) ? t(`account.security.method.${login.method}`) : login.method }}<template v-if="login.ip"> · {{ login.ip }}</template></div></span>
               <span class="row-value"><StatusTag :value="login.success ? t('account.security.loginOk') : t('account.security.loginFailed')" :tone="login.success ? 'ok' : 'warn'" /></span>
             </div>
           </div>
@@ -126,7 +128,7 @@ onMounted(run)
         </div>
         <div class="sessions-foot">
           <Button :label="t('account.security.endOthers')" severity="secondary" :disabled="otherSessions.length === 0" :loading="ending === 'others'" data-testid="end-others" @click="endOthers" />
-          <span class="caption">{{ t('account.security.endOthersNote') }}</span>
+          <span class="caption">{{ otherSessions.length === 0 ? t('account.security.noOtherSessions') : t('account.security.endOthersNote') }}</span>
         </div>
       </AsyncState>
       <ErrorBox :error="actionError" />
@@ -136,7 +138,7 @@ onMounted(run)
 
 <style scoped>
 /* аккаунт (account-security-new): колонка 880 по центру, карточки padding 24 */
-.page { max-width: 880px; }
+.page { max-width: 1120px; }
 .card { padding: 24px; }
 .security-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .col { display: flex; flex-direction: column; gap: 16px; }
@@ -145,8 +147,10 @@ onMounted(run)
 .line .small { font-size: var(--fs-base-sm); }
 .row-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row-main.stack { display: block; }
-.row-main .tabular { font-weight: var(--fw-bold); font-size: 13px; }
+.row-main .tabular { font-weight: var(--fw-bold); font-size: 14px; }
 .strong { font-weight: var(--fw-bold); }
+.logins-scroll { max-height: 300px; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.logins-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-md); }
 .sessions-foot { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
 @media (max-width: 900px) { .security-grid { grid-template-columns: 1fr; } }
 </style>

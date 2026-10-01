@@ -106,15 +106,16 @@ onMounted(async () => {
         <AppCard :title="t('account.profile.personal')" label>
           <Skeleton v-if="loading && !profile" :lines="4" />
           <div v-else class="form-grid two">
-            <div class="field"><label for="p-name">{{ t('account.profile.fullName') }}</label><InputText id="p-name" :model-value="profile?.displayName ?? name" disabled /><span class="caption">{{ t('account.profile.byAdmin') }}</span></div>
+            <div class="field"><label for="p-name">{{ t('account.profile.fullName') }}</label><InputText id="p-name" :model-value="profile?.displayName ?? name" disabled /></div>
             <div v-if="hasJob" class="field"><label for="p-position">{{ t('account.profile.position') }}</label><InputText id="p-position" :model-value="profile?.position ?? '—'" disabled /></div>
-            <div v-if="hasJob" class="field"><label for="p-specialty">{{ t('account.profile.specialty') }}</label><InputText id="p-specialty" :model-value="profile?.specialty ?? '—'" disabled /><span class="caption">{{ t('account.profile.byAdmin') }}</span></div>
+            <div v-if="hasJob" class="field"><label for="p-specialty">{{ t('account.profile.specialty') }}</label><InputText id="p-specialty" :model-value="profile?.specialty ?? '—'" disabled /></div>
             <div class="field">
               <label for="p-phone">{{ t('account.profile.phone') }}</label>
               <InputText id="p-phone" v-model="phone" :invalid="!phoneValid" inputmode="tel" autocomplete="tel" placeholder="+7 7__ ___ __ __" data-testid="profile-phone" />
               <span v-if="!phoneValid" class="error">{{ t('validation.phone') }}</span>
             </div>
           </div>
+          <p v-if="hasJob" class="caption by-admin">{{ t('account.profile.byAdminJob') }}</p>
         </AppCard>
         <div class="grid cols-2">
           <AppCard :title="t('account.profile.email')" label>
@@ -141,7 +142,7 @@ onMounted(async () => {
 
 <style scoped>
 /* аккаунт (account-profile-new): колонка 880 по центру, карточки padding 24 */
-.page { max-width: 880px; }
+.page { max-width: 1120px; }
 .card { padding: 24px; }
 .account-col { display: flex; flex-direction: column; gap: 16px; }
 .who { display: flex; align-items: center; gap: 18px; }
@@ -149,8 +150,10 @@ onMounted(async () => {
 .who-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .who-name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 17px; font-weight: var(--fw-extrabold); letter-spacing: -0.01em; }
 .egov-off { font-size: var(--fs-sm); color: var(--warning-text); margin-top: 2px; }
-.form-grid.two { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; }
+@media (max-width: 600px) { .form-grid.two { grid-template-columns: 1fr; } }
 .form-grid.two :deep(.p-inputtext), .form-grid.two :deep(.p-select) { min-height: 44px; border-radius: var(--radius-lg); }
+.by-admin { margin: 12px 0 0; color: var(--text-faint); }
 .email-row { font-size: var(--fs-md); font-weight: var(--fw-bold); }
 .email-note { margin: 8px 0 0; color: var(--text-faint); }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; }

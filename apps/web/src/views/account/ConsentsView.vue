@@ -149,7 +149,7 @@ onMounted(() => Promise.all([consents.run(), log.run()]))
 
 <style scoped>
 /* аккаунт (account-consents-new): колонка 880 по центру, карточки padding 24 */
-.page { max-width: 880px; }
+.page { max-width: 1120px; }
 .card { padding: 24px; }
 .account-col { display: flex; flex-direction: column; gap: 16px; }
 .row-value { gap: 12px; }

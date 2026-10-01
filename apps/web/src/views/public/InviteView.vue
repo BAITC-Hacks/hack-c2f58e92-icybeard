@@ -148,8 +148,8 @@ onMounted(load)
 .org { font-size: var(--fs-base); font-weight: var(--fw-bold); }
 .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .meta :deep(.status) { background: var(--accent-soft); color: var(--accent-strong); }
-.field > label, .field :deep(label) { font-size: 12px; font-weight: var(--fw-bold); text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
-.field.checkbox > label { font-size: 12px; }
+.field > label, .field :deep(label) { font-size: 13px; font-weight: var(--fw-bold); text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
+.field.checkbox > label { font-size: 13px; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .error-text { color: var(--danger-text); font-size: var(--fs-sm); }
 .wide { width: 100%; justify-content: center; }

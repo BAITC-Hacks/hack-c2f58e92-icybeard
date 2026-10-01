@@ -157,7 +157,7 @@ onMounted(run)
 
 <style scoped>
 /* аккаунт (account-notifications-new): колонка 880 по центру, карточки padding 24 */
-.page { max-width: 880px; }
+.page { max-width: 1120px; }
 .card { padding: 24px; }
 .account-col { display: flex; flex-direction: column; gap: 16px; }
 .matrix th.center, .matrix td.center { text-align: center; width: 96px; }
@@ -167,8 +167,9 @@ onMounted(run)
 .delivery-note i { color: var(--warning-strong); margin-top: 2px; }
 .digest-off { color: var(--warning-text); }
 .form-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 520px) { .form-grid.two { grid-template-columns: 1fr; } }
 .form-grid.two :deep(.p-select) { min-height: 42px; }
 .quiet-except { margin-top: 14px; }
-.quiet-except label { font-weight: var(--fw-bold); font-size: 13px; }
+.quiet-except label { font-weight: var(--fw-bold); font-size: 14px; }
 .form-actions { display: flex; justify-content: flex-end; }
 </style>

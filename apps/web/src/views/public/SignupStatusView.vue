@@ -169,7 +169,7 @@ onBeforeUnmount(() => window.clearInterval(timer))
 .public-page { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding: 60px 16px 16px; }
 .public-card { width: min(460px, 100%); display: flex; flex-direction: column; gap: 16px; padding: 32px; border-radius: var(--radius-card-lg); }
 .public-card h1 { font-size: var(--fs-xl); margin: 0; }
-.lead { margin: -4px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+.lead { margin: -4px 0 0; color: var(--text-secondary); font-size: 14px; line-height: 1.5; }
 .wide { width: 100%; justify-content: center; }
 .center { text-align: center; margin: 0; }
 .error-text { color: var(--danger-text); font-size: var(--fs-sm); }
@@ -177,10 +177,10 @@ onBeforeUnmount(() => window.clearInterval(timer))
 .status-icon.approved { background: var(--success-bg); color: var(--success-text); }
 .status-icon.rejected { background: var(--warning-bg); color: var(--warning-text); }
 .steps { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
-.steps li { display: flex; align-items: center; gap: 12px; color: var(--text); font-size: 13px; }
+.steps li { display: flex; align-items: center; gap: 12px; color: var(--text); font-size: 14px; }
 .steps li.todo { color: var(--text-muted); }
 .dot { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: var(--fs-2xs); font-weight: var(--fw-extrabold); flex: none; background: var(--surface-sunken); color: var(--text-faint); }
-.dot i { font-size: 10px; }
+.dot i { font-size: 11px; }
 .steps li.done .dot { background: var(--success-bg); color: var(--success-text); }
 .steps li.current .dot { background: var(--accent-soft); color: var(--accent-strong); }
 .dot-mark { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-strong); }
