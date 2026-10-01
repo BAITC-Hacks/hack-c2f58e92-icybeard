@@ -25,7 +25,7 @@ import PageShell from '@/components/ui/PageShell.vue'
 import SearchSelect from '@/components/ui/SearchSelect.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { anomalySentence, describeEntity, streamTitle, type EntityNames } from '@/lib/anomaly'
-import { days, num, pct, shortOrgName } from '@/lib/format'
+import { days, INDEX_SCALE_STEPS, num, pct, shortOrgName } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
@@ -72,6 +72,15 @@ const kpis = computed(() => {
   return { avgP90: mean(items.map((i) => i.p90Days)), shareOver30: mean(items.map((i) => i.shareOver30)), below: items.filter((i) => i.indexValue < INDEX_THRESHOLD).length }
 })
 const anomalyRegions = computed(() => new Set(openAnomalies.value.map((a) => a.regionKato).filter((k): k is string => !!k)))
+/** Подписи ступеней легенды из тех же порогов, что красят карту (indexStep): «60 и выше», «50–59», …, «ниже 30». */
+const legendSteps = computed(() => {
+  const edges = INDEX_SCALE_STEPS
+  return [
+    t('gov.map.legend.atLeast', { n: edges[0] }),
+    ...edges.slice(1).map((edge, i) => t('gov.map.legend.range', { from: edge, to: edges[i] - 1 })),
+    t('gov.map.legend.below', { n: edges[edges.length - 1] }),
+  ]
+})
 /** Регион для ссылки «Открыть …»: наведённый, иначе первый по рейтингу. */
 const focusRegion = computed(() => hovered.value ?? index.value?.items[0]?.regionKato ?? null)
 const names: EntityNames = {
@@ -176,7 +185,7 @@ watch(signalStatus, loadSignals)
         <RegionMap :regions="refdata.regions" :index="index?.items ?? []" :highlight="hovered" :anomalies="anomalyRegions" @select="toRegion" @hover="hovered = $event" />
         <div class="legend caption">
           <span class="legend-title">{{ t('gov.map.legend.title') }}</span>
-          <span v-for="n in 5" :key="n" class="legend-item"><span class="swatch" :style="{ background: `var(--dm-map-${n})` }" />{{ t(`gov.map.legend.s${n}`) }}</span>
+          <span v-for="(label, i) in legendSteps" :key="i" class="legend-item"><span class="swatch" :style="{ background: `var(--dm-map-${i + 1})` }" />{{ label }}</span>
           <span class="legend-item"><span class="swatch dot" />{{ t('gov.map.legend.anomaly') }}</span>
           <RouterLink v-if="focusRegion" class="link-arrow small legend-open" :to="{ name: 'region', params: { kato: focusRegion } }">{{ t('gov.map.openRegion', { name: refdata.regionName(focusRegion) }) }}</RouterLink>
         </div>

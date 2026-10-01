@@ -8,7 +8,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { analytics, journal, simulation } from '@/api/endpoints'
-import type { LosItem, RedistributeResponse, SimulateResponse } from '@/api/types'
+import type { LosItem, Move, OrganizationRef, RedistributeResponse, SimulateResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -22,10 +22,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
 /** Симулятор «что если» (W-Simulator) для обычного пользователя: слева «Условия сценария» — регион, профиль, срок
- * (выпадающий список 4·8·12 недель) и четыре рычага с подсказками; справа «Что изменится» — среднее ожидание
- * сейчас → после, итог словами с диапазоном неопределённости, график, сколько пациентов больницы смогут принимать;
- * допущения модели и ориентиры — в свёрнутом «Как считали». Ниже «Куда перенаправить пациентов» (/redistribute)
- * с сохранением сценария в журнал решений и экспортом CSV. */
+ * (выпадающий список 4·8·12 недель) и четыре рычага с подсказками; справа «Что изменится» — три числа (сейчас,
+ * станет, короче/дольше на … с разбросом), полосы сравнения, сколько пациентов больницы смогут принимать;
+ * допущения модели и ориентиры — в свёрнутом «Как считали». Ниже «Куда перенаправить пациентов» (/redistribute):
+ * переносы сгруппированы по больнице-источнику (её ожидание — в заголовке группы), в строках — куда, сколько
+ * пациентов в неделю, доля направлений и ожидание у получателя; сохранение сценария в журнал и экспорт CSV. */
 interface Control { key: 'capacity' | 'redirect' | 'maxShare' | 'beds'; min: number; max: number; step: number; suffix: string }
 const CONTROLS: Control[] = [
   { key: 'beds', min: 0, max: 100, step: 5, suffix: '' },
@@ -65,13 +66,34 @@ const deltaText = computed(() => (delta.value < 0 ? t('gov.simulator.lessBy', { 
 const controlLabel = (key: Control['key']) => t(`gov.simulator.lever.${key}`)
 const controlHint = (key: Control['key']) => t(`gov.simulator.lever.${key}Hint`)
 const horizonOptions = computed(() => HORIZONS.map((w) => ({ value: w, label: t('gov.simulator.horizonOption', { weeks: w }) })))
-/** Диапазон изменения ожидания (ci — границы дельты) словами: «от 0,4 до 0,8 дн.». */
+/** Разброс изменения ожидания (ci — границы дельты) словами: «0,4–0,8 дн.» в ту же сторону, что и подпись
+ * «короче/дольше на»; если границы разного знака — со знаками: «от −0,2 до +0,3 дн.». */
 const rangeText = computed(() => {
   const ci = result.value?.ci ?? []
   if (ci.length < 2) return ''
-  const [a, b] = [Math.abs(ci[0]!), Math.abs(ci[1]!)].sort((x, y) => x - y)
+  const [lo, hi] = [ci[0]!, ci[1]!]
+  if (lo < 0 && hi > 0) return t('gov.simulator.rangeMixed', { lo: `−${num(-lo, 1)}`, hi: `+${num(hi, 1)}` })
+  const [a, b] = [Math.abs(lo), Math.abs(hi)].sort((x, y) => x - y)
   return t('gov.simulator.rangeText', { lo: num(a!, 1), hi: num(b!, 1) })
 })
+const deltaLabel = computed(() => (delta.value < 0 ? t('gov.simulator.shorterBy') : delta.value > 0 ? t('gov.simulator.longerBy') : t('gov.simulator.sameLabel')))
+
+/** Переносы по больнице-источнику: ожидание «до → после» у источника одно на все его переносы (модель считает
+ * его после всех переносов сразу), поэтому оно показывается в заголовке группы, а не в каждой строке. */
+interface MoveGroup { from: OrganizationRef; waitBefore: number; waitAfter: number; moves: Move[] }
+const moveGroups = computed<MoveGroup[]>(() => {
+  const groups = new Map<string, MoveGroup>()
+  for (const m of moves.value?.moves ?? []) {
+    const g = groups.get(m.fromMo.moCode) ?? { from: m.fromMo, waitBefore: m.waitFromBefore, waitAfter: m.waitFromAfter, moves: [] }
+    g.moves.push(m)
+    groups.set(m.fromMo.moCode, g)
+  }
+  return [...groups.values()]
+})
+const patientsPerWeek = (m: Move) => {
+  const n = m.arrivalsPerDay * 7
+  return n < 1 ? t('gov.simulator.patientsFew') : t('gov.simulator.patientsPerWeek', { n: num(Math.round(n), 0) })
+}
 
 async function run() {
   const regionKato = region.value
@@ -195,12 +217,11 @@ onMounted(async () => {
                 <span class="stat-value">{{ num(result.scenario.meanWaitDays, 1) }} <small>{{ t('common.days') }}</small></span>
               </div>
               <div class="stat">
-                <span class="stat-label">{{ t('gov.simulator.deltaLabel') }}</span>
-                <span class="stat-value" :class="delta < 0 ? 'delta-down' : delta > 0 ? 'delta-up' : ''">{{ delta > 0 ? '+' : delta < 0 ? '−' : '' }}{{ num(Math.abs(delta), 1) }} <small>{{ t('common.days') }}</small></span>
+                <span class="stat-label">{{ deltaLabel }}</span>
+                <span class="stat-value" :class="delta < 0 ? 'delta-down' : delta > 0 ? 'delta-up' : ''">{{ num(Math.abs(delta), 1) }} <small>{{ t('common.days') }}</small></span>
                 <span v-if="rangeText" class="stat-sub">{{ rangeText }}</span>
               </div>
             </div>
-            <p class="delta-text" :class="delta < 0 ? 'delta-down' : delta > 0 ? 'delta-up' : ''">{{ deltaText }}</p>
             <div class="bars" role="img" :aria-label="deltaText">
               <div class="bar-row">
                 <span class="bar-name">{{ t('gov.simulator.before') }}</span>
@@ -232,24 +253,24 @@ onMounted(async () => {
           </AppCard>
 
           <AppCard v-if="moves" :title="t('gov.simulator.movesTitle')" origin="formula">
-            <p class="caption card-lead">{{ moves.moves.length ? t('gov.simulator.movesLead', { moves: moves.moves.length, days: num(-moves.totalDeltaDays), horizon: moves.horizonDays }) : t('gov.simulator.noMoves') }}</p>
-            <p v-if="moves.moves[0]" class="example">{{ t('gov.simulator.movesExample', { share: moves.moves[0].sharePct.toFixed(0), from: shortOrgName(moves.moves[0].fromMo.name), to: shortOrgName(moves.moves[0].toMo.name), fromBefore: num(moves.moves[0].waitFromBefore, 1), fromAfter: num(moves.moves[0].waitFromAfter, 1), toBefore: num(moves.moves[0].waitToBefore, 1), toAfter: num(moves.moves[0].waitToAfter, 1) }) }}</p>
+            <p class="caption card-lead">{{ moves.moves.length ? t('gov.simulator.movesLead', { days: num(-moves.totalDeltaDays), weeks: Math.round(moves.horizonDays / 7) }) : t('gov.simulator.noMoves') }}</p>
             <div v-if="moves.moves.length" class="table-wrap">
               <table class="dense-table moves">
                 <thead>
-                  <tr><th>{{ t('gov.simulator.colFromPlain') }}</th><th>{{ t('gov.simulator.colToPlain') }}</th><th class="num">{{ t('gov.simulator.colSharePlain') }}</th><th class="num">{{ t('gov.simulator.colSourceWait') }}</th><th class="num">{{ t('gov.simulator.colTargetWait') }}</th></tr>
+                  <tr><th>{{ t('gov.simulator.colToPlain') }}</th><th class="num">{{ t('gov.simulator.colPatients') }}</th><th class="num">{{ t('gov.simulator.colSharePlain') }}</th><th class="num">{{ t('gov.simulator.colTargetWait') }}</th></tr>
                 </thead>
-                <tbody>
-                  <tr v-for="m in moves.moves" :key="m.fromMo.moCode + m.toMo.moCode">
-                    <td class="org" :title="m.fromMo.name">{{ shortOrgName(m.fromMo.name) }}</td>
+                <tbody v-for="g in moveGroups" :key="g.from.moCode">
+                  <tr class="group"><td colspan="4" :title="g.from.name">{{ t('gov.simulator.movesGroup', { name: shortOrgName(g.from.name), before: num(g.waitBefore, 1), after: num(g.waitAfter, 1) }) }}</td></tr>
+                  <tr v-for="m in g.moves" :key="m.toMo.moCode">
                     <td class="org" :title="m.toMo.name">{{ shortOrgName(m.toMo.name) }}</td>
-                    <td class="num">{{ m.sharePct.toFixed(0) }} %</td>
-                    <td class="num">{{ t('gov.simulator.waitChange', { before: num(m.waitFromBefore, 1), after: num(m.waitFromAfter, 1) }) }}</td>
+                    <td class="num">{{ patientsPerWeek(m) }}</td>
+                    <td class="num share">{{ m.sharePct.toFixed(0) }} %</td>
                     <td class="num">{{ t('gov.simulator.waitChange', { before: num(m.waitToBefore, 1), after: num(m.waitToAfter, 1) }) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
+            <p v-if="moves.moves.length" class="caption moves-note">{{ t('gov.simulator.movesNote') }}</p>
             <div class="save-row">
               <Button :label="savedId ? t('gov.simulator.saved') : t('gov.simulator.saveScenario')" :icon="savedId ? 'pi pi-check' : 'pi pi-bookmark'" :disabled="!!savedId" :loading="saving" data-testid="scenario-save" @click="saveScenario" />
               <button type="button" class="link-arrow small" :disabled="!moves.moves.length" @click="exportCsv">{{ t('shell.exportCsv') }}</button>
@@ -276,7 +297,6 @@ onMounted(async () => {
 .control-row { display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: center; }
 .slider { margin: 0 8px; }
 .control :deep(.num-input) { width: 100%; text-align: right; }
-.delta-text { margin: 14px 0 4px; font-size: var(--dm-text-md); font-weight: var(--fw-bold); }
 .chart-note { margin: 0 0 8px; }
 .fact-line { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--dm-hairline); border-bottom: 1px solid var(--dm-hairline); }
 .how { margin-top: 12px; }
@@ -290,7 +310,7 @@ onMounted(async () => {
 .stat-value { font-size: 30px; font-weight: var(--fw-extrabold); letter-spacing: -0.02em; line-height: 1.05; }
 .stat-value small { font-size: var(--dm-text-base); font-weight: 500; color: var(--text-secondary); }
 .stat-sub { font-size: var(--dm-text-sm); color: var(--text-secondary); }
-.bars { display: flex; flex-direction: column; gap: 12px; margin: 8px 0 6px; }
+.bars { display: flex; flex-direction: column; gap: 12px; margin: 16px 0 6px; }
 .bar-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) 80px; gap: 12px; align-items: center; }
 .bar-name { color: var(--text-secondary); }
 .bar-track { position: relative; height: 22px; background: var(--surface-muted); border-radius: 6px; }
@@ -300,8 +320,11 @@ onMounted(async () => {
 .bar-range { position: absolute; top: -4px; bottom: -4px; border-radius: 6px; background: color-mix(in srgb, var(--dm-accent) 22%, transparent); border: 1px dashed var(--dm-accent); box-sizing: border-box; z-index: 1; }
 .bar-value { text-align: right; font-weight: var(--fw-bold); }
 .how-list { margin: 8px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.5; }
-.example { margin: 0 0 12px; padding: 10px 14px; border-left: 3px solid var(--dm-accent); background: var(--surface-muted); border-radius: 0 10px 10px 0; line-height: 1.5; }
 .moves .org { min-width: 180px; white-space: normal; line-height: 1.35; }
+.moves tr.group td { height: auto; padding: 14px 10px 6px; font-weight: var(--fw-bold); border-bottom: 0; white-space: normal; line-height: 1.4; }
+.moves tbody:first-of-type tr.group td { padding-top: 8px; }
+.moves .share { color: var(--text-secondary); }
+.moves-note { margin: 8px 0 0; }
 @media (max-width: 700px) { .stats { grid-template-columns: 1fr; } }
 .save-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
 .link-arrow:disabled { opacity: 0.5; cursor: default; }
