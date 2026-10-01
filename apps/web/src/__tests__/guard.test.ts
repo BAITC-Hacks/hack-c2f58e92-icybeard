@@ -26,7 +26,7 @@ const ACCESS: Record<string, RoleKey[]> = {
   '/doctor/decisions': ['doctor', 'org_admin', 'regulator', 'auditor', 'admin'],
   '/gov': ['regulator', 'steward', 'auditor', 'admin'],
   '/gov/regions/75': ['regulator', 'steward', 'auditor', 'admin'],
-  '/quality': ['doctor', 'regulator', 'steward', 'auditor', 'admin'],
+  '/quality': ['regulator', 'steward', 'auditor', 'admin'],
   '/gov/simulator': ['regulator', 'admin'],
   '/gov/insight': ['regulator', 'steward', 'admin'],
   '/gov/organizations/028B': ['org_admin', 'regulator', 'admin'],

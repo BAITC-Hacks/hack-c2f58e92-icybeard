@@ -295,7 +295,7 @@ onMounted(async () => {
 .strong { font-weight: var(--fw-bold); }
 .step-row { justify-content: flex-start; gap: 12px; }
 .step-row .row-main { display: flex; flex-direction: column; gap: 2px; }
-.step-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--dm-ok-soft); color: var(--dm-ok); display: grid; place-items: center; font-size: 11px; flex: none; }
+.step-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--dm-ok-soft); color: var(--dm-ok); display: grid; place-items: center; font-size: 12px; flex: none; }
 .step-dot.warn { background: var(--dm-warn-soft); color: var(--dm-warn); }
 .draft { align-items: flex-start; }
 .panel-sub { font-size: var(--dm-text-base); margin: 16px 0 8px; }

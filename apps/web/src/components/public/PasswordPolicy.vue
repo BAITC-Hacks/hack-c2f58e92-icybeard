@@ -39,6 +39,6 @@ const STRENGTH_KEYS = ['none', 'weak', 'medium', 'strong', 'excellent'] as const
 .meter-label.s3, .meter-label.s4 { color: var(--dm-ok); }
 .rules { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 4px 12px; font-size: var(--dm-text-sm); color: var(--dm-muted); }
 .rules li { display: flex; align-items: center; gap: 8px; }
-.rules i { font-size: 11px; }
+.rules i { font-size: 12px; }
 .rules li.ok { color: var(--dm-ok); }
 </style>

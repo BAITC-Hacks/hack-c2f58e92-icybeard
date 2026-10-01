@@ -9,7 +9,8 @@ import { useNotificationBell } from '@/composables/useNotificationBell'
 /** Колокольчик персонала (задача 13 плана прозрачности, упрощена до внутрисистемных уведомлений): видна только
  * ролям с worklist.view и организацией (composable сам решает, звать ли сервер вообще — для остальных всегда пусто).
  * Опрашивается раз в 45 секунд, пока страница открыта; список кликабелен — открывает «Входящие направления» и
- * попутно отмечает событие прочитанным. */
+ * попутно отмечает событие прочитанным. Отдельной ссылки «все входящие» нет: сами уведомления ведут туда,
+ * а раздел «Входящие» есть в меню. */
 const { t } = useI18n()
 const { dateTime } = useLocaleFormat()
 const router = useRouter()
@@ -61,7 +62,6 @@ async function openDischarge(decisionId: string) {
           <span>{{ t('bell.discharged', { org: d.fromMoName }) }}<span class="caption">{{ dateTime(d.dischargedAt) }}</span></span>
         </button>
       </template>
-      <button type="button" class="bell-viewall" @click="openIncoming">{{ t('bell.viewAll') }}</button>
     </div>
   </Popover>
 </template>
@@ -70,7 +70,7 @@ async function openDischarge(decisionId: string) {
 .bell { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: var(--dm-muted); cursor: pointer; }
 .bell:hover { background: var(--dm-bg); color: var(--dm-ink); }
 .bell .icon { font-size: 16px; }
-.badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--dm-danger, #e5484d); color: #fff; font-size: 10px; font-weight: 600; line-height: 16px; text-align: center; }
+.badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--dm-danger, #e5484d); color: #fff; font-size: 11px; font-weight: 600; line-height: 16px; text-align: center; }
 .bell-content { display: flex; flex-direction: column; gap: 2px; width: min(340px, 88vw); }
 .bell-header { font-weight: 600; padding: 4px 4px 8px; }
 .bell-empty { padding: 8px 4px; color: var(--dm-muted); font-size: var(--dm-text-sm); }
@@ -78,6 +78,4 @@ async function openDischarge(decisionId: string) {
 .bell-item:hover { background: var(--dm-bg); }
 .bell-item .icon { flex: none; color: var(--dm-accent); }
 .bell-item .caption { display: block; color: var(--dm-muted); font-size: var(--dm-text-xs, 11px); }
-.bell-viewall { margin-top: 4px; padding: 8px; border: 0; border-top: 1px solid var(--dm-hairline); background: transparent; color: var(--dm-accent); font: inherit; font-weight: 500; text-align: center; cursor: pointer; }
-.bell-viewall:hover { color: var(--dm-accent-hover); }
 </style>

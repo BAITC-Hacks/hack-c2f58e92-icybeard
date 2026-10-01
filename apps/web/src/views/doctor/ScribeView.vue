@@ -331,7 +331,7 @@ onBeforeUnmount(() => recorder.dispose())
 .wave .bar { flex: 1; background: var(--dm-dot-idle); border-radius: 2px; transition: height 0.08s linear; }
 .wave.live .bar { background: var(--dm-primary); }
 .segment { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; justify-content: flex-start; margin: 0; min-height: 44px; }
-.stamp { flex: none; font-size: 10.5px; color: var(--text-faint); letter-spacing: 0.02em; }
+.stamp { flex: none; font-size: 11.5px; color: var(--text-faint); letter-spacing: 0.02em; }
 .segment-text { font-size: var(--dm-text-md); }
 .section { margin-bottom: 8px; }
 .approve-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }

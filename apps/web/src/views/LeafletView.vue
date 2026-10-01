@@ -136,13 +136,13 @@ onMounted(async () => {
 <style scoped>
 /* памятка (public-leaflet-new): документ radius 20 padding 32, номерные шаги 24 на --accent-soft */
 .leaflet { padding-block: 24px; }
-.doc { padding: 32px; border-radius: var(--radius-card-lg); display: flex; flex-direction: column; gap: 18px; font-size: 13px; line-height: 1.55; }
+.doc { padding: 32px; border-radius: var(--radius-card-lg); display: flex; flex-direction: column; gap: 18px; font-size: 14px; line-height: 1.55; }
 .doc-brand { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .brand { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: var(--fw-extrabold); letter-spacing: -0.02em; color: var(--text); }
 .spacer { flex: 1; }
 .doc-brand .caption { color: var(--text-muted); }
 .doc-head h1 { font-size: 21px; }
-.doc-head p { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
+.doc-head p { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
 .doc-actions { display: flex; gap: 10px; }
 .what-next { background: var(--surface-info); color: var(--text); border-radius: var(--radius-lg); padding: 14px 16px; }
 .strong { font-weight: var(--fw-bold); }
@@ -153,7 +153,7 @@ onMounted(async () => {
 .step-title { font-weight: var(--fw-bold); font-size: var(--fs-base); }
 .step-text { white-space: pre-wrap; color: var(--text-secondary); }
 .talked { border-top: 1px solid var(--border); padding-top: 14px; }
-.talked-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: var(--fw-bold); font-size: 13px; }
+.talked-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: var(--fw-bold); font-size: 14px; }
 .talked .caption { color: var(--text-muted); line-height: 1.5; }
 .doc-foot { display: flex; gap: 16px; align-items: flex-start; border-top: 1px solid var(--border); padding-top: 14px; }
 .qr { flex: none; border-radius: var(--radius-sm); }

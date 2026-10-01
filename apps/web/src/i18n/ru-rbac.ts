@@ -51,7 +51,7 @@ export const ruRbac = {
     email: 'Проверьте адрес почты',
     phone: 'Телефон: +7 и 10 цифр',
     bin: 'БИН — 12 цифр',
-    consent: 'Нужно ваше согласие',
+    consent: 'Чтобы отправить заявку, подтвердите согласие.',
   },
   password: {
     strength: { none: '', weak: 'Слабый', medium: 'Средний', strong: 'Надёжный', excellent: 'Очень надёжный' },

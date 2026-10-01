@@ -25,6 +25,6 @@ withDefaults(defineProps<{ icon: string; title: string; text?: string; tone?: 'n
 .state-icon.accent { background: var(--accent-soft); color: var(--accent-strong); }
 .state-icon.danger { background: var(--danger-bg); color: var(--danger-text); }
 .state-title { font-size: var(--fs-lg); font-weight: var(--fw-extrabold); color: var(--text); line-height: 1.35; }
-.state-text { margin: 0; max-width: 52ch; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.state-text { margin: 0; max-width: 52ch; font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
 .state-actions { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: center; margin-top: 8px; }
 </style>

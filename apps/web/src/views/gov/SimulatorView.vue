@@ -209,6 +209,7 @@ onMounted(async () => {
 
 <style scoped>
 .split { grid-template-columns: minmax(300px, 1fr) 1.4fr; }
+@media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
 .levers { display: flex; flex-direction: column; gap: 12px; }
 .levers :deep(.run-btn) { width: 100%; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }

@@ -90,9 +90,9 @@ onBeforeUnmount(() => {
 
 <style>
 .region-marker { background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; font: inherit; position: relative; }
-.region-marker .dot { width: var(--size); height: var(--size); border-radius: 50%; background: var(--color); color: #fff; font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums; display: grid; place-items: center; border: 2px solid #fff; box-shadow: var(--dm-shadow); transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.region-marker .dot { width: var(--size); height: var(--size); border-radius: 50%; background: var(--color); color: #fff; font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; display: grid; place-items: center; border: 2px solid #fff; box-shadow: var(--dm-shadow); transition: transform 0.12s ease, box-shadow 0.12s ease; }
 .region-marker.is-light .dot { color: var(--dm-ink); }
-.region-marker .label { font-size: 11px; font-weight: 500; color: var(--dm-ink); background: color-mix(in srgb, var(--dm-surface) 88%, transparent); padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+.region-marker .label { font-size: 12px; font-weight: 500; color: var(--dm-ink); background: color-mix(in srgb, var(--dm-surface) 88%, transparent); padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
 .region-marker.has-anomaly::after { content: ''; position: absolute; top: -2px; right: calc(50% - var(--size) / 2 - 4px); width: 12px; height: 12px; border-radius: 50%; background: var(--dm-warn-strong); border: 2px solid #fff; box-sizing: border-box; }
 .map--filtered-dark .maplibregl-canvas { filter: invert(0.92) hue-rotate(180deg) brightness(0.85) saturate(0.6); }
 .region-marker:hover .dot, .region-marker.is-hover .dot { transform: scale(1.15); box-shadow: 0 0 0 4px var(--dm-accent-soft), var(--dm-shadow); }

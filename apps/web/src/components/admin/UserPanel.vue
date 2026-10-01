@@ -104,7 +104,7 @@ function save() {
 .access { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .access li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--dm-hairline); font-size: var(--dm-text-sm); }
 .access li:last-child { border-bottom: 0; }
-.access i { width: 20px; height: 20px; border-radius: 50%; background: var(--dm-ok-soft); color: var(--dm-ok); display: grid; place-items: center; font-size: 10px; flex: none; }
+.access i { width: 20px; height: 20px; border-radius: 50%; background: var(--dm-ok-soft); color: var(--dm-ok); display: grid; place-items: center; font-size: 11px; flex: none; }
 .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
 .status { align-self: flex-start; }
 </style>

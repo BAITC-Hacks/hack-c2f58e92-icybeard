@@ -2,7 +2,7 @@
 import { ref, useId } from 'vue'
 import OriginTag from '@/components/OriginTag.vue'
 
-/** Свёртываемая секция-карточка: заголовок 20 / 500, итог справа («7 истекли, 3 действуют»), шеврон; свёрнута по
+/** Свёртываемая секция-карточка: заголовок как у карточек — мелкие прописные буквы, итог справа («7 истекли, 3 действуют»), шеврон; свёрнута по
  * умолчанию. Метка происхождения — на заголовке, одна на секцию. */
 const props = defineProps<{ title: string; summary?: string; open?: boolean; origin?: 'ml' | 'formula' | 'ai'; originNote?: string; tone?: 'warn' | 'danger' | 'ok' }>()
 const emit = defineEmits<{ toggle: [open: boolean] }>()
@@ -28,10 +28,9 @@ function toggle() {
 
 <style scoped>
 .collapsible { padding: 0; }
-.head { display: flex; align-items: center; gap: var(--dm-space-3); width: 100%; padding: 16px var(--dm-space-5); background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--dm-radius-lg); }
-.head:hover { background: var(--dm-surface-2); }
+.head { display: flex; align-items: center; gap: var(--dm-space-3); width: 100%; padding: 16px var(--dm-space-5); min-height: 52px; box-sizing: border-box; background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: var(--dm-radius-lg); }
 .expanded .head { border-radius: var(--dm-radius-lg) var(--dm-radius-lg) 0 0; }
-.head-title { font-weight: 500; font-size: var(--dm-text-lg); letter-spacing: -0.01em; flex: 1; }
+.head-title { flex: 1; display: flex; align-items: center; gap: 10px; font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); }
 .summary { color: var(--dm-muted); font-size: var(--dm-text-sm); text-align: right; }
 .summary.warn, .summary.danger { color: var(--dm-danger); }
 .summary.ok { color: var(--dm-ok); }

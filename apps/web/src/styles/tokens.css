@@ -82,18 +82,18 @@
   --shadow-login: 0 16px 36px -18px rgba(24,52,110,.20);
   --focus-ring: 0 0 0 4px var(--accent-soft);
 
-  /* --- Типографика (px) --- */
-  --fs-2xs: 10px;
-  --fs-xs: 11px;
-  --fs-sm: 11.5px;
-  --fs-base-sm: 12.5px;
-  --fs-base: 13.5px;
-  --fs-md: 14px;
-  --fs-lg: 16px;
+  /* --- Типографика (px): средняя шкала: не мелко на больших мониторах и без лишнего простора --- */
+  --fs-2xs: 10.5px;
+  --fs-xs: 11.5px;
+  --fs-sm: 12px;
+  --fs-base-sm: 13.5px;
+  --fs-base: 14.5px;
+  --fs-md: 15px;
+  --fs-lg: 16.5px;
   --fs-xl: 20px;
-  --fs-h1-cabinet: 22px;
-  --fs-kpi: 24px;
-  --fs-h1-citizen: 26px;
+  --fs-h1-cabinet: 24px;
+  --fs-kpi: 26px;
+  --fs-h1-citizen: 28px;
   --fs-display: 34px;
   --fw-regular: 400;
   --fw-semibold: 600;
@@ -102,12 +102,12 @@
   --fw-black: 800; /* у Manrope нет 900 — «чёрное» начертание рендерится как 800 */
 
   /* --- Раскладка --- */
-  --sidebar-w: 240px;
-  --topstrip-h: 60px;
+  --sidebar-w: 264px;
+  --topstrip-h: 64px;
   --citizen-header-h: 84px;
   --citizen-container: 1240px;
-  --content-pad-cabinet: 22px 28px;
-  --gap-cabinet: 14px;
+  --content-pad-cabinet: 24px 32px;
+  --gap-cabinet: 16px;
   --gap-citizen: 16px;
 
   /* --- Прежние имена (Палитра C) → новые токены; экраны переезжают постепенно --- */

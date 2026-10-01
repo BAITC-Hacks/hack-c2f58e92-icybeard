@@ -13,7 +13,7 @@ import { useAuthStore } from '@/stores/auth'
 /** Каркас: у кого есть разрешения персонала — боковая навигация; гражданину и странице входа — верхняя полоса;
  * публичные страницы (регистрация организации, приглашение) — знак и RU/KK; памятка (meta.bare) — без навигации.
  * Вошедшему пользователю над страницей — баннер «Почтовый сервер недоступен», пока почта не работает. */
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const auth = useAuthStore()
 const route = useRoute()
 const bare = computed(() => route.meta.bare === true)
@@ -33,7 +33,9 @@ const hero = computed(() => route.name === 'home' && !auth.isAuthenticated)
       <AppTopstrip v-if="sidebar" />
       <Toast />
       <EmailOutageBanner v-if="signedInShell" />
-      <RouterView />
+      <!-- тексты с сервера (этапы маршрута, нормативы, объяснения) приходят на языке запроса: при смене RU/KK страница
+           пересоздаётся и заново загружает данные на новом языке -->
+      <RouterView v-slot="{ Component }"><component :is="Component" :key="locale" /></RouterView>
       <footer v-if="isPublic" class="footer">{{ t('auth.syntheticNote') }}</footer>
       <footer v-else-if="!bare" class="footer">{{ t('app.footer') }}</footer>
     </div>

@@ -157,7 +157,7 @@ onMounted(() => Promise.all([data.run(), history.run()]))
 .legend { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: var(--dm-text-sm); color: var(--dm-muted); }
 .legend-item { display: inline-flex; align-items: center; gap: 8px; }
 .spacer { flex: 1; }
-.mark { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 10px; }
+.mark { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; }
 .mark.all { background: var(--success-bg); color: var(--success-text); }
 .mark.part { background: var(--warning-bg); color: var(--warning-text); }
 .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dm-dot-idle); }

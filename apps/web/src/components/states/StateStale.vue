@@ -2,9 +2,9 @@
 import { useI18n } from 'vue-i18n'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
 
-/** Данные устарели (W-States): баннер над блоком — «Данные на {дата}», следующая загрузка (если известна) и «Обновить →». */
+/** Данные устарели (W-States): баннер над блоком — «Данные на {дата}» и следующая загрузка (если известна). Кнопки
+ * «Обновить» нет: данные обновляет загрузка витрин, а не пользователь страницы. */
 defineProps<{ asOf: string; next?: string | null }>()
-const emit = defineEmits<{ refresh: [] }>()
 const { t } = useI18n()
 const { date } = useLocaleFormat()
 </script>
@@ -13,7 +13,6 @@ const { date } = useLocaleFormat()
   <div class="stale" role="status" data-testid="state-stale">
     <span class="stale-icon" aria-hidden="true"><i class="pi pi-clock" /></span>
     <span class="stale-text"><strong>{{ t('states.staleTitle', { date: date(asOf) }) }}</strong><template v-if="next"> · {{ t('states.staleNext', { date: date(next) }) }}</template></span>
-    <button type="button" class="link-arrow small" @click="emit('refresh')">{{ t('states.refresh') }}</button>
   </div>
 </template>
 
