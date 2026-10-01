@@ -118,7 +118,7 @@ public static class RouteBuilder
             new RouteDatesDto(Format(issuedAt), Format(registeredAt), plannedAt is null ? null : Format(plannedAt.Value), Format(expectedAt)),
             item.DaysWaiting, forecast, input.Standard.Benchmarks, checklist,
             input.Alternatives?.Items ?? [], input.Alternatives?.Model,
-            Decisions(input.Decisions, state.MoCode, names), History(input.States, reference, today, input.ProfileNames), doctor,
+            Decisions(input.Decisions, state.MoCode, names), History(input.States, reference, today, input.ProfileNames, state.ProfileCode), doctor,
             Basis(kk, today),
             new RouteStandardRefDto(input.Standard.Meta.Source, input.Standard.Meta.SourceUrl, input.Standard.Meta.SourceDate, input.Standard.Available),
             signals, validationDue);
@@ -170,8 +170,21 @@ public static class RouteBuilder
     /// <summary>2–3 прошлых направления: организация и профиль из очередей региона по сиду, исход — по доле отказов
     /// очереди, ожидание — между p50 и p90. Причина отказа не приписывается: в открытых данных её нет.</summary>
     private static IReadOnlyList<RouteHistoryDto> History(
-        IReadOnlyList<QueueStateRow> states, string reference, DateOnly today, IReadOnlyDictionary<string, string> profileNames)
+        IReadOnlyList<QueueStateRow> states, string reference, DateOnly today, IReadOnlyDictionary<string, string> profileNames, string currentProfile)
     {
+        // взрослому пациенту без пола в историю не попадают профили «по полу/беременности» и детские — те же правила,
+        // что при выборе персоны гражданина (ExcludedProfiles); если текущий профиль сам такой, фильтр не нужен
+        bool Restricted(string code) =>
+            SexSpecificProfiles.Contains(code) || (profileNames.TryGetValue(code, out var name) && PediatricProfile.IsMatch(name));
+        if (!Restricted(currentProfile))
+        {
+            var allowed = states.Where(s => !Restricted(s.ProfileCode)).ToList();
+            if (allowed.Count > 0)
+            {
+                states = allowed;
+            }
+        }
+
         if (states.Count == 0)
         {
             return [];
