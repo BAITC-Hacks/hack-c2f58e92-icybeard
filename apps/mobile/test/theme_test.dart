@@ -77,6 +77,7 @@ void main() {
         'danger': '#9F1239', 'dangerSoft': '#FFE0E6', 'dangerStrong': '#D6395E',
         'info': '#1E4FB8', 'infoSoft': '#DEEAFD', 'ai': '#48536D', 'aiSoft': '#E8EEFA', 'benchSoft': '#E8EEFA',
         'barNeutral': '#B4C0D8', 'map1': '#8CC152', 'map3': '#F2A93B', 'map5': '#D6395E',
+        'borderSoft': '#E6ECF7', 'textMuted': '#76819A', 'textFaint': '#9FA9BF', 'okLine': '#B9EBA0', 'okSoftText': '#5C8A6E',
       },
       'dark': {
         'surface': '#0D1526', 'card': '#141E33', 'ink': '#E7EDF8', 'muted': '#B5C0D6', 'faint': '#33446B',
@@ -87,6 +88,7 @@ void main() {
         'danger': '#FF9FB3', 'dangerSoft': '#3F1824', 'dangerStrong': '#F0607F',
         'info': '#A9C6FF', 'infoSoft': '#1B3263', 'ai': '#B5C0D6', 'aiSoft': '#1F2C48', 'benchSoft': '#1F2C48',
         'barNeutral': '#3A4A6E', 'map1': '#7DB548', 'map3': '#E39B30', 'map5': '#E04D6E',
+        'borderSoft': '#22304F', 'textMuted': '#8D9AB5', 'textFaint': '#66738F', 'okLine': '#2F6B4F', 'okSoftText': '#7CC39B',
       },
     };
     for (final (name, colors) in [('light', ColorTokens.light), ('dark', ColorTokens.dark)]) {
@@ -100,6 +102,8 @@ void main() {
         'danger': colors.danger, 'dangerSoft': colors.dangerSoft, 'dangerStrong': colors.dangerStrong,
         'info': colors.info, 'infoSoft': colors.infoSoft, 'ai': colors.ai, 'aiSoft': colors.aiSoft, 'benchSoft': colors.benchSoft,
         'barNeutral': colors.barNeutral, 'map1': colors.map1, 'map3': colors.map3, 'map5': colors.map5,
+        'borderSoft': colors.borderSoft, 'textMuted': colors.textMuted, 'textFaint': colors.textFaint,
+        'okLine': colors.okLine, 'okSoftText': colors.okSoftText,
       };
       final want = expected[name]!;
       expect(actual.keys.toSet(), want.keys.toSet(), reason: '$name: проверяются все токены');

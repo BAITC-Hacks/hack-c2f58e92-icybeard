@@ -11,8 +11,11 @@ class ColorTokens {
     required this.card,
     required this.ink,
     required this.muted,
+    required this.textMuted,
+    required this.textFaint,
     required this.faint,
     required this.hairline,
+    required this.borderSoft,
     required this.accent,
     required this.accentHover,
     required this.accentSoft,
@@ -26,6 +29,8 @@ class ColorTokens {
     required this.toggleOff,
     required this.ok,
     required this.okSoft,
+    required this.okLine,
+    required this.okSoftText,
     required this.warn,
     required this.warnSoft,
     required this.warnStrong,
@@ -62,11 +67,19 @@ class ColorTokens {
   /// text-secondary — вторичный текст, подписи, ячейки.
   final Color muted;
 
+  /// text-muted и text-faint — декоративный и отключённый текст (будущие этапы, сноски). Подписи мелким шрифтом
+  /// остаются на [muted]: у text-muted контраст на белом 3,9:1.
+  final Color textMuted;
+  final Color textFaint;
+
   /// border-strong — рамка чекбокса, будущий шаг, столбики тишины скрайба, точечное подчёркивание. Не для текста.
   final Color faint;
 
   /// border — разделители строк, рамки инпутов.
   final Color hairline;
+
+  /// border-soft — рамки групп чек-листа, строк ленты и плиток альтернатив, линия степпера.
+  final Color borderSoft;
 
   /// accent — primary-кнопка, активная локаль, прогресс, шаги, чекбокс.
   final Color accent;
@@ -104,6 +117,10 @@ class ColorTokens {
   /// good — текст и заливка («покрыт», «совпало», «подтверждено»).
   final Color ok;
   final Color okSoft;
+
+  /// success-line — линия пройденных этапов; success-soft-text — единица рядом с зелёным числом «быстрее».
+  final Color okLine;
+  final Color okSoftText;
 
   /// attention — риск и аномалии (всегда янтарные, никогда не синие); warnStrong — янтарные точки и полосы.
   final Color warn;
@@ -177,8 +194,11 @@ class ColorTokens {
     card: Color(0xFFFFFFFF),
     ink: Color(0xFF1B2440),
     muted: Color(0xFF48536D),
+    textMuted: Color(0xFF76819A),
+    textFaint: Color(0xFF9FA9BF),
     faint: Color(0xFFD3DCEC),
     hairline: Color(0xFFE1E8F5),
+    borderSoft: Color(0xFFE6ECF7),
     accent: Color(0xFF2F6FE4),
     accentHover: Color(0xFF1E4FB8),
     accentSoft: Color(0xFFDEEAFD),
@@ -192,6 +212,8 @@ class ColorTokens {
     toggleOff: Color(0xFFDCE4F2),
     ok: Color(0xFF2A5C4E),
     okSoft: Color(0xFFDDF7C8),
+    okLine: Color(0xFFB9EBA0),
+    okSoftText: Color(0xFF5C8A6E),
     warn: Color(0xFF9A5A00),
     warnSoft: Color(0xFFFFE9C7),
     warnStrong: Color(0xFFB45309),
@@ -221,8 +243,11 @@ class ColorTokens {
     card: Color(0xFF141E33),
     ink: Color(0xFFE7EDF8),
     muted: Color(0xFFB5C0D6),
+    textMuted: Color(0xFF8D9AB5),
+    textFaint: Color(0xFF66738F),
     faint: Color(0xFF33446B),
     hairline: Color(0xFF27365A),
+    borderSoft: Color(0xFF22304F),
     accent: Color(0xFF2F6FE4),
     accentHover: Color(0xFFA9C6FF),
     accentSoft: Color(0xFF1B3263),
@@ -236,6 +261,8 @@ class ColorTokens {
     toggleOff: Color(0xFF33446B),
     ok: Color(0xFF8FDDB0),
     okSoft: Color(0xFF16382B),
+    okLine: Color(0xFF2F6B4F),
+    okSoftText: Color(0xFF7CC39B),
     warn: Color(0xFFF4C574),
     warnSoft: Color(0xFF3A2A10),
     warnStrong: Color(0xFFE59A3A),
@@ -274,11 +301,12 @@ abstract final class AppSpacing {
   static const double page = 16;
 }
 
-/// Радиусы синей гаммы: 4 — полоски, 8 — статус-бейджи, 12 — поля и внутренние блоки, 14 — заметки и строки-плашки,
-/// 18 — карточки, pill — кнопки и чипы.
+/// Радиусы синей гаммы: 4 — полоски, 8 — статус-бейджи, 10 — плашка сигнала и заметка в ленте событий,
+/// 12 — поля и внутренние блоки, 14 — заметки и строки-плашки, 18 — карточки, pill — кнопки и чипы.
 abstract final class AppRadius {
   static const double xs = 4;
   static const double sm = 8;
+  static const double plate = 10;
   static const double md = 12;
   static const double lg = 14;
   static const double card = 18;
@@ -318,6 +346,12 @@ abstract final class AppSizes {
 
   /// Иконка в круге у состояний экрана (states-new).
   static const double stateIcon = 48;
+
+  /// Счётчик на вкладке и колокольчике (16), кружок приоритета 0…10 (32), узел этапа (24), точка ленты событий (30).
+  static const double badge = 16;
+  static const double priority = 32;
+  static const double stageNode = 24;
+  static const double feedDot = 30;
 }
 
 abstract final class AppDurations {

@@ -3,7 +3,15 @@ import 'package:flutter/widgets.dart';
 import '../api/service_status.dart';
 
 part 'strings_account.dart';
+part 'strings_citizen.dart';
+part 'strings_citizen_more.dart';
+part 'strings_doctor.dart';
+part 'strings_factors.dart';
+part 'strings_incoming.dart';
+part 'strings_route.dart';
+part 'strings_scribe.dart';
 part 'strings_service.dart';
+part 'strings_shell.dart';
 
 /// Ручной словарь статических подписей интерфейса (ru/kk). API-контент (объяснения,
 /// названия регионов/организаций) уже локализуется через Accept-Language в ApiClient —
