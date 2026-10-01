@@ -13,16 +13,17 @@ using QuestPDF.Infrastructure;
 
 namespace Darumen.Modules.Insight;
 
-/// <summary>Отчёт «Индекс доступности за месяц» в PDF (QuestPDF) и Excel (ClosedXML), плюс (5.5) четыре
-/// дополнительных раздела для того же месяца/профиля: перегруженные организации, прогнозы, открытые сигналы
-/// аномалий и решения, записанные в журнале за месяц. Данные — те же витрины, что на карте регионов и в insight-чате;
-/// ничего не пересчитывается.</summary>
+/// <summary>Отчёт «Доступность плановой госпитализации за месяц» в PDF (QuestPDF) и Excel (ClosedXML): пять разделов
+/// (регионы, перегруженные больницы, прогноз, необычные отклонения, решения за месяц). Отчёт читают руководители,
+/// поэтому вместо кодов — названия (регионы, профили, больницы, роли), вместо p90/score/актора — слова, у каждого
+/// раздела — короткое пояснение. Данные — те же витрины, что на карте регионов; ничего не пересчитывается.</summary>
 public sealed class InsightReportService(
     IAnalyticsRepository analytics,
     IQueueStateRepository queue,
     IDecisionRepository decisions,
     LoadForecasting.LoadForecastingClient forecasting,
-    IOptions<ModelServicesOptions> modelServices)
+    IOptions<ModelServicesOptions> modelServices,
+    Darumen.Modules.RefData.IRefDataRepository refData)
 {
     private const string FontFamily = "DejaVu Sans";
     private static bool _fontsReady;
@@ -78,16 +79,13 @@ public sealed class InsightReportService(
         var openAnomalies = (await analytics.AnomaliesAsync(new AnomalyFilter(null, null, null, AnomalyStatuses.Open), 1, OpenAnomaliesLimit, ct)).Items;
         var forecasts = await ForecastsAsync(items, profile, ct);
         var monthDecisions = await DecisionsForMonthAsync(chosen, ct);
+        var names = await NamesAsync(lang, ct);
 
+        var sections = Sections(chosen, profile, names, items, overloaded, forecasts, openAnomalies, monthDecisions);
         return format switch
         {
-            "xlsx" => new Report(
-                Excel(chosen, profile, items, overloaded, forecasts, openAnomalies, monthDecisions),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                $"darumen-index-{chosen}.xlsx"),
-            _ => new Report(
-                Pdf(chosen, profile, items, overloaded, forecasts, openAnomalies, monthDecisions),
-                "application/pdf", $"darumen-index-{chosen}.pdf"),
+            "xlsx" => new Report(Excel(sections), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"darumen-otchet-{chosen}.xlsx"),
+            _ => new Report(Pdf(sections), "application/pdf", $"darumen-otchet-{chosen}.pdf"),
         };
     }
 
@@ -131,452 +129,291 @@ public sealed class InsightReportService(
         var from = DateOnly.ParseExact(month + "-01", "yyyy-MM-dd");
         var to = from.AddMonths(1);
         var page = await decisions.ListAsync(null, null, null, 1, 5000, ct);
+        // события записи приёма (согласие, сессия, памятка) — служебные, не управленческие решения
         return page.Items
+            .Where(d => d.Subject != Darumen.Shared.Api.DecisionSubjects.Scribe)
             .Where(d => d.RecordedAt.UtcDateTime >= from.ToDateTime(TimeOnly.MinValue) && d.RecordedAt.UtcDateTime < to.ToDateTime(TimeOnly.MinValue))
             .ToList();
     }
 
-    private static byte[] Excel(
-        string month, string profile, IReadOnlyList<IndexItemDto> items, IReadOnlyList<OverloadedOrganizationDto> overloaded,
-        IReadOnlyList<ForecastRow> forecasts, IReadOnlyList<AnomalyDto> openAnomalies, IReadOnlyList<DecisionDto> monthDecisions)
+    /// <summary>Один раздел отчёта: одинаково рисуется листом Excel и страницей PDF.</summary>
+    private sealed record Section(string Sheet, string Title, string Subtitle, string[] Headers, float[] Widths, IReadOnlyList<string[]> Rows, string Note);
+
+    private sealed record Names(
+        IReadOnlyDictionary<string, string> Regions, IReadOnlyDictionary<string, string> Profiles, IReadOnlyDictionary<string, string> Organizations)
+    {
+        public string Region(string? kato) => kato is not null && Regions.TryGetValue(kato, out var n) ? n : kato ?? "—";
+        public string Profile(string? code) => code is null || code == AnalyticsEndpoints.AllProfiles ? "все профили" : Profiles.TryGetValue(code, out var n) ? n : code;
+        public string Organization(string? moCode) => moCode is not null && Organizations.TryGetValue(moCode, out var n) ? n : moCode ?? "—";
+    }
+
+    private async Task<Names> NamesAsync(string lang, CancellationToken ct)
+    {
+        var regions = (await refData.RegionsAsync(lang, ct)).ToDictionary(r => r.RegionKato, r => r.Name);
+        var profiles = (await refData.ProfilesAsync(ct)).GroupBy(p => p.ProfileCode).ToDictionary(g => g.Key, g => g.First().Name);
+        var organizations = (await refData.OrganizationsAsync(null, null, null, 10000, ct)).GroupBy(o => o.MoCode).ToDictionary(g => g.Key, g => g.First().Name);
+        return new Names(regions, profiles, organizations);
+    }
+
+    private static readonly string[] MonthNames = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"];
+
+    /// <summary>«2025-03» → «март 2025»; другие форматы периода — как есть.</summary>
+    private static string MonthText(string period) =>
+        period.Length >= 7 && int.TryParse(period[..4], out var year) && int.TryParse(period[5..7], out var m) && m is >= 1 and <= 12
+            ? period.Length == 7 ? $"{MonthNames[m - 1]} {year}" : $"{period[8..10]}.{period[5..7]}.{year}"
+            : period;
+
+    private static readonly System.Globalization.CultureInfo Ru = System.Globalization.CultureInfo.GetCultureInfo("ru-RU");
+
+    private static string Num(double value, int digits = 0) => value.ToString("N" + digits, Ru);
+
+    private static string Pct(double? share) => share is null ? "—" : (share.Value * 100).ToString("0", Ru) + " %";
+
+    private static string StreamText(string streamId) => streamId switch
+    {
+        "admissions_monthly" => "Госпитализации",
+        "er_visits_daily" => "Приёмный покой",
+        "vac_monthly" => "Вакцинация",
+        "rx_weekly" => "Обеспеченные рецепты",
+        "onco_monthly" => "Онкология, впервые выявленные",
+        "queue_daily" => "Очередь на госпитализацию",
+        "lab_estimate_monthly" => "Лаборатории (оценка)",
+        _ => streamId,
+    };
+
+    private static string SeverityText(string severity) => severity switch
+    {
+        "critical" => "высокая",
+        "warning" => "средняя",
+        _ => severity,
+    };
+
+    private static string RoleText(string role) => role switch
+    {
+        "citizen" => "пациент",
+        "doctor" => "врач",
+        "org_admin" => "главврач",
+        "regulator" => "Минздрав",
+        "steward" => "специалист по данным",
+        "auditor" => "аудитор",
+        "admin" => "администратор",
+        _ => role,
+    };
+
+    private static string SubjectText(string subject) => subject switch
+    {
+        "referral" => "направление пациента",
+        "anomaly" => "сигнал об отклонении",
+        "route" => "маршрут пациента",
+        "scenario" => "сценарий симулятора",
+        "role_permissions" => "права роли",
+        "user_access" => "доступ пользователя",
+        "doctor_verification" => "проверка квалификации врача",
+        "org_application" => "заявка больницы на подключение",
+        _ => subject,
+    };
+
+    /// <summary>Отклонение словами: «больше обычного в 2,1 раза», «меньше обычного на 40 %», «нет при обычных 17».</summary>
+    private static string DeviationText(double observed, double expected)
+    {
+        if (expected <= 0)
+        {
+            return observed > 0 ? "появилось при обычном нуле" : "—";
+        }
+
+        if (observed <= 0)
+        {
+            return "ни одного вместо обычных " + Num(expected);
+        }
+
+        var ratio = observed / expected;
+        return ratio >= 1.5 ? $"больше обычного в {ratio.ToString("0.0", Ru)} раза"
+            : ratio >= 1 ? $"больше обычного на {((ratio - 1) * 100).ToString("0", Ru)} %"
+            : $"меньше обычного на {((1 - ratio) * 100).ToString("0", Ru)} %";
+    }
+
+    private static IReadOnlyList<Section> Sections(
+        string month, string profile, Names names, IReadOnlyList<IndexItemDto> items, IReadOnlyList<OverloadedOrganizationDto> overloaded,
+        IReadOnlyList<ForecastRow> forecasts, IReadOnlyList<AnomalyDto> anomalies, IReadOnlyList<DecisionDto> monthDecisions)
+    {
+        var period = MonthText(month);
+        var profileText = names.Profile(profile);
+        var skipped = forecasts.Count(f => f.Points is null);
+        return
+        [
+            new Section(
+                "Доступность по регионам",
+                "Доступность плановой госпитализации по регионам",
+                $"{period} · профиль: {profileText} · регионов: {items.Count}",
+                ["Место", "Регион", "Индекс доступности (0–100)", "Ждут дольше 30 дней", "9 из 10 пациентов ждут не дольше, дн.", "Госпитализаций"],
+                [0.6f, 3f, 1.4f, 1.3f, 1.6f, 1.3f],
+                items.Select(i => new[] { i.Rank.ToString(Ru), i.Name, Num(i.IndexValue), Pct(i.ShareOver30), Num(i.P90Days), Num(i.N) }).ToList(),
+                "Индекс сравнивает регионы между собой: чем больше пациентов ждут дольше 30 дней и чем дольше ждут 9 из 10 пациентов, " +
+                "тем ниже индекс. 100 — самый доступный регион за месяц. Данные: направления на плановую госпитализацию (ИС БГ), " +
+                "I квартал 2025. Регионы, где за месяц меньше 5 госпитализаций, не показаны."),
+            new Section(
+                "Перегруженные больницы",
+                "Перегруженные больницы",
+                $"{period} · профиль: {profileText} · больниц: {overloaded.Count}",
+                ["Больница", "Регион", "Профиль коек", "Направлений больше, чем госпитализаций", "В очереди", "9 из 10 ждут не дольше, дн.", "Отказов за 4 недели"],
+                [3f, 1.6f, 2f, 1.4f, 0.9f, 1.2f, 1f],
+                overloaded.Select(o => new[]
+                {
+                    o.Name, names.Region(o.RegionKato), names.Profile(o.ProfileCode),
+                    o.Load is null ? "госпитализаций нет" : $"в {o.Load.Value.ToString("0.0", Ru)} раза",
+                    Num(o.QueueLen), o.QueueAgeP90 is null ? "—" : Num(o.QueueAgeP90.Value), Pct(o.RefusalRate4w),
+                }).ToList(),
+                "Больница перегружена, если направлений к ней приходит больше, чем она успевает госпитализировать, — очередь растёт. " +
+                $"Показаны до {OverloadedLimit} самых загруженных больниц страны (данные за последние 4 недели)."),
+            new Section(
+                "Прогноз госпитализаций",
+                "Прогноз плановых госпитализаций на 3 месяца",
+                $"после месяца «{period}» · профиль: {profileText} · {ForecastRegionCount} регионов с самой низкой доступностью",
+                ["Регион", "Месяц", "Ожидается госпитализаций", "Не меньше", "Не больше"],
+                [3f, 1.4f, 1.6f, 1.1f, 1.1f],
+                forecasts.Where(f => f.Points is not null)
+                    .SelectMany(f => f.Points!.Select(p => new[] { f.Region.Name, MonthText(p.Period), Num(p.Yhat), Num(p.Lo), Num(p.Hi) }))
+                    .ToList(),
+                "Прогноз модели. «Не меньше» и «не больше» — диапазон, в который с высокой вероятностью попадёт фактическое число." +
+                (skipped == 0 ? string.Empty : $" Для регионов без достаточной истории ({skipped}) прогноз не строился.")),
+            new Section(
+                "Необычные отклонения",
+                "Необычные отклонения (открытые сигналы)",
+                $"на {DateTime.UtcNow:dd.MM.yyyy} · сигналов: {anomalies.Count}",
+                ["Что", "Регион", "Больница", "Дата", "Важность", "Было", "Обычно", "Отклонение"],
+                [1.6f, 1.6f, 2.2f, 0.9f, 0.8f, 0.7f, 0.8f, 1.8f],
+                anomalies.Select(a => new[]
+                {
+                    StreamText(a.StreamId), names.Region(a.RegionKato), a.MoCode is null ? "—" : names.Organization(a.MoCode), MonthText(a.Period),
+                    SeverityText(a.Severity), Num(a.Observed), Num(a.Expected), DeviationText(a.Observed, a.Expected),
+                }).ToList(),
+                "Сигнал — день или месяц, когда пациентов было заметно больше или меньше, чем обычно ожидает модель. " +
+                "«Было» — фактическое число, «Обычно» — сколько ожидалось. Показаны открытые сигналы на дату отчёта " +
+                $"(до {OpenAnomaliesLimit}, сначала самые сильные); их нужно проверить и подтвердить или отметить ложными."),
+            new Section(
+                "Решения за месяц",
+                "Решения, записанные в журнале",
+                $"{period} · записей: {monthDecisions.Count}",
+                ["Дата", "Кто", "Роль", "Что решали", "Комментарий"],
+                [1.2f, 2f, 1.2f, 2f, 3f],
+                monthDecisions.Select(d => new[]
+                {
+                    d.RecordedAt.UtcDateTime.ToString("dd.MM.yyyy HH:mm", Ru), d.Actor, RoleText(d.Role), SubjectText(d.Subject), d.Reason ?? "—",
+                }).ToList(),
+                "Все решения, которые сотрудники записали в журнал за месяц: по направлениям, сигналам, сценариям и доступу."),
+        ];
+    }
+
+    private static byte[] Excel(IReadOnlyList<Section> sections)
     {
         using var workbook = new XLWorkbook();
-        var sheet = workbook.Worksheets.Add("Индекс доступности");
-        sheet.Cell(1, 1).Value = $"Индекс доступности плановой госпитализации · {month} · профиль {profile}";
-        sheet.Cell(1, 1).Style.Font.SetBold();
-        string[] headers = ["Место", "Регион", "КАТО", "Индекс", "Доля > 30 дней", "p90, дн.", "Госпитализаций"];
-        for (var c = 0; c < headers.Length; c++)
+        foreach (var section in sections)
         {
-            sheet.Cell(3, c + 1).Value = headers[c];
-            sheet.Cell(3, c + 1).Style.Font.SetBold();
+            var sheet = workbook.Worksheets.Add(section.Sheet);
+            sheet.Cell(1, 1).Value = section.Title;
+            sheet.Cell(1, 1).Style.Font.SetBold().Font.SetFontSize(14);
+            sheet.Cell(2, 1).Value = section.Subtitle;
+            sheet.Cell(2, 1).Style.Font.SetFontColor(XLColor.Gray);
+            for (var c = 0; c < section.Headers.Length; c++)
+            {
+                var cell = sheet.Cell(4, c + 1);
+                cell.Value = section.Headers[c];
+                cell.Style.Font.SetBold().Fill.SetBackgroundColor(XLColor.FromHtml("#EEF1F6")).Alignment.SetWrapText(true).Alignment.SetVertical(XLAlignmentVerticalValues.Top);
+            }
+
+            for (var r = 0; r < section.Rows.Count; r++)
+            {
+                for (var c = 0; c < section.Headers.Length; c++)
+                {
+                    sheet.Cell(5 + r, c + 1).Value = section.Rows[r][c];
+                }
+            }
+
+            if (section.Rows.Count == 0)
+            {
+                sheet.Cell(5, 1).Value = "Нет данных за этот период.";
+            }
+
+            var noteRow = 6 + Math.Max(section.Rows.Count, 1);
+            sheet.Cell(noteRow, 1).Value = section.Note;
+            sheet.Cell(noteRow, 1).Style.Font.SetItalic().Font.SetFontColor(XLColor.Gray);
+            for (var c = 0; c < section.Headers.Length; c++)
+            {
+                sheet.Column(c + 1).Width = Math.Clamp(section.Widths[c] * 14, 10, 60);
+            }
+
+            sheet.Row(4).Height = 32;
+            sheet.SheetView.FreezeRows(4);
         }
-
-        for (var r = 0; r < items.Count; r++)
-        {
-            var item = items[r];
-            sheet.Cell(4 + r, 1).Value = item.Rank;
-            sheet.Cell(4 + r, 2).Value = item.Name;
-            sheet.Cell(4 + r, 3).Value = item.RegionKato;
-            sheet.Cell(4 + r, 4).Value = Math.Round(item.IndexValue, 1);
-            sheet.Cell(4 + r, 5).Value = Math.Round(item.ShareOver30, 3);
-            sheet.Cell(4 + r, 5).Style.NumberFormat.Format = "0.0%";
-            sheet.Cell(4 + r, 6).Value = Math.Round(item.P90Days, 0);
-            sheet.Cell(4 + r, 7).Value = item.N;
-        }
-
-        sheet.Cell(5 + items.Count, 1).Value =
-            "Индекс = 100 − среднее перцентильных рангов по доле ожидания дольше 30 дней и p90 внутри месяца и профиля. " +
-            "Источник: направления ИС БГ, I квартал 2025 (ashyq.data.gov.kz). Строки с числом госпитализаций меньше 5 подавлены.";
-        sheet.Columns().AdjustToContents();
-
-        ExcelOverloaded(workbook, overloaded);
-        ExcelForecasts(workbook, month, forecasts);
-        ExcelAnomalies(workbook, openAnomalies);
-        ExcelDecisions(workbook, month, monthDecisions);
 
         using var output = new MemoryStream();
         workbook.SaveAs(output);
         return output.ToArray();
     }
 
-    private static void ExcelOverloaded(XLWorkbook workbook, IReadOnlyList<OverloadedOrganizationDto> overloaded)
-    {
-        var sheet = workbook.Worksheets.Add("Перегруженные организации");
-        sheet.Cell(1, 1).Value = "Перегруженные организации (нагрузка 4 недели / пропускная способность > 1)";
-        sheet.Cell(1, 1).Style.Font.SetBold();
-        string[] headers = ["МО", "КАТО", "Профиль", "Нагрузка", "В очереди", "p90 очереди, дн.", "Отказы, 4 нед."];
-        for (var c = 0; c < headers.Length; c++)
-        {
-            sheet.Cell(3, c + 1).Value = headers[c];
-            sheet.Cell(3, c + 1).Style.Font.SetBold();
-        }
-
-        for (var r = 0; r < overloaded.Count; r++)
-        {
-            var o = overloaded[r];
-            sheet.Cell(4 + r, 1).Value = o.Name;
-            sheet.Cell(4 + r, 2).Value = o.RegionKato;
-            sheet.Cell(4 + r, 3).Value = o.ProfileCode;
-            sheet.Cell(4 + r, 4).Value = o.Load is null ? "—" : Math.Round(o.Load.Value, 2).ToString();
-            sheet.Cell(4 + r, 5).Value = o.QueueLen;
-            sheet.Cell(4 + r, 6).Value = o.QueueAgeP90 is null ? "—" : Math.Round(o.QueueAgeP90.Value, 0).ToString();
-            sheet.Cell(4 + r, 7).Value = o.RefusalRate4w is null ? "—" : o.RefusalRate4w.Value.ToString("0.0%");
-        }
-
-        sheet.Cell(5 + overloaded.Count, 1).Value =
-            "Нагрузка = (зарегистрировано за 4 недели / 28) / пропускная способность в день. Организация также считается " +
-            "перегруженной, если поток есть, а пропускная способность равна нулю. Без ограничения по региону/профилю, " +
-            "первые по стране, отсортированы по убыванию нагрузки.";
-        sheet.Columns().AdjustToContents();
-    }
-
-    private static void ExcelForecasts(XLWorkbook workbook, string month, IReadOnlyList<ForecastRow> forecasts)
-    {
-        var sheet = workbook.Worksheets.Add("Прогнозы");
-        sheet.Cell(1, 1).Value = $"Прогноз госпитализаций (admissions_monthly) на 3 месяца после {month}";
-        sheet.Cell(1, 1).Style.Font.SetBold();
-        string[] headers = ["Регион", "КАТО", "Период", "Прогноз", "Нижняя граница", "Верхняя граница"];
-        for (var c = 0; c < headers.Length; c++)
-        {
-            sheet.Cell(3, c + 1).Value = headers[c];
-            sheet.Cell(3, c + 1).Style.Font.SetBold();
-        }
-
-        var r = 4;
-        foreach (var row in forecasts)
-        {
-            if (row.Points is null)
-            {
-                continue;
-            }
-
-            foreach (var point in row.Points)
-            {
-                sheet.Cell(r, 1).Value = row.Region.Name;
-                sheet.Cell(r, 2).Value = row.Region.RegionKato;
-                sheet.Cell(r, 3).Value = point.Period;
-                sheet.Cell(r, 4).Value = Math.Round(point.Yhat, 0);
-                sheet.Cell(r, 5).Value = Math.Round(point.Lo, 0);
-                sheet.Cell(r, 6).Value = Math.Round(point.Hi, 0);
-                r++;
-            }
-        }
-
-        var skipped = forecasts.Count(f => f.Points is null);
-        sheet.Cell(r + 1, 1).Value = skipped == 0
-            ? $"Показаны {ForecastRegionCount} регионов с наименьшим индексом доступности за {month}."
-            : $"Показаны {ForecastRegionCount} регионов с наименьшим индексом доступности за {month}; для {skipped} из них модель ещё не обучена — исключены.";
-        sheet.Columns().AdjustToContents();
-    }
-
-    private static void ExcelAnomalies(XLWorkbook workbook, IReadOnlyList<AnomalyDto> anomalies)
-    {
-        var sheet = workbook.Worksheets.Add("Открытые сигналы");
-        sheet.Cell(1, 1).Value = $"Открытые сигналы аномалий на дату формирования отчёта ({DateTime.UtcNow:yyyy-MM-dd})";
-        sheet.Cell(1, 1).Style.Font.SetBold();
-        string[] headers = ["Поток", "Регион", "МО", "Период", "Тяжесть", "Наблюдение", "Ожидание", "Score"];
-        for (var c = 0; c < headers.Length; c++)
-        {
-            sheet.Cell(3, c + 1).Value = headers[c];
-            sheet.Cell(3, c + 1).Style.Font.SetBold();
-        }
-
-        for (var r = 0; r < anomalies.Count; r++)
-        {
-            var a = anomalies[r];
-            sheet.Cell(4 + r, 1).Value = a.StreamId;
-            sheet.Cell(4 + r, 2).Value = a.RegionKato ?? "—";
-            sheet.Cell(4 + r, 3).Value = a.MoCode ?? "—";
-            sheet.Cell(4 + r, 4).Value = a.Period;
-            sheet.Cell(4 + r, 5).Value = a.Severity;
-            sheet.Cell(4 + r, 6).Value = Math.Round(a.Observed, 1);
-            sheet.Cell(4 + r, 7).Value = Math.Round(a.Expected, 1);
-            sheet.Cell(4 + r, 8).Value = Math.Round(a.Score, 2);
-        }
-
-        sheet.Cell(5 + anomalies.Count, 1).Value =
-            "Снимок на дату формирования отчёта, не привязан к выбранному месяцу: сигнал, открытый в прошлом месяце и " +
-            $"всё ещё не закрытый, здесь и остаётся. Показаны первые {OpenAnomaliesLimit} по периоду и |score| (как в /analytics/anomalies).";
-        sheet.Columns().AdjustToContents();
-    }
-
-    private static void ExcelDecisions(XLWorkbook workbook, string month, IReadOnlyList<DecisionDto> monthDecisions)
-    {
-        var sheet = workbook.Worksheets.Add("Решения за месяц");
-        sheet.Cell(1, 1).Value = $"Решения, записанные в журнале за {month}";
-        sheet.Cell(1, 1).Style.Font.SetBold();
-        string[] headers = ["Дата", "Актор", "Роль", "Тема", "ID темы", "Причина"];
-        for (var c = 0; c < headers.Length; c++)
-        {
-            sheet.Cell(3, c + 1).Value = headers[c];
-            sheet.Cell(3, c + 1).Style.Font.SetBold();
-        }
-
-        for (var r = 0; r < monthDecisions.Count; r++)
-        {
-            var d = monthDecisions[r];
-            sheet.Cell(4 + r, 1).Value = d.RecordedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm");
-            sheet.Cell(4 + r, 2).Value = d.Actor;
-            sheet.Cell(4 + r, 3).Value = d.Role;
-            sheet.Cell(4 + r, 4).Value = d.Subject;
-            sheet.Cell(4 + r, 5).Value = d.SubjectId;
-            sheet.Cell(4 + r, 6).Value = d.Reason ?? "—";
-        }
-
-        sheet.Cell(5 + monthDecisions.Count, 1).Value = $"Все решения из journal.decisions с recorded_at внутри {month} (UTC), по всем акторам и темам.";
-        sheet.Columns().AdjustToContents();
-    }
-
-    private static byte[] Pdf(
-        string month, string profile, IReadOnlyList<IndexItemDto> items, IReadOnlyList<OverloadedOrganizationDto> overloaded,
-        IReadOnlyList<ForecastRow> forecasts, IReadOnlyList<AnomalyDto> openAnomalies, IReadOnlyList<DecisionDto> monthDecisions)
+    private static byte[] Pdf(IReadOnlyList<Section> sections)
     {
         EnsureFonts();
         return Document.Create(document =>
         {
-            document.Page(page =>
+            foreach (var section in sections)
             {
-                page.Size(PageSizes.A4);
-                page.Margin(36);
-                page.DefaultTextStyle(style => style.FontFamily(FontFamily).FontSize(9.5f));
-
-                page.Header().Column(header =>
+                document.Page(page =>
                 {
-                    header.Item().Text("Darumen Health · Индекс доступности плановой госпитализации").Bold().FontSize(14);
-                    header.Item().PaddingTop(2).Text($"Месяц {month} · профиль {profile} · {items.Count} регионов").FontColor(Colors.Grey.Darken1);
-                    header.Item().PaddingVertical(6).LineHorizontal(0.8f);
-                });
-
-                page.Content().PaddingTop(6).Table(table =>
-                {
-                    table.ColumnsDefinition(columns =>
+                    page.Size(PageSizes.A4.Landscape());
+                    page.Margin(32);
+                    page.DefaultTextStyle(style => style.FontFamily(FontFamily).FontSize(10));
+                    page.Header().Column(header =>
                     {
-                        columns.ConstantColumn(38);
-                        columns.RelativeColumn(4);
-                        columns.ConstantColumn(44);
-                        columns.ConstantColumn(52);
-                        columns.ConstantColumn(78);
-                        columns.ConstantColumn(56);
-                        columns.ConstantColumn(84);
+                        header.Item().Text("Darumen Health").FontSize(9).FontColor(Colors.Grey.Darken1);
+                        header.Item().PaddingTop(2).Text(section.Title).Bold().FontSize(16);
+                        header.Item().PaddingTop(2).Text(section.Subtitle).FontColor(Colors.Grey.Darken1);
+                        header.Item().PaddingVertical(8).LineHorizontal(0.8f).LineColor(Colors.Grey.Lighten2);
                     });
-                    table.Header(h =>
+                    page.Content().Column(content =>
                     {
-                        foreach (var title in new[] { "Место", "Регион", "КАТО", "Индекс", "Доля > 30 дн.", "p90, дн.", "Госпитализаций" })
+                        content.Item().PaddingBottom(8).Text(section.Note).FontSize(9).FontColor(Colors.Grey.Darken2);
+                        if (section.Rows.Count == 0)
                         {
-                            h.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text(title).Bold();
+                            content.Item().PaddingTop(8).Text("Нет данных за этот период.").FontColor(Colors.Grey.Darken1);
+                            return;
                         }
-                    });
-                    foreach (var item in items)
-                    {
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(item.Rank.ToString());
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(item.Name);
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(item.RegionKato);
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{item.IndexValue:F1}");
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{item.ShareOver30:P1}");
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{item.P90Days:F0}");
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(item.N.ToString("N0"));
-                    }
-                });
 
-                page.Footer().Column(footer =>
-                {
-                    footer.Item().PaddingTop(6).Text(
-                            "Индекс = 100 − среднее перцентильных рангов по доле ожидания дольше 30 дней и p90 внутри месяца и профиля (расчёт по формуле). " +
-                            "Источник: направления ИС БГ, I квартал 2025, ashyq.data.gov.kz; строки с числом госпитализаций меньше 5 подавлены.")
-                        .FontSize(7.5f).FontColor(Colors.Grey.Darken1);
-                    footer.Item().PaddingTop(2).Text(text =>
+                        content.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                foreach (var width in section.Widths)
+                                {
+                                    columns.RelativeColumn(width);
+                                }
+                            });
+                            table.Header(h =>
+                            {
+                                foreach (var title in section.Headers)
+                                {
+                                    h.Cell().Background(Colors.Grey.Lighten4).PaddingVertical(6).PaddingHorizontal(5).Text(title).Bold().FontSize(9);
+                                }
+                            });
+                            foreach (var row in section.Rows)
+                            {
+                                foreach (var value in row)
+                                {
+                                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).PaddingHorizontal(5).Text(value);
+                                }
+                            }
+                        });
+                    });
+                    page.Footer().AlignRight().Text(text =>
                     {
-                        text.DefaultTextStyle(style => style.FontSize(7.5f).FontColor(Colors.Grey.Darken1));
-                        text.Span($"Сформировано {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC · dc.jurek.kz · страница ");
+                        text.DefaultTextStyle(style => style.FontSize(8).FontColor(Colors.Grey.Darken1));
+                        text.Span($"Сформировано {DateTime.UtcNow:dd.MM.yyyy HH:mm} (UTC) · страница ");
                         text.CurrentPageNumber();
                         text.Span(" из ");
                         text.TotalPages();
                     });
                 });
-            });
-
-            PdfOverloadedPage(document, month, profile, overloaded);
-            PdfForecastsPage(document, month, forecasts);
-            PdfAnomaliesPage(document, openAnomalies);
-            PdfDecisionsPage(document, month, monthDecisions);
+            }
         }).GeneratePdf();
-    }
-
-    private static void PdfHeader(PageDescriptor page, string title, string subtitle)
-    {
-        page.Size(PageSizes.A4);
-        page.Margin(36);
-        page.DefaultTextStyle(style => style.FontFamily(FontFamily).FontSize(9.5f));
-        page.Header().Column(header =>
-        {
-            header.Item().Text(title).Bold().FontSize(14);
-            header.Item().PaddingTop(2).Text(subtitle).FontColor(Colors.Grey.Darken1);
-            header.Item().PaddingVertical(6).LineHorizontal(0.8f);
-        });
-    }
-
-    private static void PdfFooter(PageDescriptor page, string note)
-    {
-        page.Footer().Column(footer =>
-        {
-            footer.Item().PaddingTop(6).Text(note).FontSize(7.5f).FontColor(Colors.Grey.Darken1);
-            footer.Item().PaddingTop(2).Text(text =>
-            {
-                text.DefaultTextStyle(style => style.FontSize(7.5f).FontColor(Colors.Grey.Darken1));
-                text.Span($"Сформировано {DateTime.UtcNow:yyyy-MM-dd HH:mm} UTC · dc.jurek.kz · страница ");
-                text.CurrentPageNumber();
-                text.Span(" из ");
-                text.TotalPages();
-            });
-        });
-    }
-
-    private static void PdfOverloadedPage(IDocumentContainer document, string month, string profile, IReadOnlyList<OverloadedOrganizationDto> overloaded)
-    {
-        document.Page(page =>
-        {
-            PdfHeader(page, "Darumen Health · Перегруженные организации", $"Месяц {month} · профиль {profile} · {overloaded.Count} организаций");
-            page.Content().PaddingTop(6).Table(table =>
-            {
-                table.ColumnsDefinition(columns =>
-                {
-                    columns.RelativeColumn(4);
-                    columns.ConstantColumn(44);
-                    columns.ConstantColumn(56);
-                    columns.ConstantColumn(64);
-                    columns.ConstantColumn(56);
-                    columns.ConstantColumn(72);
-                    columns.ConstantColumn(64);
-                });
-                table.Header(h =>
-                {
-                    foreach (var title in new[] { "МО", "КАТО", "Профиль", "Нагрузка", "В очереди", "p90 очереди, дн.", "Отказы, 4 нед." })
-                    {
-                        h.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text(title).Bold();
-                    }
-                });
-                foreach (var o in overloaded)
-                {
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(o.Name);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(o.RegionKato);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(o.ProfileCode);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(o.Load is null ? "—" : $"{o.Load.Value:F2}");
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(o.QueueLen.ToString("N0"));
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(o.QueueAgeP90 is null ? "—" : $"{o.QueueAgeP90.Value:F0}");
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(o.RefusalRate4w is null ? "—" : $"{o.RefusalRate4w.Value:P1}");
-                }
-            });
-            PdfFooter(page,
-                "Нагрузка = (зарегистрировано за 4 недели / 28) / пропускная способность в день; также перегружена организация с потоком " +
-                "и нулевой пропускной способностью. Без ограничения по региону/профилю, первые по стране, отсортированы по убыванию нагрузки.");
-        });
-    }
-
-    private static void PdfForecastsPage(IDocumentContainer document, string month, IReadOnlyList<ForecastRow> forecasts)
-    {
-        document.Page(page =>
-        {
-            PdfHeader(page, "Darumen Health · Прогнозы", $"admissions_monthly, горизонт 3 месяца после {month} · {ForecastRegionCount} наименее доступных региона");
-            page.Content().PaddingTop(6).Table(table =>
-            {
-                table.ColumnsDefinition(columns =>
-                {
-                    columns.RelativeColumn(3);
-                    columns.ConstantColumn(44);
-                    columns.ConstantColumn(64);
-                    columns.ConstantColumn(64);
-                    columns.ConstantColumn(64);
-                    columns.ConstantColumn(64);
-                });
-                table.Header(h =>
-                {
-                    foreach (var title in new[] { "Регион", "КАТО", "Период", "Прогноз", "Нижн. граница", "Верхн. граница" })
-                    {
-                        h.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text(title).Bold();
-                    }
-                });
-                foreach (var row in forecasts)
-                {
-                    if (row.Points is null)
-                    {
-                        continue;
-                    }
-
-                    foreach (var point in row.Points)
-                    {
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(row.Region.Name);
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(row.Region.RegionKato);
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(point.Period);
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{point.Yhat:F0}");
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{point.Lo:F0}");
-                        table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{point.Hi:F0}");
-                    }
-                }
-            });
-            var skipped = forecasts.Count(f => f.Points is null);
-            PdfFooter(page, skipped == 0
-                ? $"Показаны {ForecastRegionCount} регионов с наименьшим индексом доступности за {month}."
-                : $"Показаны {ForecastRegionCount} регионов с наименьшим индексом доступности за {month}; для {skipped} из них модель ещё не обучена — исключены.");
-        });
-    }
-
-    private static void PdfAnomaliesPage(IDocumentContainer document, IReadOnlyList<AnomalyDto> anomalies)
-    {
-        document.Page(page =>
-        {
-            PdfHeader(page, "Darumen Health · Открытые сигналы", $"На дату формирования отчёта {DateTime.UtcNow:yyyy-MM-dd} · {anomalies.Count} сигналов");
-            page.Content().PaddingTop(6).Table(table =>
-            {
-                table.ColumnsDefinition(columns =>
-                {
-                    columns.RelativeColumn(3);
-                    columns.ConstantColumn(44);
-                    columns.ConstantColumn(56);
-                    columns.ConstantColumn(56);
-                    columns.ConstantColumn(56);
-                    columns.ConstantColumn(64);
-                    columns.ConstantColumn(64);
-                    columns.ConstantColumn(48);
-                });
-                table.Header(h =>
-                {
-                    foreach (var title in new[] { "Поток", "Регион", "МО", "Период", "Тяжесть", "Наблюдение", "Ожидание", "Score" })
-                    {
-                        h.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text(title).Bold();
-                    }
-                });
-                foreach (var a in anomalies)
-                {
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(a.StreamId);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(a.RegionKato ?? "—");
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(a.MoCode ?? "—");
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(a.Period);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(a.Severity);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{a.Observed:F1}");
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{a.Expected:F1}");
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text($"{a.Score:F2}");
-                }
-            });
-            PdfFooter(page,
-                "Снимок на дату формирования отчёта, не привязан к выбранному месяцу: сигнал, открытый ранее и всё ещё не закрытый, " +
-                $"здесь и остаётся. Показаны первые {OpenAnomaliesLimit} по периоду и |score| (как в /analytics/anomalies).");
-        });
-    }
-
-    private static void PdfDecisionsPage(IDocumentContainer document, string month, IReadOnlyList<DecisionDto> monthDecisions)
-    {
-        document.Page(page =>
-        {
-            PdfHeader(page, "Darumen Health · Решения за месяц", $"Журнал решений · {month} · {monthDecisions.Count} записей");
-            page.Content().PaddingTop(6).Table(table =>
-            {
-                table.ColumnsDefinition(columns =>
-                {
-                    columns.ConstantColumn(80);
-                    columns.RelativeColumn(2);
-                    columns.ConstantColumn(64);
-                    columns.RelativeColumn(2);
-                    columns.ConstantColumn(64);
-                    columns.RelativeColumn(3);
-                });
-                table.Header(h =>
-                {
-                    foreach (var title in new[] { "Дата", "Актор", "Роль", "Тема", "ID темы", "Причина" })
-                    {
-                        h.Cell().Background(Colors.Grey.Lighten3).Padding(4).Text(title).Bold();
-                    }
-                });
-                foreach (var d in monthDecisions)
-                {
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(d.RecordedAt.UtcDateTime.ToString("yyyy-MM-dd HH:mm"));
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(d.Actor);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(d.Role);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(d.Subject);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(d.SubjectId);
-                    table.Cell().BorderBottom(0.4f).BorderColor(Colors.Grey.Lighten2).Padding(4).Text(d.Reason ?? "—");
-                }
-            });
-            PdfFooter(page, $"Все решения из journal.decisions с recorded_at внутри {month} (UTC), по всем акторам и темам.");
-        });
     }
 }

@@ -36,9 +36,13 @@ public static class InsightEndpoints
             .Produces<AskResponseDto>().ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .ProducesProblem(StatusCodes.Status503ServiceUnavailable).Produces(StatusCodes.Status429TooManyRequests);
 
-        group.MapGet("/status", (InsightService service, Microsoft.Extensions.Options.IOptions<InsightOptions> options) =>
-                Results.Ok(new { available = service.Available, provider = options.Value.Provider, model = options.Value.Model }))
-            .WithName("InsightStatus").WithSummary("Настроен ли доступ к модели");
+        group.MapGet("/status", async (InsightService service, Microsoft.Extensions.Options.IOptions<InsightOptions> options, CancellationToken ct) =>
+            {
+                var available = service.Available;
+                var reachable = available ? await service.ProbeAsync(ct) : (bool?)null;
+                return Results.Ok(new { available, reachable, provider = options.Value.Provider, model = options.Value.Model });
+            })
+            .WithName("InsightStatus").WithSummary("Настроен ли доступ к модели и отвечает ли локальная модель (reachable; null — не проверялось)");
 
         group.MapGet("/reports", async (string? month, string? profileCode, string? format, HttpRequest http,
                 InsightReportService reports, CancellationToken ct) =>

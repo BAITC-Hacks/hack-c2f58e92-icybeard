@@ -109,6 +109,28 @@ public sealed class InsightService(IInsightChatClientFactory factory, InsightToo
 
     public bool Available => factory.Create() is not null;
 
+    private static readonly HttpClient Probe = new() { Timeout = TimeSpan.FromSeconds(3) };
+
+    /// <summary>Для локальной модели (Ollama) — быстрая проверка, что сервер запущен и модель скачана: GET {BaseUrl}/models.
+    /// Для облачных провайдеров не проверяем (запрос с ключом) — null.</summary>
+    public async Task<bool?> ProbeAsync(CancellationToken cancellationToken)
+    {
+        if (!string.Equals(options.Value.Provider, InsightOptions.Ollama, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        try
+        {
+            var body = await Probe.GetStringAsync(options.Value.BaseUrl.TrimEnd('/') + "/models", cancellationToken);
+            return body.Contains($"\"{options.Value.Model}\"", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            return false;
+        }
+    }
+
     public async Task<AskResponseDto> AskAsync(string question, string? regionKato, CancellationToken cancellationToken)
     {
         var inner = factory.Create() ?? throw new InvalidOperationException("Insight не настроен: задайте ANTHROPIC_API_KEY");
