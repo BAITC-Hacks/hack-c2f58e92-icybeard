@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -6,11 +8,11 @@ import '../l10n/strings.dart';
 import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
-import '../theme/tones.dart';
-import '../theme/typography.dart';
+import '../widgets/api_error.dart';
 import '../widgets/app_card.dart';
 import '../widgets/darumen_mark.dart';
-import '../widgets/day_groups.dart';
+import '../widgets/decisions/decision_row.dart';
+import '../widgets/decisions/decision_text.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/format.dart';
 import '../widgets/load_state_view.dart';
@@ -18,12 +20,13 @@ import '../widgets/pill_filter.dart';
 import '../widgets/section.dart';
 import '../widgets/skeleton.dart';
 import '../widgets/state_view.dart';
-import '../widgets/status_chip.dart';
 
-/// Журнал решений по доске M-Decisions: пилюли Все · Маршрут · Направление, группы по дням (label + карточка-список),
-/// строка «реф 15/500 · Военный госпиталь → Достар Мед · время · «причина»» с чипом «совпало» (good), если выбрана
-/// рекомендованная, иначе «иначе»; тап — лист с полными именами, кодами и ключом записи. Имена организаций — из
-/// справочника региона (журнал отдаёт только коды).
+/// Журнал решений врача (веб DecisionsView): мои решения, свежие первыми (до 200 записей, `actor=me`) — что
+/// рекомендовала система, что выбрано и почему. Служебные записи скрайба скрыты (решение API 13). Сверху — подзаголовок
+/// веба и пилюли предмета со счётчиками («Все решения · N», «Пациент в очереди · N», «Новое направление · N»); строка
+/// — объект, что произошло (события маршрута — подписями журнала персонала, Q-8), дата и время, итог словами и
+/// причина; тап — лист подробностей без номера записи. Имена организаций, регионов и профилей — из справочников;
+/// чего там нет, показывается кодом. CSV, период, роль и показатели — только в вебе (§6.4).
 class DecisionsScreen extends StatefulWidget {
   const DecisionsScreen({super.key});
 
@@ -32,201 +35,126 @@ class DecisionsScreen extends StatefulWidget {
 }
 
 class _DecisionsScreenState extends State<DecisionsScreen> {
+  /// Порядок предметов в пилюлях (как в выпадающем списке веба); незнакомые предметы — после них.
+  static const _subjectOrder = [DecisionCodes.subjectReferral, DecisionCodes.subjectRoute, DecisionCodes.subjectAnomaly];
+
   LoadState<List<DecisionRecord>> _state = const Loading();
-  Map<String, String> _orgNames = const {};
+  DecisionNames _names = const DecisionNames();
   String? _subject;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    unawaited(_load());
   }
 
+  /// Первая загрузка — скелетон; обновление жестом оставляет список на экране, ошибка обновления — в снекбаре.
   Future<void> _load() async {
     final session = context.read<Session>();
-    setState(() => _state = const Loading());
+    final hadData = _state is Loaded<List<DecisionRecord>>;
+    if (!hadData) setState(() => _state = const Loading());
     try {
-      final results = await Future.wait<Object>([
-        session.api.myDecisions(),
-        session.api.organizations(session.region).catchError((_) => <Organization>[]),
-      ]);
-      if (mounted) {
-        setState(() {
-          _state = Loaded(results[0] as List<DecisionRecord>);
-          _orgNames = {for (final o in results[1] as List<Organization>) o.moCode: o.name};
-        });
-      }
-    } catch (e) {
-      if (mounted) {
+      final results = await Future.wait<Object>([session.api.myDecisions(size: 200), _loadNames(session)]);
+      if (!mounted) return;
+      setState(() {
+        _state = Loaded(journalDecisions(results[0] as List<DecisionRecord>));
+        _names = results[1] as DecisionNames;
+      });
+    } on Object catch (e) {
+      if (!mounted) return;
+      if (hadData) {
+        await showApiError(context, e);
+      } else {
         setState(() => _state = Failed(e));
       }
     }
   }
 
-  String _fullName(String? code) => code == null ? '—' : _orgNames[code] ?? code;
-
-  String _shortName(String? code) => code == null ? '—' : shortOrgName(_fullName(code));
-
-  /// «A → B», «Оставлен: A» при совпадении, «Направление: B» без рекомендации.
-  String _line(S s, DecisionRecord r) {
-    if (r.recommendedMoCode == null) {
-      return s.referralLine(_shortName(r.chosenMoCode));
-    }
-    if (r.recommendedMoCode == r.chosenMoCode) {
-      return s.keptLine(_shortName(r.chosenMoCode));
-    }
-    return '${_shortName(r.recommendedMoCode)} → ${_shortName(r.chosenMoCode)}';
-  }
-
-  void _openDetails(DecisionRecord record) {
-    final s = S.at(context);
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheet) {
-        final theme = Theme.of(sheet);
-        Widget row(String label, String value) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [FieldLabel(label), SelectableText(value, style: theme.textTheme.row)],
-              ),
-            );
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(AppSpacing.page, 0, AppSpacing.page, AppSpacing.xxl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text(dateTimeShort(record.recordedAt), style: theme.textTheme.titleLarge?.merge(AppType.numeric))),
-                  StatusChip(_subjectLabel(s, record.subject), tone: StatusTone.neutral),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              row(s.recommendedLabel, '${_fullName(record.recommendedMoCode)}${record.recommendedMoCode == null ? '' : ' (${record.recommendedMoCode})'}'),
-              row(s.chosenLabel, '${_fullName(record.chosenMoCode)}${record.chosenMoCode == null ? '' : ' (${record.chosenMoCode})'}'),
-              if (record.subjectId != null) row(s.subjectIdLabel, record.subjectId!),
-              if (record.reason != null && record.reason!.isNotEmpty) row(s.reasonShort, record.reason!),
-              row(s.recordKeyLabel, record.decisionId),
-            ],
-          ),
-        );
-      },
+  /// Справочники для подписей. Они — украшение: без них журнал показывает коды, поэтому сбой справочника не
+  /// превращается в ошибку экрана, а оставляет пустой словарь (код вместо имени виден врачу).
+  static Future<DecisionNames> _loadNames(Session session) async {
+    final api = session.api;
+    final results = await Future.wait<Object>([
+      _orEmpty<Region>(api.regions()),
+      _orEmpty<BedProfile>(api.profiles()),
+      _orEmpty<Organization>(api.organizations(session.region)),
+    ]);
+    return DecisionNames(
+      regions: {for (final r in results[0] as List<Region>) r.kato: r.name},
+      profiles: {for (final p in results[1] as List<BedProfile>) p.code: p.name},
+      organizations: {for (final o in results[2] as List<Organization>) o.moCode: o.name},
     );
   }
 
-  static String _subjectLabel(S s, String subject) => switch (subject) {
-        'route' => s.subjectRoute,
-        'referral' => s.subjectReferral,
-        _ => subject,
-      };
+  static Future<List<T>> _orEmpty<T>(Future<List<T>> request) => request.catchError((Object _) => <T>[], test: (e) => e is Exception);
+
+  List<String> _subjects(List<DecisionRecord> items) {
+    final present = {for (final d in items) d.subject};
+    return [
+      for (final subject in _subjectOrder)
+        if (present.contains(subject)) subject,
+      for (final subject in present)
+        if (!_subjectOrder.contains(subject)) subject,
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
-    final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
     return PageScaffold(
       title: s.decisionsTitle,
       leading: const DarumenMark(size: 28),
       onRefresh: _load,
       children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: PillFilter<String?>(
-            items: [(null, s.subjectAll), ('route', s.subjectRoute), ('referral', s.subjectReferral)],
-            selected: _subject,
-            onChanged: (v) => setState(() => _subject = v),
-          ),
-        ),
+        Text(s.decisionsLead, style: Theme.of(context).textTheme.bodySmall),
         LoadStateView<List<DecisionRecord>>(
           state: _state,
           onRetry: _load,
           skeleton: const CardSkeleton(height: 300),
-          isEmpty: (items) => !items.any((d) => _subject == null || d.subject == _subject),
-          empty: _subject == null
-              ? EmptyState(icon: Icons.history, title: s.emptyDecisions)
-              : FilteredEmptyState(onReset: () => setState(() => _subject = null)),
-          builder: (_, items) {
-            final groups = groupByDay([for (final d in items) if (_subject == null || d.subject == _subject) d], (d) => d.recordedAt, s);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final (g, group) in groups.indexed) ...[
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(0, g == 0 ? AppSpacing.xs : AppSpacing.lg, 0, AppSpacing.sm),
-                    child: Text(group.label.toUpperCase(), style: theme.textTheme.overline.copyWith(color: colors.muted)),
-                  ),
-                  AppCard(
-                    padding: AppCard.list,
-                    child: Column(
-                      children: [
-                        for (final (i, record) in group.items.indexed)
-                          _DecisionRow(
-                            record: record,
-                            line: _line(s, record),
-                            last: i == group.items.length - 1,
-                            onTap: () => _openDetails(record),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            );
-          },
+          isEmpty: (items) => items.isEmpty,
+          empty: EmptyState(icon: Icons.history, title: s.decisionsEmpty, body: s.decisionsEmptyText),
+          builder: (_, items) => _list(s, items),
         ),
       ],
     );
   }
-}
 
-class _DecisionRow extends StatelessWidget {
-  const _DecisionRow({required this.record, required this.line, required this.last, required this.onTap});
-
-  final DecisionRecord record;
-  final String line;
-  final bool last;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.at(context);
-    final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
-    final matched = record.recommendedMoCode != null && record.recommendedMoCode == record.chosenMoCode;
-    final detail = [timeShort(record.recordedAt), if (record.reason != null && record.reason!.isNotEmpty) '«${record.reason}»'].join(' · ');
-    return Semantics(
-      button: true,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          constraints: const BoxConstraints(minHeight: AppSizes.row),
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-          decoration: last ? null : BoxDecoration(border: Border(bottom: BorderSide(color: colors.hairline))),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(record.subjectId ?? record.decisionId, style: theme.textTheme.rowStrong.merge(AppType.numeric), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
-                    Text(line, style: theme.textTheme.bodySmall?.copyWith(color: colors.ink, height: 1.35), maxLines: 2, overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 2),
-                    Text(detail, style: theme.textTheme.rowDetail.copyWith(color: colors.muted).merge(AppType.numeric), maxLines: 2, overflow: TextOverflow.ellipsis),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              StatusChip(matched ? s.matched : s.differed, tone: matched ? StatusTone.ok : StatusTone.neutral),
+  Widget _list(S s, List<DecisionRecord> items) {
+    final visible = [for (final d in items) if (_subject == null || d.subject == _subject) d];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: PillFilter<String?>(
+            items: [
+              (null, '${s.decisionsAll} · ${items.length}'),
+              for (final subject in _subjects(items))
+                (subject, '${capitalizeFirst(s.decisionsSubject(subject))} · ${items.where((d) => d.subject == subject).length}'),
             ],
+            selected: _subject,
+            onChanged: (value) => setState(() => _subject = value),
           ),
         ),
-      ),
+        const SizedBox(height: AppSpacing.md),
+        if (visible.isEmpty)
+          FilteredEmptyState(onReset: () => setState(() => _subject = null))
+        else
+          AppCard(
+            padding: AppCard.list,
+            child: Column(
+              children: [
+                for (final (i, record) in visible.indexed)
+                  DecisionRow(
+                    record: record,
+                    names: _names,
+                    last: i == visible.length - 1,
+                    onTap: () => showDecisionSheet(context, record, _names),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

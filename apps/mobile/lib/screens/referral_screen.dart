@@ -1,57 +1,36 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../api/almaty_time.dart';
 import '../api/client.dart';
 import '../api/models.dart';
 import '../l10n/strings.dart';
-import '../state/load_state.dart';
 import '../state/session.dart';
-import '../theme/tokens.dart';
-import '../theme/tones.dart';
-import '../theme/typography.dart';
-import '../widgets/app_card.dart';
-import '../widgets/collapsible_section.dart';
-import '../widgets/empty_state.dart';
+import '../widgets/api_error.dart';
 import '../widgets/error_box.dart';
-import '../widgets/explanation_card.dart';
 import '../widgets/format.dart';
-import '../widgets/origin_tag.dart';
 import '../widgets/picker_sheet.dart';
+import '../widgets/referral/referral_form.dart';
+import '../widgets/referral/referral_options.dart';
+import '../widgets/referral/referral_params.dart';
+import '../widgets/referral/referral_result.dart';
 import '../widgets/section.dart';
-import '../widgets/skeleton.dart';
-import '../widgets/status_chip.dart';
 
-/// Значения категориальных признаков — контракт модели (русские литералы, как в вебе); в интерфейсе — переводимые
-/// подписи из S.purposeLabels / S.territorialLabels в том же порядке.
-abstract final class ReferralOptions {
-  static const purposes = ['Оперативное лечение', 'Консервативное лечение', 'Диагностика', 'Реабилитация'];
-  static const territorial = ['Город', 'Село'];
-  static const financeSource = 'Активы Фонда на ОСМС';
-}
-
-/// Вариант выбора: организация с прогнозом (текущая — из predict, альтернативы — из alternatives).
-class ReferralOption {
-  const ReferralOption({required this.moCode, required this.name, required this.p50Days, required this.risk, this.alternative});
-
-  final String moCode;
-  final String name;
-  final double p50Days;
-
-  /// Риск отказа словами или процентом (организация вне обучения — словами).
-  final String risk;
-  final Alternative? alternative;
-}
-
-/// Ассистент направления по доске M-Referral: подпись «Пациент REF · цель · территория», профиль полем,
-/// организации опция-карточками с чипом «рекомендация» (наименьший p50) и inset-обводкой у выбранной, поле
-/// «Причина», «Подтвердить направление» внизу. Прогноз считается при выборе профиля и организации — без кнопки;
-/// один Idempotency-Key на расчёт — повтор не создаёт вторую запись. Открытый с маршрута пациента экран пишет
-/// решение в его маршрут.
+/// Ассистент направления — только для НОВОГО направления, до постановки в лист ожидания (решение Q-5; решения по
+/// пациентам, которые уже ждут, принимаются на странице пациента). Веб ReferralView одной колонкой: «Параметры
+/// направления» → «Куда направить» → «Прогноз для «…»» → «Решение»; «Записать выбор» — в нижней зоне. Прогноз
+/// (`/queue/predict` и `/queue/alternatives`) пересчитывается сам при каждом изменении полной формы; ответ
+/// устаревшего расчёта отбрасывается. Выбор врача и рекомендация системы пишутся в журнал решений с subjectId
+/// `регион.организация.профиль.ГГГГ-ММ-ДД`; причина необязательна (Q-6); один ключ идемпотентности на нажатие.
+/// Ошибки: 422 — под полями «Профиль койки» и «Дата постановки в очередь» (и в плашке), сервис моделей недоступен —
+/// плашка без чисел, 403 — «нет доступа».
 class ReferralScreen extends StatefulWidget {
-  const ReferralScreen({super.key, this.patientRef, this.moCode, this.profileCode});
+  const ReferralScreen({super.key, this.moCode, this.profileCode});
 
-  final String? patientRef;
+  /// Организация и профиль — из перехода «Подобрать в ассистенте»; иначе врач выбирает сам.
   final String? moCode;
   final String? profileCode;
 
@@ -59,360 +38,275 @@ class ReferralScreen extends StatefulWidget {
   State<ReferralScreen> createState() => _ReferralScreenState();
 }
 
-class _Forecast {
-  const _Forecast(this.prediction, this.alternatives);
-
-  final PredictResponse prediction;
-  final List<Alternative> alternatives;
-}
-
 class _ReferralScreenState extends State<ReferralScreen> {
+  List<Region> _regions = const [];
   List<BedProfile> _profiles = const [];
   List<Organization> _organizations = const [];
-  String? _profile;
-  String? _moCode;
-  String? _chosen;
-  String _purpose = ReferralOptions.purposes.first;
-  String _territorial = ReferralOptions.territorial.first;
-  final _icd = TextEditingController();
-  final _reason = TextEditingController();
-  LoadState<_Forecast>? _state;
-  Object? _refdataError;
-  String _decisionKey = '';
+  List<Organization> _referring = const [];
+  late ReferralForm _form;
+  PredictResponse? _prediction;
+  List<Alternative> _alternatives = const [];
+  bool _busy = false;
+  Object? _error;
+  String? _profileError;
+  String? _dateError;
+  String? _reasonError;
+  String _chosen = '';
   String? _recorded;
   bool _recording = false;
+  int _run = 0;
+  final _icd = TextEditingController();
+  final _date = TextEditingController();
+  final _reason = TextEditingController();
+
+  ApiClient get _api => context.read<Session>().api;
 
   @override
   void initState() {
     super.initState();
     final session = context.read<Session>();
-    _profile = widget.profileCode ?? session.lastProfile;
-    _moCode = widget.moCode;
-    _reason.addListener(() => setState(() {}));
-    _load();
+    _form = ReferralForm(regionKato: session.region, moCode: widget.moCode ?? '', profileCode: widget.profileCode ?? session.lastProfile ?? '');
+    unawaited(_load());
   }
 
   @override
   void dispose() {
     _icd.dispose();
+    _date.dispose();
     _reason.dispose();
     super.dispose();
   }
 
+  // ---------- данные ----------
+
   Future<void> _load() async {
+    setState(() => _error = null);
     try {
-      final profiles = await context.read<Session>().api.profiles();
-      if (!mounted) {
-        return;
-      }
+      final results = await Future.wait<Object>([_api.regions(), _api.profiles()]);
+      if (!mounted) return;
+      final profiles = results[1] as List<BedProfile>;
       setState(() {
+        _regions = results[0] as List<Region>;
         _profiles = profiles;
-        _refdataError = null;
+        if (!profiles.any((p) => p.code == _form.profileCode)) _form = _form.copyWith(profileCode: '');
       });
-      if (_profile != null) {
-        await _loadOrganizations();
-        if (_moCode != null) {
-          await _predict();
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _refdataError = e);
-      }
+      await Future.wait([_loadOrganizations(), _loadReferring()]);
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = e);
+      return;
     }
+    await _predict();
   }
 
+  /// Организации региона с профилем; выбранная, которой в новом списке нет, сбрасывается.
   Future<void> _loadOrganizations() async {
-    final session = context.read<Session>();
-    final profile = _profile;
-    if (profile == null) {
+    final form = _form;
+    if (form.regionKato.isEmpty || form.profileCode.isEmpty) {
+      setState(() => _organizations = const []);
       return;
     }
-    final organizations = await session.api.organizations(session.region, profile);
-    if (mounted) {
-      setState(() {
-        _organizations = organizations;
-        if (!organizations.any((o) => o.moCode == _moCode)) {
-          _moCode = null;
-          _state = null;
-        }
-      });
-    }
-  }
-
-  Future<void> _pickProfile() async {
-    final s = S.at(context);
-    final chosen = await PickerSheet.show<String>(context, title: s.profileLabel, items: [for (final p in _profiles) PickerItem(p.code, p.name)], selected: _profile);
-    if (chosen == null || !mounted) {
-      return;
-    }
+    final list = await _api.organizations(form.regionKato, form.profileCode);
+    if (!mounted || form.regionKato != _form.regionKato || form.profileCode != _form.profileCode) return;
     setState(() {
-      _profile = chosen;
-      _state = null;
-      _chosen = null;
+      _organizations = list;
+      if (_form.moCode.isNotEmpty && !list.any((o) => o.moCode == _form.moCode)) _form = _form.copyWith(moCode: '');
     });
-    await _loadOrganizations();
-    if (_moCode != null) {
-      await _predict();
-    }
   }
 
-  Future<void> _pickOrganization() async {
-    final s = S.at(context);
-    final chosen = await PickerSheet.show<String>(
-      context,
-      title: s.organizationLabel,
-      items: [for (final o in _organizations) PickerItem(o.moCode, shortOrgName(o.name), detail: o.name)],
-      selected: _moCode,
-    );
-    if (chosen != null && mounted) {
-      setState(() {
-        _moCode = chosen;
-        _chosen = null;
-      });
-      await _predict();
-    }
+  /// Все организации региона — для «Направляющая организация».
+  Future<void> _loadReferring() async {
+    final region = _form.regionKato;
+    final list = await _api.organizations(region);
+    if (!mounted || region != _form.regionKato) return;
+    setState(() {
+      _referring = list;
+      if (_form.referringMoCode.isNotEmpty && !list.any((o) => o.moCode == _form.referringMoCode)) _form = _form.copyWith(referringMoCode: '');
+    });
   }
 
-  Future<void> _pickOption(String title, List<String> values, List<String> labels, String selected, void Function(String) apply) async {
-    final chosen = await PickerSheet.show<String>(
-      context,
-      title: title,
-      items: [for (final (i, value) in values.indexed) PickerItem(value, labels[i])],
-      selected: selected,
-      search: false,
-    );
-    if (chosen != null && mounted) {
-      setState(() => apply(chosen));
-      await _predict();
+  /// Новая форма → (справочники) → прогноз.
+  Future<void> _change(ReferralForm next, {bool organizations = false, bool referring = false}) async {
+    setState(() => _form = next);
+    try {
+      await Future.wait([if (organizations) _loadOrganizations(), if (referring) _loadReferring()]);
+    } on Object catch (e) {
+      if (mounted) setState(() => _error = e);
+      return;
     }
+    await _predict();
   }
-
-  Map<String, dynamic> _request(Session session) => {
-        'regionKato': session.region,
-        'moCode': _moCode,
-        'profileCode': _profile,
-        'icd10': _icd.text.trim().isEmpty ? null : _icd.text.trim(),
-        'referralPurpose': _purpose,
-        'territorialType': _territorial,
-        'financeSource': ReferralOptions.financeSource,
-      };
 
   Future<void> _predict() async {
-    final session = context.read<Session>();
-    if (_moCode == null || _profile == null) {
-      return;
-    }
+    final form = _form;
+    final run = ++_run;
     setState(() {
-      _state = const Loading();
+      _error = null;
+      _profileError = null;
+      _dateError = null;
       _recorded = null;
+      if (!form.complete) {
+        _prediction = null;
+        _alternatives = const [];
+      }
+      _busy = form.complete;
+    });
+    if (!form.complete) return;
+    try {
+      final results = await Future.wait<Object>([_api.predict(form.toRequest()), _api.alternatives(form.toAlternativesRequest())]);
+      if (!mounted || run != _run) return;
+      setState(() {
+        _prediction = results[0] as PredictResponse;
+        _alternatives = referralAlternatives(results[1] as List<Alternative>, form.moCode);
+        _chosen = form.moCode;
+      });
+      unawaited(context.read<Session>().rememberProfile(form.profileCode));
+    } on Object catch (e) {
+      if (!mounted || run != _run) return;
+      setState(() {
+        _error = e;
+        _prediction = null;
+        _alternatives = const [];
+        _profileError = apiFieldError(e, 'profileCode');
+        _dateError = apiFieldError(e, 'registrationDate');
+      });
+    } finally {
+      if (mounted && run == _run) setState(() => _busy = false);
+    }
+  }
+
+  // ---------- действия ----------
+
+  Future<void> _pick(String title, List<PickerItem<String>> items, String selected, ReferralForm Function(String value) apply,
+      {bool search = true, bool organizations = false, bool referring = false}) async {
+    final value = await PickerSheet.show<String>(context, title: title, items: items, selected: selected, search: search);
+    if (value != null && value != selected && mounted) await _change(apply(value), organizations: organizations, referring: referring);
+  }
+
+  void _textDone() {
+    final icd = _icd.text.trim();
+    final date = _date.text.trim();
+    if (icd != _form.icd10 || date != _form.registrationDate) unawaited(_change(_form.copyWith(icd10: icd, registrationDate: date)));
+  }
+
+  Future<void> _record() async {
+    final s = S.at(context);
+    final prediction = _prediction;
+    if (prediction == null || _recorded != null || _recording || _chosen.isEmpty) return;
+    final key = newIdempotencyKey();
+    setState(() {
+      _recording = true;
+      _reasonError = null;
     });
     try {
-      final request = _request(session);
-      final results = await Future.wait<Object>([session.api.predict(request), session.api.alternatives(request)]);
-      await session.rememberProfile(_profile!);
-      if (mounted) {
-        setState(() {
-          _state = Loaded(_Forecast(results[0] as PredictResponse, results[1] as List<Alternative>));
-          _decisionKey = newIdempotencyKey();
-          _chosen = null;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _state = Failed(e));
-      }
-    }
-  }
-
-  String _orgName(String code) => _organizations.where((o) => o.moCode == code).map((o) => o.name).firstOrNull ?? code;
-
-  static String _refusalWords(S s, double pRefusal) => pRefusal > 0.165 ? s.refusalAboveAverage : pRefusal > 0.055 ? s.refusalAroundAverage : s.refusalBelowAverage;
-
-  /// Опции: текущая организация с прогнозом predict, затем альтернативы; рекомендация — наименьший p50.
-  List<ReferralOption> _options(S s, _Forecast data) {
-    final p = data.prediction;
-    return [
-      ReferralOption(moCode: _moCode!, name: _orgName(_moCode!), p50Days: p.p50Days, risk: p.refusalOrgInTraining ? pct(p.pRefusal) : _refusalWords(s, p.pRefusal)),
-      for (final a in data.alternatives)
-        if (a.moCode != _moCode) ReferralOption(moCode: a.moCode, name: a.name, p50Days: a.p50Days, risk: pct(a.pRefusal), alternative: a),
-    ];
-  }
-
-  static ReferralOption recommended(List<ReferralOption> options) => options.reduce((a, b) => a.p50Days <= b.p50Days ? a : b);
-
-  Future<void> _confirm(List<ReferralOption> options) async {
-    final session = context.read<Session>();
-    final s = S.at(context);
-    final chosen = _chosen ?? recommended(options).moCode;
-    final reason = _reason.text.trim();
-    final patientRef = widget.patientRef;
-    setState(() => _recording = true);
-    try {
-      final String id;
-      if (patientRef != null && chosen != _moCode) {
-        id = await session.api.redirectRoute(patientRef, toMoCode: chosen, reason: reason, idempotencyKey: _decisionKey);
-      } else if (patientRef != null) {
-        // решение по маршруту — только через /route/{ref}/keep: сервер проверяет состояние и сторону
-        id = await session.api.keepRoute(patientRef, reason: reason, idempotencyKey: _decisionKey);
-      } else {
-        id = await session.api.recordDecision({
-          'subject': 'referral',
-          'subjectId': '${session.region}.$_moCode.$_profile.mobile',
-          'recommended': {'moCode': recommended(options).moCode},
-          'chosen': {'moCode': chosen},
-          'reason': reason,
-          // MOBILE-REFACTOR-SHIM: Idempotency-Key стал именованным параметром recordDecision
-        }, idempotencyKey: _decisionKey);
-      }
-      if (mounted) {
-        setState(() => _recorded = id);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(s.decisionRecorded),
-          action: SnackBarAction(label: s.journalShort, onPressed: () => context.go('/doctor/decisions')),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(s.serverUnavailable(e))));
-      }
+      final id = await _api.recordDecision({
+        'subject': DecisionCodes.subjectReferral,
+        'subjectId': referralSubjectId(_form, today: almatyTodayString()),
+        'recommended': {'moCode': referralRecommended(prediction, _alternatives, _form.moCode)},
+        'chosen': {'moCode': _chosen},
+        'reason': _reason.text.trim(),
+      }, idempotencyKey: key);
+      if (!mounted) return;
+      setState(() => _recorded = id);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('${s.assistDecisionRecorded}\n${s.assistToJournal}')));
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() => _reasonError = apiFieldError(e, 'reason'));
+      await showApiError(context, e, fields: const ['reason']);
     } finally {
-      if (mounted) {
-        setState(() => _recording = false);
-      }
+      if (mounted) setState(() => _recording = false);
     }
   }
 
+  // ---------- экран ----------
+
+  String? _regionName(String? kato) => _regions.where((r) => r.kato == kato).map((r) => r.name).firstOrNull;
+
+  String _orgName(String code) =>
+      [..._organizations, ..._referring].where((o) => o.moCode == code).map((o) => o.name).firstOrNull ?? code;
+
   @override
   Widget build(BuildContext context) {
     final s = S.at(context);
-    final theme = Theme.of(context);
-    final state = _state;
-    final data = switch (state) { Loaded<_Forecast>(:final data) => data, _ => null };
-    final options = data == null ? const <ReferralOption>[] : _options(s, data);
-    final chosen = options.isEmpty ? null : (_chosen ?? recommended(options).moCode);
-    final locked = _recording || _recorded != null;
-    final reasonOk = chosen == _moCode || _reason.text.trim().isNotEmpty;
-    final profileName = _profiles.where((p) => p.code == _profile).map((p) => p.name).firstOrNull;
-    final purpose = s.purposeLabels[ReferralOptions.purposes.indexOf(_purpose)];
-    final territory = s.territorialLabels[ReferralOptions.territorial.indexOf(_territorial)];
+    final p = _prediction;
+    final locked = _recorded != null || _recording;
+    final orgShort = shortOrgName(_orgName(_form.moCode));
+    final profileName = _profiles.where((x) => x.code == _form.profileCode).map((x) => x.name).firstOrNull;
+    final purposeIndex = ReferralContract.purposes.indexOf(_form.purpose);
+    final chosenAlternative = _alternatives.where((a) => a.moCode == _chosen).firstOrNull;
     return PageScaffold(
-      title: s.referralTitle,
-      bottom: FilledButton(onPressed: options.isEmpty || locked || !reasonOk ? null : () => _confirm(options), child: Text(s.confirmReferral)),
-      children: [
-        Text(
-          widget.patientRef != null ? s.patientLine(widget.patientRef!, purpose, territory) : '$purpose · $territory',
-          style: theme.textTheme.bodySmall?.merge(AppType.numeric),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FieldLabel(s.profileShort),
-            PickerRow(label: s.profileShort, value: profileName, placeholder: s.choosePlaceholder, onTap: _pickProfile, enabled: _profiles.isNotEmpty),
-          ],
-        ),
-        Row(
-          children: [
-            Expanded(child: PickerRow(label: s.purposeLabel, value: purpose, onTap: () => _pickOption(s.purposeLabel, ReferralOptions.purposes, s.purposeLabels, _purpose, (v) => _purpose = v))),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(child: PickerRow(label: s.territoryShort, value: territory, onTap: () => _pickOption(s.territorialLabel, ReferralOptions.territorial, s.territorialLabels, _territorial, (v) => _territorial = v))),
-          ],
-        ),
-        PickerRow(
-          label: s.organizationLabel,
-          value: _moCode == null ? null : shortOrgName(_orgName(_moCode!)),
-          placeholder: s.choosePlaceholder,
-          onTap: _pickOrganization,
-          enabled: _organizations.isNotEmpty,
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            FieldLabel('${s.icdLabel} · ${s.icdOptionalHint}'),
-            TextField(
-              controller: _icd,
-              textCapitalization: TextCapitalization.characters,
-              onSubmitted: (_) => _predict(),
-              decoration: const InputDecoration(hintText: 'H25.1', isDense: true),
+      title: s.assistTitle,
+      bottom: p == null
+          ? null
+          : FilledButton(
+              onPressed: locked || _chosen.isEmpty ? null : _record,
+              child: _recording
+                  ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(_recorded != null ? s.assistRecorded : s.assistSaveChoice),
             ),
-          ],
-        ),
-        if (_refdataError != null) ErrorBox(error: _refdataError, onRetry: _load),
-        if (state == null)
-          EmptyState(icon: Icons.assignment_outlined, title: s.selectOrganizationHint, body: s.selectOrganizationBody)
-        else
-          switch (state) {
-            Loading<_Forecast>() => const Column(children: [CardSkeleton(height: 96), SizedBox(height: AppSpacing.sm), CardSkeleton(height: 96)]),
-            Failed<_Forecast>(:final error) => ErrorBox(error: error, onRetry: _predict),
-            Loaded<_Forecast>(:final data) => _Options(
-                options: options,
-                chosen: chosen!,
-                locked: locked,
-                onSelect: (code) => setState(() => _chosen = code),
-                prediction: data.prediction,
-                reason: _reason,
-                recorded: _recorded,
-              ),
-          },
-      ],
-    );
-  }
-}
-
-class _Options extends StatelessWidget {
-  const _Options({required this.options, required this.chosen, required this.locked, required this.onSelect, required this.prediction, required this.reason, required this.recorded});
-
-  final List<ReferralOption> options;
-  final String chosen;
-  final bool locked;
-  final void Function(String moCode) onSelect;
-  final PredictResponse prediction;
-  final TextEditingController reason;
-  final String? recorded;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = S.at(context);
-    final theme = Theme.of(context);
-    final colors = AppPalette.of(context);
-    final best = _ReferralScreenState.recommended(options).moCode;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        CardLabel(s.organizationLabel, trailing: const OriginTag(Origin.ml)),
-        const SizedBox(height: AppSpacing.sm),
-        for (final (i, o) in options.indexed)
-          Padding(
-            padding: EdgeInsets.only(top: i == 0 ? 0 : AppSpacing.sm),
-            child: AppCard(
-              padding: AppCard.plain,
-              onTap: locked ? null : () => onSelect(o.moCode),
-              color: o.moCode == chosen ? colors.surfaceInfo : null,
-              border: o.moCode == chosen ? Border.all(color: colors.accent, width: 2) : null,
-              semanticsLabel: '${shortOrgName(o.name)}, ${s.altLine(days(o.p50Days), o.risk)}',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(child: Text(shortOrgName(o.name), style: theme.textTheme.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis)),
-                      if (o.moCode == best) ...[const SizedBox(width: 10), StatusChip(s.recommendationChip, tone: StatusTone.accent)],
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(s.altLine(days(o.p50Days), o.risk), style: theme.textTheme.bodySmall?.copyWith(color: colors.muted).merge(AppType.numeric)),
-                ],
-              ),
-            ),
+        Text(p == null ? s.assistLead : '${s.assistLead} · ${s.assistAsOf(p.model.trainedThrough)}', style: Theme.of(context).textTheme.bodySmall),
+        if (_error != null) ErrorBox(error: _error, onRetry: _regions.isEmpty || _profiles.isEmpty ? _load : _predict),
+        ReferralParamsCard(
+          form: _form,
+          regionName: _regionName(_form.regionKato),
+          profileName: profileName,
+          referringName: _form.referringMoCode.isEmpty ? null : shortOrgName(_orgName(_form.referringMoCode)),
+          icd: _icd,
+          registrationDate: _date,
+          profileError: _profileError,
+          dateError: _dateError,
+          profilesReady: _profiles.isNotEmpty,
+          onRegion: () => _pick(s.assistRegion, [for (final r in _regions) PickerItem(r.kato, r.name)], _form.regionKato,
+              (v) => _form.copyWith(regionKato: v, moCode: '', referringMoCode: ''), organizations: true, referring: true),
+          onProfile: () => _pick(s.profileLabel, [for (final x in _profiles) PickerItem(x.code, x.name)], _form.profileCode, (v) => _form.copyWith(profileCode: v),
+              organizations: true),
+          onPurpose: () => _pick(s.assistPurpose, [for (final (i, v) in ReferralContract.purposes.indexed) PickerItem(v, s.purposeLabels[i])], _form.purpose,
+              (v) => _form.copyWith(purpose: v), search: false),
+          onTerritory: () => _pick(s.assistTerritory, [for (final (i, v) in ReferralContract.territorial.indexed) PickerItem(v, s.territorialLabels[i])],
+              _form.territorial, (v) => _form.copyWith(territorial: v), search: false),
+          onReferring: () => _pick(
+            s.assistReferringOrg,
+            [PickerItem('', s.assistNotSpecified), for (final o in _referring) PickerItem(o.moCode, shortOrgName(o.name), detail: o.moCode)],
+            _form.referringMoCode,
+            (v) => _form.copyWith(referringMoCode: v),
           ),
-        if (!prediction.refusalOrgInTraining) ...[const SizedBox(height: AppSpacing.sm), Text(s.refusalOrgUnknownNote, style: theme.textTheme.labelSmall)],
-        const SizedBox(height: AppSpacing.md),
-        FieldLabel(s.reasonShortLabel),
-        TextField(controller: reason, enabled: !locked, maxLines: 2, decoration: InputDecoration(hintText: s.reasonHint)),
-        const SizedBox(height: AppSpacing.md),
-        CollapsibleSection(title: s.whySo, summary: '${prediction.explanation.factors.length}', origin: Origin.ml, child: FactorList(explanation: prediction.explanation, model: prediction.model)),
-        const SizedBox(height: AppSpacing.md),
-        Text(recorded == null ? s.modelDisclaimer : s.recordedLabel(recorded!), style: theme.textTheme.labelSmall?.merge(AppType.numeric)),
+          onNeighbors: (v) => _change(_form.copyWith(includeNeighbors: v)),
+          onTextDone: _textDone,
+        ),
+        ReferralWhereCard(
+          form: _form,
+          prediction: p,
+          alternatives: _alternatives,
+          chosen: _chosen,
+          orgName: _orgName(_form.moCode),
+          regionName: _regionName,
+          canPick: _organizations.isNotEmpty,
+          locked: locked,
+          onPickOrg: () => _pick(s.assistPickOrg, [for (final o in _organizations) PickerItem(o.moCode, shortOrgName(o.name), detail: o.moCode)], _form.moCode,
+              (v) => _form.copyWith(moCode: v)),
+          onChangeOrg: () => _change(_form.copyWith(moCode: '')),
+          onChoose: (code) => setState(() => _chosen = code),
+        ),
+        ReferralForecastCard(
+          busy: _busy,
+          prediction: p,
+          orgName: orgShort,
+          factors: p == null ? const [] : referralFactors(s, p, profileName: profileName, referringSet: _form.referringMoCode.isNotEmpty),
+        ),
+        if (p != null)
+          ReferralDecisionCard(
+            where: chosenAlternative == null ? orgShort : shortOrgName(chosenAlternative.name),
+            insteadOf: chosenAlternative == null ? null : orgShort,
+            what: [profileName ?? _form.profileCode, if (purposeIndex >= 0) s.purposeLabels[purposeIndex], if (_form.icd10.isNotEmpty) _form.icd10].join(' · '),
+            reason: _reason,
+            reasonError: _reasonError,
+            locked: locked,
+            recorded: _recorded != null,
+            onJournal: () => context.go('/doctor/decisions'),
+            onWorklist: () => context.go('/doctor/patients'),
+          ),
       ],
     );
   }
