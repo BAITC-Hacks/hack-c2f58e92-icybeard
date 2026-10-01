@@ -14,6 +14,12 @@ public sealed class JournalModule : IDarumenModule
         services.AddScoped<INotificationReadRepository, NotificationReadRepository>();
         services.AddMemoryCache();
         services.AddScoped<QueuePredictions>();
+        // сервис скрайба (Python) — тот же адрес, что у прокси /api/v1/scribe/*
+        services.AddHttpClient<IScribeService, ScribeHttpService>(client =>
+        {
+            client.BaseAddress = new Uri(configuration[ScribeHttpService.AddressKey] ?? "http://localhost:8010/");
+            client.Timeout = TimeSpan.FromSeconds(60);
+        });
     }
 
     public void MapEndpoints(IEndpointRouteBuilder api)
@@ -21,5 +27,6 @@ public sealed class JournalModule : IDarumenModule
         JournalEndpoints.Map(api);
         RouteEndpoints.Map(api);
         NotificationBellEndpoints.Map(api);
+        ScribeEndpoints.Map(api);
     }
 }

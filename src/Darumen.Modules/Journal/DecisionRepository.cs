@@ -16,6 +16,12 @@ public sealed class DecisionRepository(IDbContextOutbox<DarumenDbContext> outbox
         recommended::text AS RecommendedJson, chosen::text AS ChosenJson, reason AS Reason, recorded_at AS RecordedAt
         """;
 
+    public async Task<DecisionDto?> FindByIdempotencyKeyAsync(string key, CancellationToken cancellationToken)
+    {
+        var existing = await outbox.DbContext.Decisions.AsNoTracking().FirstOrDefaultAsync(d => d.IdempotencyKey == key, cancellationToken);
+        return existing is null ? null : ToDto(existing);
+    }
+
     public async Task<(DecisionDto Decision, bool Created)> RecordAsync(NewDecision decision, Func<DecisionDto, object> outboxEvent, CancellationToken cancellationToken)
     {
         var context = outbox.DbContext;

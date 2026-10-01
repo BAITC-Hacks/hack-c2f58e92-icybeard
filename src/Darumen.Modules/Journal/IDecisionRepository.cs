@@ -8,6 +8,10 @@ public interface IDecisionRepository
     /// возвращает уже записанное (Created = false) и ничего не публикует.</summary>
     Task<(DecisionDto Decision, bool Created)> RecordAsync(NewDecision decision, Func<DecisionDto, object> outboxEvent, CancellationToken cancellationToken);
 
+    /// <summary>Уже записанное решение с этим Idempotency-Key (повтор запроса) — чтобы повтор отвечал той же записью, даже
+    /// если после неё состояние маршрута изменилось и само действие уже недоступно.</summary>
+    Task<DecisionDto?> FindByIdempotencyKeyAsync(string key, CancellationToken cancellationToken);
+
     /// <summary>subjectId — решения по одному предмету (например, реф пациента для маршрута); null — без фильтра.</summary>
     Task<Paged<DecisionDto>> ListAsync(string? actor, string? subject, string? subjectId, int page, int size, CancellationToken cancellationToken);
 

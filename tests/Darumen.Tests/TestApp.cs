@@ -36,6 +36,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
 
     public InMemoryDecisions Decisions { get; } = new();
 
+    public FakeScribe Scribe { get; } = new();
+
     public FakeInsightFactory Insight { get; } = new();
 
     public FakeWeather Weather { get; } = new();
@@ -110,6 +112,8 @@ public sealed class TestApp : WebApplicationFactory<Program>
             services.AddSingleton<IWeatherSource>(Weather);
             services.RemoveAll<INewsSource>();
             services.AddSingleton<INewsSource>(News);
+            services.RemoveAll<IScribeService>();
+            services.AddSingleton<IScribeService>(Scribe);
             services.RemoveAll<IIntakeRepository>();
             services.AddSingleton<IIntakeRepository, InMemoryIntake>();
             ReplaceAccess(services);

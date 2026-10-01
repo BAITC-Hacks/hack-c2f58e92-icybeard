@@ -75,6 +75,25 @@ public static class WorklistBuilder
     public const string ActionReviewBeforeCall = "review_before_call";
     public const string ActionClarifyDate = "clarify_date";
     public const string ActionWaitForCall = "wait_for_call";
+
+    /// <summary>Коды следующего шага по состоянию маршрута (<see cref="RouteProgress"/>): то, что система уже знает из журнала,
+    /// важнее подсказки по данным очереди.</summary>
+    public const string ActionDecisionMade = "decision_made";
+    public const string ActionAwaitConsent = "await_consent";
+    public const string ActionAwaitConfirmation = "await_confirmation";
+    public const string ActionConfirmAdmission = "confirm_admission";
+    public const string ActionTransferredOut = "transferred_out";
+    public const string ActionAdmitOnDate = "admit_on_date";
+    public const string ActionDateOverdue = "date_overdue";
+    public const string ActionDischarge = "discharge_when_done";
+    public const string ActionConfirmWithdrawal = "confirm_withdrawal";
+    public const string ActionClosed = "closed";
+
+    /// <summary>Флаги строк по состоянию маршрута.</summary>
+    public const string TransferPending = "transfer_pending";
+    public const string TransferredIn = "transferred_in";
+    public const string PrefersCurrent = "prefers_current";
+    public const string DateOverdue = "date_overdue";
     public const int MaxItems = 60;
     public const int MaxPerQueue = 6;
     public const double RefusalRiskThreshold = 0.2;
@@ -90,7 +109,8 @@ public static class WorklistBuilder
     /// (см. WorklistResponseDto.ModelBacked).</summary>
     public static IReadOnlyList<WorklistItemDto> Build(
         IReadOnlyList<QueueStateRow> states, IReadOnlyDictionary<(string MoCode, string ProfileCode), QueuePrediction> predictions, string? flag = null,
-        IReadOnlyDictionary<string, PatientSignalDto>? signals = null)
+        IReadOnlyDictionary<string, PatientSignalDto>? signals = null, Func<WorklistItemDto, WorklistItemDto?>? adjust = null,
+        IEnumerable<WorklistItemDto>? extra = null)
     {
         var total = states.Sum(s => s.QueueLen);
         if (total == 0)
@@ -108,11 +128,20 @@ public static class WorklistBuilder
             for (var i = 0; i < count; i++)
             {
                 var item = BuildItem(state, i, prediction, fastest.GetValueOrDefault(state.ProfileCode, double.NaN));
-                items.Add(signals is not null && signals.TryGetValue(item.PatientRef, out var signal) ? WithSignal(item, signal) : item);
+                item = signals is not null && signals.TryGetValue(item.PatientRef, out var signal) ? WithSignal(item, signal) : item;
+                // adjust — состояние маршрута из журнала (переведённые уходят, решения меняют следующий шаг), null — убрать строку
+                if ((adjust is null ? item : adjust(item)) is { } kept)
+                {
+                    items.Add(kept);
+                }
             }
         }
 
+        // пациенты, переведённые в эту больницу из других очередей (уже со своим состоянием)
+        items.AddRange(extra ?? []);
+
         var filtered = flag is null ? items : items.Where(i => i.RiskFlags.Contains(flag));
+
         return filtered.OrderByDescending(i => i.Priority).ThenByDescending(i => i.DaysWaiting).Take(MaxItems).ToList();
     }
 
@@ -122,6 +151,137 @@ public static class WorklistBuilder
         RiskFlags = item.RiskFlags.Contains(PatientSignal) ? item.RiskFlags : [.. item.RiskFlags, PatientSignal],
         Priority = item.Priority + SignalPriorityBonus,
         PatientSignal = signal,
+    };
+
+    /// <summary>Строка рабочего списка с учётом журнала маршрута: открытый запрос пациента, «хочет остаться», решение уже
+    /// принято, перевод в процессе, переведён (к нам или от нас), дата прошла, снятие с очереди. Чистая функция: проекция
+    /// и «сегодня» приходят аргументами. Флаги очереди (> 30 дней, риск отказа, есть быстрее) остаются как факты.</summary>
+    public static WorklistItemDto Apply(WorklistItemDto item, RouteProgress progress, RouteSide side, DateOnly today, PatientSignalDto? openSignal)
+    {
+        if (openSignal is not null && progress.OpenSignalId is not null)
+        {
+            item = WithSignal(item, openSignal);
+        }
+        else if (item.PatientSignal is not null)
+        {
+            // сигнал больше не открыт (ответ дан) — без флага и без бонуса к приоритету
+            item = item with
+            {
+                RiskFlags = item.RiskFlags.Where(f => f != PatientSignal).ToList(), Priority = Math.Max(0, item.Priority - SignalPriorityBonus),
+                PatientSignal = null,
+            };
+        }
+
+        var flags = item.RiskFlags.ToList();
+        void Flag(string flag)
+        {
+            if (!flags.Contains(flag))
+            {
+                flags.Add(flag);
+            }
+        }
+
+        string code;
+        var priority = item.Priority;
+        var expected = item.ExpectedDate;
+        var stage = item.StageCode;
+        switch (progress.Status)
+        {
+            case RouteStatuses.Waiting:
+                code = item.NextActionCode;
+                if (progress.PrefersCurrent)
+                {
+                    Flag(PrefersCurrent);
+                    if (code == ActionRedirectFaster)
+                    {
+                        code = flags.Contains(RefusalRisk) ? ActionReviewBeforeCall : flags.Contains(StuckOver30) ? ActionClarifyDate : ActionWaitForCall;
+                    }
+                }
+
+                break;
+            case RouteStatuses.Kept:
+                code = ActionDecisionMade;
+                priority = Math.Max(0, priority - SignalPriorityBonus);
+                if (progress.PrefersCurrent)
+                {
+                    Flag(PrefersCurrent);
+                }
+
+                break;
+            case RouteStatuses.TransferPendingConsent:
+                Flag(TransferPending);
+                code = ActionAwaitConsent;
+                break;
+            case RouteStatuses.TransferPendingConfirmation:
+                Flag(TransferPending);
+                code = side == RouteSide.Receiving ? ActionConfirmAdmission : ActionAwaitConfirmation;
+                break;
+            case RouteStatuses.Transferred:
+                expected = progress.Transfer?.PlannedAt is { } planned ? planned.ToString("yyyy-MM-dd") : expected;
+                stage = StageCalled;
+                if (side == RouteSide.Receiving)
+                {
+                    Flag(TransferredIn);
+                    code = progress.Overdue(today) ? ActionDateOverdue : ActionAdmitOnDate;
+                    if (progress.Overdue(today))
+                    {
+                        Flag(DateOverdue);
+                    }
+                }
+                else
+                {
+                    code = ActionTransferredOut;
+                }
+
+                break;
+            case RouteStatuses.Admitted:
+                code = ActionDischarge;
+                if (side == RouteSide.Receiving)
+                {
+                    Flag(TransferredIn);
+                }
+
+                break;
+            case RouteStatuses.WithdrawalRequested:
+                code = ActionConfirmWithdrawal;
+                break;
+            default:
+                code = ActionClosed;
+                break;
+        }
+
+        return item with
+        {
+            RiskFlags = flags, Priority = priority, NextActionCode = code, NextAction = ActionLabel(code, item.NextAction), ExpectedDate = expected,
+            StageCode = stage, Stage = StageLabel(stage),
+        };
+    }
+
+    /// <summary>Подпись следующего шага по-русски для клиентов без словаря кодов (мобилка, экспорт); RU/KK на экранах — по коду.</summary>
+    public static string ActionLabel(string code, string fallback) => code switch
+    {
+        ActionRedirectFaster => "предложить перенаправление в организацию с меньшим ожиданием",
+        ActionReviewBeforeCall => "проверить показания и документы до вызова",
+        ActionClarifyDate => "уточнить дату в организации",
+        ActionWaitForCall => "ждать вызова",
+        ActionDecisionMade => "решение принято",
+        ActionAwaitConsent => "ждём согласия пациента на перевод",
+        ActionAwaitConfirmation => "ждём подтверждения принимающей больницы",
+        ActionConfirmAdmission => "подтвердить приём и назначить дату или отказать",
+        ActionTransferredOut => "пациент переведён в другую больницу",
+        ActionAdmitOnDate => "отметить госпитализацию в назначенную дату",
+        ActionDateOverdue => "дата прошла: отметить госпитализацию или неявку",
+        ActionDischarge => "выписать с эпикризом после лечения",
+        ActionConfirmWithdrawal => "пациент больше не ждёт: подтвердить снятие с очереди",
+        ActionClosed => "маршрут завершён",
+        _ => fallback,
+    };
+
+    private static string StageLabel(string stageCode) => stageCode switch
+    {
+        StageRegistered => "зарегистрирован",
+        StageCalled => "вызов на госпитализацию",
+        _ => "ожидает",
     };
 
     /// <summary>Сколько синтетических пациентов приходится на очередь: пропорционально её доле в регионе, от 1 до

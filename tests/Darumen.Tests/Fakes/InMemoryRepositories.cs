@@ -150,6 +150,9 @@ public sealed class InMemoryDecisions : IDecisionRepository
 
     public List<object> Published { get; } = [];
 
+    public Task<DecisionDto?> FindByIdempotencyKeyAsync(string key, CancellationToken cancellationToken) =>
+        Task.FromResult<DecisionDto?>(_rows.FirstOrDefault(r => r.Key == key).Decision);
+
     public Task<(DecisionDto Decision, bool Created)> RecordAsync(NewDecision decision, Func<DecisionDto, object> outboxEvent, CancellationToken cancellationToken)
     {
         if (decision.IdempotencyKey is not null)

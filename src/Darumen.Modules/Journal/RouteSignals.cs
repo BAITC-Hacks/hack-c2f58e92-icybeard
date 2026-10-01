@@ -13,14 +13,17 @@ public static class RouteSignals
     public const string TreatedElsewhere = "treated_elsewhere";
     public const string Withdraw = "withdraw";
     public const string RequestRedirect = "request_redirect";
+
+    /// <summary>Гражданин сам сообщает, что хочет остаться в текущей больнице: система перестаёт предлагать ему перевод.</summary>
+    public const string PreferCurrent = "prefer_current";
     public const string CitizenRole = "citizen";
 
     /// <summary>Через сколько дней без подтверждения гражданину снова задаётся вопрос «Вы ещё ждёте?».</summary>
     public const int ValidationIntervalDays = 30;
 
-    public static readonly IReadOnlySet<string> Kinds = new HashSet<string>(StringComparer.Ordinal) { StillWaiting, TreatedElsewhere, Withdraw, RequestRedirect };
+    public static readonly IReadOnlySet<string> Kinds = new HashSet<string>(StringComparer.Ordinal) { StillWaiting, TreatedElsewhere, Withdraw, RequestRedirect, PreferCurrent };
 
-    private static readonly IReadOnlySet<string> Confirmations = new HashSet<string>(StringComparer.Ordinal) { StillWaiting, TreatedElsewhere, Withdraw };
+    private static readonly IReadOnlySet<string> Confirmations = new HashSet<string>(StringComparer.Ordinal) { StillWaiting, TreatedElsewhere, Withdraw, PreferCurrent };
 
     public static string Json(string kind, string? toMoCode) =>
         toMoCode is null ? JsonSerializer.Serialize(new { signal = kind }) : JsonSerializer.Serialize(new { signal = kind, moCode = toMoCode });

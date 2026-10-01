@@ -21,11 +21,14 @@ public sealed record NewDecision(
 /// <summary>Входящее направление (redirect) в организацию, ещё не подтверждённое ею (или подтверждённое, если
 /// includeConfirmed=true в запросе): FromMoCode/FromMoName — организация-отправитель (из рефа маршрута), ProfileCode —
 /// профиль очереди; PatientConsent — pending | accepted | declined (<see cref="RouteConsent"/>); подтвердить приём
-/// можно только когда PatientConsent == accepted (<see cref="ReferralConfirmation"/>).</summary>
+/// можно только когда PatientConsent == accepted (<see cref="ReferralConfirmation"/>).
+/// Status — состояние маршрута (<see cref="RouteStatuses"/>), PlannedAt — назначенная дата, Allowed — что принимающая
+/// организация может сделать сейчас (подтвердить, отказать, перенести, госпитализация, неявка, выписка, снять с очереди).</summary>
 public sealed record IncomingReferralDto(
     Guid DecisionId, string PatientRef, string FromMoCode, string FromMoName, string ProfileCode, string? Reason,
     DateTimeOffset RecordedAt, bool Severe, string PatientConsent, bool Confirmed, DateTimeOffset? ConfirmedAt,
-    bool Discharged = false, DateTimeOffset? DischargedAt = null);
+    bool Discharged = false, DateTimeOffset? DischargedAt = null, string? Status = null, string? PlannedAt = null, bool Admitted = false,
+    bool Overdue = false, IReadOnlyList<string>? Allowed = null, string? ClosedReason = null);
 
 /// <summary>Колокольчик (задача 13 плана прозрачности, упрощена до внутрисистемных уведомлений вместо push):
 /// направления, отправленные моей организацией, которые уже подтвердила принимающая сторона, с отметкой,
@@ -36,7 +39,8 @@ public sealed record SentReferralConfirmationDto(
 /// <summary>Сводка колокольчика для главной страницы: сколько входящих направлений ждут подтверждения (требует
 /// действия) и какие из отправленных моей организацией уже подтверждены, но ещё не прочитаны мной.</summary>
 public sealed record NotificationBellDto(
-    int PendingIncomingCount, List<SentReferralConfirmationDto> UnreadConfirmations, List<DischargeReadyDto> UnreadDischarges);
+    int PendingIncomingCount, List<SentReferralConfirmationDto> UnreadConfirmations, List<DischargeReadyDto> UnreadDischarges,
+    List<PatientEventDto>? PatientSignals = null);
 
 /// <summary>Запрос на выписку/эпикриз (задача 11): decisionId в пути — id решения redirect, которое выписывается.</summary>
 public sealed record DischargeRequestDto(string? PatientRef, string? Summary);
@@ -49,5 +53,11 @@ public sealed record DischargeReadyDto(
     Guid DecisionId, string PatientRef, string FromMoCode, string FromMoName, string Summary, DateTimeOffset DischargedAt, bool Read);
 
 
-/// <summary>PatientRef обязателен — тот же реф, что показан в <see cref="IncomingReferralDto"/> и на /route/{patientRef}.</summary>
-public sealed record ReferralConfirmRequestDto(string? PatientRef, string? Comment);
+/// <summary>PatientRef обязателен — тот же реф, что показан в <see cref="IncomingReferralDto"/> и на /route/{patientRef};
+/// PlannedAt — назначенная дата госпитализации (ГГГГ-ММ-ДД, от сегодня до 30 дней вперёд), обязательна.</summary>
+public sealed record ReferralConfirmRequestDto(string? PatientRef, string? Comment, string? PlannedAt = null);
+
+/// <summary>Отказ в приёме (причина обязательна), отметка госпитализации или неявки (причина — по желанию).</summary>
+public sealed record ReferralReasonRequestDto(string? PatientRef, string? Reason);
+
+public sealed record ReferralRescheduleRequestDto(string? PatientRef, string? PlannedAt, string? Reason);

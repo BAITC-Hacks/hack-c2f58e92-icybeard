@@ -42,6 +42,7 @@ public sealed class AccessModule : IDarumenModule
         services.AddSingleton<IInvitationStore, PostgresInvitationStore>();
         services.AddSingleton<IOrgApplicationStore, PostgresOrgApplicationStore>();
         services.AddSingleton<IAccountStore, PostgresAccountStore>();
+        services.AddSingleton<Darumen.Modules.Journal.IRouteNotificationPreferences, RouteNotificationPreferences>();
         services.AddSingleton<PostgresActivityReader>();
         services.AddSingleton<IActivityReader>(sp => sp.GetRequiredService<PostgresActivityReader>());
         services.AddSingleton<IOrgDataStatus>(sp => sp.GetRequiredService<PostgresActivityReader>());

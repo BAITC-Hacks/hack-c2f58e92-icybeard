@@ -5,6 +5,12 @@ public static class NotificationKinds
 {
     public const string ReferralConfirmed = "referral-confirmed";
     public const string ReferralDischarged = "referral-discharged";
+
+    /// <summary>Колокольчик врача: что сделал пациент его больницы (просьба, «остаюсь», «не нужно», ответ на перевод или запись).</summary>
+    public const string PatientSignal = "patient-signal";
+
+    /// <summary>Уведомления гражданина по своему маршруту (id — запись журнала или истекающие анализы).</summary>
+    public const string Route = "route";
 }
 
 /// <summary>Отметки «прочитано» для завершённых уведомлений колокольчика (задача 13 плана прозрачности,

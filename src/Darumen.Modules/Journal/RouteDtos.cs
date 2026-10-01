@@ -9,14 +9,16 @@ namespace Darumen.Modules.Journal;
 /// со сроками давности, альтернативы, решения врача и история прошлых направлений. Пациент синтетический
 /// (Synthetic = true): выдуман, но сроки и исходы взяты из реального состояния очередей региона на AsOf.
 /// Doctor заполняется только для врача — гражданин не видит риск отказа и приоритет (docs/system-structure.md, правило 1).
-/// Даты — ISO yyyy-MM-dd; коды стадий и статусов машинные, клиенты локализуют их сами (RU/KK).</summary>
+/// Даты — ISO yyyy-MM-dd; коды стадий и статусов машинные, клиенты локализуют их сами (RU/KK).
+/// Progress — состояние, которое ведёт система (перевод, дата от принимающей больницы, завершение) и действия, доступные
+/// именно этому пользователю; Journal — хроника всех действий людей по маршруту, свежие первыми.</summary>
 public sealed record RouteDto(
     string PatientRef, bool Synthetic, string Audience, string AsOf, string RegionKato, RouteOrganizationDto Organization,
     string Stage, string StageTitle, IReadOnlyList<RouteStageDto> Timeline, RouteDatesDto Dates, int DaysWaiting,
     RouteForecastDto Forecast, IReadOnlyList<RouteBenchmarkDto> Benchmarks, IReadOnlyList<RouteChecklistItemDto> Checklist,
     IReadOnlyList<AlternativeDto> Alternatives, ModelInfoDto? AlternativesModel, IReadOnlyList<RouteDecisionDto> Decisions,
     IReadOnlyList<RouteHistoryDto> History, RouteDoctorPanelDto? Doctor, string Basis, RouteStandardRefDto Standard,
-    IReadOnlyList<RouteSignalDto> Signals, bool ValidationDue);
+    IReadOnlyList<RouteSignalDto> Signals, bool ValidationDue, RouteProgressDto? Progress = null, IReadOnlyList<RouteJournalEntryDto>? Journal = null);
 
 /// <summary>Сигнал гражданина по своему маршруту (<see cref="RouteSignals"/>): подтверждение ожидания, «уже лечился
 /// в другом месте», «больше не нужно» или просьба рассмотреть организацию быстрее (ToMoCode). Open — врач ещё не
@@ -26,6 +28,9 @@ public sealed record RouteSignalDto(Guid DecisionId, DateTimeOffset RecordedAt, 
 public sealed record RouteSignalRequestDto(string? Kind, string? ToMoCode, string? Comment);
 
 public sealed record RouteKeepRequestDto(string? Reason);
+
+/// <summary>Отмена ещё не подтверждённого перевода или подтверждение снятия с листа ожидания: причина обязательна.</summary>
+public sealed record RouteReasonRequestDto(string? Reason);
 
 public sealed record RouteOrganizationDto(string MoCode, string MoName, string ProfileCode, string ProfileName);
 
@@ -74,6 +79,9 @@ public static class RouteStages
     public const string ReferralIssued = "referral_issued";
     public const string Examination = "examination";
     public const string Waitlisted = "waitlisted";
+
+    /// <summary>Перевод в другую больницу — этап, который ведёт сама система (не из refdata Стандарта).</summary>
+    public const string Transfer = "transfer";
     public const string DateAssigned = "date_assigned";
     public const string Hospitalized = "hospitalized";
     public const string Refused = "refused";

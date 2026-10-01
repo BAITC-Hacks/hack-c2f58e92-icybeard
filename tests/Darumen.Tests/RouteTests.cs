@@ -10,11 +10,18 @@ using Grpc.Core;
 
 namespace Darumen.Tests;
 
-/// <summary>Маршрут пациента: отдельный класс — отдельный TestApp, чтобы записи решений здесь не пересекались
-/// с тестами журнала, которые считают события в своём экземпляре.</summary>
-public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
+/// <summary>Маршрут пациента: свой TestApp на каждый тест — записи решений не пересекаются ни с тестами журнала, ни
+/// между собой (гражданин — один из пяти пациентов региона, а маршрут хранит состояние: перевод, согласие).</summary>
+public sealed class RouteTests : IDisposable
 {
+    private readonly TestApp app = new();
+
+    public void Dispose() => app.Dispose();
+
     private const string Citizen = "citizen1";
+
+    /// <summary>«Сегодня» по Казахстану — дата госпитализации при подтверждении (сегодня..+30 дней).</summary>
+    private static string Today => RouteJournal.TodayAt(DateTimeOffset.UtcNow).ToString("yyyy-MM-dd");
 
     /// <summary>Маршрут пациента читает решения по своему рефу: фильтр subjectId возвращает только их.</summary>
     [Fact]
@@ -169,7 +176,7 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
     {
         var citizen = app.CreateClient("citizen", Citizen);
         var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
-        var doctor = app.CreateClient("doctor", "doctor1", "75");
+        var doctor = app.CreateClient("doctor", "doctor1", "75", route!.Organization.MoCode);
         doctor.DefaultRequestHeaders.Add(DecisionRecording.IdempotencyHeader, "route-k-1");
         var body = new RouteRedirectRequestDto("22GN", "ожидание короче, профиль совпадает");
 
@@ -229,9 +236,17 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
         var after = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
         Assert.Equal(RouteConsent.Accepted, Assert.Single(after!.Decisions, d => d.DecisionId == decisionId).PatientConsent);
 
-        // повторное согласие на уже отвеченное решение — тоже 404 (не pending)
-        var again = await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, false, null));
-        Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
+        // повторное согласие — 409: уже согласился, ждём больницу
+        var again = await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, null));
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+
+        // до подтверждения больницей согласие можно отозвать; после отзыва перевода нет — ответить на него снова нельзя (404)
+        var withdraw = await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, false, "передумал"));
+        Assert.Equal(HttpStatusCode.Created, withdraw.StatusCode);
+        var withdrawn = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
+        Assert.Equal(RouteStatuses.Kept, withdrawn!.Progress!.Status);
+        var late = await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, null));
+        Assert.Equal(HttpStatusCode.NotFound, late.StatusCode);
     }
 
     /// <summary>Задача 4 плана прозрачности: /route/{patientRef} завязан на организацию-ОТПРАВИТЕЛЯ (она зашита в сам
@@ -243,8 +258,8 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
     {
         var citizen = app.CreateClient("citizen", "c-incoming");
         var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
-        var sendingDoctor = app.CreateClient("doctor", "doctor-incoming-send", "75");
-        var receivingMoCode = route!.Organization.MoCode == "22GN" ? "028B" : "22GN";
+        var sendingDoctor = app.CreateClient("doctor", "doctor-incoming-send", "75", route!.Organization.MoCode);
+        var receivingMoCode = route.Organization.MoCode == "22GN" ? "028B" : "22GN";
 
         var redirect = await sendingDoctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/redirect",
             new RouteRedirectRequestDto(receivingMoCode, "нужен профиль принимающей организации", Severe: true));
@@ -272,7 +287,7 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
         await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, "согласен"));
 
         var confirm = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm",
-            new ReferralConfirmRequestDto(route.PatientRef, "место подготовлено"));
+            new ReferralConfirmRequestDto(route.PatientRef, "место подготовлено", Today));
         Assert.Equal(HttpStatusCode.Created, confirm.StatusCode);
 
         // подтверждённое направление по умолчанию больше не в списке несделанных, но видно с includeConfirmed=true
@@ -285,8 +300,14 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
 
         // повторное подтверждение — 409, не тихий успех
         var again = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm",
-            new ReferralConfirmRequestDto(route.PatientRef, null));
+            new ReferralConfirmRequestDto(route.PatientRef, null, Today));
         Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+
+        // после подтверждения пациент закреплён за принимающей больницей: она видит маршрут, дата — назначенная ею
+        var receivingView = await receivingDoctor.GetFromJsonAsync<RouteDto>($"/api/v1/route/{route.PatientRef}");
+        Assert.Equal(RouteStatuses.Transferred, receivingView!.Progress!.Status);
+        Assert.Equal(Today, receivingView.Dates.PlannedAt);
+        Assert.Equal(receivingMoCode, receivingView.Organization.MoCode);
 
         // организация-отправитель не видит собственное направление как «входящее» у себя
         var sendingSide = app.CreateClient("doctor", "doctor-incoming-send-view", "75", route.Organization.MoCode);
@@ -310,8 +331,8 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
     {
         var citizen = app.CreateClient("citizen", "c-bell");
         var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
-        var sendingDoctor = app.CreateClient("doctor", "doctor-bell-send", "75");
-        var receivingMoCode = route!.Organization.MoCode == "22GN" ? "028B" : "22GN";
+        var sendingDoctor = app.CreateClient("doctor", "doctor-bell-send", "75", route!.Organization.MoCode);
+        var receivingMoCode = route.Organization.MoCode == "22GN" ? "028B" : "22GN";
 
         var redirect = await sendingDoctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/redirect",
             new RouteRedirectRequestDto(receivingMoCode, "нужен профиль принимающей организации", Severe: false));
@@ -323,7 +344,7 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
 
         await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, "согласен"));
         var receivingDoctor = app.CreateClient("doctor", "doctor-bell-receive", "75", receivingMoCode);
-        await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm", new ReferralConfirmRequestDto(route.PatientRef, null));
+        await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm", new ReferralConfirmRequestDto(route.PatientRef, null, Today));
 
         var afterConfirm = await sendingSide.GetFromJsonAsync<NotificationBellDto>("/api/v1/journal/notifications/bell");
         var item = Assert.Single(afterConfirm!.UnreadConfirmations, c => c.DecisionId == decisionId);
@@ -359,8 +380,8 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
     {
         var citizen = app.CreateClient("citizen", "c-discharge");
         var route = await citizen.GetFromJsonAsync<RouteDto>("/api/v1/route/me");
-        var sendingDoctor = app.CreateClient("doctor", "doctor-discharge-send", "75");
-        var receivingMoCode = route!.Organization.MoCode == "22GN" ? "028B" : "22GN";
+        var sendingDoctor = app.CreateClient("doctor", "doctor-discharge-send", "75", route!.Organization.MoCode);
+        var receivingMoCode = route.Organization.MoCode == "22GN" ? "028B" : "22GN";
 
         var redirect = await sendingDoctor.PostAsJsonAsync($"/api/v1/route/{route.PatientRef}/redirect",
             new RouteRedirectRequestDto(receivingMoCode, "нужен профиль принимающей организации", Severe: false));
@@ -373,7 +394,7 @@ public sealed class RouteTests(TestApp app) : IClassFixture<TestApp>
         Assert.Equal(HttpStatusCode.Conflict, tooEarly.StatusCode);
 
         await citizen.PostAsJsonAsync("/api/v1/route/me/consent", new RouteConsentRequestDto(decisionId, true, "согласен"));
-        await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm", new ReferralConfirmRequestDto(route.PatientRef, null));
+        await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/confirm", new ReferralConfirmRequestDto(route.PatientRef, null, Today));
 
         var discharge = await receivingDoctor.PostAsJsonAsync($"/api/v1/journal/referrals/{decisionId}/discharge",
             new DischargeRequestDto(route.PatientRef, "госпитализация прошла успешно, рекомендовано наблюдение по месту жительства"));

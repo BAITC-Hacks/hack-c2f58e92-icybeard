@@ -122,7 +122,7 @@
 { "patientRef": "SYN-75-028B-381-01", "synthetic": true, "audience": "citizen", "asOf": "2025-03-31", "regionKato": "75",
   "organization": { "moCode", "moName", "profileCode", "profileName" },
   "stage": "waitlisted", "stageTitle": "Внесено в лист ожидания",
-  "timeline": [ { "code": "referral_issued | examination | waitlisted | date_assigned | hospitalized", "order", "title", "date", "status": "done | current | upcoming", "norm" } ],
+  "timeline": [ { "code": "referral_issued | examination | waitlisted | transfer | date_assigned | hospitalized", "order", "title", "date", "status": "done | current | upcoming", "norm" } ],
   "dates": { "issuedAt", "registeredAt", "plannedAt", "expectedAt" }, "daysWaiting": 47,
   "forecast": { "p50Days", "p90Days", "pWithin30Days", "fromModel": true, "model": { "name", "version", "trainedThrough" } },
   "benchmarks": [ { "code": "moh_target_wait_days", "value": 20, "unit": "days", "title", "source", "sourceDate": "2026-02-19" } ],
@@ -149,6 +149,52 @@
 Двусторонний маршрут: тело `{ "kind": "still_waiting | treated_elsewhere | withdraw | request_redirect", "toMoCode"?, "comment"? }`, `Idempotency-Key`. Первые три — цифровая валидация листа ожидания («Вы ещё ждёте?», как DrDoctor/NECU в NHS), четвёртый — просьба рассмотреть организацию быстрее (`toMoCode` обязателен и не равен текущей → иначе 422). Запись идёт в те же `journal.decisions` (subject `route`, роль `citizen`, `chosen = {"signal", "moCode"?}`, `reason` = комментарий); в аудит не попадает. Ответ 201 `{ "decisionId", "recordedAt" }`.
 
 В `GET /route/me` и `GET /route/{ref}` добавлены `"signals": [ { "decisionId", "recordedAt", "kind", "toMoCode", "toMoName", "comment", "open" } ]` (свежие первыми, `open` — врач ещё не ответил решением после сигнала) и `"validationDue"` (нет подтверждения ожидания за 30 дней). Сигналы не входят в `decisions`.
+
+### Состояние маршрута: `progress` и `journal`
+
+Журнал (`journal.decisions`, subject `route`, subjectId = реф) — единственный источник правды; состояние — чистая свёртка журнала (`RouteProgress`), сервер сам ничего не меняет (решает человек, каждое действие — запись в журнале). Этапы 1–3 (направление, обследование, лист ожидания) приходят из ИС БГ и только показываются; этап `transfer` («Перевод») появляется на `timeline`, только если перевод идёт или состоялся. В `GET /route/me` и `GET /route/{ref}` добавлены (поля необязательные, старые клиенты их игнорируют):
+
+```json
+"progress": { "status": "waiting | kept | transfer_pending_consent | transfer_pending_confirmation | transferred | admitted | withdrawal_requested | closed",
+  "originMoCode", "responsibleMoCode", "responsibleMoName",
+  "transfer": { "decisionId", "toMoCode", "toMoName", "severe", "reason", "proposedAt", "consentAt", "confirmedAt", "plannedAt": "2026-10-10", "admittedAt" },
+  "lastAttempt": { "outcome": "declined | consent_withdrawn | cancelled | rejected | patient_withdrew | no_show", "toMoCode", "toMoName", "at", "reason" },
+  "prefersCurrent": false, "closedReason": "discharged | no_show | withdrawn | treated_elsewhere", "closedAt", "overdue": false,
+  "allowed": ["keep", "redirect"], "blockedMoCodes": ["22GN"], "side": "none | citizen | origin | receiving" },
+"journal": [ { "id", "at", "kind": "request | prefer_current | still_waiting | withdraw | treated_elsewhere | keep | redirect | consent_accepted | consent_declined | confirm | reject | reschedule | admit | no_show | discharge | cancel | close",
+  "role", "moCode", "moName", "reason", "plannedAt", "severe" } ]
+```
+
+`allowed` — что может сделать именно этот пользователь сейчас; клиенты показывают только эти кнопки, сервер отклоняет остальное **409** с понятным `detail` и `status` в extensions. Таблица:
+
+| Состояние | Гражданин | Больница пациента (origin) | Принимающая (receiving) |
+|---|---|---|---|
+| `waiting` / `kept` | `request_transfer`, `prefer_current`, `still_waiting`, `withdraw` | `keep`, `redirect` | — |
+| `transfer_pending_consent` | `accept_transfer`, `decline_transfer`, `withdraw` | `cancel_transfer` | — (видит во входящих) |
+| `transfer_pending_confirmation` | `decline_transfer` (отзыв согласия), `withdraw` | `cancel_transfer` | `confirm` (с датой), `reject` (с причиной) |
+| `transferred` | `withdraw` | — | `reschedule`; с даты — `admit`, `discharge`; после даты — `no_show` |
+| `admitted` | — | — | `discharge` |
+| `withdrawal_requested` | `still_waiting` | `close` (до перевода) | `close` (после перевода) |
+| `closed` | — | — | — |
+
+Правила: дата госпитализации обязательна при подтверждении и переносе, от сегодня до +30 дней по времени Казахстана (Asia/Almaty), иначе 422; «дата прошла» (`overdue`) — с 4-го дня после даты. После подтверждения переводить дальше, просить перевод и спрашивать «Вы ещё ждёте?» нельзя; за пациента отвечает принимающая больница — ей открыт `GET /route/{ref}` (в том числе из другого региона), пациент в её рабочем списке с флагом `transferred_in`, у исходной больницы его в списке больше нет. Больницу, которая отказала, и больницу, от которой отказался пациент, повторно не предлагают (`blockedMoCodes`; вторую — пока пациент сам её не попросит). «Хочу остаться» (`prefer_current`) — не запрос: система перестаёт предлагать пациенту перевод (флаг `prefers_current`), врач всё равно может его предложить. Срок ожидания переводом не обнуляется. Действия по одному пациенту выполняются последовательно; повтор с тем же `Idempotency-Key` — 200 с той же записью, даже если состояние уже изменилось.
+
+### `POST /api/v1/route/{patientRef}/cancel-transfer` и `/close` (`referral.confirm`)
+Тело `{ "reason" }` (обязательно, иначе 422), `Idempotency-Key`. `cancel-transfer` — больница пациента отменяет ещё не подтверждённый перевод; `close` — ответственная больница подтверждает снятие с листа ожидания по просьбе пациента (`closedReason` — `treated_elsewhere` или `withdrawn` по сигналу). 403 — не та больница, 409 — не то состояние.
+
+### `GET /api/v1/journal/referrals/incoming` и действия принимающей больницы (`worklist.view` / `referral.confirm`)
+В строках добавлены `status`, `plannedAt`, `admitted`, `overdue`, `allowed`, `closedReason`. Отказавшая больница направление больше не видит. Действия (`Idempotency-Key`, тело с `patientRef`):
+`POST /referrals/{id}/confirm` `{ "patientRef", "plannedAt": "YYYY-MM-DD", "comment"? }` · `/reject` `{ "patientRef", "reason" }` · `/reschedule` `{ "patientRef", "plannedAt", "reason" }` · `/admit` `{ "patientRef" }` · `/no-show` `{ "patientRef", "reason"? }` · `/discharge` `{ "patientRef", "summary" }`. 404 — нет действующего перевода этого пациента в вашу больницу с таким id, 409 — не то состояние.
+
+### `GET /api/v1/route/me/notifications` и `POST /route/me/notifications/{id}/read` (`route.own`)
+Колокольчик гражданина: `{ "unread", "items": [ { "id", "kind", "at", "moName", "plannedAt", "reason", "needsAction", "read", "count" } ] }` — только то, что по маршруту сделали другие (`redirect`, `keep`, `cancel`, `confirm`, `reject`, `reschedule`, `admit`, `no_show`, `discharge`, `close`) и `tests_expiring` (анализы истекут до госпитализации). Остальное подчиняется настройке «Изменения моего маршрута» (`route_updates`, in-app), но предложенный перевод, ждущий ответа (`needsAction: true`), показывается всегда. Мобильному приложению нужны те же поля и действия — сейчас оно их не использует.
+
+### Согласие на запись приёма (AI-скрайб)
+Запись приёма — только с согласия пациента, и оно действует на один приём в день запроса (Asia/Almaty). Всё пишется в журнал (`subject: scribe`, `subjectId` — реф пациента).
+- `GET /api/v1/scribe-consents?patientRef=` и `POST /api/v1/scribe-consents` `{ "patientRef", "comment"? }` (`scribe.use`; только больница пациента, иначе 403): запросы по пациенту и новый запрос; второй действующий — 409 с `requestId`. `POST /scribe-consents/{id}/cancel` `{ "patientRef" }` — отменить, пока запись не начата.
+- Статусы: `pending | granted | declined | withdrawn | cancelled | expired | recording | discarded | completed`. `recording` — запись начата, но не утверждена: врач продолжает её (`GET /api/v1/scribe/sessions/{id}` возвращает стенограмму и черновик; сессии скрайба хранятся на диске и переживают перезапуск) или отменяет — `POST /scribe-consents/{id}/discard` `{ "patientRef" }` (аудио и черновик удаляются). Неутверждённая запись истекает в конце дня; новый запрос согласия она не блокирует.
+- `POST /api/v1/scribe/sessions` `{ "consentId", "language" }` — обрабатывается API (точнее прокси): без `consentId` — 422, согласие не дано / истекло / уже использовано — 409, согласие другой больнице — 403. `POST /api/v1/scribe/sessions/{id}/approve` — тоже через API: аудио удаляется, памятка привязывается к пациенту. Остальные шаги скрайба идут в сервис через прокси, как раньше.
+- Гражданин (`route.own`): `GET /api/v1/route/me/scribe` — запросы и памятки (`leafletToken` → `/leaflet/{token}`); `POST /route/me/scribe/{id}/answer` `{ "granted": true|false }` — ответить на запрос; `false` после согласия, пока запись не начата, отзывает его. В колокольчике: `scribe_consent` (нужен ответ, показывается всегда) и `scribe_leaflet`.
 
 ## Insight
 
@@ -214,6 +260,9 @@
 - `POST /api/v1/scribe/sessions`: `{ "consent": true, "language": "ru|kk" }` → `{ sessionId, wsUrl }`.
 - WebSocket `wsUrl`: клиент шлёт аудио‑чанки, сервер шлёт `{ "type": "partial|final", "text", "t0", "t1" }`.
 - `POST /api/v1/scribe/sessions/{id}/draft` → черновик записи `{ sections: [ { name, text, spans: [ { t0, t1 } ] } ] }`.
+- `POST /api/v1/scribe/sessions/{id}/segments/{index}` `{ text }` — врач исправил фразу стенограммы; исходный текст распознавания хранится в `original`, `source: "doctor"`. Текст, равный `original`, — возврат правки.
+- `POST /api/v1/scribe/sessions/{id}/correct` — по кнопке врача языковая модель исправляет искажённые медицинские термины, сверяясь со словарём; исправленные фразы `source: "ai"` с `original`, ответ `{ transcript, changed }`. Правки, похожие на пересказ (сильно другая длина или текст), отбрасываются. Модель недоступна — 503 с понятным текстом.
+- `GET|POST /api/v1/scribe/vocabulary` `{ words }` — термины клиники (до 500), в дополнение к встроенным спискам `ml/src/darumen/scribe/terms/{ru,kk}.txt`. Термины клиники попадают в подсказку модели распознавания речи, все термины — в кандидаты для исправления через ИИ. Модель распознавания — `DARUMEN_WHISPER_MODEL` (по умолчанию `large-v3-turbo`).
 - `POST /api/v1/scribe/sessions/{id}/approve` `{ sections, patientLeaflet: { text } }` → 204, аудио удалено.
 - `GET /api/v1/scribe/leaflets/{token}` (публичный по QR) → памятка.
 

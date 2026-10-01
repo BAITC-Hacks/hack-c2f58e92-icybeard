@@ -19,13 +19,15 @@ public static class RouteBuilder
     public sealed record Inputs(
         WorklistItemDto Item, QueueStateRow State, IReadOnlyList<QueueStateRow> States, RouteStandardDto Standard,
         PredictResponseDto? Prediction, AlternativesResponseDto? Alternatives, IReadOnlyList<DecisionDto> Decisions,
-        IReadOnlyDictionary<string, string> ProfileNames, string Audience, string Lang, DateTimeOffset? Now = null);
+        IReadOnlyDictionary<string, string> ProfileNames, string Audience, string Lang, DateTimeOffset? Now = null,
+        RouteProgress? Progress = null, RouteSide Side = RouteSide.None, DateOnly? Today = null, IReadOnlyDictionary<string, string>? ExtraNames = null);
 
     private static readonly (string Code, int Order, string Ru, string Kk)[] DefaultStages =
     [
         (RouteStages.ReferralIssued, 1, "Направление выдано", "Жолдама берілді"),
         (RouteStages.Examination, 2, "Обследование", "Тексеру"),
         (RouteStages.Waitlisted, 3, "Внесено в лист ожидания", "Күту парағына енгізілді"),
+        (RouteStages.Transfer, 3, "Перевод", "Ауыстыру"),
         (RouteStages.DateAssigned, 4, "Дата госпитализации назначена", "Емдеуге жатқызу күні белгіленді"),
         (RouteStages.Hospitalized, 5, "Госпитализация", "Емдеуге жатқызу"),
     ];
@@ -78,16 +80,20 @@ public static class RouteBuilder
         var today = state.AsOf;
         var reference = item.PatientRef;
         var kk = input.Lang == Locale.Kk;
+        var progress = input.Progress ?? RouteProgress.From(input.Decisions, state.MoCode);
+        var realToday = input.Today ?? DateOnly.FromDateTime((input.Now ?? DateTimeOffset.UtcNow).UtcDateTime);
 
         var registeredAt = today.AddDays(-item.DaysWaiting);
         var issuedAt = registeredAt.AddDays(-(1 + (int)(WorklistBuilder.Seed(reference + "|issued") % 10)));
         var expectedAt = DateOnly.ParseExact(item.ExpectedDate!, DateFormat, CultureInfo.InvariantCulture);
-        DateOnly? plannedAt = item.StageCode == WorklistBuilder.StageCalled ? expectedAt : null;
-        var stage = plannedAt is not null ? RouteStages.DateAssigned : RouteStages.Waitlisted;
+        // дата по данным очереди (пациента вызвали) — или назначенная принимающей больницей после перевода
+        DateOnly? plannedAt = progress.TransferConfirmed ? progress.Transfer!.PlannedAt
+            : item.StageCode == WorklistBuilder.StageCalled ? expectedAt : null;
+        var stage = StageOf(progress, plannedAt);
 
         var checklist = Checklist(input.Standard, reference, issuedAt, registeredAt, today, plannedAt ?? expectedAt);
         var examinedAt = checklist.Count > 0 ? checklist.Max(c => Parse(c.DoneAt)) : registeredAt;
-        var timeline = Timeline(input.Standard, stage, issuedAt, examinedAt, registeredAt, plannedAt, kk);
+        var timeline = Timeline(input.Standard, stage, issuedAt, examinedAt, registeredAt, plannedAt, progress, kk);
 
         var fallback = WorklistBuilder.Fallback(state);
         var forecast = input.Prediction is { } prediction
@@ -100,48 +106,109 @@ public static class RouteBuilder
             names.TryAdd(alternative.Mo.MoCode, alternative.Mo.Name);
         }
 
-        // сигналы гражданина — реальные события (время сервера), в отличие от дат маршрута, живущих в «сегодня» витрины
-        var signals = RouteSignals.FromDecisions(input.Decisions, names);
-        var validationDue = RouteSignals.ValidationDue(signals, input.Now ?? DateTimeOffset.UtcNow);
-        IReadOnlyList<string> riskFlags = signals.Any(s => s.Open) && !item.RiskFlags.Contains(WorklistBuilder.PatientSignal)
-            ? [.. item.RiskFlags, WorklistBuilder.PatientSignal]
-            : item.RiskFlags;
+        foreach (var (code, name) in input.ExtraNames ?? new Dictionary<string, string>())
+        {
+            names.TryAdd(code, name);
+        }
+
+        // сигналы гражданина — реальные события (время сервера), в отличие от дат маршрута, живущих в «сегодня» витрины;
+        // «открыт» только сигнал, на который ещё нужен ответ (просьба о переводе или о снятии с очереди) — по проекции
+        var signals = RouteSignals.FromDecisions(input.Decisions, names)
+            .Select(sig => sig with { Open = sig.DecisionId == progress.OpenSignalId }).ToList();
+        var validationDue = progress.Status is RouteStatuses.Waiting or RouteStatuses.Kept
+                            && RouteSignals.ValidationDue(signals, input.Now ?? DateTimeOffset.UtcNow);
+        var open = signals.FirstOrDefault(sig => sig.Open);
+        var adjusted = WorklistBuilder.Apply(item, progress, input.Side, realToday,
+            open is null ? null : new PatientSignalDto(open.Kind, open.ToMoCode, open.ToMoName, open.Comment, open.RecordedAt));
         var doctor = input.Audience == RouteAudience.Doctor
-            ? new RouteDoctorPanelDto(item.Priority, riskFlags, item.NextAction, item.NextActionCode, item.Explanation,
+            ? new RouteDoctorPanelDto(adjusted.Priority, adjusted.RiskFlags, adjusted.NextAction, adjusted.NextActionCode, adjusted.Explanation,
                 input.Prediction?.PRefusal ?? fallback.PRefusal, input.Prediction?.RefusalOrgInTraining ?? false, input.Prediction?.Explanation)
             : null;
 
+        // после подтверждённого перевода пациент — у принимающей больницы; переводить дальше по этому направлению нельзя
+        var profileName = input.ProfileNames.GetValueOrDefault(state.ProfileCode, state.ProfileCode);
+        var organization = progress.TransferConfirmed
+            ? new RouteOrganizationDto(progress.ResponsibleMoCode, names.GetValueOrDefault(progress.ResponsibleMoCode, progress.ResponsibleMoCode),
+                state.ProfileCode, profileName)
+            : new RouteOrganizationDto(state.MoCode, state.MoName, state.ProfileCode, profileName);
+        IReadOnlyList<AlternativeDto> alternatives = progress.TransferConfirmed || progress.IsClosed ? [] : input.Alternatives?.Items ?? [];
+        var citizen = input.Audience == RouteAudience.Citizen;
+
         return new RouteDto(
-            reference, true, input.Audience, Format(today), state.RegionKato,
-            new RouteOrganizationDto(state.MoCode, state.MoName, state.ProfileCode, input.ProfileNames.GetValueOrDefault(state.ProfileCode, state.ProfileCode)),
+            reference, true, input.Audience, Format(today), state.RegionKato, organization,
             stage, timeline.FirstOrDefault(t => t.Code == stage)?.Title ?? stage, timeline,
             new RouteDatesDto(Format(issuedAt), Format(registeredAt), plannedAt is null ? null : Format(plannedAt.Value), Format(expectedAt)),
             item.DaysWaiting, forecast, input.Standard.Benchmarks, checklist,
-            input.Alternatives?.Items ?? [], input.Alternatives?.Model,
-            Decisions(input.Decisions, state.MoCode, names), History(input.States, reference, today, input.ProfileNames, state.ProfileCode), doctor,
+            alternatives, input.Alternatives?.Model,
+            Decisions(input.Decisions, progress.OriginMoCode, names), History(input.States, reference, today, input.ProfileNames, state.ProfileCode), doctor,
             Basis(kk, today),
             new RouteStandardRefDto(input.Standard.Meta.Source, input.Standard.Meta.SourceUrl, input.Standard.Meta.SourceDate, input.Standard.Available),
-            signals, validationDue);
+            signals, validationDue,
+            ProgressDto(progress, input.Side, realToday, names, citizen),
+            RouteJournalKinds.Build(input.Decisions, progress.OriginMoCode, names, citizen));
     }
 
-    /// <summary>Стадии Стандарта до госпитализации; отказ на таймлайне активного маршрута не показывается.
-    /// Даты только у пройденных и текущей стадии; норма — у всех, интерфейс показывает её для предстоящих.</summary>
+    /// <summary>Текущий этап: из данных очереди, пока система ничего не меняла; «Перевод» — пока перевод не подтверждён;
+    /// дата госпитализации и сама госпитализация — по ответам принимающей больницы.</summary>
+    private static string StageOf(RouteProgress progress, DateOnly? plannedAt) => progress.Status switch
+    {
+        RouteStatuses.TransferPendingConsent or RouteStatuses.TransferPendingConfirmation => RouteStages.Transfer,
+        RouteStatuses.Admitted => RouteStages.Hospitalized,
+        RouteStatuses.Closed when progress.ClosedReason == RouteCloseReasons.Discharged => RouteStages.Hospitalized,
+        _ when progress.TransferConfirmed => RouteStages.DateAssigned,
+        _ => plannedAt is not null ? RouteStages.DateAssigned : RouteStages.Waitlisted,
+    };
+
+    public static RouteProgressDto ProgressDto(RouteProgress progress, RouteSide side, DateOnly today, IReadOnlyDictionary<string, string> names, bool citizen)
+    {
+        string Name(string code) => names.GetValueOrDefault(code, code);
+        var transfer = progress.Transfer is { } t
+            ? new RouteTransferDto(t.DecisionId, t.ToMoCode, Name(t.ToMoCode), !citizen && t.Severe, t.Reason, t.ProposedAt, t.ConsentAt, t.ConfirmedAt,
+                t.PlannedAt is { } planned ? Format(planned) : null, t.AdmittedAt)
+            : null;
+        var attempt = progress.LastAttempt is { } a ? new RouteTransferAttemptDto(a.Outcome, a.ToMoCode, Name(a.ToMoCode), a.At, a.Reason) : null;
+        return new RouteProgressDto(progress.Status, progress.OriginMoCode, progress.ResponsibleMoCode, Name(progress.ResponsibleMoCode), transfer, attempt,
+            progress.PrefersCurrent, progress.ClosedReason, progress.ClosedAt, progress.Overdue(today),
+            progress.Allowed(side, today).OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            progress.RejectedMoCodes.Concat(progress.DeclinedMoCodes).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+            side.ToString().ToLowerInvariant());
+    }
+
+    /// <summary>Этапы Стандарта до госпитализации плюс «Перевод», если он идёт или состоялся; отказ на таймлайне активного
+    /// маршрута не показывается. Даты только у пройденных и текущей стадии; норма — у всех, интерфейс показывает её для
+    /// предстоящих. Первые три этапа приходят из ИС БГ (данные очереди) и только показываются.</summary>
     private static IReadOnlyList<RouteStageDto> Timeline(
-        RouteStandardDto standard, string current, DateOnly issuedAt, DateOnly examinedAt, DateOnly registeredAt, DateOnly? plannedAt, bool kk)
+        RouteStandardDto standard, string current, DateOnly issuedAt, DateOnly examinedAt, DateOnly registeredAt, DateOnly? plannedAt,
+        RouteProgress progress, bool kk)
     {
         var defs = standard.Available
-            ? standard.Stages.Where(s => s.Code != RouteStages.Refused).Select(s => (s.Code, s.Order, Title: s.Title, Norm: (string?)s.Norm)).ToList()
-            : DefaultStages.Select(d => (d.Code, d.Order, Title: kk ? d.Kk : d.Ru, Norm: (string?)null)).ToList();
+            ? standard.Stages.Where(s => s.Code != RouteStages.Refused && s.Code != RouteStages.Transfer)
+                .Select(s => (s.Code, s.Order, s.Title, Norm: (string?)s.Norm)).ToList()
+            : DefaultStages.Where(d => d.Code != RouteStages.Transfer)
+                .Select(d => (d.Code, d.Order, Title: kk ? d.Kk : d.Ru, Norm: (string?)null)).ToList();
+        var transfer = progress.Transfer;
+        if (transfer is not null && (progress.TransferActive || progress.TransferConfirmed))
+        {
+            var waitlisted = defs.FindIndex(d => d.Code == RouteStages.Waitlisted);
+            var title = DefaultStages.First(d => d.Code == RouteStages.Transfer);
+            defs.Insert(waitlisted + 1, (RouteStages.Transfer, 0, kk ? title.Kk : title.Ru, null));
+        }
+
+        defs = defs.Select((d, i) => (d.Code, Order: i + 1, d.Title, d.Norm)).ToList();
         var currentOrder = defs.Where(d => d.Code == current).Select(d => d.Order).DefaultIfEmpty(int.MaxValue).First();
+        var finished = progress.IsClosed && progress.ClosedReason == RouteCloseReasons.Discharged;
         return defs.Select(d =>
         {
-            var status = d.Order < currentOrder ? RouteTimelineStatus.Done : d.Order == currentOrder ? RouteTimelineStatus.Current : RouteTimelineStatus.Upcoming;
+            var status = finished || d.Order < currentOrder ? RouteTimelineStatus.Done
+                : d.Order == currentOrder ? RouteTimelineStatus.Current : RouteTimelineStatus.Upcoming;
             DateOnly? date = d.Code switch
             {
                 RouteStages.ReferralIssued => issuedAt,
                 RouteStages.Examination => examinedAt,
                 RouteStages.Waitlisted => registeredAt,
+                RouteStages.Transfer => DateOnly.FromDateTime((transfer!.ConfirmedAt ?? transfer.ProposedAt).UtcDateTime),
                 RouteStages.DateAssigned => plannedAt,
+                RouteStages.Hospitalized => transfer?.AdmittedAt is { } admitted ? DateOnly.FromDateTime(admitted.UtcDateTime) : null,
                 _ => null,
             };
             return new RouteStageDto(d.Code, d.Order, d.Title, status == RouteTimelineStatus.Upcoming || date is null ? null : Format(date.Value), status, d.Norm);
@@ -210,29 +277,26 @@ public static class RouteBuilder
         return rows.OrderByDescending(r => r.RegisteredAt, StringComparer.Ordinal).ToList();
     }
 
-    private static IReadOnlyList<RouteDecisionDto> Decisions(IReadOnlyList<DecisionDto> decisions, string currentMoCode, IReadOnlyDictionary<string, string> names)
+    /// <summary>Решения врача (оставить / перевести) из журнала; все остальные события маршрута — в хронике
+    /// (<see cref="RouteJournalKinds"/>) и в состоянии (<see cref="RouteProgress"/>). Разбор формы chosen — только в
+    /// <see cref="RouteEvents.Parse"/>, чтобы новые события с полем moCode не превращались в фиктивные решения.</summary>
+    private static IReadOnlyList<RouteDecisionDto> Decisions(IReadOnlyList<DecisionDto> decisions, string originMoCode, IReadOnlyDictionary<string, string> names)
     {
         var rows = new List<RouteDecisionDto>();
         foreach (var decision in decisions)
         {
-            // сигналы гражданина ({"signal": …}) — не решения врача, они идут в RouteDto.Signals; подтверждение
-            // приёма принимающей организацией ({"moCode", "confirms": decisionId}, задача 4) и выписка/эпикриз
-            // ({"moCode", "discharges": decisionId, "summary": …}, задача 11) — тоже не отдельные решения redirect/keep
-            // для этого списка (у обеих есть поле "moCode", иначе бы прошли через фильтр ниже и создали фиктивную
-            // дублирующую строку redirect/keep, как уже было найдено и исправлено для задачи 4) — их статус виден
-            // отдельно, через ReferralConfirmation.ConfirmedAt/DischargeSummary.RecordFor на решении redirect.
-            var to = MoCode(decision.Chosen);
-            if (to is null || RouteSignals.Kind(decision.Chosen) is not null || ReferralConfirmation.Confirms(decision.Chosen) is not null
-                || DischargeSummary.Discharges(decision.Chosen) is not null)
+            var e = RouteEvents.Parse(decision);
+            if (e.Kind != RouteEventKind.DoctorDecision)
             {
                 continue;
             }
 
-            var kind = to == currentMoCode ? RouteDecisionKinds.Keep : RouteDecisionKinds.Redirect;
+            var to = e.MoCode!;
+            var kind = string.Equals(to, originMoCode, StringComparison.OrdinalIgnoreCase) ? RouteDecisionKinds.Keep : RouteDecisionKinds.Redirect;
             rows.Add(new RouteDecisionDto(
                 decision.DecisionId, decision.Role, decision.RecordedAt, MoCode(decision.Recommended), to, names.GetValueOrDefault(to, to), decision.Reason,
                 kind, kind == RouteDecisionKinds.Redirect ? RouteConsent.StatusFor(decision.DecisionId, decisions) : null,
-                kind == RouteDecisionKinds.Redirect && Severe(decision.Chosen)));
+                kind == RouteDecisionKinds.Redirect && e.Severe));
         }
 
         return rows;
@@ -242,12 +306,6 @@ public static class RouteBuilder
         json is { ValueKind: JsonValueKind.Object } element && element.TryGetProperty("moCode", out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
-
-    /// <summary>Клинический флаг тяжести (RouteRedirectRequestDto.Severe), независимый от очередных RiskFlags в WorklistBuilder:
-    /// врач ставит его при направлении беременных или сложных операций — принимающая сторона видит это отдельно от риска отказа.</summary>
-    private static bool Severe(JsonElement? json) =>
-        json is { ValueKind: JsonValueKind.Object } element && element.TryGetProperty("severe", out var value)
-        && value.ValueKind == JsonValueKind.True;
 
     private static string Basis(bool kk, DateOnly asOf) => kk
         ? $"Синтетикалық маршрут: пациент ойдан шығарылған, ал мерзімдер, кезек және нәтижелер {asOf:dd.MM.yyyy} күнгі аймақ кезектерінің нақты жағдайынан алынған. Бас тарту себептері ашық деректерде жоқ және пациентке тіркелмейді."

@@ -13,6 +13,10 @@ public static class DecisionSubjects
     /// синтетического пациента (SYN-регион-организация-профиль-NN); гражданин видит эти решения на своём маршруте.</summary>
     public const string Route = "route";
 
+    /// <summary>Согласие пациента на запись приёма AI-скрайбом и её итог: subject_id — реф пациента, chosen — см.
+    /// ScribeConsents (запрос врача, ответ пациента, начатая сессия, утверждённая памятка).</summary>
+    public const string Scribe = "scribe";
+
     /// <summary>Сценарий симулятора регулятора: recommended/chosen — параметры сценария.</summary>
     public const string Scenario = "scenario";
 

@@ -13,9 +13,6 @@ namespace Darumen.Modules.Journal;
 /// принимающей стороной, но я их ещё не видел; какие из них уже выписаны с эпикризом (задача 11), но я их ещё не видел.</summary>
 public static class NotificationBellEndpoints
 {
-    private const int RouteDecisionsPage = 500;
-    private const int ReferralHistoryLimit = 20;
-
     public static void Map(IEndpointRouteBuilder api)
     {
         var group = api.MapGroup("/journal").WithTags("Journal");
@@ -32,57 +29,41 @@ public static class NotificationBellEndpoints
                 if (scope.MoCode is null)
                 {
                     // виджет для главной, а не листинг: без организации молча ничего не показываем, а не 422
-                    return Results.Ok(new NotificationBellDto(0, [], []));
+                    return Results.Ok(new NotificationBellDto(0, [], [], []));
                 }
 
-                var forOrg = (await decisions.ListForOrganizationAsync(scope.MoCode, null, DecisionSubjects.Route, null, 1, RouteDecisionsPage, ct)).Items;
+                // всё — из проекций маршрутов (RouteProgress): отменённые, отклонённые и отказы пациента не считаются
+                var routes = await RouteJournal.AllAsync(decisions, ct);
+                var pendingIncoming = routes.Values.Count(r => r.Progress.Status == RouteStatuses.TransferPendingConfirmation
+                    && string.Equals(r.Progress.Transfer!.ToMoCode, scope.MoCode, StringComparison.OrdinalIgnoreCase));
 
-                var incoming = forOrg.Where(d => RouteSignals.MoCode(d.Chosen) == scope.MoCode && RouteSignals.Kind(d.Chosen) is null
-                    && RouteConsent.Response(d.Chosen) is null && ReferralConfirmation.Confirms(d.Chosen) is null
-                    && DischargeSummary.Discharges(d.Chosen) is null
-                    && RoutePatientRef.TryParse(d.SubjectId, out var parsedIn) && parsedIn!.MoCode != scope.MoCode);
-
-                var pendingIncoming = 0;
-                foreach (var candidate in incoming)
-                {
-                    var related = (await decisions.ListAsync(null, DecisionSubjects.Route, candidate.SubjectId, 1, ReferralHistoryLimit, ct)).Items;
-                    if (ReferralConfirmation.ConfirmedAt(candidate.DecisionId, related) is null)
-                    {
-                        pendingIncoming++;
-                    }
-                }
-
-                // «отправленные моей организацией» определяются по рефу пациента (SYN-{регион}-{moCode}-{профиль}-{NN}),
-                // а не по actor_mo_code/recommended.moCode/chosen.moCode — ListForOrganizationAsync фильтрует именно по
-                // этим полям (годится для «входящих», где принимающая организация есть в chosen.moCode) и никогда не
-                // вернёт запись, где организация-отправитель видна только в SubjectId. Поэтому здесь — отдельная,
-                // не отфильтрованная по организации выборка с фильтром в памяти: тот же приём, что уже применяется в
-                // /worklist для сигналов по региону (SubjectId.StartsWith), только по коду организации в рефе.
-                var allRoute = (await decisions.ListAsync(null, DecisionSubjects.Route, null, 1, RouteDecisionsPage, ct)).Items;
-                var sent = allRoute.Where(d => RouteSignals.MoCode(d.Chosen) != scope.MoCode && RouteSignals.Kind(d.Chosen) is null
-                    && RouteConsent.Response(d.Chosen) is null && ReferralConfirmation.Confirms(d.Chosen) is null
-                    && DischargeSummary.Discharges(d.Chosen) is null
-                    && RoutePatientRef.TryParse(d.SubjectId, out var parsedOut) && parsedOut!.MoCode == scope.MoCode);
-
+                // «отправленные моей организацией» — по рефу пациента (SYN-{регион}-{moCode}-{профиль}-{NN}): больница, где он стоял в очереди
                 var confirmedItems = new List<(Guid DecisionId, string PatientRef, string ToMoCode, DateTimeOffset ConfirmedAt)>();
                 var dischargedItems = new List<(Guid DecisionId, string PatientRef, string FromMoCode, string Summary, DateTimeOffset DischargedAt)>();
-                foreach (var candidate in sent)
+                foreach (var (reference, route) in routes)
                 {
-                    var related = (await decisions.ListAsync(null, DecisionSubjects.Route, candidate.SubjectId, 1, ReferralHistoryLimit, ct)).Items;
-                    var confirmedAt = ReferralConfirmation.ConfirmedAt(candidate.DecisionId, related);
-                    if (confirmedAt is not null)
+                    var progress = route.Progress;
+                    if (!string.Equals(progress.OriginMoCode, scope.MoCode, StringComparison.OrdinalIgnoreCase) || progress.Transfer is not { ConfirmedAt: not null } transfer)
                     {
-                        confirmedItems.Add((candidate.DecisionId, candidate.SubjectId, RouteSignals.MoCode(candidate.Chosen)!, confirmedAt.Value));
+                        continue;
                     }
 
-                    if (DischargeSummary.RecordFor(candidate.DecisionId, related) is { } dischargeRecord)
+                    confirmedItems.Add((transfer.DecisionId, reference, transfer.ToMoCode, transfer.ConfirmedAt.Value));
+                    if (progress.ClosedReason == RouteCloseReasons.Discharged)
                     {
-                        dischargedItems.Add((candidate.DecisionId, candidate.SubjectId, RouteSignals.MoCode(candidate.Chosen)!,
-                            DischargeSummary.Summary(dischargeRecord.Chosen) ?? "", dischargeRecord.RecordedAt));
+                        var summary = RouteEvents.Ordered(route.Decisions).LastOrDefault(e => e.Kind == RouteEventKind.Discharge)?.Value ?? "";
+                        dischargedItems.Add((transfer.DecisionId, reference, transfer.ToMoCode, summary, progress.ClosedAt!.Value));
                     }
                 }
 
                 var actor = CurrentUser.From(http).Actor;
+
+                // что сделали пациенты моей больницы за последние дни (кроме уже прочитанного)
+                var scribe = (await decisions.ListAsync(null, DecisionSubjects.Scribe, null, 1, RouteJournal.AllRoutesLimit, ct)).Items;
+                var signals = PatientSignals.From(routes, scribe, scope.MoCode, (http.RequestServices.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow().AddDays(-PatientSignals.Days), RouteJournal.Today(http));
+                var readSignals = await reads.ReadDecisionIdsAsync(actor, NotificationKinds.PatientSignal, signals.Select(s => s.Id).ToList(), ct);
+                signals = signals.Where(s => !readSignals.Contains(s.Id)).ToList();
+
                 var readConfirmations = await reads.ReadDecisionIdsAsync(actor, NotificationKinds.ReferralConfirmed,
                     confirmedItems.Select(c => c.DecisionId).ToList(), ct);
                 var readDischarges = await reads.ReadDecisionIdsAsync(actor, NotificationKinds.ReferralDischarged,
@@ -95,7 +76,8 @@ public static class NotificationBellEndpoints
                 // (mo_code уникален глобально): региона второй стороны из рефа пациента-отправителя не узнать, а
                 // показывать код вместо названия в колокольчике для конечного пользователя недопустимо.
                 var names = new Dictionary<string, string>(StringComparer.Ordinal);
-                foreach (var code in pendingConfirmations.Select(c => c.ToMoCode).Concat(pendingDischarges.Select(c => c.FromMoCode)).Distinct(StringComparer.Ordinal))
+                foreach (var code in pendingConfirmations.Select(c => c.ToMoCode).Concat(pendingDischarges.Select(c => c.FromMoCode))
+                             .Concat(signals.Select(s => s.MoCode).OfType<string>()).Distinct(StringComparer.Ordinal))
                 {
                     var found = await refData.OrganizationsAsync(null, code, null, 1, ct);
                     if (found.FirstOrDefault(o => o.MoCode == code) is { } org)
@@ -113,7 +95,8 @@ public static class NotificationBellEndpoints
                     .OrderByDescending(c => c.DischargedAt)
                     .ToList();
 
-                return Results.Ok(new NotificationBellDto(pendingIncoming, unreadConfirmations, unreadDischarges));
+                var patientSignals = signals.Select(s => s.MoCode is { } mo ? s with { MoName = names.GetValueOrDefault(mo, mo) } : s).ToList();
+                return Results.Ok(new NotificationBellDto(pendingIncoming, unreadConfirmations, unreadDischarges, patientSignals));
             })
             .RequireAuthorization(Permissions.Policy(Permissions.WorklistView))
             .WithName("NotificationBell")
@@ -124,10 +107,10 @@ public static class NotificationBellEndpoints
         group.MapPost("/notifications/bell/{kind}/{decisionId:guid}/read", async (string kind, Guid decisionId, HttpContext http,
                 INotificationReadRepository reads, CancellationToken ct) =>
             {
-                if (kind != NotificationKinds.ReferralConfirmed && kind != NotificationKinds.ReferralDischarged)
+                if (kind != NotificationKinds.ReferralConfirmed && kind != NotificationKinds.ReferralDischarged && kind != NotificationKinds.PatientSignal)
                 {
                     return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Неизвестный вид уведомления",
-                        detail: $"kind должен быть один из: {NotificationKinds.ReferralConfirmed}, {NotificationKinds.ReferralDischarged}");
+                        detail: $"kind должен быть один из: {NotificationKinds.ReferralConfirmed}, {NotificationKinds.ReferralDischarged}, {NotificationKinds.PatientSignal}");
                 }
 
                 if (await OrgAccess.CheckAsync(http, null, Permissions.WorklistView) is { } denied)
