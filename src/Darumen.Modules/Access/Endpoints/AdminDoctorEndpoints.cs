@@ -50,10 +50,18 @@ public static class AdminDoctorEndpoints
                     return new ValidationErrors().Add("status", $"ожидается одно из: {string.Join(", ", VerificationStatuses.All)}").Problem();
                 }
 
-                var (target, _, problem) = await AdminUserEndpoints.TargetAsync(id, http, directory, ct);
+                var (target, scope, problem) = await AdminUserEndpoints.TargetAsync(id, http, directory, ct);
                 if (problem is not null)
                 {
                     return problem;
+                }
+
+                // проверка диплома и сертификата — дело администратора платформы, а не руководителя больницы:
+                // главврач не подтверждает квалификацию собственного сотрудника (конфликт интересов)
+                if (scope.IsOwn)
+                {
+                    return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Верификацию проводит администратор платформы",
+                        detail: "подтвердить или отклонить квалификацию врача может только администратор платформы");
                 }
 
                 if (!target!.Has(Roles.Doctor))

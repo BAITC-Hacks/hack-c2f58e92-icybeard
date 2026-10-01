@@ -120,17 +120,21 @@ public sealed class OrgScopeTests(TestApp app) : IClassFixture<TestApp>
     }
 
     [Fact]
-    public async Task Doctor_verification_is_recorded_and_scoped()
+    public async Task Doctor_verification_is_done_by_the_platform_admin_only()
     {
-        var verified = await OrgAdmin.PostAsJsonAsync("/api/v1/admin/doctors/doctor1/verification", new VerificationRequestDto("verified", "диплом проверен"));
+        // руководитель больницы не подтверждает квалификацию своего врача — только администратор платформы
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await OrgAdmin.PostAsJsonAsync("/api/v1/admin/doctors/doctor1/verification", new VerificationRequestDto("verified", "диплом проверен"))).StatusCode);
+        await AssertForbiddenAsync(await OrgAdmin.PostAsJsonAsync("/api/v1/admin/doctors/doctor2/verification", new VerificationRequestDto("verified", null)),
+            AccessProblems.OtherOrganization);
+
+        var platform = app.CreateClient(Roles.Admin, "admin-verify");
+        var verified = await platform.PostAsJsonAsync("/api/v1/admin/doctors/doctor1/verification", new VerificationRequestDto("verified", "диплом проверен"));
         Assert.Equal(HttpStatusCode.OK, verified.StatusCode);
         Assert.Equal("verified", (await verified.Content.ReadFromJsonAsync<DoctorRowDto>())!.Verification);
         Assert.Contains(app.Decisions.Published.OfType<Darumen.Contracts.V1.DecisionRecorded>(), e => e.Subject == DecisionSubjects.DoctorVerification);
-
-        await AssertForbiddenAsync(await OrgAdmin.PostAsJsonAsync("/api/v1/admin/doctors/doctor2/verification", new VerificationRequestDto("verified", null)),
-            AccessProblems.OtherOrganization);
         Assert.Equal(HttpStatusCode.UnprocessableEntity,
-            (await OrgAdmin.PostAsJsonAsync("/api/v1/admin/doctors/doctor1/verification", new VerificationRequestDto("maybe", null))).StatusCode);
+            (await platform.PostAsJsonAsync("/api/v1/admin/doctors/doctor1/verification", new VerificationRequestDto("maybe", null))).StatusCode);
     }
 
     private static object Decision(string subjectId, string recommended, string chosen) =>
