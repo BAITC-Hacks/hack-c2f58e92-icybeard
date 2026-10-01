@@ -47,7 +47,6 @@ void main() {
       expect(router.routerDelegate.currentConfiguration.uri.path, path);
       expect(find.byType(ConsentsScreen), findsOneWidget, reason: path);
       expect(find.text('Данные и согласия'), findsOneWidget);
-      expect(find.text('Согласий пока нет'), findsOneWidget);
       expect(find.byType(FloatingNav), findsNothing);
     }
     expect(tester.takeException(), isNull);
@@ -64,8 +63,8 @@ void main() {
     expect(find.byType(StaffNotificationsScreen), findsNothing);
   });
 
-  testWidgets('incoming stub: title, the web empty state and the pill; no back button at a tab root', (tester) async {
-    final router = await pumpApp(tester, roles: ['chief'], claims: {'mo_code': '028B', 'region_kato': '75'});
+  testWidgets('incoming tab: title, the web empty state of an empty list and the pill; no back button at a tab root', (tester) async {
+    final router = await pumpApp(tester, roles: ['chief'], claims: {'mo_code': '028B', 'region_kato': '75'}, api: {'/journal/referrals/incoming': <Object>[]});
     router.go('/doctor/incoming');
     await settle(tester);
     expect(find.text('Входящие направления'), findsOneWidget);

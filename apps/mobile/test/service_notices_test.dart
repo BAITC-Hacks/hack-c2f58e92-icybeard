@@ -171,7 +171,7 @@ void main() {
       }
       expect(find.text('Сервис ещё не подключён'), findsNWidgets(2), reason: 'SMS и push');
       expect(find.textContaining('не сбрасываются'), findsOneWidget);
-      expect(find.byType(Switch), findsNWidgets(3));
+      expect(find.byType(Switch), findsNWidgets(4), reason: 'три канала и событие «Изменения моего маршрута» гражданина');
       expect(switchOf(tester, 'email').onChanged, isNull);
       expect(switchOf(tester, 'sms').onChanged, isNull);
       expect(switchOf(tester, 'push').onChanged, isNull);
@@ -179,7 +179,7 @@ void main() {
       expect(switchOf(tester, 'sms').value, isFalse);
       expect(switchOf(tester, 'push').value, isTrue);
 
-      await tester.tap(find.byType(Switch).first);
+      await tester.tap(find.descendant(of: find.byKey(const ValueKey('channel-email')), matching: find.byType(Switch)));
       await tester.pumpAndSettle();
       expect(switchOf(tester, 'email').value, isTrue);
       expect(requests.where((r) => r.method == 'PUT'), isEmpty, reason: 'мобилка ничего не перезаписывает');

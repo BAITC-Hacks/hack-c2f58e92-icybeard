@@ -104,7 +104,7 @@ void main() {
     router.go('/doctor/referral?moCode=028B&profileCode=381');
     await settle(tester);
     expect(find.byType(FloatingNav), findsNothing);
-    expect(find.text('Подтвердить направление'), findsOneWidget);
+    expect(find.text('Ассистент направления'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

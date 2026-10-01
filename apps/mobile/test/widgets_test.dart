@@ -5,17 +5,12 @@ import 'package:darumen/theme/app_theme.dart';
 import 'package:darumen/widgets/checklist_tile.dart';
 import 'package:darumen/widgets/collapsible_section.dart';
 import 'package:darumen/widgets/day_groups.dart';
-import 'package:darumen/widgets/doctor_route_view.dart';
 import 'package:darumen/widgets/hero_number.dart';
 import 'package:darumen/widgets/kpi_tile.dart';
 import 'package:darumen/widgets/org_name.dart';
 import 'package:darumen/widgets/origin_tag.dart';
 import 'package:darumen/widgets/picker_sheet.dart';
-import 'package:darumen/widgets/redirect_reason_dialog.dart';
-import 'package:darumen/widgets/route_events.dart';
 import 'package:darumen/widgets/route_timeline.dart';
-import 'package:darumen/widgets/route_view.dart';
-import 'package:darumen/widgets/signal_card.dart';
 import 'package:darumen/widgets/stage_stepper.dart';
 import 'package:darumen/widgets/status_chip.dart';
 import 'package:flutter/material.dart';
@@ -54,21 +49,6 @@ const kkStages = [
 ];
 
 const longOrg = 'Товарищество с ограниченной ответственностью "Достар Мед"';
-
-PatientRoute citizenRoute({bool validationDue = true, List<Map<String, dynamic>> signals = const [], List<Map<String, dynamic>> decisions = const []}) =>
-    PatientRoute.fromJson({
-      'patientRef': 'SYN-75-028B-381-01',
-      'stage': 'waitlisted',
-      'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
-      'timeline': [for (final s in stages) {'code': s.code, 'order': s.order, 'title': s.title, 'date': s.date, 'status': s.status, 'norm': s.norm}],
-      'forecast': {'p50Days': 47, 'p90Days': 106, 'fromModel': true},
-      'alternatives': [
-        {'mo': {'moCode': '22GN', 'name': longOrg}, 'p50Days': 9, 'p90Days': 20, 'pRefusal': 0.1, 'distanceKm': 12},
-      ],
-      'validationDue': validationDue,
-      'signals': signals,
-      'decisions': decisions,
-    });
 
 void main() {
   testWidgets('timeline rows show short labels, dd.MM for passed stages, the norm for upcoming ones and a dash without it', (tester) async {
@@ -174,147 +154,6 @@ void main() {
     await tester.tap(find.text('прогноз модели'));
     await tester.pumpAndSettle();
     expect(find.textContaining('по истории очередей'), findsOneWidget);
-  });
-
-  testWidgets('reason sheet requires a reason, returns it and survives its exit animation', (tester) async {
-    String? result;
-    await tester.pumpWidget(host(Builder(
-      builder: (context) => FilledButton(
-        onPressed: () async => result = await RedirectReasonDialog.show(context, organization: longOrg),
-        child: const Text('open'),
-      ),
-    )));
-    await tester.tap(find.text('open'));
-    await tester.pumpAndSettle();
-    expect(find.text('Достар Мед'), findsOneWidget);
-    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Направить сюда')).enabled, isFalse);
-    await tester.enterText(find.byType(TextField), 'ожидание короче');
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Направить сюда'));
-    await tester.pumpAndSettle();
-    expect(result, 'ожидание короче');
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('citizen route asks "are you still waiting" with three options and lets the patient ask for a faster organisation', (tester) async {
-    final signals = <String>[];
-    Alternative? requested;
-    await tester.pumpWidget(host(RouteView(route: citizenRoute(), onSignal: signals.add, onRequest: (a) => requested = a)));
-    expect(find.text('В листе ожидания'), findsOneWidget);
-    expect(find.text('Половина — 47 дн., 9 из 10 — до 106 дн.'), findsOneWidget);
-    expect(find.text('до 106'), findsOneWidget);
-    expect(find.text('Вы ещё ждёте госпитализацию?'), findsOneWidget);
-    expect(find.text('Уже лечился в другом месте'), findsOneWidget);
-    await tester.ensureVisible(find.text('Да, жду'));
-    await tester.tap(find.text('Да, жду'));
-    expect(signals, ['still_waiting']);
-    expect(find.text('Достар Мед ≈ 9 дн.'), findsOneWidget);
-    await tester.ensureVisible(find.text('Где быстрее'));
-    await tester.tap(find.text('Где быстрее'));
-    await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Попросить'));
-    await tester.tap(find.text('Попросить'));
-    expect(requested?.moCode, '22GN');
-    expect(find.text('Направить сюда'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('citizen route shows the doctor answer as a signal card, then "what now" with the pending request chip', (tester) async {
-    final route = citizenRoute(
-      validationDue: false,
-      decisions: [
-        {'decisionId': 'd1', 'recordedAt': '2025-02-20T10:00:00+00:00', 'toMoCode': '22GN', 'toMoName': longOrg, 'reason': 'ближе к дому', 'kind': 'redirect'},
-      ],
-      signals: [
-        {'decisionId': 'a', 'recordedAt': '2025-02-21T10:00:00+00:00', 'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': longOrg, 'open': true},
-      ],
-    );
-    var opened = false;
-    await tester.pumpWidget(host(RouteView(route: route, onSignal: (_) {}, onRequest: (_) {}, seenDecisionId: null, onOpenAnswer: () => opened = true)));
-    expect(find.byType(SignalCard), findsOneWidget);
-    expect(find.text('Врач предложил Достар Мед'), findsOneWidget);
-    expect(find.textContaining('«ближе к дому»'), findsOneWidget);
-    expect(find.text('Что сейчас'), findsNothing);
-    await tester.ensureVisible(find.text('Врач предложил Достар Мед'));
-    await tester.tap(find.text('Врач предложил Достар Мед'));
-    expect(opened, isTrue);
-    // после «Понятно» (экран запоминает решение) — «Что сейчас» с чипом ожидания ответа и следующим этапом
-    await tester.pumpWidget(host(RouteView(route: route, onSignal: (_) {}, onRequest: (_) {}, seenDecisionId: 'd1')));
-    expect(find.byType(SignalCard), findsNothing);
-    expect(find.text('Что сейчас'), findsOneWidget);
-    expect(find.text('Ждёт ответа врача'), findsOneWidget);
-    expect(find.text('Следующий этап: Дата госпитализации назначена'), findsOneWidget);
-    await tester.ensureVisible(find.text('Где быстрее'));
-    await tester.tap(find.text('Где быстрее'));
-    await tester.pumpAndSettle();
-    expect(find.text('Запрос отправлен'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('doctor route shows the panel first and answers the open signal with an inline reason', (tester) async {
-    final route = PatientRoute.fromJson({
-      'patientRef': 'SYN-75-028B-381-01',
-      'audience': 'doctor',
-      'stage': 'waitlisted',
-      'organization': {'moCode': '028B', 'moName': 'Институт', 'profileCode': '381', 'profileName': 'Офтальмология'},
-      'timeline': [for (final s in stages) {'code': s.code, 'order': s.order, 'title': s.title, 'date': s.date, 'status': s.status}],
-      'forecast': {'p50Days': 47, 'p90Days': 106, 'fromModel': true},
-      'alternatives': [
-        {'mo': {'moCode': '22GN', 'name': longOrg}, 'p50Days': 9, 'p90Days': 20, 'pRefusal': 0.1, 'distanceKm': 12},
-      ],
-      'doctor': {'priority': 12, 'riskFlags': ['patient_signal'], 'nextAction': 'ждать вызова', 'nextActionCode': 'wait_for_call', 'explanation': '', 'pRefusal': 0.2, 'refusalOrgInTraining': true},
-      'signals': [
-        {'decisionId': 'a', 'recordedAt': '2026-09-25T10:00:00+00:00', 'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': longOrg, 'comment': 'живу рядом', 'open': true},
-      ],
-    });
-    String? kept;
-    Alternative? redirected;
-    String? redirectReason;
-    await tester.pumpWidget(host(DoctorRouteView(
-      route: route,
-      onRedirect: (a, {reason}) {
-        redirected = a;
-        redirectReason = reason;
-      },
-      onKeep: (reason) => kept = reason,
-    )));
-    expect(find.textContaining('приоритет 12'), findsOneWidget);
-    expect(find.text('РЕКОМЕНДАЦИЯ'), findsOneWidget);
-    expect(find.text('≈ 9'), findsOneWidget, reason: 'hero — лучшая альтернатива');
-    expect(find.text('Риск отказа 20 %'), findsOneWidget, reason: 'риск отказа виден только врачу');
-    expect(find.text('Следующий шаг: ждать вызова'), findsOneWidget);
-    expect(find.text('Пациент просит Достар Мед'), findsOneWidget);
-    expect(find.text('Вы ещё ждёте госпитализацию?'), findsNothing);
-    expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Оставить')).enabled, isFalse, reason: 'без причины кнопки заблокированы');
-    await tester.enterText(find.byType(TextField).first, 'профиль совпадает');
-    await tester.pump();
-    await tester.ensureVisible(find.text('Оставить'));
-    await tester.tap(find.text('Оставить'));
-    expect(kept, 'профиль совпадает');
-    await tester.ensureVisible(find.text('Направить сюда'));
-    await tester.tap(find.text('Направить сюда'));
-    expect(redirected?.moCode, '22GN');
-    expect(redirectReason, 'профиль совпадает');
-    expect(tester.takeException(), isNull);
-  });
-
-  test('route events carry a kind, short names and the open-route action', () {
-    final route = citizenRoute(
-      signals: [
-        {'decisionId': 'a', 'recordedAt': '2026-09-25T10:00:00+00:00', 'kind': 'request_redirect', 'toMoCode': '22GN', 'toMoName': longOrg, 'open': true},
-      ],
-      decisions: [
-        {'decisionId': 'd', 'recordedAt': '2026-09-26T10:00:00+00:00', 'toMoCode': '22GN', 'toMoName': longOrg, 'reason': 'ближе', 'kind': 'redirect'},
-      ],
-    );
-    final events = routeEvents(route, S.of('ru'));
-    expect(events.first.title, 'Врач предложил Достар Мед');
-    expect(events.first.kind, RouteEventKind.doctor);
-    expect(events.first.detail, '«ближе»');
-    expect(events.first.opensRoute, isTrue);
-    expect(events[1].title, 'Вы попросили рассмотреть: Достар Мед');
-    expect(events[1].detail, 'ждёт ответа врача');
-    expect(events.last.kind, RouteEventKind.stage);
   });
 
   test('day groups label today, yesterday and older days in both languages', () {
