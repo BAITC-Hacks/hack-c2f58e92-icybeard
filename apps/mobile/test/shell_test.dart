@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:darumen/router/app_router.dart';
 import 'package:darumen/theme/app_theme.dart';
 import 'package:darumen/widgets/app_shell.dart';
@@ -63,30 +65,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('doctor shell: Пациенты · Решения · Профиль, assistant and scribe open without tabs', (tester) async {
-    final router = await pumpApp(tester, roles: ['doctor'], region: '75');
+  testWidgets('doctor shell: Пациенты · Входящие · Решения · Профиль; notifications and the assistant open without tabs', (tester) async {
+    final router = await pumpApp(tester, roles: ['doctor'], region: '75', claims: {'mo_code': '028B'});
     expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/patients');
     expect(find.byType(FloatingNav), findsOneWidget);
     expect(find.text('Пациенты'), findsNWidgets(2));
+    expect(find.text('Входящие'), findsOneWidget);
     expect(find.text('Решения'), findsOneWidget);
     expect(find.text('Профиль'), findsOneWidget);
     expect(find.text('Скрайб'), findsNothing);
     expect(find.text('Направление'), findsNothing);
+    final labels = tester.widget<FloatingNav>(find.byType(FloatingNav)).destinations.map((d) => d.label);
+    expect(labels, ['Пациенты', 'Входящие', 'Решения', 'Профиль'], reason: 'порядок вкладок — Q-1');
+
+    await tester.tap(find.text('Входящие'));
+    await settle(tester);
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/incoming');
+    expect(find.text('Входящие направления'), findsOneWidget);
+    expect(find.byType(FloatingNav), findsOneWidget, reason: 'входящие — корень вкладки');
 
     await tester.tap(find.text('Решения'));
     await settle(tester);
     expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/decisions');
     expect(find.text('Журнал решений'), findsOneWidget);
 
-    router.go('/doctor/scribe');
+    router.go('/doctor/patients');
     await settle(tester);
+    unawaited(router.push('/doctor/notifications'));
+    await settle(tester);
+    expect(router.state.uri.path, '/doctor/notifications', reason: 'push: верхний экран стека');
     expect(find.byType(FloatingNav), findsNothing);
-    expect(find.text('AI-скрайб'), findsOneWidget);
+    expect(find.text('Новых уведомлений нет'), findsOneWidget);
+    expect(find.byTooltip('Назад'), findsOneWidget, reason: 'открыто поверх списка — «назад» возвращает к нему');
+    await tester.tap(find.byTooltip('Назад'));
+    await settle(tester);
+    expect(router.state.uri.path, '/doctor/patients');
 
-    router.go('/doctor/referral');
+    router.go('/doctor/referral?moCode=028B&profileCode=381');
     await settle(tester);
     expect(find.byType(FloatingNav), findsNothing);
     expect(find.text('Подтвердить направление'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('removed routes (/doctor/scribe, /doctor/patients/:ref/referral) and unknown paths land on the home screen', (tester) async {
+    final router = await pumpApp(tester, roles: ['doctor'], region: '75', claims: {'mo_code': '028B'});
+    for (final path in ['/doctor/scribe', '/doctor/patients/SYN-75-028B-381-01/referral?moCode=22GN&profileCode=381', '/nowhere']) {
+      router.go('/doctor/decisions');
+      await settle(tester);
+      router.go(path);
+      await settle(tester);
+      expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/patients', reason: path);
+    }
     expect(tester.takeException(), isNull);
   });
 
@@ -108,13 +138,17 @@ void main() {
     expect(find.text('Войти через eGov mobile'), findsOneWidget);
   });
 
-  testWidgets('org_admin (legacy chief with mo_code) gets the doctor shell with the journal tab', (tester) async {
+  testWidgets('org_admin (legacy chief with mo_code) gets the doctor shell with incoming referrals and the journal tab', (tester) async {
     final router = await pumpApp(tester, roles: ['chief'], claims: {'mo_code': '028B', 'region_kato': '75'});
     expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/patients');
+    expect(find.text('Входящие'), findsOneWidget);
     expect(find.text('Решения'), findsOneWidget);
-    router.go('/doctor/scribe');
+    router.go('/doctor/patients/SYN-75-028B-381-01/scribe');
     await settle(tester);
     expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/patients', reason: 'без scribe.use скрайб закрыт');
+    router.go('/doctor/referral');
+    await settle(tester);
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/doctor/patients', reason: 'без referral.assist ассистент закрыт');
   });
 
   testWidgets('/me without decisions permissions hides the «Решения» tab, the other tabs still switch branches', (tester) async {
@@ -130,6 +164,7 @@ void main() {
       },
     });
     expect(find.text('Решения'), findsNothing);
+    expect(find.text('Входящие'), findsOneWidget);
     expect(find.text('Профиль'), findsOneWidget);
     await tester.tap(find.text('Профиль'));
     await settle(tester);

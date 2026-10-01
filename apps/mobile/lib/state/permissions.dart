@@ -117,10 +117,12 @@ const _all = PermScope.all;
 const _own = PermScope.own;
 
 /// Матрица docs/rbac.md («Разрешения» + системные `data.steward`, `admin.orgs`); `admin` получает всё отдельно.
+/// Рабочий список врача — `own`, как на сервере: врач без клейма `mo_code` не получает врачебный кабинет и попадает
+/// в гражданский (его `route.own` — `all`), а не в список, на который API ответил бы 403 `no_organization`.
 const roleMatrix = <String, Map<String, PermScope>>{
   'citizen': {Perm.routeOwn: _all, Perm.waitPublic: _all, Perm.medicinesCheck: _all},
   'doctor': {
-    Perm.routeOwn: _all, Perm.waitPublic: _all, Perm.medicinesCheck: _all, Perm.worklistView: _all, Perm.referralAssist: _all, //
+    Perm.routeOwn: _all, Perm.waitPublic: _all, Perm.medicinesCheck: _all, Perm.worklistView: _own, Perm.referralAssist: _all, //
     Perm.referralConfirm: _all, Perm.scribeUse: _all, Perm.decisionsOwn: _all,
   },
   'org_admin': {

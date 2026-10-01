@@ -15,7 +15,8 @@ void main() {
     anonymous = await session(roles: []);
     byRole = {
       'citizen': await signedIn(FakeBackend(roles: ['citizen'], claims: {'iin': '000000000001'})),
-      'doctor': await signedIn(FakeBackend(roles: ['doctor'], claims: {'region_kato': '75'})),
+      'doctor': await signedIn(FakeBackend(roles: ['doctor'], claims: {'region_kato': '75', 'mo_code': '028B'})),
+      'doctor_no_org': await signedIn(FakeBackend(roles: ['doctor'], claims: {'region_kato': '75'})),
       'org_admin': await signedIn(FakeBackend(roles: ['org_admin'], claims: {'mo_code': '028B', 'region_kato': '75'})),
       'regulator': await signedIn(FakeBackend(roles: ['regulator'])),
       'steward': await signedIn(FakeBackend(roles: ['steward'])),
@@ -36,11 +37,12 @@ void main() {
     expect(guard(anonymous, '/web'), '/login?from=%2Fweb');
   });
 
-  test('each of the 7 roles lands on its home: doctor shell, citizen shell or the web-only screen', () {
+  test('each of the 7 roles (and a doctor without mo_code) lands on its home: doctor shell, citizen shell or the web-only screen', () {
     final homes = {for (final e in byRole.entries) e.key: guard(e.value, '/')};
     expect(homes, {
       'citizen': '/home',
       'doctor': '/doctor/patients',
+      'doctor_no_org': '/home',
       'org_admin': '/doctor/patients',
       'regulator': '/web',
       'steward': '/web',
@@ -53,27 +55,42 @@ void main() {
     }
   });
 
-  test('citizen: never enters the doctor shell or the web-only screen; medicines are allowed', () {
+  test('citizen: never enters the doctor shell or the web-only screen; medicines, the leaflet and consents are allowed', () {
     final citizen = byRole['citizen']!;
     expect(guard(citizen, '/home/route'), isNull);
+    expect(guard(citizen, '/home/route/leaflet/9f3c2a71'), isNull);
+    expect(guard(citizen, '/home/route/leaflet/scribe'), isNull, reason: 'токен памятки — данные, а не сегмент экрана скрайба');
     expect(guard(citizen, '/home/medicines'), isNull);
     expect(guard(citizen, '/profile/security'), isNull);
-    expect(guard(citizen, '/doctor/scribe'), '/home');
+    expect(guard(citizen, '/profile/consents'), isNull);
+    expect(guard(citizen, '/doctor/patients/SYN-1/scribe'), '/home');
+    expect(guard(citizen, '/doctor/incoming'), '/home');
+    expect(guard(citizen, '/doctor/notifications'), '/home');
     expect(guard(citizen, '/doctor/decisions'), '/home');
     expect(guard(citizen, '/web'), '/home');
   });
 
-  test('doctor: whole doctor shell including assistant, scribe, journal and security', () {
+  test('doctor without mo_code lives in the citizen shell (Q-20): no worklist, no incoming referrals', () {
+    final doctor = byRole['doctor_no_org']!;
+    expect(guard(doctor, '/home/route'), isNull);
+    expect(guard(doctor, '/doctor/patients'), '/home');
+    expect(guard(doctor, '/doctor/incoming'), '/home');
+  });
+
+  test('doctor: whole doctor shell including incoming, notifications, assistant, scribe, journal and the account screens', () {
     final doctor = byRole['doctor']!;
     for (final path in [
       '/doctor/patients',
       '/doctor/patients/SYN-75-028B-381-01',
-      '/doctor/patients/SYN-75-028B-381-01/referral',
       '/doctor/patients/SYN-75-028B-381-01/scribe',
+      '/doctor/incoming',
+      '/doctor/notifications',
       '/doctor/decisions',
       '/doctor/referral',
-      '/doctor/scribe',
+      '/doctor/referral?moCode=028B&profileCode=381',
       '/doctor/profile/security',
+      '/doctor/profile/notifications',
+      '/doctor/profile/consents',
     ]) {
       expect(guard(doctor, path), isNull, reason: path);
     }
@@ -82,15 +99,16 @@ void main() {
     expect(guard(doctor, '/web'), '/doctor/patients');
   });
 
-  test('org_admin: worklist, patient route and journal, but no assistant (referral.assist) and no scribe (scribe.use)', () {
+  test('org_admin: worklist, patient route, incoming, notifications and journal, but no assistant (referral.assist) and no scribe (scribe.use)', () {
     final chief = byRole['org_admin']!;
     expect(guard(chief, '/doctor/patients'), isNull);
     expect(guard(chief, '/doctor/patients/SYN-1'), isNull);
+    expect(guard(chief, '/doctor/incoming'), isNull, reason: 'приём переводов — основная работа принимающей стороны');
+    expect(guard(chief, '/doctor/notifications'), isNull);
     expect(guard(chief, '/doctor/decisions'), isNull);
-    expect(guard(chief, '/doctor/patients/SYN-1/referral'), '/doctor/patients');
     expect(guard(chief, '/doctor/patients/SYN-1/scribe'), '/doctor/patients');
     expect(guard(chief, '/doctor/referral'), '/doctor/patients');
-    expect(guard(chief, '/doctor/scribe'), '/doctor/patients');
+    expect(guard(chief, '/doctor/referral?moCode=028B'), '/doctor/patients');
   });
 
   test('regulator, steward, auditor: only the web-only screen', () {
@@ -106,17 +124,26 @@ void main() {
 
   test('admin has every permission and lives in the doctor shell', () {
     final admin = byRole['admin']!;
-    expect(guard(admin, '/doctor/scribe'), isNull);
-    expect(guard(admin, '/doctor/patients/SYN-1/referral'), isNull);
+    expect(guard(admin, '/doctor/patients/SYN-1/scribe'), isNull);
+    expect(guard(admin, '/doctor/referral'), isNull);
+    expect(guard(admin, '/doctor/incoming'), isNull);
     expect(guard(admin, '/home'), '/doctor/patients');
   });
 
-  test('requiredPermissions maps screens to rbac.md codes', () {
-    expect(requiredPermissions('/doctor/patients/X/referral'), [Perm.referralAssist]);
-    expect(requiredPermissions('/doctor/scribe'), [Perm.scribeUse]);
+  test('requiredPermissions maps screens to rbac.md codes by route pattern, not by any segment', () {
+    expect(requiredPermissions('/doctor/referral'), [Perm.referralAssist]);
+    expect(requiredPermissions('/doctor/referral?moCode=028B&profileCode=381'), [Perm.referralAssist]);
+    expect(requiredPermissions('/doctor/patients/SYN-75-028B-381-01/scribe'), [Perm.scribeUse]);
     expect(requiredPermissions('/doctor/decisions'), [Perm.decisionsOwn, Perm.decisionsAll]);
     expect(requiredPermissions('/home/medicines'), [Perm.medicinesCheck]);
     expect(requiredPermissions('/doctor/patients'), isNull);
+    expect(requiredPermissions('/doctor/patients/SYN-1'), isNull);
+    expect(requiredPermissions('/doctor/incoming'), isNull, reason: 'вкладка открыта всем с worklist.view — это и есть врачебный shell');
+    expect(requiredPermissions('/doctor/notifications'), isNull);
+    expect(requiredPermissions('/home/route/leaflet/referral'), isNull, reason: 'параметр пути не путается с экраном');
+    expect(requiredPermissions('/home/route/leaflet/decisions'), isNull);
+    expect(requiredPermissions('/doctor/patients/scribe'), isNull, reason: 'реф пациента на месте :ref — не экран скрайба');
+    expect(requiredPermissions('/profile/consents'), isNull);
   });
 
   test('afterLogin returns only to safe internal paths of the right shell', () {

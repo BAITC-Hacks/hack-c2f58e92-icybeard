@@ -77,6 +77,10 @@ class Session extends ChangeNotifier {
   String? get displayName => _me?.displayName.isNotEmpty == true ? _me!.displayName : _name;
   String? get email => _me?.email ?? _email;
   String? get organizationName => _me?.moName;
+
+  /// Код своей организации: из `/me`, иначе из клейма `mo_code`; null — учётная запись не привязана к больнице
+  /// (входящие направления и колокольчик персонала тогда не запрашиваются).
+  String? get moCode => _me?.moCode ?? _moClaim;
   String? get iin => _iin;
   String get locale => _locale;
   bool get rememberMe => _remember;
@@ -213,9 +217,14 @@ class Session extends ChangeNotifier {
     await _persist('locale', locale);
   }
 
-  /// Регион учётной записи без клейма region_kato; при клейме выбор не переопределяет учётную запись.
+  /// Регион учётной записи без клейма region_kato; при клейме выбор не переопределяет учётную запись. Слушатели
+  /// уведомляются, только если сменился действующий [region]: от него зависят маршрут гражданина и его колокольчик.
   Future<void> setRegion(String regionKato) async {
+    final before = region;
     _preferredRegion = regionKato;
+    if (region != before) {
+      notifyListeners();
+    }
     await _persist('region', regionKato);
   }
 
@@ -306,14 +315,15 @@ class Session extends ChangeNotifier {
     _iin = claims['iin'] as String?;
   }
 
-  /// Разрешения: из `/me`, иначе по ролям токена; shell — из разрешений.
+  /// Разрешения: из `/me`, иначе по ролям токена (own-разрешения — только при организации из `/me` или клейма);
+  /// shell — из разрешений.
   void _recompute() {
     if (_access == null) {
       _grants = Grants.none;
       _shell = null;
       return;
     }
-    _grants = _me?.grants ?? Grants.fromRoles(_tokenRoles, hasOrganization: _moClaim != null);
+    _grants = _me?.grants ?? Grants.fromRoles(_tokenRoles, hasOrganization: moCode != null);
     _shell = _grants.shell;
   }
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:darumen/state/permissions.dart';
 import 'package:darumen/state/session.dart';
 import 'package:darumen/state/token_store.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -57,14 +58,40 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('without /me (404) permissions come from token roles by the rbac.md matrix', () async {
-    final doctor = await signedIn(FakeBackend(roles: ['doctor'], claims: {'region_kato': '75'}));
+    final doctor = await signedIn(FakeBackend(roles: ['doctor'], claims: {'region_kato': '75', 'mo_code': '028B'}));
     expect(doctor.grantsFromApi, isFalse);
     expect(doctor.shell, ShellKind.doctor);
     for (final code in ['worklist.view', 'referral.assist', 'referral.confirm', 'scribe.use', 'decisions.own']) {
       expect(doctor.can(code), isTrue, reason: code);
     }
+    expect(doctor.grants.scopeOf('worklist.view'), PermScope.own, reason: 'как на сервере: рабочий список — только своей больницы');
+    expect(doctor.grants.scopeOf('referral.confirm'), PermScope.all);
     expect(doctor.can('decisions.all'), isFalse);
     expect(doctor.can('gov.map'), isFalse);
+  });
+
+  test('a doctor without mo_code follows the server: no worklist.view, so the citizen shell (Q-20)', () async {
+    final doctor = await signedIn(FakeBackend(roles: ['doctor'], claims: {'region_kato': '75'}));
+    expect(doctor.can('worklist.view'), isFalse, reason: 'own без организации пустое — API ответил бы 403 no_organization');
+    expect(doctor.shell, ShellKind.citizen, reason: 'route.own у врача — all');
+    expect(doctor.can('referral.assist'), isTrue, reason: 'разрешения со scope all не зависят от организации');
+    expect(doctor.moCode, isNull);
+    expect(Grants.fromRoles(const ['doctor'], hasOrganization: true).scopeOf(Perm.worklistView), PermScope.own);
+    expect(Grants.fromRoles(const ['doctor']).can(Perm.worklistView), isFalse);
+  });
+
+  test('moCode comes from /me, otherwise from the mo_code claim', () async {
+    final byClaim = await signedIn(FakeBackend(roles: ['doctor'], claims: {'mo_code': '22GN'}));
+    expect(byClaim.moCode, '22GN');
+    final byMe = await signedIn(FakeBackend(roles: ['doctor'], claims: {'mo_code': '22GN'}, me: {
+      'userId': 'u', 'displayName': 'D', 'roles': ['doctor'], 'moCode': '028B',
+      'permissions': [{'code': 'worklist.view', 'scope': 'own'}],
+    }));
+    expect(byMe.moCode, '028B', reason: '/me — источник истины');
+    final citizen = await signedIn(FakeBackend(roles: ['citizen']));
+    expect(citizen.moCode, isNull);
+    await byClaim.logout();
+    expect(byClaim.moCode, isNull);
   });
 
   test('legacy chief is org_admin: doctor shell with confirm and journal, no assistant or scribe; without mo_code — web', () async {
@@ -102,9 +129,9 @@ void main() {
   });
 
   test('a /me response without permissions keeps the fallback instead of locking the user out', () async {
-    final s = await signedIn(FakeBackend(roles: ['doctor'], me: {'userId': 'u', 'displayName': 'D', 'roles': ['doctor']}));
+    final s = await signedIn(FakeBackend(roles: ['doctor'], me: {'userId': 'u', 'displayName': 'D', 'roles': ['doctor'], 'moCode': '028B'}));
     expect(s.grantsFromApi, isFalse);
-    expect(s.shell, ShellKind.doctor);
+    expect(s.shell, ShellKind.doctor, reason: 'организация из /me тоже открывает own-разрешения фолбэка');
   });
 
   test('regulator, steward and auditor get the web-only screen, admin gets everything', () async {

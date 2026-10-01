@@ -1,27 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../l10n/strings.dart';
 import '../theme/tokens.dart';
 import '../theme/tones.dart';
+import '../theme/typography.dart';
+import 'count_badge.dart';
 import 'notice_card.dart';
 
 /// Вкладка плавающей нижней навигации: подпись, иконка, корневой путь и индекс ветки StatefulShellRoute (вкладки
-/// без разрешения скрываются, поэтому позиция в пилюле и номер ветки могут не совпадать).
+/// без разрешения скрываются, поэтому позиция в пилюле и номер ветки могут не совпадать). [badge] — счётчик на
+/// иконке ([CountBadge], 0 — нет), [badgeLabel] — что он значит для чтения с экрана («новых: 3»); вкладка тогда
+/// озвучивается как «Уведомления, новых: 3».
 class ShellDestination {
-  const ShellDestination({required this.label, required this.icon, required this.path, required this.branch});
+  const ShellDestination({required this.label, required this.icon, required this.path, required this.branch, this.badge = 0, this.badgeLabel});
 
   final String label;
   final IconData icon;
   final String path;
   final int branch;
+  final int badge;
+  final String? badgeLabel;
+
+  /// Подпись вкладки для чтения с экрана: с непустым счётчиком — вместе с его смыслом.
+  String semanticsLabel(S s) => badge > 0 && badgeLabel != null ? s.tabWithBadge(label, badgeLabel!) : label;
 }
 
 /// Плавающая пилюля навигации поверх StatefulShellRoute: `margin 12 16 16`, высота 64, белая, тень `--shadow-pop`;
-/// три пункта — иконка 22, подпись 11/700, полоска 16×3 accent под активным (активный пункт — accent-strong,
-/// остальные text-muted — доска m-home-new). Показывается только на корневых экранах веток: на
-/// вложенных («Мой путь», «Сколько ждут», маршрут пациента) вместо неё нижняя кнопка экрана. Повторное нажатие
-/// на активную вкладку возвращает её в корень. Над экранами обоих shell'ов — баннер «Почтовый сервер недоступен»
-/// ([EmailOutageBanner]), пока почта не работает и пользователь его не закрыл.
+/// три-четыре пункта — иконка 22 (со счётчиком [CountBadge], если он есть), подпись 11/700, полоска 16×3 accent под
+/// активным (активный пункт — accent-strong, остальные text-muted — доска m-home-new). Показывается только на
+/// корневых экранах веток: на вложенных («Мой путь», «Сколько ждут», маршрут пациента) вместо неё нижняя кнопка
+/// экрана. Повторное нажатие на активную вкладку возвращает её в корень. Над экранами обоих shell'ов — баннер
+/// «Почтовый сервер недоступен» ([EmailOutageBanner]), пока почта не работает и пользователь его не закрыл.
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.shell, required this.destinations});
 
@@ -107,17 +117,18 @@ class _NavItem extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: destination.label,
+      label: destination.semanticsLabel(S.at(context)),
+      excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(destination.icon, size: 22, color: color),
+            CountBadge(count: destination.badge, child: Icon(destination.icon, size: 22, color: color)),
             const SizedBox(height: 3),
             Text(
               destination.label,
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 11, color: color),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: AppType.navLabelSize, color: color),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
