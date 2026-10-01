@@ -1,15 +1,18 @@
 import { ref } from 'vue'
+import { ApiError } from '@/api/client'
 import { journal } from '@/api/endpoints'
 import type { IncomingReferral } from '@/api/types'
 
-/** Входящие направления в свою организацию (задача 4): список из /journal/referrals/incoming и подтверждение приёма.
- * Подтвердить можно только направление с patientConsent === 'accepted' — сервер отклонит остальные 409. */
+/** Входящие направления в свою организацию: список из /journal/referrals/incoming и действия принимающей больницы —
+ * подтвердить с датой, отказать, перенести дату, отметить госпитализацию или неявку, выписать. Какие кнопки показать —
+ * только из item.allowed (сервер считает по журналу и отклонит остальное 409). */
 export function useIncomingReferrals() {
   const items = ref<IncomingReferral[]>([])
   const error = ref<unknown>(null)
   const loading = ref(false)
   const acting = ref<string | null>(null)
-  const showConfirmed = ref(false)
+  // по умолчанию — все входящие (и подтверждённые, и выписанные): отбор делают фильтры на странице
+  const showConfirmed = ref(true)
   const severeOnly = ref(false)
 
   async function load() {
@@ -24,14 +27,15 @@ export function useIncomingReferrals() {
     }
   }
 
-  /** decisionId и patientRef — из той же строки списка, что и кнопка «Подтвердить». */
-  async function confirm(decisionId: string, patientRef: string, comment?: string): Promise<boolean> {
+  async function run(decisionId: string, request: (key: string) => Promise<unknown>): Promise<boolean> {
     acting.value = decisionId
     try {
-      await journal.confirmReferral(decisionId, { patientRef, comment: comment?.trim() || undefined }, crypto.randomUUID())
+      await request(crypto.randomUUID())
       await load()
       return true
     } catch (e) {
+      // 409 — состояние уже изменилось (пациент отозвал согласие, коллега успел раньше): обновляем список
+      if (e instanceof ApiError && e.status === 409) await load()
       error.value = e
       return false
     } finally {
@@ -39,21 +43,20 @@ export function useIncomingReferrals() {
     }
   }
 
-  /** Выписка/эпикриз (задача 11): доступна только когда i.confirmed && !i.discharged — сервер и так это проверит
-   * (409), но фронтенд скрывает действие заранее, чтобы не полагаться на обработку ошибки как на основной путь. */
-  async function discharge(decisionId: string, patientRef: string, summary: string): Promise<boolean> {
-    acting.value = decisionId
-    try {
-      await journal.dischargeReferral(decisionId, { patientRef, summary: summary.trim() }, crypto.randomUUID())
-      await load()
-      return true
-    } catch (e) {
-      error.value = e
-      return false
-    } finally {
-      acting.value = null
-    }
-  }
+  const trim = (v?: string) => v?.trim() || undefined
 
-  return { items, error, loading, acting, showConfirmed, severeOnly, load, confirm, discharge }
+  /** Подтвердить приём и назначить дату госпитализации (сегодня..+30 дней). */
+  const confirm = (i: IncomingReferral, plannedAt: string, comment?: string) =>
+    run(i.decisionId, (key) => journal.confirmReferral(i.decisionId, { patientRef: i.patientRef, plannedAt, comment: trim(comment) }, key))
+  const reject = (i: IncomingReferral, reason: string) =>
+    run(i.decisionId, (key) => journal.rejectReferral(i.decisionId, { patientRef: i.patientRef, reason: reason.trim() }, key))
+  const reschedule = (i: IncomingReferral, plannedAt: string, reason: string) =>
+    run(i.decisionId, (key) => journal.rescheduleReferral(i.decisionId, { patientRef: i.patientRef, plannedAt, reason: reason.trim() }, key))
+  const admit = (i: IncomingReferral) => run(i.decisionId, (key) => journal.admitReferral(i.decisionId, { patientRef: i.patientRef }, key))
+  const noShow = (i: IncomingReferral, reason?: string) =>
+    run(i.decisionId, (key) => journal.noShowReferral(i.decisionId, { patientRef: i.patientRef, reason: trim(reason) }, key))
+  const discharge = (i: IncomingReferral, summary: string) =>
+    run(i.decisionId, (key) => journal.dischargeReferral(i.decisionId, { patientRef: i.patientRef, summary: summary.trim() }, key))
+
+  return { items, error, loading, acting, showConfirmed, severeOnly, load, confirm, reject, reschedule, admit, noShow, discharge }
 }

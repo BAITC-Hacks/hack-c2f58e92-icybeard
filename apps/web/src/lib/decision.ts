@@ -12,6 +12,8 @@ export const SUBJECT_REFERRAL = 'referral'
 export const SUBJECT_ANOMALY = 'anomaly'
 /** Решения по маршруту пациента (redirect / keep) пишутся с предметом route. */
 export const SUBJECT_ROUTE = 'route'
+/** Согласие пациента на запись приёма и утверждённая запись скрайба. */
+export const SUBJECT_SCRIBE = 'scribe'
 
 const ROLE_IDS = ['doctor', 'chief', 'org_admin', 'regulator', 'steward', 'auditor', 'admin', 'citizen']
 
@@ -25,6 +27,7 @@ export function subjectLabel(subject: string): string {
   if (subject === SUBJECT_REFERRAL) return t('decision.subjectReferral')
   if (subject === SUBJECT_ANOMALY) return t('decision.subjectAnomaly')
   if (subject === SUBJECT_ROUTE) return t('decision.subjectRoute')
+  if (subject === SUBJECT_SCRIBE) return t('decision.subjectScribe')
   return subject
 }
 

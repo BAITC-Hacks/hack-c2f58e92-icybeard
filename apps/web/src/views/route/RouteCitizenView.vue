@@ -4,7 +4,8 @@ import Textarea from 'primevue/textarea'
 import { useToast } from 'primevue/usetoast'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { SignalKind } from '@/api/types'
+import { route as routeApi } from '@/api/endpoints'
+import type { ScribeConsent, SignalKind } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
 import OriginTag from '@/components/OriginTag.vue'
 import RouteAlternatives from '@/components/route/RouteAlternatives.vue'
@@ -63,10 +64,40 @@ function dismissAnswer(id: string) {
 }
 
 
+const progress = computed(() => r.progress.value)
+/** Пока пациент ждёт в своей больнице (waiting/kept), сверху — ответ врача или «Вы ещё ждёте?»; во всех остальных
+ * состояниях (перевод, дата, больница, снятие, завершение) — карточка состояния с действиями из progress.allowed. */
+const waiting = computed(() => !progress.value || progress.value.status === 'waiting' || progress.value.status === 'kept')
+const transferName = computed(() => shortOrgName(progress.value?.transfer?.toMoName ?? progress.value?.responsibleMoName ?? ''))
+const statusTitle = computed(() => {
+  switch (progress.value?.status) {
+    case 'transfer_pending_consent': return t('route.citizen.proposedTitle')
+    case 'transfer_pending_confirmation': return t('route.citizen.waitConfirmTitle')
+    case 'transferred': return t('route.citizen.transferredTitle')
+    case 'admitted': return t('route.citizen.admittedTitle')
+    case 'withdrawal_requested': return t('route.citizen.withdrawalTitle')
+    case 'closed': return t('route.citizen.closedTitle')
+    default: return ''
+  }
+})
+const statusBody = computed(() => {
+  const p = progress.value
+  if (!p) return ''
+  switch (p.status) {
+    case 'transfer_pending_consent': return t('route.citizen.proposedBody', { name: transferName.value })
+    case 'transfer_pending_confirmation': return t('route.citizen.waitConfirmBody', { name: transferName.value })
+    case 'transferred': return t('route.citizen.transferredBody', { name: transferName.value, date: dateShort(p.transfer?.plannedAt) })
+    case 'admitted': return shortOrgName(p.responsibleMoName)
+    case 'withdrawal_requested': return t('route.citizen.withdrawalBody')
+    case 'closed': return p.closedReason ? t('route.progress.closed.' + p.closedReason) : ''
+    default: return ''
+  }
+})
+
 /** Ответ врача показывается, если он новее последнего сигнала гражданина и его ещё не закрыли «Понятно». */
 const doctorAnswer = computed(() => {
   const d = r.latestDecision.value
-  if (!d || seenDecision.value === d.decisionId) return null
+  if (!waiting.value || !d || d.patientConsent === 'pending' || seenDecision.value === d.decisionId) return null
   const lastSignal = r.data.value?.signals[0]
   return !lastSignal || lastSignal.recordedAt < d.recordedAt ? d : null
 })
@@ -91,14 +122,46 @@ async function signal(kind: SignalKind, toMoCode?: string) {
   requestComment.value = ''
 }
 
-/** Ответ на решение redirect, ждущее согласия (задача 2): пока не ответит — «Понятно» не показывается, банер держится. */
-async function respondConsent(decisionId: string, accepted: boolean) {
-  const ok = await r.consent(decisionId, accepted)
+/** Ответ на предложенный перевод; до подтверждения больницей «отказ» = отзыв согласия. */
+async function respondConsent(accepted: boolean) {
+  const transfer = progress.value?.transfer
+  if (!transfer) return
+  const withdrawing = !accepted && progress.value?.status === 'transfer_pending_confirmation'
+  const ok = await r.consent(transfer.decisionId, accepted)
   if (!ok) return
-  toast.add({ severity: 'success', summary: t(accepted ? 'route.consentAccepted' : 'route.consentDeclined'), life: 4000 })
+  toast.add({ severity: 'success', summary: t(withdrawing ? 'route.citizen.consentWithdrawn' : accepted ? 'route.consentAccepted' : 'route.consentDeclined'), life: 4000 })
 }
 
-onMounted(r.load)
+/** Запись приёма AI-скрайбом: врач просит согласие, пациент отвечает здесь; утверждённые памятки — списком. */
+const scribe = ref<ScribeConsent[]>([])
+const scribeBusy = ref(false)
+const scribeAsk = computed(() => scribe.value.find((c) => c.status === 'pending') ?? null)
+const scribeGranted = computed(() => scribe.value.find((c) => c.status === 'granted') ?? null)
+const leaflets = computed(() => scribe.value.filter((c) => c.status === 'completed' && c.leafletToken))
+async function loadScribe() {
+  try {
+    scribe.value = await routeApi.myScribe()
+  } catch {
+    scribe.value = [] // блок второстепенный: без него маршрут всё равно показывается
+  }
+}
+async function answerScribe(id: string, granted: boolean) {
+  scribeBusy.value = true
+  try {
+    await routeApi.answerScribe(id, granted)
+    toast.add({ severity: 'success', summary: t('route.citizen.scribeAnswered'), life: 3000 })
+  } catch (e) {
+    r.error.value = e
+  } finally {
+    scribeBusy.value = false
+    await loadScribe()
+  }
+}
+
+onMounted(() => {
+  r.load()
+  loadScribe()
+})
 </script>
 
 <template>
@@ -157,6 +220,9 @@ onMounted(r.load)
                 <span class="row-main"><span class="row-title">{{ nextStage.title }}</span><span v-if="nextStage.norm" class="row-sub">{{ t('route.normLabel') }}: {{ nextStage.norm }}</span></span>
               </div>
               <div v-else-if="currentStage" class="row"><span class="row-main row-title">{{ currentStage.title }}</span></div>
+              <div v-if="waiting && progress?.lastAttempt" class="row" data-testid="last-attempt">
+                <span class="row-main"><span class="row-title">{{ t('route.citizen.attemptTitle') }}</span><span class="row-sub">{{ t('route.progress.attempt.' + progress.lastAttempt.outcome, { name: shortOrgName(progress.lastAttempt.toMoName) }) }}<template v-if="progress.lastAttempt.reason"> — «{{ progress.lastAttempt.reason }}»</template></span></span>
+              </div>
               <div v-if="r.pendingRequest.value" class="row">
                 <span class="row-main row-title" :title="r.pendingRequest.value.toMoName ?? ''">{{ t('route.signal.request_redirect', { name: shortOrgName(r.pendingRequest.value.toMoName) }) }}</span>
                 <span class="row-value"><StatusTag :value="t('route.awaitingDoctor')" tone="accent" /></span>
@@ -176,7 +242,33 @@ onMounted(r.load)
         </div>
         <div class="col">
           <!-- ответ врача: карточка-сигнал на accent-soft -->
-          <section v-if="doctorAnswer" class="card signal-card" data-testid="doctor-answer">
+          <section v-if="scribeAsk" class="card signal-card" data-testid="scribe-ask">
+            <div class="signal-head"><i class="pi pi-microphone" aria-hidden="true" /><span class="signal-title">{{ t('route.citizen.scribeAskTitle') }}</span></div>
+            <span class="signal-body">{{ t('route.citizen.scribeAskBody', { org: shortOrgName(scribeAsk.moName ?? '') }) }}</span>
+            <span v-if="scribeAsk.comment" class="muted">«{{ scribeAsk.comment }}»</span>
+            <div class="signal-actions">
+              <Button :label="t('route.citizen.scribeAllow')" :loading="scribeBusy" :disabled="scribeBusy" data-testid="scribe-allow" @click="answerScribe(scribeAsk.requestId, true)" />
+              <Button :label="t('route.citizen.scribeDeny')" severity="secondary" :disabled="scribeBusy" data-testid="scribe-deny" @click="answerScribe(scribeAsk.requestId, false)" />
+            </div>
+          </section>
+          <div v-else-if="scribeGranted" class="scribe-granted" data-testid="scribe-granted">
+            <i class="pi pi-microphone" aria-hidden="true" /><span>{{ t('route.citizen.scribeAllowed') }}</span>
+            <button type="button" class="link-btn" :disabled="scribeBusy" @click="answerScribe(scribeGranted.requestId, false)">{{ t('route.citizen.scribeWithdraw') }}</button>
+          </div>
+          <section v-if="!waiting && progress" class="card signal-card" data-testid="route-progress" :data-status="progress.status">
+            <div class="signal-head"><i class="pi pi-shield" aria-hidden="true" /><span class="signal-title">{{ statusTitle }}</span></div>
+            <span class="signal-body" :title="progress.transfer?.toMoName ?? ''">{{ statusBody }}</span>
+            <span v-if="progress.status === 'transfer_pending_consent' && progress.transfer?.reason" class="muted">{{ t('route.doctorReason', { reason: progress.transfer.reason }) }}</span>
+            <span v-if="progress.overdue" class="muted">{{ t('route.citizen.overdueBody') }}</span>
+            <div v-if="progress.allowed.length" class="signal-actions">
+              <Button v-if="r.can('accept_transfer')" :label="t('route.consentAccept')" :loading="r.acting.value === 'accept_transfer'" :disabled="r.acting.value !== null" data-testid="consent-accept" @click="respondConsent(true)" />
+              <Button v-if="r.can('decline_transfer')" :label="progress.status === 'transfer_pending_confirmation' ? t('route.citizen.withdrawConsent') : t('route.consentDecline')" severity="secondary"
+                :loading="r.acting.value === 'decline_transfer'" :disabled="r.acting.value !== null" data-testid="consent-decline" @click="respondConsent(false)" />
+              <Button v-if="r.can('still_waiting')" :label="t('route.citizen.stillWaiting')" :disabled="r.acting.value !== null" data-testid="still-waiting" @click="signal('still_waiting')" />
+              <button v-if="r.can('withdraw') && progress.status !== 'withdrawal_requested'" type="button" class="link-btn" :disabled="r.acting.value !== null" data-testid="withdraw" @click="signal('withdraw')">{{ progress.status === 'transferred' ? t('route.citizen.refuseHospital') : t('route.citizen.notNeeded') }}</button>
+            </div>
+          </section>
+          <section v-else-if="doctorAnswer" class="card signal-card" data-testid="doctor-answer">
             <div class="signal-head"><i class="pi pi-shield" aria-hidden="true" /><span class="signal-title">{{ doctorAnswer.kind === 'redirect' ? t('route.doctorSuggested') : t('route.keep') }}</span></div>
             <span v-if="doctorAnswer.kind === 'redirect'" class="signal-body" :title="doctorAnswer.toMoName">
               {{ shortOrgName(doctorAnswer.toMoName) }}<template v-if="answerAlternative"> · ≈ {{ days(answerAlternative.p50Days) }} {{ t('common.days') }} — {{ t('hero.half') }}</template>
@@ -185,16 +277,12 @@ onMounted(r.load)
             <StatusTag v-if="doctorAnswer.patientConsent === 'accepted'" :value="t('route.consentAccepted')" tone="ok" />
             <StatusTag v-else-if="doctorAnswer.patientConsent === 'declined'" :value="t('route.consentDeclined')" tone="neutral" />
             <div class="signal-actions">
-              <template v-if="doctorAnswer.patientConsent === 'pending'">
-                <Button :label="t('route.consentAccept')" :loading="r.acting.value === doctorAnswer.decisionId" :disabled="r.acting.value !== null" data-testid="consent-accept" @click="respondConsent(doctorAnswer.decisionId, true)" />
-                <Button :label="t('route.consentDecline')" severity="secondary" :loading="r.acting.value === doctorAnswer.decisionId" :disabled="r.acting.value !== null" data-testid="consent-decline" @click="respondConsent(doctorAnswer.decisionId, false)" />
-              </template>
-              <Button v-else :label="t('route.gotIt')" @click="dismissAnswer(doctorAnswer.decisionId)" />
+              <Button :label="t('route.gotIt')" @click="dismissAnswer(doctorAnswer.decisionId)" />
               <RouterLink class="link-arrow" to="/wait">{{ t('route.compareWait') }}</RouterLink>
             </div>
           </section>
           <!-- валидация листа ожидания -->
-          <AppCard v-else-if="r.data.value.validationDue" :title="t('route.validationTitle')" class="validation" data-testid="validation-card">
+          <AppCard v-else-if="r.data.value.validationDue && r.can('still_waiting')" :title="t('route.validationTitle')" class="validation" data-testid="validation-card">
             <p class="muted small validation-body">{{ t('route.validationBody') }}</p>
             <div class="options">
               <button type="button" class="option" :disabled="r.acting.value !== null" data-testid="still-waiting" @click="signal('still_waiting')">{{ t('route.validationStill') }}</button>
@@ -204,8 +292,20 @@ onMounted(r.load)
           </AppCard>
           <AppCard :title="t('route.whereFaster')" label :origin="r.data.value.alternativesModel ? 'ml' : undefined" class="grow">
             <p class="muted small faster-lead">{{ t('route.citizen.fasterLead') }}</p>
-            <RouteAlternatives :items="r.data.value.alternatives" audience="citizen" :acting="r.acting.value" :pending-code="r.pendingRequest.value?.toMoCode" :action-label="t('route.requestConsider')" :baseline-days="r.data.value.forecast.p50Days" @act="signal('request_redirect', $event)" />
-            <div v-if="r.data.value.alternatives.length" class="comment-block" :class="{ open: commentOpen || requestComment }">
+            <RouteAlternatives :items="r.alternatives.value" audience="citizen" :acting="r.acting.value" :pending-code="r.pendingRequest.value?.toMoCode" :action-label="r.can('request_transfer') ? t('route.requestConsider') : undefined" :baseline-days="r.data.value.forecast.p50Days" @act="signal('request_redirect', $event)" />
+            <p v-if="!waiting && r.alternatives.value.length" class="muted small stay-note">{{ t('route.citizen.requestsClosed') }}</p>
+            <div v-if="waiting && (progress?.prefersCurrent || r.can('prefer_current') || (r.can('withdraw') && !r.data.value.validationDue))" class="stay" data-testid="stay">
+              <p class="stay-title">{{ t('route.citizen.stayTitle') }}</p>
+              <p v-if="progress?.prefersCurrent" class="stay-done"><i class="pi pi-check-circle" aria-hidden="true" />{{ t('route.citizen.stayDone') }}</p>
+              <div class="stay-actions">
+                <Button v-if="r.can('prefer_current')" :label="t('route.citizen.stay')" icon="pi pi-home" size="small" severity="secondary" outlined
+                  :loading="r.acting.value === 'prefer_current'" :disabled="r.acting.value !== null" data-testid="prefer-current" @click="signal('prefer_current')" />
+                <Button v-if="r.can('withdraw') && !r.data.value.validationDue" :label="t('route.citizen.notNeeded')" icon="pi pi-times-circle" size="small" severity="danger" outlined
+                  :loading="r.acting.value === 'withdraw'" :disabled="r.acting.value !== null" data-testid="not-needed" @click="signal('withdraw')" />
+              </div>
+              <p class="muted small stay-hint">{{ t('route.citizen.stayHint') }}</p>
+            </div>
+            <div v-if="r.alternatives.value.length && r.can('request_transfer')" class="comment-block" :class="{ open: commentOpen || requestComment }">
               <button type="button" class="comment-toggle" :aria-expanded="commentOpen || !!requestComment" aria-controls="request-comment-box" data-testid="comment-toggle" @click="commentOpen = !commentOpen">
                 <i class="pi pi-comment" aria-hidden="true" />{{ t('route.citizen.commentToggle') }}
                 <i class="pi chevron" :class="commentOpen || requestComment ? 'pi-chevron-up' : 'pi-chevron-down'" aria-hidden="true" />
@@ -222,8 +322,16 @@ onMounted(r.load)
       <CollapsibleSection id="route-tests" :key="testsKey" :open="testsOpen" :title="t('route.checklist')" :summary="t('route.checklistSummary', { expired: r.expired.value, valid: r.valid.value })" origin="formula" data-testid="route-tests">
         <RouteChecklist :items="r.data.value.checklist" :standard="r.data.value.standard" />
       </CollapsibleSection>
+      <AppCard v-if="leaflets.length" :title="t('route.citizen.leafletsTitle')" label data-testid="leaflets">
+        <div class="rows">
+          <div v-for="l in leaflets" :key="l.requestId" class="row">
+            <span class="row-main"><span class="row-title">{{ shortOrgName(l.moName ?? '') }}</span><span class="row-sub">{{ dateShort(l.approvedAt) }}</span></span>
+            <RouterLink class="link-arrow small" :to="{ name: 'leaflet', params: { token: l.leafletToken! } }">{{ t('route.citizen.leafletOpen') }}</RouterLink>
+          </div>
+        </div>
+      </AppCard>
       <div class="grid cols-2">
-        <AppCard :title="t('route.signalsTitle')" label><RouteFeed :entries="r.entries.value" audience="citizen" /></AppCard>
+        <AppCard :title="t('route.signalsTitle')" label><RouteFeed :entries="r.journal.value" audience="citizen" /></AppCard>
         <AppCard :title="t('route.pastReferrals')" label><RouteHistory :items="r.data.value.history" /></AppCard>
       </div>
       <p class="caption footnote">{{ r.data.value.basis }} · {{ t('route.synthetic', { asOf: dateShort(r.data.value.asOf) }) }} · {{ t('route.stagesSource') }}</p>
@@ -290,6 +398,17 @@ onMounted(r.load)
 .comment-box { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .comment-note { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); line-height: 1.45; }
 .footnote { color: var(--text-faint); }
+.scribe-granted { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 16px; border: 1px solid var(--border-soft); border-radius: var(--radius-card); background: var(--surface); font-size: var(--fs-base-sm); }
+.scribe-granted .pi { color: var(--text-secondary); }
+.stay { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; padding: 16px 18px; border-radius: 14px; background: var(--surface-muted); border: 1px solid var(--border-soft); }
+.stay-title { margin: 0; font-weight: var(--fw-bold); font-size: var(--fs-base); }
+.stay-done { margin: 0; display: flex; gap: 8px; align-items: flex-start; line-height: 1.45; color: var(--success-text, var(--text)); }
+.stay-done .pi { margin-top: 3px; }
+.stay-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.stay-hint { margin: 0; line-height: 1.45; }
+.stay-note { margin: 0; flex-basis: 100%; line-height: 1.45; }
+.muted-link { color: var(--text-muted); }
+.link-btn:disabled { opacity: 0.6; cursor: default; }
 .grid.cols-2 .card { display: flex; flex-direction: column; }
 @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
 </style>

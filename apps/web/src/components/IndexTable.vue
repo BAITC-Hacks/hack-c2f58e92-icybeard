@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import type { IndexItem } from '@/api/types'
-import { days, indexColor, pct } from '@/lib/format'
+import { days, indexColor, num, pct } from '@/lib/format'
 
 /** Ранжированная таблица регионов по индексу: квадратик ступени шкалы (пять синих) рядом со значением; наведение и
  * клик уходят наружу — подсветка общая с картой. */
@@ -14,7 +14,7 @@ const { t } = useI18n()
   <div class="table-wrap index-wrap">
     <table class="dense-table" data-testid="index-table">
       <thead>
-        <tr><th>#</th><th>{{ t('common.region') }}</th><th class="num">{{ t('indexTable.index') }}</th><th class="num">&gt; 30 {{ t('common.days') }}</th><th class="num">p90</th><th class="num">n</th></tr>
+        <tr><th>{{ t('indexTable.place') }}</th><th>{{ t('common.region') }}</th><th class="num">{{ t('indexTable.indexPlain') }}</th><th class="num">{{ t('indexTable.over30') }}</th><th class="num">{{ t('indexTable.p90Plain') }}</th><th class="num">{{ t('indexTable.nPlain') }}</th></tr>
       </thead>
       <tbody>
         <tr
@@ -31,7 +31,7 @@ const { t } = useI18n()
           <td class="num"><span class="index"><span class="swatch" :style="{ background: indexColor(item.indexValue) }" aria-hidden="true" />{{ item.indexValue.toFixed(1) }}</span></td>
           <td class="num">{{ pct(item.shareOver30) }}</td>
           <td class="num">{{ days(item.p90Days) }}</td>
-          <td class="num muted">{{ item.n }}</td>
+          <td class="num muted">{{ num(item.n) }}</td>
         </tr>
       </tbody>
     </table>

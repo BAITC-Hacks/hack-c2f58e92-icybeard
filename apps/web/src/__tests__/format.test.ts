@@ -54,13 +54,13 @@ describe('format', () => {
     expect(signed(0)).toBe('0.0')
   })
 
-  it('maps the index to one of the five map-scale steps (below 60 → 87 and above)', () => {
-    expect(indexStep(0)).toBe(1)
-    expect(indexStep(59.9)).toBe(1)
-    expect(indexStep(60)).toBe(2)
-    expect(indexStep(79.9)).toBe(3)
-    expect(indexStep(86)).toBe(4)
-    expect(indexStep(87)).toBe(5)
-    expect(indexColor(100)).toBe('var(--dm-map-5)')
+  it('maps the access index to one of the five map-scale steps (higher index = better = step 1)', () => {
+    expect(indexStep(100)).toBe(1)
+    expect(indexStep(60)).toBe(1)
+    expect(indexStep(59.9)).toBe(2)
+    expect(indexStep(45)).toBe(3)
+    expect(indexStep(30)).toBe(4)
+    expect(indexStep(29.9)).toBe(5)
+    expect(indexColor(10)).toBe('var(--dm-map-5)')
   })
 })

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -15,6 +18,7 @@ import StateEmailOff from '@/components/states/StateEmailOff.vue'
 import FilterPill from '@/components/ui/FilterPill.vue'
 import PageShell from '@/components/ui/PageShell.vue'
 import Pager from '@/components/ui/Pager.vue'
+import SidePanel from '@/components/ui/SidePanel.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useAsync } from '@/composables/useAsync'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
@@ -39,17 +43,22 @@ const regionKato = ref<string | null>(null)
 const type = ref<string | null>(null)
 const status = ref<string | null>(null)
 const page = ref(1)
+const q = ref('')
+const panelOpen = computed({ get: () => selectedCode.value !== null, set: (v: boolean) => { if (!v) selectedCode.value = null } })
+/** Заявки на подключение — не отдельная коробка сбоку, а строка-уведомление над таблицей, открывает боковое окно. */
+const applicationsOpen = ref(false)
+const pendingCount = computed(() => applications.data.value?.items.length ?? 0)
 const selectedCode = ref<string | null>(null)
 const busyId = ref<string | null>(null)
 const actionError = ref<unknown>(null)
 /** Одобренная заявка, письмо по которой не ушло: ссылку-приглашение нужно передать вручную. */
 const decision = ref<ApplicationDecision | null>(null)
 
-const list = useAsync<PagedList<AdminOrg>>(() => admin.orgs({ regionKato: regionKato.value ?? undefined, type: type.value ?? undefined, status: status.value ?? undefined, page: page.value, size: PAGE_SIZE }))
+const list = useAsync<PagedList<AdminOrg>>(() => admin.orgs({ regionKato: regionKato.value ?? undefined, type: type.value ?? undefined, status: status.value ?? undefined, q: q.value.trim() || undefined, page: page.value, size: PAGE_SIZE }))
 const detail = useAsync<AdminOrgDetailResponse>(() => admin.org(selectedCode.value!))
 const applications = useAsync<{ items: OrgApplication[] }>(() => admin.applications('pending_review'))
 
-const filtered = computed(() => !!(regionKato.value || type.value || status.value))
+const filtered = computed(() => !!(regionKato.value || type.value || status.value || q.value.trim()))
 const regionOptions = computed(() => refdata.regions.map((r) => ({ value: r.regionKato, label: r.name })))
 const typeLabel = (value: string | null) => (value && te(`admin.orgs.type.${value}`) ? t(`admin.orgs.type.${value}`) : value ?? '—')
 /** Типы справочника плюс незнакомые клиенту, если встретились в строках. */
@@ -68,6 +77,7 @@ function resetFilters() {
   regionKato.value = null
   type.value = null
   status.value = null
+  q.value = ''
 }
 
 async function decide(run: () => Promise<unknown>, id: string, done: string) {
@@ -87,6 +97,11 @@ async function decide(run: () => Promise<unknown>, id: string, done: string) {
 }
 
 watch([regionKato, type, status], () => (page.value === 1 ? void list.run() : (page.value = 1)))
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+watch(q, () => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => (page.value === 1 ? void list.run() : (page.value = 1)), 300)
+})
 watch(page, () => void list.run())
 onMounted(async () => {
   await refdata.load().catch(() => undefined)
@@ -96,43 +111,55 @@ onMounted(async () => {
 
 <template>
   <PageShell :title="t('admin.orgs.title')" :lead="lead">
-    <div class="toolbar">
-      <FilterPill v-model="regionKato" :label="t('admin.users.colRegion')" :all-label="t('admin.all')" :options="regionOptions" searchable testid="filter-region" />
-      <FilterPill v-model="type" :label="t('admin.orgs.colType')" :all-label="t('admin.all')" :options="typeOptions" />
-      <FilterPill v-model="status" :label="t('admin.orgs.colStatusFull')" :all-label="t('admin.all')" :options="statusOptions" testid="filter-status" />
-    </div>
-    <div class="with-panel">
-      <section class="card">
-        <AsyncState :loading="list.loading.value" :error="list.error.value" :empty="!list.data.value?.items.length" :filtered="filtered" :lines="8" :empty-title="t('admin.orgs.empty')" empty-icon="pi pi-building" @retry="list.run" @reset="resetFilters">
-          <div class="table-wrap">
-            <table class="dense-table" data-testid="orgs-table">
-              <thead><tr><th>{{ t('admin.orgs.colOrg') }}</th><th>{{ t('admin.users.colRegion') }}</th><th class="col-type">{{ t('admin.orgs.colType') }}</th><th v-if="hasProfiles" class="num">{{ t('admin.orgs.colProfiles') }}</th><th class="num">{{ t('admin.orgs.colUsers') }}</th><th>{{ t('admin.orgs.colStatus') }}</th><th>{{ t('admin.orgs.colLoad') }}</th></tr></thead>
-              <tbody>
-                <tr v-for="o in list.data.value!.items" :key="o.moCode" class="clickable" :class="{ selected: selectedCode === o.moCode }" @click="select(o)">
-                  <td class="clip" :title="o.name"><span class="strong">{{ shortOrgName(o.name) }}</span><div class="caption">{{ o.moCode }}</div></td>
-                  <td class="clip">{{ o.regionKato ? refdata.regionName(o.regionKato) : '—' }}</td>
-                  <td class="muted col-type">{{ typeLabel(o.type) }}</td>
-                  <td v-if="hasProfiles" class="num">{{ num(o.profiles) }}</td>
-                  <td class="num">{{ num(o.users) }}</td>
-                  <td><StatusTag :value="t(`admin.orgs.status.${o.status}`)" :tone="ORG_STATUS_TONE[o.status]" /></td>
-                  <td class="nowrap tabular">{{ lastLoad(o) ? dateTimeShort(lastLoad(o)) : t('admin.orgs.neverLoaded') }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <Pager v-model:page="page" :total="list.data.value!.total" :size="PAGE_SIZE" :note="hasProfiles ? t('admin.orgs.profilesNote') : undefined" />
-        </AsyncState>
-      </section>
-      <aside class="panel-col">
-        <OrgPanel v-if="selectedCode" :org="detail.data.value?.organization ?? null" :loading="detail.loading.value" :error="detail.error.value" @retry="detail.run" />
-        <section v-else class="card hint"><i class="pi pi-building muted" aria-hidden="true" /><span class="muted small">{{ t('admin.orgs.pickHint') }}</span></section>
-        <StateEmailOff :text="t('serviceStatus.notes.applications')" />
-        <OrgApplications :items="applications.data.value?.items ?? []" :loading="applications.loading.value" :error="applications.error.value" :busy-id="busyId" @retry="applications.run"
-          @approve="(a) => decide(() => admin.approveApplication(a.id), a.id, t('admin.orgs.approved'))"
-          @reject="(a, reason) => decide(() => admin.rejectApplication(a.id, reason), a.id, t('admin.orgs.rejected'))" />
-        <ErrorBox :error="actionError" />
-      </aside>
-    </div>
+    <section class="card">
+      <button v-if="pendingCount" type="button" class="apps-banner" data-testid="org-applications-open" @click="applicationsOpen = true">
+        <i class="pi pi-inbox" aria-hidden="true" />
+        <span>{{ t('admin.orgs.appsBanner', { n: pendingCount }) }}</span>
+        <span class="apps-link">{{ t('admin.orgs.appsOpen') }} <i class="pi pi-arrow-right" aria-hidden="true" /></span>
+      </button>
+      <div class="toolbar list-toolbar">
+        <span class="list-count">{{ list.data.value ? t('admin.orgs.found', { n: num(list.data.value.total) }) : '' }}</span>
+        <span class="spacer" />
+        <FilterPill v-model="regionKato" :label="t('admin.users.colRegion')" :all-label="t('admin.all')" :options="regionOptions" searchable testid="filter-region" />
+        <FilterPill v-model="type" :label="t('admin.orgs.colType')" :all-label="t('admin.all')" :options="typeOptions" />
+        <FilterPill v-model="status" :label="t('admin.orgs.colStatusFull')" :all-label="t('admin.all')" :options="statusOptions" testid="filter-status" />
+        <IconField class="search-field">
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="q" :placeholder="t('admin.orgs.searchPlaceholder')" :aria-label="t('admin.search')" data-testid="orgs-search" />
+        </IconField>
+      </div>
+      <AsyncState :loading="list.loading.value" :error="list.error.value" :empty="!list.data.value?.items.length" :filtered="filtered" :lines="8" :empty-title="t('admin.orgs.empty')" empty-icon="pi pi-building" @retry="list.run" @reset="resetFilters">
+        <div class="table-wrap">
+          <table class="dense-table" data-testid="orgs-table">
+            <thead><tr><th>{{ t('admin.orgs.colOrg') }}</th><th>{{ t('admin.users.colRegion') }}</th><th class="col-type">{{ t('admin.orgs.colType') }}</th><th v-if="hasProfiles" class="num">{{ t('admin.orgs.colProfiles') }}</th><th class="num">{{ t('admin.orgs.colUsers') }}</th><th>{{ t('admin.orgs.colStatus') }}</th><th>{{ t('admin.orgs.colLoad') }}</th></tr></thead>
+            <tbody>
+              <tr v-for="o in list.data.value!.items" :key="o.moCode" class="clickable" :class="{ selected: selectedCode === o.moCode }" @click="select(o)">
+                <td class="clip" :title="o.name"><span class="strong">{{ shortOrgName(o.name) }}</span><div class="caption">{{ o.moCode }}</div></td>
+                <td class="clip">{{ o.regionKato ? refdata.regionName(o.regionKato) : '—' }}</td>
+                <td class="muted col-type">{{ typeLabel(o.type) }}</td>
+                <td v-if="hasProfiles" class="num">{{ num(o.profiles) }}</td>
+                <td class="num">{{ num(o.users) }}</td>
+                <td><StatusTag :value="t(`admin.orgs.status.${o.status}`)" :tone="ORG_STATUS_TONE[o.status]" /></td>
+                <td class="nowrap tabular">{{ lastLoad(o) ? dateTimeShort(lastLoad(o)) : t('admin.orgs.neverLoaded') }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <Pager v-model:page="page" :total="list.data.value!.total" :size="PAGE_SIZE" />
+      </AsyncState>
+      <ErrorBox :error="actionError" />
+    </section>
+
+    <SidePanel v-model:visible="panelOpen" :title="detail.data.value?.organization ? shortOrgName(detail.data.value.organization.name) : t('admin.orgs.title')" :subtitle="selectedCode ?? ''">
+      <OrgPanel v-if="selectedCode" bare :org="detail.data.value?.organization ?? null" :loading="detail.loading.value" :error="detail.error.value" @retry="detail.run" />
+    </SidePanel>
+
+    <SidePanel v-model:visible="applicationsOpen" :title="t('admin.orgs.applicationsTitle')" :subtitle="t('admin.orgs.appsSubtitle')">
+      <StateEmailOff :text="t('serviceStatus.notes.applications')" />
+      <OrgApplications bare :items="applications.data.value?.items ?? []" :loading="applications.loading.value" :error="applications.error.value" :busy-id="busyId" @retry="applications.run"
+        @approve="(a) => decide(() => admin.approveApplication(a.id), a.id, t('admin.orgs.approved'))"
+        @reject="(a, reason) => decide(() => admin.rejectApplication(a.id, reason), a.id, t('admin.orgs.rejected'))" />
+    </SidePanel>
     <Dialog :visible="decision !== null" modal :header="t('admin.orgs.approvedTitle')" :style="{ width: 'min(520px, 94vw)' }" @update:visible="(v: boolean) => !v && (decision = null)">
       <InviteLink v-if="decision?.inviteUrl" :url="decision.inviteUrl" />
       <template #footer><Button :label="t('common.close')" @click="decision = null" /></template>
@@ -141,12 +168,17 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.with-panel { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
-.panel-col { display: flex; flex-direction: column; gap: 16px; }
-.hint { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 32px 24px; }
+.list-toolbar { margin-bottom: var(--gap-cabinet, 16px); row-gap: 8px; }
+.list-count { font-size: var(--fs-base); color: var(--text-secondary); }
+.spacer { flex: 1; }
+.search-field { flex: 0 1 340px; min-width: 240px; }
+.search-field :deep(.p-inputtext) { width: 100%; }
+.apps-banner { display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 14px; padding: 12px 16px; border: 0; border-radius: 12px; background: var(--accent-soft); color: var(--accent-strong); font: inherit; font-weight: var(--fw-semibold, 600); text-align: left; cursor: pointer; }
+.apps-banner:hover { filter: brightness(0.97); }
+.apps-link { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: var(--fw-bold); }
 .strong { font-weight: var(--fw-bold); }
-.clip { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clip { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nowrap { white-space: nowrap; }
-@media (max-width: 1500px) { .col-type { display: none; } }
-@media (max-width: 1200px) { .with-panel { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .col-type { display: none; } }
+@media (max-width: 900px) { .search-field { flex: 1 1 100%; } }
 </style>

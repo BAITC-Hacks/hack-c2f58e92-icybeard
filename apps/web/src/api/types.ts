@@ -174,7 +174,7 @@ export interface WorklistItem {
   patientSignal: PatientSignal | null
 }
 export interface PatientSignal { kind: SignalKind; toMoCode: string | null; toMoName: string | null; comment: string | null; recordedAt: string }
-export type SignalKind = 'still_waiting' | 'treated_elsewhere' | 'withdraw' | 'request_redirect'
+export type SignalKind = 'still_waiting' | 'treated_elsewhere' | 'withdraw' | 'request_redirect' | 'prefer_current'
 /** Конверт /journal/worklist: modelBacked=false — прогнозы посчитаны по агрегатам витрины, а не моделью. */
 export interface WorklistResponse { items: WorklistItem[]; synthetic: boolean; asOf: string; regionKato: string; modelBacked: boolean }
 
@@ -219,7 +219,42 @@ export interface PatientRoute {
   decisions: RouteDecision[]; history: RouteHistoryItem[]; doctor: RouteDoctorPanel | null; basis: string; standard: RouteStandardRef
   /** Сигналы гражданина, свежие первыми; validationDue — нет подтверждения ожидания за 30 дней, показать «Вы ещё ждёте?». */
   signals: RouteSignal[]; validationDue: boolean
+  /** Состояние маршрута по журналу и что может сделать именно этот пользователь (allowed) — экраны правил не вычисляют. */
+  progress: RouteProgress | null
+  /** Хроника: всё, что сделали люди, свежие первыми. */
+  journal: RouteJournalEntry[] | null
 }
+
+export type RouteStatus =
+  | 'waiting' | 'kept' | 'transfer_pending_consent' | 'transfer_pending_confirmation' | 'transferred' | 'admitted' | 'withdrawal_requested' | 'closed'
+export type RouteAction =
+  | 'request_transfer' | 'prefer_current' | 'still_waiting' | 'withdraw' | 'accept_transfer' | 'decline_transfer' | 'keep' | 'redirect'
+  | 'cancel_transfer' | 'close' | 'confirm' | 'reject' | 'reschedule' | 'admit' | 'no_show' | 'discharge'
+export type RouteSide = 'none' | 'citizen' | 'origin' | 'receiving'
+export interface RouteTransfer {
+  decisionId: string; toMoCode: string; toMoName: string; severe: boolean; reason: string | null; proposedAt: string; consentAt: string | null
+  confirmedAt: string | null; plannedAt: string | null; admittedAt: string | null
+}
+export type TransferOutcome = 'declined' | 'consent_withdrawn' | 'cancelled' | 'rejected' | 'patient_withdrew' | 'no_show'
+export interface RouteTransferAttempt { outcome: TransferOutcome; toMoCode: string; toMoName: string; at: string; reason: string | null }
+export interface RouteProgress {
+  status: RouteStatus; originMoCode: string; responsibleMoCode: string; responsibleMoName: string; transfer: RouteTransfer | null
+  lastAttempt: RouteTransferAttempt | null; prefersCurrent: boolean; closedReason: 'discharged' | 'no_show' | 'withdrawn' | 'treated_elsewhere' | null
+  closedAt: string | null; overdue: boolean; allowed: RouteAction[]; blockedMoCodes: string[]; side: RouteSide
+}
+export type RouteJournalKind =
+  | 'request' | 'prefer_current' | 'still_waiting' | 'withdraw' | 'treated_elsewhere' | 'keep' | 'redirect' | 'consent_accepted' | 'consent_declined'
+  | 'confirm' | 'reject' | 'reschedule' | 'admit' | 'no_show' | 'discharge' | 'cancel' | 'close'
+export interface RouteJournalEntry {
+  id: string; at: string; kind: RouteJournalKind; role: string; moCode: string | null; moName: string | null; reason: string | null
+  plannedAt: string | null; severe: boolean
+}
+/** Колокольчик гражданина (GET /route/me/notifications): needsAction — нужен его ответ на перевод. */
+export interface CitizenNotification {
+  id: string; kind: RouteJournalKind | 'tests_expiring' | 'scribe_consent' | 'scribe_leaflet'; at: string; moName: string | null; plannedAt: string | null; reason: string | null
+  needsAction: boolean; read: boolean; count: number | null
+}
+export interface CitizenNotifications { unread: number; items: CitizenNotification[] }
 
 /** Входящее направление в организацию (задача 4): GET /journal/referrals/incoming, POST /journal/referrals/{id}/confirm.
  * Confirmed/confirmedAt — уже подтверждено принимающей организацией; подтвердить можно только когда patientConsent === 'accepted'. */
@@ -228,6 +263,8 @@ export interface IncomingReferral {
   recordedAt: string; severe: boolean; patientConsent: 'pending' | 'accepted' | 'declined'; confirmed: boolean; confirmedAt: string | null
   /** Эпикриз выписки (задача 11): появляется только после confirmed - принимающая сторона закрывает лечение. */
   discharged: boolean; dischargedAt: string | null
+  /** Состояние маршрута и что может сделать эта больница сейчас (allowed); plannedAt — назначенная ею дата. */
+  status: RouteStatus | null; plannedAt: string | null; admitted: boolean; overdue: boolean; allowed: RouteAction[]; closedReason: string | null
 }
 
 /** Колокольчик (задача 13, упрощена до внутрисистемных уведомлений): GET /journal/notifications/bell, опрашивается
@@ -237,13 +274,17 @@ export interface NotificationBell {
   pendingIncomingCount: number
   unreadConfirmations: SentReferralConfirmation[]
   unreadDischarges: DischargeReady[]
+  /** Что сделали пациенты моей больницы (просьба о переводе, «остаюсь», «не нужно», ответы на перевод и запись приёма). */
+  patientSignals?: PatientEvent[]
 }
+
+export interface PatientEvent { id: string; patientRef: string; kind: string; moCode: string | null; moName: string | null; comment: string | null; at: string }
 
 export interface SentReferralConfirmation { decisionId: string; patientRef: string; toMoCode: string; toMoName: string; confirmedAt: string; read: boolean }
 
 export interface DischargeReady { decisionId: string; patientRef: string; fromMoCode: string; fromMoName: string; summary: string; dischargedAt: string; read: boolean }
 
-export type NotificationKind = 'referral-confirmed' | 'referral-discharged'
+export type NotificationKind = 'referral-confirmed' | 'referral-discharged' | 'patient-signal'
 
 
 export interface Region { regionKato: string; name: string; capital: string; lat: number | null; lon: number | null; populationThousands: number | null }
@@ -268,11 +309,20 @@ export interface Mnn { mnnId: string; nosologyId: string; categoryId: string; is
 
 export interface ChartSeries { name: string; data: (number | null)[] }
 export interface Chart { type: 'line' | 'bar'; title: string; x: string[]; series: ChartSeries[] }
-export interface InsightStatus { available: boolean; provider: string; model: string }
+/** reachable: отвечает ли локальная модель (Ollama) и скачана ли она; null — облачный провайдер, не проверялось. */
+export interface InsightStatus { available: boolean; reachable?: boolean | null; provider: string; model: string }
 export interface AskResponse { answer: string; value: number | null; unit: string | null; chart: Chart | null; toolsUsed: string[]; sources: string[]; model: string }
 
-export interface ScribeHealth { status: string; transcriber: string; drafter: string }
-export interface ScribeSegment { t0: number; t1: number; text: string }
+export interface ScribeHealth { status: string; transcriber: string; drafter: string; transcriberState?: 'idle' | 'loading' | 'ready' | 'error'; transcriberError?: string | null; transcriberProgress?: { downloadedMb: number; totalMb: number | null } | null }
+/** Запрос согласия пациента на запись приёма (GET /scribe-consents, GET /route/me/scribe): одно согласие — один приём в день запроса. */
+export type ScribeConsentStatus = 'pending' | 'granted' | 'declined' | 'withdrawn' | 'cancelled' | 'expired' | 'recording' | 'discarded' | 'completed'
+export interface ScribeConsent {
+  requestId: string; patientRef: string; moCode: string | null; moName: string | null; requestedRole: string; requestedAt: string; day: string
+  comment: string | null; status: ScribeConsentStatus; answeredAt: string | null; sessionId: string | null; leafletToken: string | null; approvedAt: string | null
+}
+/** original — текст распознавания до правки; source — кто исправил фразу (ИИ по словарю терминов или врач). */
+export interface ScribeSegment { t0: number; t1: number; text: string; original?: string; source?: 'ai' | 'dictionary' | 'doctor' }
+export interface ScribeVocabulary { words: string[]; builtIn: number; groups?: { name: string; language: 'ru' | 'kk'; terms: string[] }[] }
 export interface ScribeSection { name: string; text: string; spans?: { t0: number; t1: number }[] }
 export interface ScribeDraft { sections: ScribeSection[]; leaflet: string; model: string; patientLeaflet: { text: string } }
 export interface ScribeTranscriptResponse { transcript: ScribeSegment[]; text?: string; transcriber?: string }

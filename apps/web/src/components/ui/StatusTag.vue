@@ -5,11 +5,15 @@ import type { StatusTone } from './tones'
  * («нет данных»), ok — успех («подтверждено», «в норме»), warn — внимание («есть сигнал»; янтарь), danger — ошибка
  * («риск отказа», «истёк»), accent и info — инфо (--accent-soft/--accent-strong: «в очереди», «ожидает», роль),
  * ai и bench — бывшие лавандовый «AI» и бирюзовый ориентир, теперь нейтральная пилюля surface-muted/text-secondary. */
-withDefaults(defineProps<{ value: string; tone?: StatusTone; icon?: string }>(), { tone: 'neutral' })
+import { computed } from 'vue'
+
+const props = withDefaults(defineProps<{ value: string; tone?: StatusTone; icon?: string }>(), { tone: 'neutral' })
+/** Подпись всегда с заглавной буквы, как и остальные метки интерфейса («Новая», «В норме»). */
+const label = computed(() => (props.value ? props.value.charAt(0).toLocaleUpperCase() + props.value.slice(1) : props.value))
 </script>
 
 <template>
-  <span class="status" :class="tone"><i v-if="icon" :class="icon" /> {{ value }}</span>
+  <span class="status" :class="tone"><i v-if="icon" :class="icon" /> {{ label }}</span>
 </template>
 
 <style scoped>

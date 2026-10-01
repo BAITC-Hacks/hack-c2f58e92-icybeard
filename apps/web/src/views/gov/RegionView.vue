@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
+import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -9,7 +12,8 @@ import { analytics, queue, refdata as refdataApi } from '@/api/endpoints'
 import type { Anomaly, ForecastResponse, IndexItem, OrganizationItem, OrganizationSeries, OverloadedOrganization, PredictResponse, RouteBenchmark, Seasonality } from '@/api/types'
 import AnomalyFeed from '@/components/AnomalyFeed.vue'
 import ErrorBox from '@/components/ErrorBox.vue'
-import OriginTag from '@/components/OriginTag.vue'
+import OriginLegend from '@/components/OriginLegend.vue'
+import OverloadedTable from '@/components/OverloadedTable.vue'
 import QueueChart from '@/components/QueueChart.vue'
 import SeriesChart from '@/components/SeriesChart.vue'
 import AppCard from '@/components/ui/AppCard.vue'
@@ -23,9 +27,9 @@ import { dateShort } from '@/lib/route'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
-/** Регион (W-Region): подпись «индекс · место · профиль · данные на», четыре KPI (p50 и p90 по региону, за 30 дней,
- * в листе ожидания), слева очередь выбранной организации за 90 дней и прогноз потока, справа организации региона,
- * ориентиры и сигналы. Поток прогноза (3.1): у каждого свой второй ключ сущности и единица измерения. */
+/** Регион (W-Region): подпись «индекс · место · профиль · данные на» и одна легенда происхождения, четыре KPI
+ * (подпись над числом), очередь выбранной больницы за 90 дней рядом с сигналами региона, перегруженные больницы с
+ * поиском и листанием, прогноз потока с потребностью в койках сбоку, ориентиры таблицей. Поток прогноза (3.1): у каждого свой второй ключ сущности и единица измерения. */
 const STREAM_DEFS = [
   { value: 'admissions', streamId: 'admissions_monthly' },
   { value: 'er_visits', streamId: 'er_visits_daily' },
@@ -33,7 +37,7 @@ const STREAM_DEFS = [
 ] as const
 type StreamKind = (typeof STREAM_DEFS)[number]['value']
 const TARGET_OCCUPANCY = 0.85
-const ORG_ROWS = 6
+const ORG_ROWS = 5
 
 const { t } = useI18n()
 const { num } = useLocaleFormat()
@@ -72,6 +76,13 @@ const asOf = computed(() => series.value?.days.at(-1)?.day ?? regionPrediction.v
 const planOptions = computed(() => vaccinationPlans.value.map((plan) => ({ plan })))
 const orgLabel = (o: OrganizationItem) => shortOrgName(o.name)
 const orgTitle = (o: OrganizationItem) => o.name
+const orgSearch = ref('')
+const shownOverloaded = computed(() => {
+  const q = orgSearch.value.trim().toLowerCase()
+  return q ? overloaded.value.filter((o) => `${o.name} ${o.moCode} ${refdata.profileName(o.profileCode)}`.toLowerCase().includes(q)) : overloaded.value
+})
+/** Единица ориентира из справочника (en: days, weeks, percent) — словами на языке интерфейса. */
+const unitText = (unit: string) => (/^(days?|дн|дн\.|дней)$/i.test(unit) ? t('common.days') : /^weeks?$/i.test(unit) ? t('gov.region.unitWeeks') : unit === 'percent' ? '%' : unit)
 const queueTotal = computed(() => overloaded.value.reduce((s, o) => s + o.queueLen, 0))
 const target = computed(() => benchmarks.value.find((b) => b.code === 'moh_target_wait_days') ?? null)
 
@@ -244,117 +255,157 @@ watch(vaccinationPlan, () => {
   <PageShell :title="refdata.regionName(kato)" :back="{ to: { name: 'gov' }, label: t('nav.gov') }">
     <template #subtitle>
       <template v-if="indexItem">{{ t('gov.region.subtitleIndex', { value: indexItem.indexValue.toFixed(0), rank: indexItem.rank, total: indexTotal }) }} · </template>{{ refdata.profileName(profile) }}<template v-if="asOf"> · {{ t('shell.asOf', { date: dateShort(asOf) }) }}</template>
+      <div class="page-legend"><OriginLegend /></div>
     </template>
     <template #actions>
-      <SearchSelect v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" size="small" class="w-profile" />
+      <SearchSelect v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" size="small" class="w-profile" :aria-label="t('common.profile')" />
     </template>
     <ErrorBox :error="error" />
 
     <KpiRow>
-      <KpiTile :value="days(regionPrediction?.p50Days)" :unit="t('common.days')" :label="target ? t('gov.region.kpiP50', { target: days(target.value) }) : t('hero.halfMedian')" origin="ml" />
-      <KpiTile :value="days(regionPrediction?.p90Days)" :unit="t('common.days')" :label="t('gov.region.kpiP90')" origin="ml" />
-      <KpiTile :value="pct(regionPrediction?.pWithin30Days)" :label="t('gov.org.within30')" origin="ml" />
-      <KpiTile :value="num(queueTotal)" :label="t('gov.region.kpiQueue')" origin="formula" :hint="`${overloaded.length} ${t('gov.simulator.organisations')}`" />
+      <KpiTile label-first :value="days(regionPrediction?.p50Days)" :unit="t('common.days')" :label="t('gov.region.kpiP50Label')" :hint="target ? t('gov.region.kpiP50Hint', { target: days(target.value) }) : undefined" />
+      <KpiTile label-first :value="days(regionPrediction?.p90Days)" :unit="t('common.days')" :label="t('gov.region.kpiP90Label')" :hint="t('gov.region.kpiP90Hint')" />
+      <KpiTile label-first :value="pct(regionPrediction?.pWithin30Days)" :label="t('gov.region.kpiWithin30Label')" :hint="t('gov.region.kpiWithin30Hint')" />
+      <KpiTile label-first :value="num(queueTotal)" :label="t('gov.region.kpiQueueLabel')" :hint="t('gov.region.kpiQueueHint', { n: overloaded.length })" />
     </KpiRow>
 
     <div class="main-grid">
-      <div class="col">
-        <AppCard :title="t('gov.region.queueTitle')" origin="formula">
-          <template #header>
-            <SearchSelect v-model="moCode" :options="organizations" :option-label="orgLabel" option-value="moCode" :option-title="orgTitle" size="small" :placeholder="t('common.organization')" class="w-org" />
-          </template>
-          <ErrorBox :error="seriesError" />
-          <template v-if="series">
-            <div class="facts-line caption">
-              {{ t('gov.region.factHeader') }} · {{ t('gov.region.queueNow') }} <b class="ink">{{ series.days.at(-1)?.queueLen ?? '—' }}</b> · {{ t('gov.region.admissionsPerDay4w') }} <b class="ink">{{ days(series.throughput?.throughputPerDay, 1) }}</b> ·
-              p50 / p90 <b class="ink">{{ days(series.throughput?.waitP50Days) }} / {{ days(series.throughput?.waitP90Days) }}</b> · {{ t('gov.region.refusals4w') }} <b class="ink">{{ pct(series.throughput?.refusalRate4w) }}</b>
-            </div>
-            <QueueChart :days="series.days" bare />
-          </template>
-          <p v-else class="muted">{{ t('gov.region.noQueueSeries') }}</p>
-          <div class="links">
-            <RouterLink v-if="moCode" class="link-arrow small" :to="{ name: 'organization', params: { moCode }, query: { kato, profile } }">{{ t('gov.region.toOrganization') }}</RouterLink>
-            <RouterLink v-if="auth.can('gov.simulator')" class="link-arrow small" :to="{ name: 'simulator', query: { region: kato, profile } }">{{ t('nav.simulator') }}</RouterLink>
+      <AppCard :title="t('gov.region.queueTitle')">
+        <template #header>
+          <SearchSelect v-model="moCode" :options="organizations" :option-label="orgLabel" option-value="moCode" :option-title="orgTitle" size="small" :placeholder="t('common.organization')" class="w-org" :aria-label="t('common.organization')" />
+        </template>
+        <p class="caption card-lead">{{ t('gov.region.queueLead') }}</p>
+        <ErrorBox :error="seriesError" />
+        <template v-if="series">
+          <dl class="facts">
+            <div><dt>{{ t('gov.region.factQueue') }}</dt><dd class="tabular">{{ series.days.at(-1)?.queueLen ?? '—' }}</dd></div>
+            <div><dt>{{ t('gov.region.factPerWeek') }}</dt><dd class="tabular">{{ series.throughput?.throughputPerDay != null ? num(Math.round(series.throughput.throughputPerDay * 7)) : '—' }}</dd><span class="fact-sub">{{ t('gov.region.factPerWeekSub') }}</span></div>
+            <div><dt>{{ t('gov.region.factWaitP90') }}</dt><dd class="tabular">{{ days(series.throughput?.waitP90Days) }} {{ t('common.days') }}</dd><span class="fact-sub">{{ t('gov.region.factWaitP50', { p50: days(series.throughput?.waitP50Days) }) }}</span></div>
+            <div><dt>{{ t('gov.region.factRefusals') }}</dt><dd class="tabular">{{ pct(series.throughput?.refusalRate4w) }}</dd><span class="fact-sub">{{ t('gov.region.factRefusalsSub') }}</span></div>
+          </dl>
+          <QueueChart :days="series.days" bare />
+        </template>
+        <p v-else class="muted">{{ t('gov.region.noQueueSeries') }}</p>
+        <div class="links">
+          <RouterLink v-if="moCode" class="link-arrow small" :to="{ name: 'organization', params: { moCode }, query: { kato, profile } }">{{ t('gov.region.toOrganization') }}</RouterLink>
+          <RouterLink v-if="auth.can('gov.simulator')" class="link-arrow small" :to="{ name: 'simulator', query: { region: kato, profile } }">{{ t('gov.region.toSimulator') }}</RouterLink>
+        </div>
+      </AppCard>
+
+      <div class="side-slot">
+        <AppCard :title="t('gov.region.signals')" origin="ml" class="side-card">
+          <template #header><span class="caption">{{ t('gov.region.signalsCount', { n: anomalies.length }) }}</span></template>
+          <p class="caption card-lead">{{ t('gov.region.signalsLead') }}</p>
+          <div class="side-scroll">
+            <AnomalyFeed :items="anomalies" compact="region" :can-ack="auth.canAny(['gov.map', 'org.cabinet'])" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
           </div>
-        </AppCard>
-
-        <AppCard :title="t('gov.region.tabForecast')" origin="ml">
-          <template #header>
-            <Select v-model="streamKind" :options="STREAMS" option-label="label" option-value="value" size="small" />
-            <SearchSelect v-if="streamKind === 'vac'" v-model="vaccinationPlan" :options="planOptions" option-label="plan" option-value="plan" size="small" :placeholder="t('gov.region.vaccinationPlan')" class="w-org" />
-          </template>
-          <SeriesChart v-if="forecast" :history="forecast.history" :points="forecast.points" :title="forecastTitle" :unit="streamMeta.unit" bare />
-          <p v-else-if="forecastHint" class="muted">{{ forecastHint }}</p>
-          <p v-if="forecast" class="caption">
-            {{ t('gov.map.backtest') }}: sMAPE {{ pct(forecast.backtest.smape, 1) }} {{ t('gov.map.vsNaive') }} {{ pct(forecast.backtest.baselineSmape, 1) }}, MASE {{ forecast.backtest.mase.toFixed(2) }}. {{ forecast.model.name }} {{ forecast.model.version }}.
-            <span v-if="forecast.flat" class="synthetic" style="margin-left: 6px">{{ t('gov.region.flatForecastHint') }}</span>
-          </p>
-          <template v-if="streamKind === 'admissions'">
-            <p v-if="flatSeasonHint" class="caption">{{ t('gov.region.seasonHint') }}: {{ flatSeasonHint }} {{ t('gov.region.seasonHintSuffix') }}</p>
-            <!-- коэффициент и источник: refdata/external_benchmarks.yaml (diagnostics.dm01_tests_per_admission) -->
-            <p v-if="forecast && forecast.points.length" class="caption">
-              {{ t('gov.region.diagnosticsLoad') }}: ≈ {{ num(Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5)) }} {{ t('gov.region.diagnosticsLoadSuffix') }}
-            </p>
-            <div class="bed-block">
-              <div class="bed-head"><span class="eyebrow">{{ t('gov.region.bedDemand.title') }}</span><OriginTag kind="formula" :note="t('gov.region.bedDemand.formula')" /></div>
-              <div v-if="bedDemand.length" class="bed-row tabular">
-                <span v-for="d in bedDemand" :key="d.period" class="bed"><span class="bed-value">{{ d.beds }}</span><span class="caption">{{ d.label }} · {{ t('gov.region.bedDemand.unit') }}</span></span>
-              </div>
-              <p v-else-if="bedForecastHint" class="muted small">{{ bedForecastHint }}</p>
-              <p class="caption">{{ t('gov.region.bedDemand.formula') }}</p>
-            </div>
-          </template>
-        </AppCard>
-      </div>
-
-      <div class="col">
-        <AppCard :title="t('gov.region.orgsTitle')" origin="formula">
-          <template #header><span class="caption">{{ refdata.profileName(profile) }}</span></template>
-          <p v-if="!overloaded.length" class="muted">{{ t('overloadedTable.none') }}</p>
-          <table v-else class="dense-table">
-            <thead><tr><th>{{ t('common.organization') }}</th><th class="num">{{ t('overloadedTable.queue') }}</th><th class="num">p90</th><th class="num">{{ t('overloadedTable.refusals') }}</th></tr></thead>
-            <tbody>
-              <tr v-for="o in overloaded.slice(0, ORG_ROWS)" :key="o.moCode + o.profileCode" class="clickable" @click="toOrganization(o.moCode)">
-                <td class="clip" :title="o.name">{{ shortOrgName(o.name) }} <span class="muted">· {{ o.moCode }}</span><div class="caption">{{ refdata.profileName(o.profileCode) }}</div></td>
-                <td class="num">{{ o.queueLen }}</td>
-                <td class="num" :class="{ 'delta-up': (o.queueAgeP90 ?? 0) > 60 }">{{ o.queueAgeP90?.toFixed(0) ?? '—' }}</td>
-                <td class="num">{{ pct(o.refusalRate4w) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </AppCard>
-
-        <AppCard :title="t('gov.region.benchmarksTitle')" origin="formula">
-          <div class="rows">
-            <div v-for="b in benchmarks" :key="b.code" class="row"><span class="row-main">{{ b.title }}<div class="caption">{{ b.source }} · {{ dateShort(b.sourceDate) }}</div></span><span class="row-value strong">{{ days(b.value) }} {{ b.unit }}</span></div>
-            <div v-if="regionPrediction" class="row"><span class="row-main">{{ refdata.regionName(kato) }}, {{ refdata.profileName(profile).toLowerCase() }} p50</span><span class="row-value strong">{{ days(regionPrediction.p50Days) }} {{ t('common.days') }}</span></div>
-          </div>
-          <p class="caption" style="margin: 12px 0 0">{{ t('gov.region.benchmarksNote') }}</p>
-        </AppCard>
-
-        <AppCard :title="t('gov.region.signals')" origin="ml">
-          <template #header><span class="caption">{{ anomalies.length }}</span></template>
-          <AnomalyFeed :items="anomalies" :can-ack="auth.canAny(['gov.map', 'org.cabinet'])" @ack="(id, c) => resolve(id, c, 'acknowledged')" @dismiss="(id, c) => resolve(id, c, 'dismissed')" />
         </AppCard>
       </div>
     </div>
+
+    <AppCard :title="t('gov.region.orgsTitle')" class="block">
+      <p class="caption card-lead">{{ t('gov.region.orgsLead') }}</p>
+      <div class="toolbar list-toolbar">
+        <span class="list-count">{{ t('gov.region.orgsShown', { n: shownOverloaded.length }) }}</span>
+        <span class="spacer" />
+        <IconField class="search-field">
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="orgSearch" :placeholder="t('gov.region.orgsSearch')" :aria-label="t('gov.region.orgsSearch')" />
+        </IconField>
+      </div>
+      <OverloadedTable :items="shownOverloaded" :size="ORG_ROWS" @organization="toOrganization" @simulate="router.push({ name: 'simulator', query: { region: kato, profile: $event.profileCode } })" />
+    </AppCard>
+
+    <AppCard :title="t('gov.region.forecastTitle')" origin="ml" class="block">
+      <template #header>
+        <Select v-model="streamKind" :options="STREAMS" option-label="label" option-value="value" size="small" class="f-select" :aria-label="t('gov.region.forecastWhat')" />
+        <SearchSelect v-if="streamKind === 'vac'" v-model="vaccinationPlan" :options="planOptions" option-label="plan" option-value="plan" size="small" :placeholder="t('gov.region.vaccinationPlan')" class="w-org" />
+      </template>
+      <p class="caption card-lead">{{ t(`gov.region.forecastLead.${streamKind}`) }}</p>
+      <div class="forecast-grid" :class="{ single: streamKind !== 'admissions' }">
+        <div class="forecast-main">
+          <SeriesChart v-if="forecast" :history="forecast.history" :points="forecast.points" :title="forecastTitle" :unit="streamMeta.unit" bare />
+          <p v-else-if="forecastHint" class="muted">{{ forecastHint }}</p>
+          <p v-if="forecast" class="caption">
+            {{ t('gov.region.accuracy', { model: pct(forecast.backtest.smape, 0), naive: pct(forecast.backtest.baselineSmape, 0) }) }}
+            <template v-if="forecast.flat"> {{ t('gov.region.flatPlain') }}</template>
+          </p>
+          <p v-if="streamKind === 'admissions' && flatSeasonHint" class="caption">{{ t('gov.region.seasonPlain', { months: flatSeasonHint }) }}</p>
+        </div>
+        <aside v-if="streamKind === 'admissions'" class="forecast-side">
+          <div class="side-block">
+            <div class="side-title">{{ t('gov.region.bedDemand.title') }}</div>
+            <div v-if="bedDemand.length" class="bed-row tabular">
+              <div v-for="d in bedDemand" :key="d.period" class="bed"><span class="caption">{{ d.label }}</span><span class="bed-value">{{ d.beds }}</span><span class="caption">{{ t('gov.region.bedDemand.unit') }}</span></div>
+            </div>
+            <p v-else-if="bedForecastHint" class="muted small">{{ bedForecastHint }}</p>
+            <p class="caption">{{ t('gov.region.bedDemand.plain') }}</p>
+          </div>
+          <div v-if="forecast && forecast.points.length" class="side-block">
+            <div class="side-title">{{ t('gov.region.diagnosticsTitle') }}</div>
+            <div class="bed-value tabular">≈ {{ num(Math.round((forecast.points.reduce((s, p) => s + p.yhat, 0) / forecast.points.length) * 1.5)) }}</div>
+            <p class="caption">{{ t('gov.region.diagnosticsPlain') }}</p>
+          </div>
+        </aside>
+      </div>
+    </AppCard>
+
+    <AppCard :title="t('gov.region.benchmarksTitle')" class="block">
+      <p class="caption card-lead">{{ t('gov.region.benchmarksLead') }}</p>
+      <div class="table-wrap">
+        <table class="dense-table">
+          <thead><tr><th>{{ t('gov.region.colBenchmark') }}</th><th>{{ t('gov.region.colSource') }}</th><th class="num">{{ t('gov.region.colValue') }}</th></tr></thead>
+          <tbody>
+            <tr v-if="regionPrediction" class="own-row"><td>{{ t('gov.region.ownRow', { region: refdata.regionName(kato), profile: refdata.profileName(profile).toLowerCase() }) }}</td><td class="muted">{{ t('gov.region.ownSource') }}</td><td class="num">{{ days(regionPrediction.p50Days) }} {{ t('common.days') }}</td></tr>
+            <tr v-for="b in benchmarks" :key="b.code"><td>{{ b.title }}</td><td class="muted">{{ b.source }} · {{ dateShort(b.sourceDate) }}</td><td class="num">{{ b.unit === 'share' ? pct(b.value) : `${days(b.value)} ${unitText(b.unit)}` }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </AppCard>
   </PageShell>
 </template>
 
 <style scoped>
 .w-profile { min-width: 240px; }
-.w-org { min-width: 240px; max-width: 100%; }
-.main-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: start; }
-.col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
-.facts-line { margin-bottom: 8px; }
-.facts-line .ink { color: var(--dm-ink); font-weight: var(--fw-bold); }
+.w-org { min-width: 260px; max-width: 100%; }
+.f-select { min-width: 200px; }
+.page-legend { display: flex; margin-top: 8px; }
+.card-lead { margin: -4px 0 14px; line-height: 1.5; }
+.block { margin-top: var(--dm-space-4); }
+.main-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: var(--dm-space-4); align-items: stretch; }
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 16px; border-top: 1px solid var(--dm-hairline); border-bottom: 1px solid var(--dm-hairline); }
+.facts div { padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+.facts div + div { border-left: 1px solid var(--dm-hairline); }
+.facts div:first-child { padding-left: 0; }
+.facts dt { font-size: var(--dm-text-sm); color: var(--text-secondary); line-height: 1.3; }
+.facts dd { margin: 0; font-size: var(--dm-text-xl); font-weight: var(--fw-bold); }
+.fact-sub { font-size: var(--dm-text-sm); color: var(--text-secondary); line-height: 1.35; }
+.side-slot { position: relative; min-height: 420px; }
+.side-card { position: absolute; inset: 0; display: flex; flex-direction: column; }
+.side-scroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
 .links { display: flex; gap: 20px; margin-top: 12px; flex-wrap: wrap; }
-.bed-block { border-top: 1px solid var(--dm-hairline); margin-top: 12px; padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
-.bed-head { display: flex; align-items: center; gap: 10px; }
-.bed-row { display: flex; gap: 24px; flex-wrap: wrap; }
+.list-toolbar { margin-bottom: 12px; row-gap: 8px; }
+.list-count { color: var(--text-secondary); }
+.spacer { flex: 1; }
+.search-field { flex: 0 1 340px; min-width: 240px; }
+.search-field :deep(.p-inputtext) { width: 100%; }
+.forecast-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: var(--dm-space-4); align-items: start; }
+.forecast-grid.single { grid-template-columns: minmax(0, 1fr); }
+.forecast-side { display: flex; flex-direction: column; gap: 12px; }
+.side-block { background: var(--surface-muted); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.side-block p { margin: 0; line-height: 1.45; }
+.side-title { font-weight: var(--fw-bold); }
+.bed-row { display: flex; gap: 20px; flex-wrap: wrap; }
 .bed { display: flex; flex-direction: column; gap: 2px; }
 .bed-value { font-size: var(--dm-text-xl); font-weight: var(--fw-extrabold); letter-spacing: -0.01em; }
-.clip { max-width: 280px; }
-.strong { font-weight: var(--fw-bold); }
-@media (max-width: 1000px) { .main-grid { grid-template-columns: 1fr; } }
+.own-row td { font-weight: var(--fw-bold); }
+@media (max-width: 1000px) {
+  .main-grid, .forecast-grid { grid-template-columns: 1fr; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts div + div { border-left: 0; }
+  .facts div { padding-left: 0; }
+  .side-slot { min-height: 0; }
+  .side-card { position: static; }
+  .side-scroll { max-height: 480px; }
+}
 </style>

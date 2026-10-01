@@ -1,36 +1,32 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { journal } from '@/api/endpoints'
-import type { NotificationBell, NotificationKind } from '@/api/types'
+import { journal, route as routeApi } from '@/api/endpoints'
+import type { CitizenNotifications, NotificationBell, NotificationKind } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 
 const POLL_INTERVAL_MS = 45_000
 
-/** Колокольчик (задача 13 плана прозрачности, упрощена до внутрисистемных уведомлений вместо push-инфраструктуры):
- * опрашивает GET /journal/notifications/bell раз в 45 секунд, пока вкладка открыта — не WebSocket и не Kafka
- * (осознанное решение: прод-стенд работает в Messaging Mode "local", без Kafka, и ни один другой экран системы
- * не push-based; задержка в десятки секунд для уведомления о направлении пациента не критична). Опрос идёт только
- * для ролей с worklist.view и своей организацией — без этого сервер и так вернёт пустой ответ, но незачем дёргать
- * эндпоинт зря для гражданина/регулятора/оператора данных.</summary> */
+/** Колокольчик (внутрисистемные уведомления вместо push-инфраструктуры): опрос раз в 45 секунд, пока вкладка открыта.
+ * Персонал с worklist.view и своей организацией — GET /journal/notifications/bell (входящие, подтверждения, выписки);
+ * гражданин — GET /route/me/notifications (что по его маршруту сделали другие: предложили перевод, назначили дату,
+ * отказали, сняли с очереди…). Остальным ролям сервер не опрашивается. */
 export function useNotificationBell() {
   const auth = useAuthStore()
   const data = ref<NotificationBell | null>(null)
+  const citizen = ref<CitizenNotifications | null>(null)
   const error = ref<unknown>(null)
   let timer: ReturnType<typeof setInterval> | null = null
 
   const eligible = computed(() => auth.isAuthenticated && auth.can('worklist.view') && !!auth.moCode)
+  const citizenEligible = computed(() => auth.isAuthenticated && auth.role === 'citizen' && auth.can('route.own'))
   const unreadCount = computed(() => {
-    if (!data.value) return 0
-    return data.value.pendingIncomingCount + data.value.unreadConfirmations.length + data.value.unreadDischarges.length
+    const staff = data.value ? data.value.pendingIncomingCount + data.value.unreadConfirmations.length + data.value.unreadDischarges.length + (data.value.patientSignals?.length ?? 0) : 0
+    return staff + (citizen.value?.unread ?? 0)
   })
 
   async function load() {
-    if (!eligible.value) {
-      data.value = null
-      return
-    }
-
     try {
-      data.value = await journal.notificationBell(auth.moCode ?? undefined)
+      data.value = eligible.value ? await journal.notificationBell(auth.moCode ?? undefined) : null
+      citizen.value = citizenEligible.value ? await routeApi.notifications() : null
       error.value = null
     } catch (e) {
       error.value = e
@@ -46,6 +42,14 @@ export function useNotificationBell() {
     }
   }
 
+  async function markRouteRead(id: string) {
+    try {
+      await routeApi.markNotificationRead(id)
+    } finally {
+      await load()
+    }
+  }
+
   onMounted(() => {
     load()
     timer = setInterval(load, POLL_INTERVAL_MS)
@@ -55,5 +59,5 @@ export function useNotificationBell() {
     if (timer !== null) clearInterval(timer)
   })
 
-  return { data, error, unreadCount, load, markRead }
+  return { data, citizen, error, unreadCount, load, markRead, markRouteRead }
 }

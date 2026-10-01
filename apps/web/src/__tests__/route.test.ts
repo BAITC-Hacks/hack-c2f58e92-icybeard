@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteDecision, RouteSignal } from '@/api/types'
-import { NEXT_ACTION_CODES, STAGE_CODES, checklistTone, dateShort, nextActionKey, openRequest, openSignal, outcomeTone, pendingConsent, routeEntries, stageIndex, stageTone } from '@/lib/route'
+import { NEXT_ACTION_CODES, STAGE_CODES, addDays, almatyToday, checklistTone, dateShort, nextActionKey, openRequest, openSignal, outcomeTone, pendingConsent, routeEntries, stageIndex, stageTone } from '@/lib/route'
 
 const signal = (over: Partial<RouteSignal>): RouteSignal => ({
   decisionId: 'a', recordedAt: '2026-09-25T10:00:00+00:00', kind: 'still_waiting', toMoCode: null, toMoName: null, comment: null, open: false, ...over,
@@ -39,7 +39,8 @@ describe('route signals', () => {
 
 describe('route helpers', () => {
   it('maps next-action codes to dictionary keys and leaves unknown codes to the raw API text', () => {
-    expect(NEXT_ACTION_CODES).toHaveLength(4)
+    expect(NEXT_ACTION_CODES).toHaveLength(14)
+    expect(nextActionKey('confirm_admission')).toBe('doctor.worklist.action.confirm_admission')
     expect(nextActionKey('redirect_faster')).toBe('doctor.worklist.action.redirect_faster')
     expect(nextActionKey('')).toBeNull()
     expect(nextActionKey(undefined)).toBeNull()
@@ -47,7 +48,8 @@ describe('route helpers', () => {
   })
 
   it('orders stages as the standard does and tolerates unknown codes', () => {
-    expect(STAGE_CODES).toHaveLength(6)
+    expect(STAGE_CODES).toHaveLength(7)
+    expect(stageIndex('transfer')).toBe(stageIndex('waitlisted') + 1)
     expect(stageIndex('referral_issued')).toBe(0)
     expect(stageIndex('hospitalized')).toBeGreaterThan(stageIndex('waitlisted'))
     expect(stageIndex('unknown')).toBe(-1)
@@ -69,5 +71,11 @@ describe('route helpers', () => {
     expect(dateShort('2026-09-22T10:15:00+05:00')).toBe('22.09.2026')
     expect(dateShort(null)).toBe('—')
     expect(dateShort('вчера')).toBe('вчера')
+  })
+
+  it('counts Kazakhstan dates for the hospitalisation window', () => {
+    expect(almatyToday(new Date('2026-09-30T20:30:00Z'))).toBe('2026-10-01')
+    expect(addDays('2026-10-01', 30)).toBe('2026-10-31')
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
   })
 })

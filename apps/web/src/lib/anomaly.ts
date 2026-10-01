@@ -81,3 +81,18 @@ export function describeEntity(entity: Record<string, string>, regionKato: strin
 export function deviationText(observed: number, expected: number): string {
   return observed >= expected ? t('anomaly.aboveExpected') : t('anomaly.belowExpected')
 }
+
+/** Период сигнала для людей: «2025-04-03» → «03.04.2025», «2025-03» → «март 2025». */
+export function periodText(period: string): string {
+  const day = /^(\d{4})-(\d{2})-(\d{2})/.exec(period)
+  if (day) return `${day[3]}.${day[2]}.${day[1]}`
+  const month = /^(\d{4})-(\d{2})$/.exec(period)
+  if (month) return new Date(Number(month[1]), Number(month[2]) - 1, 1).toLocaleDateString((i18n.global.locale as unknown as { value: string }).value === 'kk' ? 'kk-KZ' : 'ru-RU', { month: 'long', year: 'numeric' })
+  return period
+}
+
+/** Сигнал одной фразой: «03.04.2025: 0 пациентов в очереди, обычно около 332 — меньше обычного». */
+export function anomalySentence(a: { streamId: string; period: string; observed: number; expected: number }, fmt: (n: number) => string): string {
+  const unit = STREAM_IDS.includes(a.streamId) ? t(`anomaly.unit.${a.streamId}`) : ''
+  return t('anomalyFeed.sentence', { date: periodText(a.period), observed: fmt(a.observed), unit, expected: fmt(a.expected), deviation: deviationText(a.observed, a.expected) })
+}

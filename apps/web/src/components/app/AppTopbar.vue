@@ -8,11 +8,12 @@ import BrandMark from '@/components/app/BrandMark.vue'
 import { accountNav, topbarNav } from '@/lib/nav'
 import { useAuthStore } from '@/stores/auth'
 import LocaleSwitch from './LocaleSwitch.vue'
+import NotificationBell from './NotificationBell.vue'
 import ThemeToggle from './ThemeToggle.vue'
 
 /** Шапка гражданина («синяя гамма», components.md): 84 px, белая с разделителем, контейнер 1240; слева знак +
  * «darumen», по центру пункты из разрешений (Мой путь · Сколько ждут · Проверка рецепта) с подчёркиванием активной
- * вкладки, справа RU/KK, тема и меню пользователя (аккаунт, «Выйти»); без сессии — «Войти» (пунктов нет).
+ * вкладки, справа колокольчик (после входа), RU/KK, тема и меню пользователя (аккаунт, «Выйти»); без сессии — «Войти» (пунктов нет).
  * На главной без входа (home-prop-5) шапка прозрачная — фон даёт градиент каркаса. */
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -39,6 +40,7 @@ const accountItems = computed(() => [
         <RouterLink v-for="link in links" :key="link.to" :to="link.to" class="nav-link" active-class="active">{{ link.label }}</RouterLink>
       </nav>
       <span class="spacer" />
+      <NotificationBell v-if="auth.isAuthenticated" />
       <LocaleSwitch />
       <ThemeToggle />
       <template v-if="auth.isAuthenticated">

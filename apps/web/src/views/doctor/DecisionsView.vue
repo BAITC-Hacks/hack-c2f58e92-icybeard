@@ -16,7 +16,7 @@ import PageShell from '@/components/ui/PageShell.vue'
 import SidePanel from '@/components/ui/SidePanel.vue'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
 import { downloadCsv } from '@/lib/csv'
-import { describeChoice, describeSubject, organizationOf, roleLabel, SUBJECT_ANOMALY, SUBJECT_REFERRAL, subjectLabel, type DecisionNames } from '@/lib/decision'
+import { describeChoice, describeSubject, organizationOf, roleLabel, SUBJECT_ANOMALY, SUBJECT_REFERRAL, SUBJECT_SCRIBE, subjectLabel, type DecisionNames } from '@/lib/decision'
 import { shortOrgName } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
@@ -115,6 +115,10 @@ async function load() {
   error.value = null
   try {
     const page = await journal.decisions({ actor: auth.can('decisions.all') ? undefined : 'me', size: 200 })
+    // служебные события записи приёма (запрос согласия, сессия, памятка) — не решения врача: их видно в скрайбе и у пациента
+    const hidden = page.items.filter((d) => d.subject === SUBJECT_SCRIBE).length
+    page.items = page.items.filter((d) => d.subject !== SUBJECT_SCRIBE)
+    page.total = Math.max(0, page.total - hidden)
     const codes = page.items.flatMap((d) => [organizationOf(d.recommended), organizationOf(d.chosen)]).filter((c): c is string => c !== null)
     await refdata.resolveOrganizations(codes)
     items.value = page.items

@@ -19,6 +19,9 @@ import Skeleton from '@/components/ui/Skeleton.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useForecastFactors } from '@/composables/useForecastFactors'
 import { useRouteData } from '@/composables/useRouteData'
+import { scribe } from '@/api/endpoints'
+import type { ScribeConsent } from '@/api/types'
+import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 import { days, pct, refusalWords, shortOrgName } from '@/lib/format'
 import { dateShort, nextActionKey } from '@/lib/route'
@@ -33,11 +36,22 @@ const { t } = useI18n()
 const toast = useToast()
 const r = useRouteData(() => props.patientRef)
 const refdata = useRefdataStore()
+const auth = useAuthStore()
 const reason = ref('')
+/** Причина для отмены перевода или снятия с листа ожидания — обязательна, попадает в журнал. */
+const actionReason = ref('')
+const progress = computed(() => r.progress.value)
+/** Решение «оставить или перевести» нужно только пока пациент ждёт в своей больнице (по progress.allowed). */
+const canDecide = computed(() => r.can('keep') || r.can('redirect'))
+const transfer = computed(() => progress.value?.transfer ?? null)
+const attempt = computed(() => progress.value?.lastAttempt ?? null)
 /** Клинический флаг тяжести (задача 3): применяется только к «Направить» — принимающая организация видит его в /journal/referrals/incoming. */
 const severe = ref(false)
 
-const FLAG_TONES: Record<string, 'neutral' | 'danger' | 'accent' | 'warn'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'warn' }
+const FLAG_TONES: Record<string, 'neutral' | 'danger' | 'accent' | 'warn'> = {
+  stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'warn',
+  transfer_pending: 'accent', transferred_in: 'accent', prefers_current: 'neutral', date_overdue: 'danger',
+}
 const doctor = computed(() => r.data.value?.doctor ?? null)
 const nextAction = computed(() => {
   const key = nextActionKey(doctor.value?.nextActionCode)
@@ -46,6 +60,20 @@ const nextAction = computed(() => {
 
 /** «Что сделать»: сейчас система даёт один шаг, но блок — список, чтобы вместить несколько. */
 const todoItems = computed(() => (nextAction.value ? [nextAction.value] : []))
+
+/** Записи приёма этого пациента (AI-скрайб): утверждённые — с памяткой, которую видит пациент; плюс текущая запись. */
+const visits = ref<ScribeConsent[]>([])
+const VISIT_STATUSES = ['completed', 'recording', 'granted', 'pending']
+const shownVisits = computed(() => visits.value.filter((v) => VISIT_STATUSES.includes(v.status)))
+async function loadVisits() {
+  if (!auth.can('scribe.use')) return
+  try {
+    visits.value = await scribe.consents(props.patientRef)
+  } catch {
+    visits.value = [] // скрайб — дополнительная функция, маршрут без него работает
+  }
+}
+watch(() => props.patientRef, loadVisits, { immediate: true })
 const refusalHigh = computed(() => (doctor.value?.pRefusal ?? 0) > 0.2)
 const refusalText = computed(() => (doctor.value ? (doctor.value.refusalOrgInTraining ? pct(doctor.value.pRefusal) : refusalWords(doctor.value.pRefusal)) : ''))
 
@@ -86,6 +114,18 @@ async function saveDecision(kind: 'keep' | 'redirect') {
   }
 }
 
+async function routeAction(kind: 'cancel_transfer' | 'close') {
+  if (!actionReason.value.trim()) {
+    toast.add({ severity: 'warn', summary: t('route.progress.reasonRequired'), life: 3000 })
+    return
+  }
+  const ok = kind === 'close' ? await r.close(actionReason.value.trim()) : await r.cancelTransfer(actionReason.value.trim())
+  if (ok) {
+    toast.add({ severity: 'success', summary: t(kind === 'close' ? 'route.progress.closeDone' : 'route.progress.cancelDone'), life: 4000 })
+    actionReason.value = ''
+  }
+}
+
 onMounted(r.load)
 watch(() => props.patientRef, r.load)
 </script>
@@ -103,8 +143,14 @@ watch(() => props.patientRef, r.load)
         <div class="who">
           <div class="who-main">
             <span class="eyebrow">{{ t('route.doctorView.patient') }}</span>
-            <span class="who-name tabular">{{ patientRef }}</span>
+            <div class="name-row">
+              <span class="who-name tabular">{{ patientRef }}</span>
+              <RouterLink v-if="auth.can('scribe.use') && progress?.side !== 'none'" class="record-visit" :to="{ name: 'scribe', query: { patientRef } }" data-testid="record-visit">
+                <i class="pi pi-microphone" aria-hidden="true" />{{ t('route.doctorView.recordVisit') }}
+              </RouterLink>
+            </div>
             <span class="chips"><StatusTag v-for="f in doctor.riskFlags" :key="f" :value="t('route.flags.' + f)" :tone="FLAG_TONES[f] ?? 'neutral'" /></span>
+            <span v-if="progress" class="status-line" data-testid="route-status" :data-status="progress.status">{{ t('route.progress.status.' + progress.status) }}<template v-if="progress.closedReason"> · {{ t('route.progress.closed.' + progress.closedReason) }}</template></span>
           </div>
           <dl class="who-facts">
             <div class="fact"><dt>{{ t('route.citizen.factSince') }}</dt><dd class="tabular">{{ dateShort(r.data.value.dates.registeredAt) }}</dd></div>
@@ -161,13 +207,17 @@ watch(() => props.patientRef, r.load)
       </section>
 
       <!-- решение: все варианты одним списком, общий комментарий, одна кнопка -->
-      <AppCard ref="decisionCard" :title="t('route.doctorView.whereTitle')" label :origin="r.data.value.alternativesModel ? 'ml' : undefined" data-testid="decision-card">
+      <AppCard v-if="canDecide" ref="decisionCard" :title="t('route.doctorView.whereTitle')" label :origin="r.data.value.alternativesModel ? 'ml' : undefined" data-testid="decision-card">
         <div v-if="r.openSig.value" class="signal" data-testid="signal-banner" :title="r.openSig.value.toMoName ?? ''">
           <i class="pi pi-comment" aria-hidden="true" />
           <span>{{ t('route.patientSignal.' + r.openSig.value.kind, { name: shortOrgName(r.openSig.value.toMoName) }) }}<template v-if="r.openSig.value.comment"> — «{{ r.openSig.value.comment }}»</template><span class="muted"> · {{ dateShort(r.openSig.value.recordedAt) }}</span></span>
         </div>
+        <p v-if="attempt" class="attempt" data-testid="last-attempt">
+          <span class="muted">{{ t('route.progress.lastAttempt') }}:</span> {{ t('route.progress.attempt.' + attempt.outcome, { name: shortOrgName(attempt.toMoName) }) }}<template v-if="attempt.reason"> — «{{ attempt.reason }}»</template><span class="muted"> · {{ dateShort(attempt.at) }}</span>
+        </p>
+        <p v-if="progress?.prefersCurrent" class="attempt muted">{{ t('route.progress.prefersCurrent') }}</p>
         <div class="options" role="radiogroup" :aria-label="t('route.doctorView.whereTitle')">
-          <label v-for="a in r.data.value.alternatives" :key="a.mo.moCode" class="option" :class="{ on: choice === a.mo.moCode }">
+          <label v-for="a in r.alternatives.value" :key="a.mo.moCode" class="option" :class="{ on: choice === a.mo.moCode }">
             <input :checked="choice === a.mo.moCode" type="radio" name="where" :value="a.mo.moCode" data-testid="redirect" @click="toggleChoice(a.mo.moCode)" />
             <span class="opt-main">
               <span class="opt-name" :title="a.mo.name">{{ shortOrgName(a.mo.name) }}<StatusTag v-if="r.openSig.value?.toMoCode === a.mo.moCode" :value="t('route.doctorView.requested')" tone="warn" class="opt-tag" /></span>
@@ -175,7 +225,7 @@ watch(() => props.patientRef, r.load)
             </span>
             <span class="opt-wait"><span class="opt-wait-label">{{ t('route.doctorView.halfShort') }}</span><span class="opt-days tabular faster">≈ {{ days(a.p50Days) }} {{ t('common.days') }}</span></span>
           </label>
-          <p v-if="!r.data.value.alternatives.length" class="muted small">{{ t('doctor.referral.noAlternatives') }}</p>
+          <p v-if="!r.alternatives.value.length" class="muted small">{{ t('doctor.referral.noAlternatives') }}</p>
         </div>
         <div class="decide">
           <label class="field-label" for="decision-reason">{{ t('route.doctorView.comment') }} <span class="req">{{ t('route.doctorView.required') }}</span></label>
@@ -193,13 +243,55 @@ watch(() => props.patientRef, r.load)
         </div>
       </AppCard>
 
+      <AppCard v-else-if="progress" :title="t('route.progress.title')" label data-testid="transfer-card">
+        <div v-if="r.openSig.value" class="signal" :title="r.openSig.value.toMoName ?? ''">
+          <i class="pi pi-comment" aria-hidden="true" />
+          <span>{{ t('route.patientSignal.' + r.openSig.value.kind, { name: shortOrgName(r.openSig.value.toMoName) }) }}<template v-if="r.openSig.value.comment"> — «{{ r.openSig.value.comment }}»</template><span class="muted"> · {{ dateShort(r.openSig.value.recordedAt) }}</span></span>
+        </div>
+        <div class="rows">
+          <div class="row"><span class="row-main row-title">{{ t('route.progress.status.' + progress.status) }}</span><span v-if="progress.closedReason" class="row-value">{{ t('route.progress.closed.' + progress.closedReason) }}</span></div>
+          <div v-if="transfer && progress.status !== 'withdrawal_requested'" class="row">
+            <span class="row-main"><span :title="transfer.toMoName">{{ t('route.progress.transferTo', { name: shortOrgName(transfer.toMoName) }) }}</span><span v-if="transfer.reason" class="row-sub">{{ t('route.feed.reason') }}: {{ transfer.reason }}</span></span>
+            <span v-if="transfer.severe" class="row-value"><StatusTag :value="t('route.severeFlag')" tone="danger" /></span>
+          </div>
+          <div v-if="transfer?.plannedAt" class="row"><span class="row-main row-title">{{ t('route.progress.plannedAt', { date: dateShort(transfer.plannedAt) }) }}</span></div>
+          <p v-if="progress.overdue" class="overdue">{{ t('route.progress.overdue') }}</p>
+          <p v-if="progress.side === 'origin' && progress.responsibleMoCode !== progress.originMoCode" class="muted small">{{ t('route.progress.responsible', { name: shortOrgName(progress.responsibleMoName) }) }}</p>
+        </div>
+        <div v-if="r.can('cancel_transfer') || r.can('close')" class="decide">
+          <label class="field-label" for="action-reason">{{ r.can('close') ? t('route.progress.closeReason') : t('route.progress.cancelReason') }} <span class="req">{{ t('route.doctorView.required') }}</span></label>
+          <Textarea id="action-reason" v-model="actionReason" rows="2" auto-resize data-testid="action-reason" />
+          <div class="decide-foot">
+            <span class="spacer" />
+            <Button v-if="r.can('cancel_transfer')" :label="t('route.progress.cancel')" severity="secondary" size="small" :loading="r.acting.value === 'cancel_transfer'" :disabled="r.acting.value !== null" data-testid="cancel-transfer" @click="routeAction('cancel_transfer')" />
+            <Button v-if="r.can('close')" :label="t('route.progress.close')" size="small" :loading="r.acting.value === 'close'" :disabled="r.acting.value !== null" data-testid="close-route" @click="routeAction('close')" />
+          </div>
+        </div>
+        <RouterLink v-if="progress.side === 'receiving' && !progress.closedReason" class="link-arrow small" :to="{ name: 'incoming-referrals' }">{{ t('route.progress.toIncoming') }}</RouterLink>
+      </AppCard>
+
       <CollapsibleSection :title="t('route.checklist')" :summary="t('route.checklistSummary', { expired: r.expired.value, valid: r.valid.value })" :tone="r.expired.value ? 'danger' : undefined" origin="formula">
         <RouteChecklist :items="r.data.value.checklist" :standard="r.data.value.standard" />
       </CollapsibleSection>
 
 
+      <AppCard v-if="auth.can('scribe.use')" :title="t('route.doctorView.visitsTitle')" label data-testid="patient-visits">
+        <p v-if="!shownVisits.length" class="muted small">{{ t('route.doctorView.visitsEmpty') }}</p>
+        <ul v-else class="visits">
+          <li v-for="v in shownVisits" :key="v.requestId" class="visit">
+            <i class="pi" :class="v.status === 'completed' ? 'pi-file-check' : 'pi-microphone'" aria-hidden="true" />
+            <div class="visit-main">
+              <span class="visit-title">{{ v.status === 'completed' ? t('route.doctorView.visitDone') : t('doctor.scribe.consentStatus.' + v.status) }}</span>
+              <span class="caption">{{ dateShort(v.approvedAt ?? v.answeredAt ?? v.requestedAt) }}<template v-if="v.moName"> · {{ shortOrgName(v.moName) }}</template></span>
+            </div>
+            <RouterLink v-if="v.status === 'completed' && v.leafletToken" class="visit-link" :to="{ name: 'leaflet', params: { token: v.leafletToken } }" target="_blank">{{ t('route.doctorView.openLeaflet') }}</RouterLink>
+            <RouterLink v-else-if="v.status !== 'completed'" class="visit-link" :to="{ name: 'scribe', query: { patientRef } }">{{ t('route.doctorView.openScribe') }}</RouterLink>
+          </li>
+        </ul>
+      </AppCard>
+
       <div class="grid cols-2">
-        <AppCard :title="t('route.signalsTitle')" label><div class="scroll-list"><RouteFeed :entries="r.entries.value" audience="doctor" /></div></AppCard>
+        <AppCard :title="t('route.signalsTitle')" label><div class="scroll-list"><RouteFeed :entries="r.journal.value" audience="doctor" /></div></AppCard>
         <AppCard :title="t('route.pastReferrals')" label><div class="scroll-list"><RouteHistory :items="r.data.value.history" /></div></AppCard>
       </div>
       <p class="caption footnote">{{ r.data.value.basis }} · {{ t('route.synthetic', { asOf: dateShort(r.data.value.asOf) }) }}</p>
@@ -284,6 +376,25 @@ watch(() => props.patientRef, r.load)
 .lead { margin: 0 0 6px; }
 .row-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .scroll-list { max-height: 340px; overflow-y: auto; padding-right: 4px; }
+.name-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.record-visit { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-pill);
+  font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); text-decoration: none; white-space: nowrap; transition: border-color .12s, color .12s; }
+.record-visit .pi { font-size: 12px; }
+.visits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.visit { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border-soft); }
+.visit:first-child { border-top: 0; padding-top: 4px; }
+.visit > .pi { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--accent-soft); color: var(--accent-strong); font-size: 14px; }
+.visit-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.visit-title { font-weight: var(--fw-bold); }
+.visit-link { font-weight: var(--fw-bold); color: var(--link, var(--accent)); text-decoration: none; white-space: nowrap; }
+.visit-link:hover { text-decoration: underline; }
+.record-visit:hover { border-color: var(--accent); color: var(--accent-strong); }
+.status-line { font-size: var(--fs-base-sm); color: var(--text-secondary); margin-top: 2px; }
+.attempt { margin: 0 0 8px; font-size: var(--fs-base-sm); line-height: 1.45; }
+.overdue { margin: 4px 0 0; font-size: var(--fs-base-sm); font-weight: var(--fw-semibold); color: var(--danger-text); }
+.rows .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+.row-title { font-weight: var(--fw-semibold); }
+.row-sub { font-size: var(--fs-sm); color: var(--text-muted); }
 
 .factor-effect { font-weight: var(--fw-bold); white-space: nowrap; }
 .factor-effect.plus { color: var(--danger-text); }

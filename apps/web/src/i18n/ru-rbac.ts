@@ -45,7 +45,7 @@ export const ruRbac = {
     staleNext: 'следующая загрузка — {date}',
     refresh: 'Обновить',
   },
-  pager: { shown: 'Показаны {from}–{to} из {total}', page: 'страница {page} из {pages}', prev: 'Назад', next: 'Дальше' },
+  pager: { range: '{from}–{to} из {total}', shown: 'Показаны {from}–{to} из {total}', page: 'страница {page} из {pages}', prev: 'Назад', next: 'Дальше' },
   validation: {
     required: 'Заполните поле',
     email: 'Проверьте адрес почты',

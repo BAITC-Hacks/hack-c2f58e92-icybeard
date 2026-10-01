@@ -25,16 +25,14 @@ const refdata = useRefdataStore()
 const router = useRouter()
 const route = useRoute()
 
-/** Последний открытый регион (страницы региона и организации) — цель пункта «Регион»; иначе свой регион. */
-const lastRegion = computed(() => {
-  const fromRoute = route.name === 'region' ? String(route.params.kato ?? '') : route.name === 'organization' || route.name === 'organization-referrals' ? String(route.query.kato ?? '') : ''
-  return fromRoute || auth.region || null
-})
+/** Пункт «Регион» — только свой регион из учётной записи: меню не должно меняться от того, какую страницу открыли
+ * (раньше пункт появлялся на странице региона и пропадал при уходе с неё). Чужой регион открывается с карты. */
+const homeRegion = computed(() => auth.region || null)
 
 /** На десктопе (без подвала) аккаунт — в меню пользователя верхней полосы, как у гражданина; в мобильном
  * drawer верхней полосы нет, поэтому группа «Аккаунт» там остаётся. */
 const groups = computed(() =>
-  sidebarNav(router.getRoutes(), { can: auth.can, moCode: auth.moCode, region: lastRegion.value })
+  sidebarNav(router.getRoutes(), { can: auth.can, moCode: auth.moCode, region: homeRegion.value })
     .filter((section) => props.foot || section.group !== 'account')
     .map((section) => ({
     ...section,

@@ -32,7 +32,7 @@ import { useRefdataStore } from '@/stores/refdata'
  * выпадающим списком, поиск пациента, сортировка кликом по заголовку колонки. Полный список региона грузится
  * один раз, фильтры, поиск и сортировка считаются на клиенте; строки с запросом пациента — ответ прямо в строке.
  * Клик по строке — быстрый просмотр маршрута в панели справа; «Открыть →» — полная страница маршрута. */
-const FLAGS = ['stuck_over_30', 'refusal_risk', 'faster_alternative', 'patient_signal'] as const
+const FLAGS = ['stuck_over_30', 'refusal_risk', 'faster_alternative', 'patient_signal', 'transfer_pending', 'transferred_in', 'prefers_current', 'date_overdue'] as const
 type Flag = (typeof FLAGS)[number]
 const SORT_COLUMNS: { key: SortKey; label: string; num?: boolean }[] = [
   { key: 'patient', label: 'doctor.worklist.patient' },
@@ -41,7 +41,10 @@ const SORT_COLUMNS: { key: SortKey; label: string; num?: boolean }[] = [
   { key: 'days', label: 'doctor.worklist.daysWaiting', num: true },
   { key: 'priority', label: 'doctor.worklist.priority', num: true },
 ]
-const FLAG_TONES: Record<Flag, 'neutral' | 'danger' | 'accent' | 'warn'> = { stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'warn' }
+const FLAG_TONES: Record<Flag, 'neutral' | 'danger' | 'accent' | 'warn'> = {
+  stuck_over_30: 'neutral', refusal_risk: 'danger', faster_alternative: 'accent', patient_signal: 'warn',
+  transfer_pending: 'accent', transferred_in: 'accent', prefers_current: 'neutral', date_overdue: 'danger',
+}
 const STAGE_TONES: Record<string, 'neutral' | 'accent' | 'ok'> = { registered: 'ok', waiting: 'accent', called: 'ok' }
 
 const { t, te } = useI18n()
@@ -105,7 +108,7 @@ function stageLabel(item: WorklistItem): string {
 }
 /** Главный чип строки: запрос пациента, иначе риск отказа, иначе первый флаг, иначе этап. */
 function primaryFlag(item: WorklistItem): { label: string; tone: 'neutral' | 'danger' | 'accent' | 'warn' | 'ok' } {
-  const f = (['patient_signal', 'refusal_risk', 'faster_alternative', 'stuck_over_30'] as const).find((x) => item.riskFlags.includes(x))
+  const f = (['date_overdue', 'patient_signal', 'transfer_pending', 'transferred_in', 'refusal_risk', 'faster_alternative', 'stuck_over_30', 'prefers_current'] as const).find((x) => item.riskFlags.includes(x))
   return f ? { label: flagLabel(f), tone: FLAG_TONES[f] } : { label: stageLabel(item), tone: STAGE_TONES[item.stageCode] ?? 'neutral' }
 }
 /** Короткая подпись следующего шага (doctor.worklist.actionShort.<code>); незнакомый код — русская подпись API как есть. */

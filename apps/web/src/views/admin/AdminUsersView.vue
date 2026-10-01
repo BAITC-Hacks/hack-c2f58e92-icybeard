@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
+import IconField from 'primevue/iconfield'
+import InputIcon from 'primevue/inputicon'
 import InputText from 'primevue/inputtext'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -14,6 +16,7 @@ import FilterPill from '@/components/ui/FilterPill.vue'
 import KpiRow from '@/components/ui/KpiRow.vue'
 import KpiTile from '@/components/ui/KpiTile.vue'
 import PageShell from '@/components/ui/PageShell.vue'
+import SidePanel from '@/components/ui/SidePanel.vue'
 import Pager from '@/components/ui/Pager.vue'
 import StatusTag from '@/components/ui/StatusTag.vue'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
@@ -51,6 +54,8 @@ const selected = ref<AdminUser | null>(null)
 const busy = ref(false)
 const actionError = ref<unknown>(null)
 const inviteOpen = ref(false)
+/** Пользователь открывается в боковой панели поверх списка (как журнал решений), а не в колонке рядом с таблицей. */
+const panelOpen = computed({ get: () => selected.value !== null, set: (v: boolean) => { if (!v) selected.value = null } })
 const organizations = ref<OrganizationItem[]>([])
 const matrix = ref<MatrixCell[] | null>(null)
 
@@ -148,26 +153,25 @@ onMounted(async () => {
 
 <template>
   <PageShell :title="t('admin.users.title')" :lead="lead">
-    <template #actions>
-      <Button :label="t('admin.users.invite')" icon="pi pi-plus" data-testid="invite-open" @click="inviteOpen = true" />
-    </template>
-    <div class="toolbar">
-      <FilterPill v-model="role" :label="t('admin.users.colRole')" :all-label="t('admin.all')" :options="roleOptions" testid="filter-role" />
-      <FilterPill v-if="own" :model-value="auth.moCode" :label="t('admin.users.colOrg')" :all-label="t('admin.all')" :options="[{ value: auth.moCode ?? '', label: shortOrgName(refdata.organizationName(auth.moCode)) }]" locked testid="filter-org" />
-      <FilterPill v-else v-model="moCode" :label="t('admin.users.colOrg')" :all-label="t('admin.all')" :options="orgOptions" searchable testid="filter-org" />
-      <FilterPill v-model="status" :label="t('admin.users.colStatus')" :all-label="t('admin.all')" :options="statusOptions" testid="filter-status" />
-      <span class="spacer" />
-      <label class="search"><span class="caption">{{ t('admin.search') }}</span><InputText v-model="q" size="small" :placeholder="t('admin.users.searchPlaceholder')" data-testid="users-search" /></label>
-    </div>
-
     <KpiRow v-if="summary">
-      <KpiTile :value="num(summary.active)" :label="t('admin.users.kpiActive')" />
-      <KpiTile :value="num(summary.invited ?? summary.invitedStale)" :label="summary.invited !== undefined ? t('admin.users.kpiInvited') : t('admin.users.kpiInvitedStale')" :chip="summary.invited !== undefined && summary.invitedStale ? t('admin.users.staleChip', { n: summary.invitedStale }) : undefined" chip-tone="warn" />
-      <KpiTile :value="num(summary.blocked)" :label="t('admin.users.kpiBlocked')" />
+      <KpiTile label-first :value="num(summary.active)" :label="t('admin.users.kpiActiveLabel')" :hint="t('admin.users.kpiActiveHint')" />
+      <KpiTile label-first :value="num(summary.invited ?? summary.invitedStale)" :label="summary.invited !== undefined ? t('admin.users.kpiInvitedLabel') : t('admin.users.kpiInvitedStaleLabel')" :hint="t('admin.users.kpiInvitedHint')" :chip="summary.invited !== undefined && summary.invitedStale ? t('admin.users.staleChip', { n: summary.invitedStale }) : undefined" chip-tone="warn" />
+      <KpiTile label-first :value="num(summary.blocked)" :label="t('admin.users.kpiBlockedLabel')" :hint="t('admin.users.kpiBlockedHint')" />
     </KpiRow>
 
-    <div class="with-panel">
-      <section class="card">
+    <section class="card">
+      <div class="toolbar list-toolbar">
+        <Button :label="t('admin.users.invite')" icon="pi pi-plus" size="small" data-testid="invite-open" @click="inviteOpen = true" />
+        <span class="spacer" />
+        <FilterPill v-model="role" :label="t('admin.users.colRole')" :all-label="t('admin.all')" :options="roleOptions" testid="filter-role" />
+      <FilterPill v-if="own" :model-value="auth.moCode" :label="t('admin.users.colOrg')" :all-label="t('admin.all')" :options="[{ value: auth.moCode ?? '', label: shortOrgName(refdata.organizationName(auth.moCode)) }]" locked testid="filter-org" />
+      <FilterPill v-else v-model="moCode" :label="t('admin.users.colOrg')" :all-label="t('admin.all')" :options="orgOptions" searchable testid="filter-org" />
+        <FilterPill v-model="status" :label="t('admin.users.colStatus')" :all-label="t('admin.all')" :options="statusOptions" testid="filter-status" />
+        <IconField class="search-field">
+          <InputIcon class="pi pi-search" />
+          <InputText v-model="q" :placeholder="t('admin.users.searchPlaceholder')" :aria-label="t('admin.search')" data-testid="users-search" />
+        </IconField>
+      </div>
         <AsyncState :loading="loading" :error="error" :empty="!response?.items.length" :filtered="filtered" :lines="8" :empty-title="t('admin.users.empty')" :empty-text="t('admin.users.emptyText')" empty-icon="pi pi-users" @retry="load" @reset="resetFilters">
           <template #empty-actions><Button :label="t('admin.users.invite')" size="small" @click="inviteOpen = true" /></template>
           <div class="table-wrap">
@@ -187,13 +191,13 @@ onMounted(async () => {
           </div>
           <Pager v-model:page="page" :total="response!.total" :size="PAGE_SIZE" />
         </AsyncState>
-      </section>
-      <aside class="panel-col">
-        <UserPanel v-if="selected" :user="selected" :scope="scope" :own-mo-code="auth.moCode" :organizations="organizations" :matrix="matrix" :busy="busy" @save="save" @block="block" @unblock="unblock" />
-        <section v-else class="card hint"><i class="pi pi-user muted" aria-hidden="true" /><span class="muted small">{{ t('admin.users.pickHint') }}</span></section>
-        <ErrorBox :error="actionError" />
-      </aside>
-    </div>
+        <p v-if="response?.items.length" class="caption pick-hint">{{ t('admin.users.pickHint') }}</p>
+    </section>
+
+    <SidePanel v-model:visible="panelOpen" :title="selected ? (selected.displayName ?? selected.username) : ''" :subtitle="selected ? selected.username : ''">
+      <UserPanel v-if="selected" bare :user="selected" :scope="scope" :own-mo-code="auth.moCode" :organizations="organizations" :matrix="matrix" :busy="busy" @save="save" @block="block" @unblock="unblock" />
+      <ErrorBox :error="actionError" />
+    </SidePanel>
 
     <InviteDialog v-model:visible="inviteOpen" :scope="scope" :own-mo-code="auth.moCode" :organizations="organizations" @invited="load" />
   </PageShell>
@@ -201,17 +205,16 @@ onMounted(async () => {
 
 <style scoped>
 .spacer { flex: 1; }
-.search { display: inline-flex; align-items: center; gap: 10px; }
-.search .p-inputtext { background: var(--dm-surface-2); min-width: 260px; }
-.with-panel { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
-.panel-col { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 16px; }
-.hint { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; padding: 32px 24px; }
+.list-toolbar { margin-bottom: var(--gap-cabinet, 16px); row-gap: 8px; }
+.search-field { flex: 0 1 420px; min-width: 280px; }
+.search-field :deep(.p-inputtext) { width: 100%; }
+.pick-hint { margin: 12px 0 0; }
 .strong { font-weight: var(--fw-bold); }
 .user-cell { white-space: nowrap; }
 .clip.region { max-width: 110px; }
 .clip { max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nowrap { white-space: nowrap; }
 /* на ноутбуке регион уходит, чтобы статус оставался в видимой части таблицы */
-@media (max-width: 1500px) { .col-region { display: none; } }
-@media (max-width: 1200px) { .with-panel { grid-template-columns: 1fr; } .panel-col { position: static; } }
+@media (max-width: 1100px) { .col-region { display: none; } }
+@media (max-width: 900px) { .search-field { flex: 1 1 100%; } }
 </style>

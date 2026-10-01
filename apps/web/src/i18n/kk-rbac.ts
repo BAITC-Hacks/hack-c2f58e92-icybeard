@@ -45,7 +45,7 @@ export const kkRbac = {
     staleNext: 'келесі жүктеу — {date}',
     refresh: 'Жаңарту',
   },
-  pager: { shown: '{total} ішінен {from}–{to} көрсетілген', page: '{pages} беттің {page}-беті', prev: 'Артқа', next: 'Әрі қарай' },
+  pager: { range: '{total} ішінен {from}–{to}', shown: '{total} ішінен {from}–{to} көрсетілген', page: '{pages} беттің {page}-беті', prev: 'Артқа', next: 'Әрі қарай' },
   validation: {
     required: 'Өрісті толтырыңыз',
     email: 'Пошта мекенжайын тексеріңіз',

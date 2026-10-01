@@ -53,4 +53,10 @@ const { t } = useI18n()
 .page-actions :deep(.p-select), .page-actions :deep(.p-inputtext) { background: var(--dm-surface); border-radius: var(--dm-radius-pill); min-height: 36px; }
 .page-actions :deep(.search-select) { width: auto; min-width: 220px; max-width: 320px; }
 .page-actions :deep(.p-select-sm .p-select-label) { padding-block: 6px; }
+/* фильтры-пилюли, выпадающие списки и кнопки в одной строке — одной высоты */
+.page-actions :deep(.chip-filter), .page-actions :deep(.p-button-sm) { height: 36px; }
+.page-actions :deep(.p-select-sm) { height: 36px; align-items: center; }
+.page-actions :deep(.p-select-label) { padding-inline: 16px 6px; }
+.page-actions :deep(.p-select-dropdown) { padding-right: 10px; }
+.page-actions :deep(.chips) { gap: var(--dm-space-2); }
 </style>

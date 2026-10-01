@@ -26,8 +26,9 @@ describe('decision labels', () => {
   })
 
   it('translates subject and role', () => {
-    expect(subjectLabel('referral')).toBe('направление')
-    expect(subjectLabel('anomaly')).toBe('сигнал')
+    expect(subjectLabel('referral')).toBe('новое направление')
+    expect(subjectLabel('anomaly')).toBe('сигнал по данным')
+    expect(subjectLabel('route')).toBe('пациент в очереди')
     expect(roleLabel('regulator')).toBe('регулятор')
   })
 })

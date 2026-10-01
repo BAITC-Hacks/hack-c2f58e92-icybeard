@@ -1,47 +1,53 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import StatusTag from '@/components/ui/StatusTag.vue'
+import type { RouteJournalEntry, RouteJournalKind } from '@/api/types'
 import { dateTime, shortOrgName } from '@/lib/format'
-import type { RouteEntry } from '@/lib/route'
+import { dateShort } from '@/lib/route'
 
-/** Лента решений врача и сигналов гражданина, свежие первыми; формулировки — по аудитории. Каждая запись — лента
- * событий: значок (перевод, оставлен, запрос пациента), заголовок, дата со временем и кто, ниже — причина врача или
- * комментарий пациента отдельной плашкой; справа статус (согласие пациента, «ждёт ответа врача»). */
-defineProps<{ entries: RouteEntry[]; audience: 'citizen' | 'doctor' }>()
+/** Хроника маршрута из журнала (RouteDto.journal), свежие первыми: что сделали люди — запросы и ответы пациента,
+ * решения врача, ответы принимающей больницы. Формулировки — по аудитории; у каждой записи значок, кто и когда,
+ * ниже причина или комментарий отдельной плашкой и назначенная дата, если она есть. */
+defineProps<{ entries: RouteJournalEntry[]; audience: 'citizen' | 'doctor' }>()
 const { t } = useI18n()
 
-function icon(e: RouteEntry): string {
-  if (e.kind === 'signal') return 'pi-comment'
-  return e.decision.kind === 'redirect' ? 'pi-arrow-right-arrow-left' : 'pi-check'
+const CITIZEN_KINDS = new Set<RouteJournalKind>(['request', 'prefer_current', 'still_waiting', 'withdraw', 'treated_elsewhere', 'consent_accepted', 'consent_declined'])
+const ICONS: Partial<Record<RouteJournalKind, string>> = {
+  redirect: 'pi-arrow-right-arrow-left', keep: 'pi-check', confirm: 'pi-calendar', reschedule: 'pi-calendar', admit: 'pi-building', discharge: 'pi-sign-out',
+  reject: 'pi-times', cancel: 'pi-times', no_show: 'pi-times', close: 'pi-flag', consent_accepted: 'pi-thumbs-up', consent_declined: 'pi-thumbs-down',
 }
-function tone(e: RouteEntry): string {
-  if (e.kind === 'signal') return 'signal'
-  return e.decision.kind === 'redirect' ? 'redirect' : 'keep'
+
+function byCitizen(e: RouteJournalEntry) {
+  return CITIZEN_KINDS.has(e.kind)
+}
+function tone(e: RouteJournalEntry): string {
+  if (byCitizen(e)) return 'signal'
+  if (e.kind === 'reject' || e.kind === 'cancel' || e.kind === 'no_show') return 'stop'
+  if (e.kind === 'keep' || e.kind === 'confirm' || e.kind === 'admit' || e.kind === 'discharge') return 'keep'
+  return 'redirect'
+}
+function who(e: RouteJournalEntry, audience: 'citizen' | 'doctor') {
+  if (byCitizen(e)) return audience === 'doctor' ? t('route.feed.patient') : t('route.feed.you')
+  return t('decision.role.' + e.role)
+}
+function noteLabel(e: RouteJournalEntry, audience: 'citizen' | 'doctor') {
+  if (!byCitizen(e)) return t('route.feed.reason')
+  return audience === 'doctor' ? t('route.feed.patientComment') : t('route.feed.yourComment')
 }
 </script>
 
 <template>
   <ol class="feed" data-testid="route-decisions">
     <p v-if="entries.length === 0" class="muted">{{ t('route.noDecisions') }}</p>
-    <li v-for="e in entries" :key="e.kind === 'decision' ? e.decision.decisionId : e.signal.decisionId" class="entry">
-      <span class="dot" :class="tone(e)" aria-hidden="true"><i class="pi" :class="icon(e)" /></span>
+    <li v-for="e in entries" :key="e.id" class="entry" :data-kind="e.kind">
+      <span class="dot" :class="tone(e)" aria-hidden="true"><i class="pi" :class="ICONS[e.kind] ?? 'pi-comment'" /></span>
       <div class="body">
-        <div class="head">
-          <template v-if="e.kind === 'decision'">
-            <span class="title" :title="e.decision.toMoName">{{ e.decision.kind === 'redirect' ? t('route.redirect', { name: shortOrgName(e.decision.toMoName) }) : t('route.keep') }}</span>
-          </template>
-          <span v-else class="title" :title="e.signal.toMoName ?? undefined">{{ t((audience === 'doctor' ? 'route.patientSignal.' : 'route.signal.') + e.signal.kind, { name: shortOrgName(e.signal.toMoName) }) }}</span>
-          <StatusTag v-if="e.kind === 'signal' && e.signal.open" :value="t('route.awaitingDoctor')" tone="accent" />
-          <StatusTag v-else-if="e.kind === 'decision' && e.decision.patientConsent" :value="t('route.consentStatus.' + e.decision.patientConsent)"
-            :tone="e.decision.patientConsent === 'accepted' ? 'ok' : e.decision.patientConsent === 'declined' ? 'neutral' : 'accent'" />
-        </div>
+        <span class="title" :title="e.moName ?? undefined">{{ t(`route.journal.${audience}.${e.kind}`, { name: shortOrgName(e.moName) }) }}</span>
         <div class="meta">
-          {{ dateTime(e.kind === 'decision' ? e.decision.recordedAt : e.signal.recordedAt) }} ·
-          {{ e.kind === 'decision' ? t('decision.role.' + e.decision.role) : audience === 'doctor' ? t('route.feed.patient') : t('route.feed.you') }}
-          <template v-if="audience === 'doctor' && e.kind === 'decision' && e.decision.severe"> · <span class="severe">{{ t('route.severeFlag') }}</span></template>
+          {{ dateTime(e.at) }} · {{ who(e, audience) }}
+          <template v-if="audience === 'doctor' && e.severe"> · <span class="severe">{{ t('route.severeFlag') }}</span></template>
         </div>
-        <p v-if="e.kind === 'decision' && e.decision.reason" class="note"><span class="note-label">{{ t('route.feed.reason') }}</span>{{ e.decision.reason }}</p>
-        <p v-else-if="e.kind === 'signal' && e.signal.comment" class="note"><span class="note-label">{{ audience === 'doctor' ? t('route.feed.patientComment') : t('route.feed.yourComment') }}</span>{{ e.signal.comment }}</p>
+        <p v-if="e.plannedAt" class="planned">{{ t('route.journal.planned', { date: dateShort(e.plannedAt) }) }}</p>
+        <p v-if="e.reason" class="note"><span class="note-label">{{ noteLabel(e, audience) }}</span>{{ e.reason }}</p>
       </div>
     </li>
   </ol>
@@ -55,11 +61,12 @@ function tone(e: RouteEntry): string {
 .dot.redirect { background: var(--accent-subtle); color: var(--accent-strong); }
 .dot.keep { background: var(--success-bg); color: var(--success-text); }
 .dot.signal { background: var(--warning-bg); color: var(--warning-text); }
+.dot.stop { background: var(--surface-muted); color: var(--text-secondary); }
 .body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
-.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .title { font-size: var(--fs-base); font-weight: var(--fw-semibold); line-height: 1.4; }
 .meta { font-size: var(--fs-sm); color: var(--text-muted); }
 .severe { color: var(--danger-text); font-weight: var(--fw-semibold); }
+.planned { margin: 2px 0 0; font-size: var(--fs-base-sm); font-weight: var(--fw-semibold); }
 .note { margin: 4px 0 0; padding: 8px 12px; border-radius: var(--radius-md); background: var(--surface-muted); font-size: var(--fs-base-sm); line-height: 1.45; overflow-wrap: anywhere; }
 .note-label { display: block; font-size: var(--fs-xs); font-weight: var(--fw-bold); color: var(--text-muted); margin-bottom: 2px; }
 </style>

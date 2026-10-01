@@ -55,15 +55,16 @@ export function dateTimeShort(iso: string | null | undefined): string {
   return `${two(parsed.getDate())}.${two(parsed.getMonth() + 1)} · ${two(parsed.getHours())}:${two(parsed.getMinutes())}`
 }
 
-/** Ступень шкалы карты для индекса нагрузки (0…100): 1 — ниже 60, 2 — 60–69, 3 — 70–79, 4 — 80–86, 5 — 87 и выше.
- * Цвета ступеней — рамп --dm-map-1…5 синей гаммы (--scale-good → --scale-mid → --scale-bad): выше = хуже. */
-export const INDEX_SCALE_STEPS = [60, 70, 80, 87] as const
+/** Ступень шкалы карты для индекса доступности (0…100, выше = доступнее): 1 — 60 и выше, 2 — 50–59, 3 — 40–49,
+ * 4 — 30–39, 5 — ниже 30. Цвета ступеней — рамп --dm-map-1…5 (зелёный → жёлтый → оранжевый → красный): чем
+ * краснее, тем хуже доступность. Индекс относительный (среднее перцентильных рангов), поэтому значения держатся
+ * в середине шкалы и границы идут через 10 пунктов. */
+export const INDEX_SCALE_STEPS = [60, 50, 40, 30] as const
 export function indexStep(value: number): 1 | 2 | 3 | 4 | 5 {
-  const step = INDEX_SCALE_STEPS.filter((edge) => value >= edge).length
+  const step = INDEX_SCALE_STEPS.filter((edge) => value < edge).length
   return (step + 1) as 1 | 2 | 3 | 4 | 5
 }
 
-/** CSS-переменная цвета ступени рампа карты; для canvas и маркеров берётся вычисленное значение через useChartTheme.scale. */
 export function indexColor(value: number): string {
   return `var(--dm-map-${indexStep(value)})`
 }
@@ -128,7 +129,8 @@ function closingQuote(text: string): number {
  * «Товарищество с ограниченной ответственностью "Достар Мед"»). Полное имя остаётся для title и подстрок. */
 export function shortOrgName(name: string | null | undefined): string {
   if (!name) return ''
-  const rest = stripLegalForm(name.trim())
+  // «на праве хозяйственного ведения "…"» встречается и без формы собственности впереди
+  const rest = stripLegalForm(name.trim()).replace(/^на праве (хозяйственного ведения|оперативного управления)\s*/iu, '')
   if (!rest) return name.trim()
   let short = rest
   if (OPEN_QUOTES.includes(rest[0]!)) {

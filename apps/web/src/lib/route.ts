@@ -27,11 +27,14 @@ export function routeEntries(route: Pick<PatientRoute, 'decisions' | 'signals'>)
 }
 
 /** Коды стадий маршрута из Стандарта ҚР-ДСМ-27 в порядке прохождения (docs/api.md, раздел Route). */
-export const STAGE_CODES = ['referral_issued', 'examination', 'waitlisted', 'date_assigned', 'hospitalized', 'refused'] as const
+export const STAGE_CODES = ['referral_issued', 'examination', 'waitlisted', 'transfer', 'date_assigned', 'hospitalized', 'refused'] as const
 export type StageCode = (typeof STAGE_CODES)[number]
 
 /** Коды следующего шага рабочего списка (WorklistBuilder.Action* в API); подпись — ключ doctor.worklist.action.<code>. */
-export const NEXT_ACTION_CODES = ['redirect_faster', 'review_before_call', 'clarify_date', 'wait_for_call'] as const
+export const NEXT_ACTION_CODES = [
+  'redirect_faster', 'review_before_call', 'clarify_date', 'wait_for_call', 'decision_made', 'await_consent', 'await_confirmation', 'confirm_admission',
+  'transferred_out', 'admit_on_date', 'date_overdue', 'discharge_when_done', 'confirm_withdrawal', 'closed',
+] as const
 export type NextActionCode = (typeof NEXT_ACTION_CODES)[number]
 
 export type Tone = 'success' | 'info' | 'warn' | 'danger' | 'secondary'
@@ -63,6 +66,18 @@ export function outcomeTone(outcome: string): Tone {
   if (outcome === 'hospitalized') return 'success'
   if (outcome === 'refused') return 'danger'
   return 'secondary'
+}
+
+/** «Сегодня» по Казахстану (Asia/Almaty) как `YYYY-MM-DD` — так же считает сервер для дат госпитализации. */
+export function almatyToday(now = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Almaty', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+}
+
+/** `YYYY-MM-DD` + n дней (календарных). */
+export function addDays(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
 }
 
 /** `YYYY-MM-DD` или ISO 8601 → `дд.мм.гггг`; пустое значение → «—», незнакомый формат — как есть. */

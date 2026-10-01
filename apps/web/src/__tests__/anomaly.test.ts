@@ -25,9 +25,9 @@ describe('anomaly labels', () => {
   it('translates stream, severity, status and deviation', () => {
     expect(streamTitle('onco_monthly')).toBe('Онкология, впервые выявленные')
     expect(streamTitle('custom')).toBe('custom')
-    expect(severityLabel('critical')).toBe('критический')
+    expect(severityLabel('critical')).toBe('сильное отклонение')
     expect(statusLabel('dismissed')).toBe('ложный сигнал')
-    expect(deviationText(10, 5)).toBe('выше ожидания')
-    expect(deviationText(1, 5)).toBe('ниже ожидания')
+    expect(deviationText(10, 5)).toBe('больше обычного')
+    expect(deviationText(1, 5)).toBe('меньше обычного')
   })
 })

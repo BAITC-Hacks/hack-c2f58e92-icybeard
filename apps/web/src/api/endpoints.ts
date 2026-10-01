@@ -3,7 +3,7 @@ import type {
   AlternativesResponse, Anomaly, AskResponse, AuditEntry, Batch, InsightStatus, CheckResponse, Decision, DecisionCreated, DecisionRequest, EquipmentOrganization, EquipmentResponse, ForecastResponse, IndexResponse,
   IntakeApproveResult, IntakeDraft, IntakeDraftSummary, IntakeQuarantineResponse, IntakeUploadResult, IncomingReferral, NotificationBell, NotificationKind,
   DailyResponse, LosResponse, Mnn, Nosology, OrganizationItem, OrganizationSeries, OverloadedOrganization, Paged, PatientRoute, PredictRequest, QualityReport, RouteStandard, ScribeDraft, ScribeHealth, ScribeTranscriptResponse, PredictResponse, Profile, RedistributeResponse, Region, Seasonality,
-  SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistResponse, SignalKind,
+  CitizenNotifications, ScribeConsent, ScribeSegment, ScribeVocabulary, SimulateResponse, StaffingResponse, Stream, VaccinationBenchmark, VaccinationRefusalsResponse, OncologyLateStageResponse, WorklistResponse, SignalKind,
   AccessLogEntry, AdminDoctor, ApplicationDecision, CodeResent, InviteAccepted, AdminOrg, AdminOrgDetailResponse, AdminUserDetail, AdminUsersResponse, AdminUserUpdate, ApplicationStatus, ConsentsResponse, InviteInfo,
   InviteRequest, InviteResponse, LoginExamples, MeResponse, NotificationSettings, OrgApplication, OrgApplicationCreated, OrgApplicationRequest,
   OrgApplicationStatus, PagedList, ProfileResponse, ProfileUpdate, RoleChange, RoleCreate, RolePermissionsUpdate, RolesResponse, SecurityResponse, Verification,
@@ -60,8 +60,20 @@ export const journal = {
   referralsIncoming: (filter: { moCode?: string; severe?: boolean; includeConfirmed?: boolean } = {}) =>
     api<IncomingReferral[]>('/api/v1/journal/referrals/incoming', { query: filter }),
   /** Принимающая организация подтверждает приём; требует, чтобы пациент уже согласился (409 иначе). */
-  confirmReferral: (decisionId: string, body: { patientRef: string; comment?: string }, idempotencyKey: string) =>
+  confirmReferral: (decisionId: string, body: { patientRef: string; comment?: string; plannedAt: string }, idempotencyKey: string) =>
     api<DecisionCreated>(`/api/v1/journal/referrals/${encodeURIComponent(decisionId)}/confirm`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Отказ в приёме с причиной: эту больницу пациенту больше не предлагают. */
+  rejectReferral: (decisionId: string, body: { patientRef: string; reason: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/journal/referrals/${encodeURIComponent(decisionId)}/reject`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Перенос даты госпитализации (сегодня..+30 дней) с причиной. */
+  rescheduleReferral: (decisionId: string, body: { patientRef: string; plannedAt: string; reason: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/journal/referrals/${encodeURIComponent(decisionId)}/reschedule`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Пациент госпитализирован (в день даты и позже). */
+  admitReferral: (decisionId: string, body: { patientRef: string; reason?: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/journal/referrals/${encodeURIComponent(decisionId)}/admit`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Пациент не пришёл (после даты) — маршрут завершается. */
+  noShowReferral: (decisionId: string, body: { patientRef: string; reason?: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/journal/referrals/${encodeURIComponent(decisionId)}/no-show`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
   /** Принимающая организация закрывает лечение и отправляет эпикриз направившему врачу (задача 11); требует, чтобы
    * приём уже был подтверждён (409 иначе); повторная выписка — тоже 409. */
   dischargeReferral: (decisionId: string, body: { patientRef: string; summary: string }, idempotencyKey: string) =>
@@ -89,6 +101,19 @@ export const route = {
   /** Согласие/отказ гражданина на решение врача о переносе (задача 2); decisionId — то самое решение redirect. */
   consent: (body: { decisionId: string; accepted: boolean; reason?: string }, idempotencyKey: string) =>
     api<DecisionCreated>('/api/v1/route/me/consent', { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Отменить ещё не подтверждённый перевод (больница пациента), с причиной. */
+  cancelTransfer: (patientRef: string, body: { reason: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/route/${encodeURIComponent(patientRef)}/cancel-transfer`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Подтвердить снятие с листа ожидания по просьбе пациента, с причиной. */
+  close: (patientRef: string, body: { reason: string }, idempotencyKey: string) =>
+    api<DecisionCreated>(`/api/v1/route/${encodeURIComponent(patientRef)}/close`, { body, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Колокольчик гражданина: что по его маршруту сделали другие. */
+  notifications: (regionKato?: string) => api<CitizenNotifications>('/api/v1/route/me/notifications', { query: { regionKato } }),
+  markNotificationRead: (id: string) => api<void>(`/api/v1/route/me/notifications/${encodeURIComponent(id)}/read`, { method: 'POST' }),
+  /** Запросы согласия на запись приёма и памятки врача. */
+  myScribe: () => api<ScribeConsent[]>('/api/v1/route/me/scribe'),
+  answerScribe: (requestId: string, granted: boolean) =>
+    api<DecisionCreated>(`/api/v1/route/me/scribe/${encodeURIComponent(requestId)}/answer`, { body: { granted }, headers: { 'Idempotency-Key': crypto.randomUUID() } }),
 }
 
 export const refdata = {
@@ -118,12 +143,31 @@ export const insight = {
 
 export const scribe = {
   health: () => api<ScribeHealth>('/api/v1/scribe/health'),
-  createSession: (consent: boolean, language: string) => api<{ sessionId: string }>('/api/v1/scribe/sessions', { body: { consent, language } }),
+  /** Запись — только по согласию пациента (consentId); сервер проверяет, что согласие дано сегодня и ещё не использовано. */
+  createSession: (consentId: string, language: string) =>
+    api<{ sessionId: string; consentId: string; patientRef: string }>('/api/v1/scribe/sessions', { body: { consentId, language } }),
+  consents: (patientRef: string) => api<ScribeConsent[]>('/api/v1/scribe-consents', { query: { patientRef } }),
+  requestConsent: (patientRef: string, idempotencyKey: string, comment?: string) =>
+    api<DecisionCreated>('/api/v1/scribe-consents', { body: { patientRef, comment }, headers: { 'Idempotency-Key': idempotencyKey } }),
+  /** Состояние начатой записи (стенограмма, черновик) — продолжить с того же места. */
+  session: (sessionId: string) =>
+    api<{ sessionId: string; language: 'ru' | 'kk'; approved: boolean; transcript: ScribeSegment[]; draft: ScribeDraft | null }>(`/api/v1/scribe/sessions/${encodeURIComponent(sessionId)}`),
+  /** Отменить начатую и не утверждённую запись: аудио и черновик удаляются, для нового приёма нужно новое согласие. */
+  discardRecording: (requestId: string, patientRef: string) =>
+    api<DecisionCreated>(`/api/v1/scribe-consents/${encodeURIComponent(requestId)}/discard`, { body: { patientRef } }),
+  cancelConsent: (requestId: string, patientRef: string) =>
+    api<DecisionCreated>(`/api/v1/scribe-consents/${encodeURIComponent(requestId)}/cancel`, { body: { patientRef } }),
   uploadAudio: (sessionId: string, file: Blob, filename: string) =>
     apiUpload<ScribeTranscriptResponse>(`/api/v1/scribe/sessions/${sessionId}/audio`, file, filename),
   setTranscript: (sessionId: string, text: string) =>
     api<ScribeTranscriptResponse>(`/api/v1/scribe/sessions/${sessionId}/transcript`, { body: { text } }),
   draft: (sessionId: string) => api<ScribeDraft>(`/api/v1/scribe/sessions/${sessionId}/draft`, { method: 'POST', body: {} }),
+  editSegment: (sessionId: string, index: number, text: string) =>
+    api<{ transcript: ScribeSegment[] }>(`/api/v1/scribe/sessions/${sessionId}/segments/${index}`, { body: { text } }),
+  correctTerms: (sessionId: string) =>
+    api<{ transcript: ScribeSegment[]; changed: number; aiError?: string | null }>(`/api/v1/scribe/sessions/${sessionId}/correct`, { method: 'POST', body: {} }),
+  vocabulary: () => api<ScribeVocabulary>('/api/v1/scribe/vocabulary'),
+  saveVocabulary: (words: string[]) => api<ScribeVocabulary>('/api/v1/scribe/vocabulary', { body: { words } }),
   approve: (sessionId: string, sections: { name: string; text: string }[], patientLeaflet: string) =>
     api<{ leafletToken: string }>(`/api/v1/scribe/sessions/${sessionId}/approve`, { body: { sections, patientLeaflet } }),
   leaflet: (token: string) => api<{ text: string; language: string; approvedAt: string }>(`/api/v1/scribe/leaflets/${encodeURIComponent(token)}`),
@@ -181,7 +225,7 @@ export const account = {
 
 export interface UserFilter { role?: string; moCode?: string; status?: string; q?: string; page?: number; size?: number }
 export interface DoctorFilter { regionKato?: string; moCode?: string; specialty?: string; verification?: string; page?: number; size?: number }
-export interface OrgFilter { regionKato?: string; type?: string; status?: string; page?: number; size?: number }
+export interface OrgFilter { regionKato?: string; type?: string; status?: string; q?: string; page?: number; size?: number }
 
 /** Администрирование: пользователи и врачи — admin.users (own — своя организация), роли — admin.roles, организации — admin.orgs. */
 export const admin = {

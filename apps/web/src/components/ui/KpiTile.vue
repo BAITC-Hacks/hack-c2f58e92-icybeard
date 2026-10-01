@@ -17,17 +17,20 @@ defineProps<{
   chipTone?: StatusTone
   tone?: 'ok' | 'warn' | 'danger'
   loading?: boolean
+  /** подпись над числом («Пациентов в листе ожидания» → 1784): читается как фраза */
+  labelFirst?: boolean
 }>()
 </script>
 
 <template>
-  <div class="item" :class="tone">
+  <div class="item" :class="[tone, { 'label-first': labelFirst }]">
+    <div v-if="labelFirst" class="label-line"><span class="label">{{ label }}</span><OriginTag v-if="origin" :kind="origin" /></div>
     <Skeleton v-if="loading" kind="kpi" />
     <div v-else class="value tabular">
       <span class="number">{{ value }}</span><span v-if="unit" class="unit">{{ unit }}</span>
       <StatusTag v-if="chip" :value="chip" :tone="chipTone ?? 'danger'" class="chip" />
     </div>
-    <div class="label-line"><span class="label">{{ label }}</span><OriginTag v-if="origin" :kind="origin" /></div>
+    <div v-if="!labelFirst" class="label-line"><span class="label">{{ label }}</span><OriginTag v-if="origin" :kind="origin" /></div>
     <div v-if="hint" class="hint caption">{{ hint }}</div>
   </div>
 </template>
@@ -40,4 +43,7 @@ defineProps<{
 .item.warn .number { color: var(--dm-warn); }
 .item.danger .number { color: var(--dm-danger); }
 .chip { align-self: center; }
+.label-first { gap: 10px; }
+.label-first .label { color: var(--text-secondary); font-size: var(--fs-base-sm, 15px); font-weight: var(--fw-semibold, 600); line-height: 1.35; }
+.label-first .hint { line-height: 1.45; }
 </style>

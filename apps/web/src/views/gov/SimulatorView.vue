@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
+import Select from 'primevue/select'
 import Slider from 'primevue/slider'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref } from 'vue'
@@ -9,7 +10,6 @@ import { useRoute } from 'vue-router'
 import { analytics, journal, simulation } from '@/api/endpoints'
 import type { LosItem, RedistributeResponse, SimulateResponse } from '@/api/types'
 import ErrorBox from '@/components/ErrorBox.vue'
-import BeforeAfterChart from '@/components/gov/BeforeAfterChart.vue'
 import AppCard from '@/components/ui/AppCard.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import PageShell from '@/components/ui/PageShell.vue'
@@ -17,20 +17,20 @@ import SearchSelect from '@/components/ui/SearchSelect.vue'
 import Skeleton from '@/components/ui/Skeleton.vue'
 import { useLocaleFormat } from '@/composables/useLocaleFormat'
 import { downloadCsv } from '@/lib/csv'
-import { days, shortOrgName, signed } from '@/lib/format'
+import { shortOrgName } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
 import { useRefdataStore } from '@/stores/refdata'
 
-/** Симулятор «что если» (W-Simulator): горизонт пилюлями 4·8·12 недель; слева «Рычаги сценария» (регион, профиль,
- * доля переноса, мощность, +N коек, максимум от одной организации) и «Рассчитать»; справа «До и после» — пара
- * «сейчас → сценарий» по медиане региона, график, четыре карточки (пропускная способность; p90, «ждут дольше 20»,
- * простой коек — их нет в открытых данных, так и подписаны), «Эффект по организациям» из /redistribute с сохранением
- * сценария в журнал решений и экспортом CSV. */
+/** Симулятор «что если» (W-Simulator) для обычного пользователя: слева «Условия сценария» — регион, профиль, срок
+ * (выпадающий список 4·8·12 недель) и четыре рычага с подсказками; справа «Что изменится» — среднее ожидание
+ * сейчас → после, итог словами с диапазоном неопределённости, график, сколько пациентов больницы смогут принимать;
+ * допущения модели и ориентиры — в свёрнутом «Как считали». Ниже «Куда перенаправить пациентов» (/redistribute)
+ * с сохранением сценария в журнал решений и экспортом CSV. */
 interface Control { key: 'capacity' | 'redirect' | 'maxShare' | 'beds'; min: number; max: number; step: number; suffix: string }
 const CONTROLS: Control[] = [
-  { key: 'redirect', min: 0, max: 50, step: 1, suffix: '%' },
-  { key: 'capacity', min: -30, max: 60, step: 1, suffix: '%' },
   { key: 'beds', min: 0, max: 100, step: 5, suffix: '' },
+  { key: 'capacity', min: -30, max: 60, step: 1, suffix: '%' },
+  { key: 'redirect', min: 0, max: 50, step: 1, suffix: '%' },
   { key: 'maxShare', min: 5, max: 50, step: 5, suffix: '%' },
 ]
 const HORIZONS = [4, 8, 12] as const
@@ -61,8 +61,17 @@ const interval = computed<[number, number]>(() => {
   const r = result.value
   return r ? [r.scenario.meanWaitDays + (r.ci[0] ?? 0) - r.deltaDays, r.scenario.meanWaitDays + (r.ci[1] ?? 0) - r.deltaDays] : [0, 0]
 })
-const deltaText = computed(() => (delta.value < 0 ? t('gov.simulator.lessBy', { days: days(-delta.value, 1) }) : delta.value > 0 ? t('gov.simulator.moreBy', { days: days(delta.value, 1) }) : t('gov.simulator.noChange')))
-const controlLabel = (key: Control['key']) => t(`gov.simulator.${key}`)
+const deltaText = computed(() => (delta.value < 0 ? t('gov.simulator.lessBy', { days: num(-delta.value, 1) }) : delta.value > 0 ? t('gov.simulator.moreBy', { days: num(delta.value, 1) }) : t('gov.simulator.noChange')))
+const controlLabel = (key: Control['key']) => t(`gov.simulator.lever.${key}`)
+const controlHint = (key: Control['key']) => t(`gov.simulator.lever.${key}Hint`)
+const horizonOptions = computed(() => HORIZONS.map((w) => ({ value: w, label: t('gov.simulator.horizonOption', { weeks: w }) })))
+/** Диапазон изменения ожидания (ci — границы дельты) словами: «от 0,4 до 0,8 дн.». */
+const rangeText = computed(() => {
+  const ci = result.value?.ci ?? []
+  if (ci.length < 2) return ''
+  const [a, b] = [Math.abs(ci[0]!), Math.abs(ci[1]!)].sort((x, y) => x - y)
+  return t('gov.simulator.rangeText', { lo: num(a!, 1), hi: num(b!, 1) })
+})
 
 async function run() {
   const regionKato = region.value
@@ -105,13 +114,38 @@ async function saveScenario() {
   }
 }
 
+/** CSV для Excel: русские заголовки, полные названия больниц, сценарий в первых строках имени файла. */
 function exportCsv() {
-  if (!moves.value) return
-  downloadCsv(
-    'scenario-moves.csv',
-    moves.value.moves.map((m) => ({ from: m.fromMo.moCode, fromName: m.fromMo.name, to: m.toMo.moCode, toName: m.toMo.name, sharePct: m.sharePct, arrivalsPerDay: m.arrivalsPerDay, waitFromBefore: m.waitFromBefore, waitFromAfter: m.waitFromAfter, waitToBefore: m.waitToBefore, waitToAfter: m.waitToAfter })),
-  )
+  if (!moves.value || !region.value || !profile.value) return
+  const c = (key: string) => t(`gov.simulator.csv.${key}`)
+  const cols = ['from', 'fromCode', 'to', 'toCode', 'share', 'arrivals', 'fromBefore', 'fromAfter', 'toBefore', 'toAfter'].map(c)
+  const rows = moves.value.moves.map((m) => Object.fromEntries([
+    [c('from'), m.fromMo.name], [c('fromCode'), m.fromMo.moCode], [c('to'), m.toMo.name], [c('toCode'), m.toMo.moCode],
+    [c('share'), Math.round(m.sharePct)], [c('arrivals'), Math.round(m.arrivalsPerDay * 7 * 10) / 10],
+    [c('fromBefore'), Math.round(m.waitFromBefore * 10) / 10], [c('fromAfter'), Math.round(m.waitFromAfter * 10) / 10],
+    [c('toBefore'), Math.round(m.waitToBefore * 10) / 10], [c('toAfter'), Math.round(m.waitToAfter * 10) / 10],
+  ]))
+  const name = `${t('gov.simulator.csv.file')} ${refdata.regionName(region.value)} ${refdata.profileName(profile.value)} ${new Date().toISOString().slice(0, 10)}`
+  downloadCsv(`${name.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim()}.csv`, rows, cols)
 }
+
+/** «Как считали» простыми словами — из тех же величин, что и расчёт; технические допущения API не показываем. */
+const howItems = computed(() => {
+  const r = result.value
+  if (!r) return []
+  const items = [t('gov.simulator.how.flow'), t('gov.simulator.how.queue', { n: r.organisations }), t('gov.simulator.how.range')]
+  if (los.value && los.value.losMedianFact > 0) {
+    items.push(t('gov.simulator.how.beds', { days: num(los.value.losMedianFact, 1) }))
+    if (scenario.value.beds > 0) items.push(t('gov.simulator.how.bedsAdded', { beds: scenario.value.beds, n: num((scenario.value.beds / los.value.losMedianFact) * 7, 0) }))
+  } else if (scenario.value.beds > 0) {
+    items.push(t('gov.simulator.how.bedsMissing', { beds: scenario.value.beds }))
+  }
+  items.push(t('gov.simulator.how.estimate'))
+  return items
+})
+/** Ширина полос сравнения «сейчас / после» — от большего из значений и верхней границы диапазона. */
+const barScale = computed(() => Math.max(result.value?.baseline.meanWaitDays ?? 0, interval.value[1], result.value?.scenario.meanWaitDays ?? 0, 0.1))
+const barWidth = (v: number) => `${Math.max(2, (v / barScale.value) * 100)}%`
 
 onMounted(async () => {
   await refdata.load()
@@ -122,84 +156,105 @@ onMounted(async () => {
 
 <template>
   <PageShell :title="t('gov.simulator.titleWhatIf')">
-    <template #subtitle>
-      <template v-if="region">{{ refdata.regionName(region) }} · </template><template v-if="profile">{{ refdata.profileName(profile).toLowerCase() }} · </template>{{ t('gov.simulator.humanDecides') }}
-    </template>
-    <template #actions>
-      <div class="chips"><button v-for="w in HORIZONS" :key="w" type="button" class="chip-filter" :class="{ active: weeks === w }" @click="weeks = w">{{ t('gov.simulator.horizonWeeks', { weeks: w }) }}</button></div>
-    </template>
+    <template #subtitle>{{ t('gov.simulator.subtitlePlain') }}</template>
     <ErrorBox :error="error" />
 
     <div class="split">
-      <AppCard :title="t('gov.simulator.levers')" label class="sticky levers">
+      <AppCard :title="t('gov.simulator.leversTitle')" class="sticky levers">
+        <p class="caption card-lead">{{ t('gov.simulator.leversLead') }}</p>
         <div class="form-col">
-          <div class="field"><label>{{ t('common.region') }}</label><SearchSelect v-model="region" :options="refdata.regions" option-label="name" option-value="regionKato" :placeholder="t('common.region')" /></div>
-          <div class="field"><label>{{ t('common.profile') }}</label><SearchSelect v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" :placeholder="t('common.profile')" /></div>
+          <div class="field"><label>{{ t('common.region') }}</label><SearchSelect v-model="region" :options="refdata.regions" option-label="name" option-value="regionKato" :placeholder="t('gov.simulator.pickRegion')" /></div>
+          <div class="field"><label>{{ t('common.profile') }}</label><SearchSelect v-model="profile" :options="refdata.profiles" option-label="name" option-value="profileCode" :placeholder="t('gov.simulator.pickProfile')" /></div>
+          <div class="field"><label>{{ t('gov.simulator.horizonLabel') }}</label><Select v-model="weeks" :options="horizonOptions" option-label="label" option-value="value" /></div>
           <div v-for="c in CONTROLS" :key="c.key" class="field control">
             <label>{{ controlLabel(c.key) }}</label>
+            <span class="hint">{{ controlHint(c.key) }}</span>
             <div class="control-row">
               <Slider v-model="scenario[c.key]" :min="c.min" :max="c.max" :step="c.step" class="slider" />
               <InputNumber v-model="scenario[c.key]" :min="c.min" :max="c.max" :step="c.step" :suffix="c.suffix ? ` ${c.suffix}` : undefined" size="small" show-buttons button-layout="stacked" input-class="num-input" />
             </div>
           </div>
         </div>
-        <div class="actions"><Button :label="t('common.apply')" class="run-btn" :loading="busy" :disabled="!region || !profile" data-testid="simulate-run" @click="run" /></div>
-        <p class="caption">{{ t('gov.simulator.leversNote') }}</p>
+        <div class="actions"><Button :label="t('common.apply')" icon="pi pi-calculator" class="run-btn" :loading="busy" :disabled="!region || !profile" data-testid="simulate-run" @click="run" /></div>
+        <p class="caption">{{ t('gov.simulator.leversNotePlain') }}</p>
       </AppCard>
 
       <div class="col">
         <AppCard v-if="busy && !result"><Skeleton kind="kpi" /><Skeleton kind="chart" style="margin-top: 12px" /></AppCard>
-        <AppCard v-else-if="!result"><EmptyState :title="t('gov.simulator.pickTitle')" icon="pi pi-sliders-h" /></AppCard>
+        <AppCard v-else-if="!result"><EmptyState :title="t('gov.simulator.pickTitle')" :text="t('gov.simulator.pickText')" icon="pi pi-sliders-h" /></AppCard>
         <template v-else>
-          <AppCard :title="t('gov.simulator.beforeAfter', { weeks })" origin="formula" data-testid="simulate-result">
-            <template #header><span class="caption">{{ t('gov.simulator.regionMedianDays') }}</span></template>
-            <div class="pair-block tabular">
-              <div class="pair"><span class="big">{{ days(result.baseline.meanWaitDays, 1) }}</span><span class="caption">{{ t('gov.simulator.now') }}</span></div>
-              <span class="arrow" aria-hidden="true">→</span>
-              <div class="pair"><span class="big" :class="delta < 0 ? 'delta-down' : delta > 0 ? 'delta-up' : ''">{{ days(result.scenario.meanWaitDays, 1) }}</span><span class="caption">{{ t('gov.simulator.scenarioShare', { share: scenario.redirect }) }}</span></div>
+          <AppCard :title="t('gov.simulator.resultTitle', { weeks })" origin="formula" data-testid="simulate-result">
+            <p class="caption card-lead">{{ t('gov.simulator.resultLead', { region: refdata.regionName(region ?? ''), profile: refdata.profileName(profile ?? '').toLowerCase() }) }}</p>
+            <div class="stats tabular">
+              <div class="stat">
+                <span class="stat-label">{{ t('gov.simulator.nowLabel') }}</span>
+                <span class="stat-value">{{ num(result.baseline.meanWaitDays, 1) }} <small>{{ t('common.days') }}</small></span>
+              </div>
+              <div class="stat stat-after" :class="delta < 0 ? 'good' : delta > 0 ? 'bad' : ''">
+                <span class="stat-label">{{ t('gov.simulator.afterLabel') }}</span>
+                <span class="stat-value">{{ num(result.scenario.meanWaitDays, 1) }} <small>{{ t('common.days') }}</small></span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">{{ t('gov.simulator.deltaLabel') }}</span>
+                <span class="stat-value" :class="delta < 0 ? 'delta-down' : delta > 0 ? 'delta-up' : ''">{{ delta > 0 ? '+' : delta < 0 ? '−' : '' }}{{ num(Math.abs(delta), 1) }} <small>{{ t('common.days') }}</small></span>
+                <span v-if="rangeText" class="stat-sub">{{ rangeText }}</span>
+              </div>
             </div>
             <p class="delta-text" :class="delta < 0 ? 'delta-down' : delta > 0 ? 'delta-up' : ''">{{ deltaText }}</p>
-            <p class="muted small">{{ t('gov.simulator.sensitivity') }}: {{ signed(result.ci[0] ?? 0) }} … {{ signed(result.ci[1] ?? 0) }} {{ t('common.days') }} · {{ result.organisations }} {{ t('gov.simulator.organisations') }}</p>
-            <BeforeAfterChart :before="result.baseline.meanWaitDays" :after="result.scenario.meanWaitDays" :interval="interval" />
-            <div class="mini-grid tabular">
-              <div class="mini"><span class="mini-value">{{ result.admissionsPerDay !== null ? `${num(result.admissionsPerDay, 1)} ${t('gov.simulator.perDayShort')}` : '—' }}</span><span class="caption">{{ t('gov.simulator.throughputScenario') }}</span></div>
-              <div class="mini"><span class="mini-value muted">{{ t('gov.simulator.notInOpenData') }}</span><span class="caption">{{ t('gov.simulator.p90Region') }}</span></div>
-              <div class="mini"><span class="mini-value muted">{{ t('gov.simulator.notInOpenData') }}</span><span class="caption">{{ t('gov.simulator.over20') }}</span></div>
-              <div class="mini"><span class="mini-value muted">{{ t('gov.simulator.notInOpenData') }}</span><span class="caption">{{ t('gov.simulator.bedIdle') }}</span></div>
+            <div class="bars" role="img" :aria-label="deltaText">
+              <div class="bar-row">
+                <span class="bar-name">{{ t('gov.simulator.before') }}</span>
+                <div class="bar-track"><div class="bar before" :style="{ width: barWidth(result.baseline.meanWaitDays) }" /></div>
+                <span class="bar-value tabular">{{ num(result.baseline.meanWaitDays, 1) }} {{ t('common.days') }}</span>
+              </div>
+              <div class="bar-row">
+                <span class="bar-name">{{ t('gov.simulator.after') }}</span>
+                <div class="bar-track">
+                  <div class="bar-range" :style="{ left: barWidth(Math.min(...interval)), width: `calc(${barWidth(Math.max(...interval))} - ${barWidth(Math.min(...interval))})` }" />
+                  <div class="bar after" :style="{ width: barWidth(result.scenario.meanWaitDays) }" />
+                </div>
+                <span class="bar-value tabular">{{ num(result.scenario.meanWaitDays, 1) }} {{ t('common.days') }}</span>
+              </div>
             </div>
-            <ul class="caption assumptions"><li v-for="a in result.assumptions" :key="a">{{ a }}</li></ul>
-            <p v-if="los && los.losMedianFact > 0" class="caption">
-              {{ t('gov.simulator.losIntro') }}: {{ los.losMedianFact.toFixed(1) }} {{ t('common.days') }} ({{ t('gov.simulator.losMedianCaveat') }}, {{ num(los.n) }} {{ t('gov.simulator.cases') }}<template v-if="los.losP50Model !== null">; p50 LOS: {{ los.losP50Model.toFixed(1) }} {{ t('common.days') }}</template>) —
-              {{ t('gov.simulator.oneBed') }} ≈ {{ (1 / los.losMedianFact).toFixed(2) }} {{ t('gov.simulator.admissionsPerDayShort') }}<template v-if="scenario.beds > 0">, {{ t('gov.simulator.soBedsDelta') }} +{{ scenario.beds }} {{ t('gov.simulator.bedsUnit') }} ≈ +{{ (scenario.beds / los.losMedianFact).toFixed(2) }} {{ t('gov.simulator.admissionsPerDayShort') }}</template>.
-            </p>
-            <p v-else-if="scenario.beds > 0" class="caption">{{ t('gov.simulator.losMissing', { beds: scenario.beds }) }}</p>
-            <!-- значения и источники: refdata/external_benchmarks.yaml (beds) -->
-            <p class="caption">{{ t('gov.simulator.aggregateNote') }} {{ result.model.name }} {{ result.model.version }} · {{ t('gov.simulator.bedsBenchmark') }}</p>
+            <p class="caption chart-note">{{ t('gov.simulator.chartNotePlain') }}</p>
+            <div v-if="result.admissionsPerDay !== null" class="fact-line">
+              <span>{{ t('gov.simulator.throughputPlain') }}</span>
+              <b class="tabular">{{ t('gov.simulator.throughputValue', { n: num(result.admissionsPerDay * 7, 0) }) }}</b>
+            </div>
+            <details class="how">
+              <summary>{{ t('gov.simulator.howTitle') }}</summary>
+              <ul class="how-list">
+                <li v-for="item in howItems" :key="item">{{ item }}</li>
+              </ul>
+              <!-- значения и источники: refdata/external_benchmarks.yaml (beds) -->
+              <p class="caption">{{ t('gov.simulator.how.benchmark') }}</p>
+            </details>
           </AppCard>
 
-          <AppCard v-if="moves" :title="t('gov.simulator.orgEffect')" origin="formula">
-            <template #header><span class="caption">{{ t('gov.simulator.redistributeTitle', { moves: moves.moves.length, days: num(-moves.totalDeltaDays), horizon: moves.horizonDays }) }}</span></template>
-            <p v-if="moves.moves.length === 0" class="muted">{{ t('gov.simulator.noMoves') }}</p>
-            <div v-else class="table-wrap">
-              <table class="dense-table">
-                <thead><tr><th>{{ t('gov.simulator.colFrom') }}</th><th>{{ t('gov.simulator.colTo') }}</th><th class="num">{{ t('gov.simulator.colShare') }}</th><th class="num">{{ t('gov.simulator.colSource') }}</th><th class="num">{{ t('gov.simulator.colTarget') }}</th><th class="num">Δ</th></tr></thead>
+          <AppCard v-if="moves" :title="t('gov.simulator.movesTitle')" origin="formula">
+            <p class="caption card-lead">{{ moves.moves.length ? t('gov.simulator.movesLead', { moves: moves.moves.length, days: num(-moves.totalDeltaDays), horizon: moves.horizonDays }) : t('gov.simulator.noMoves') }}</p>
+            <p v-if="moves.moves[0]" class="example">{{ t('gov.simulator.movesExample', { share: moves.moves[0].sharePct.toFixed(0), from: shortOrgName(moves.moves[0].fromMo.name), to: shortOrgName(moves.moves[0].toMo.name), fromBefore: num(moves.moves[0].waitFromBefore, 1), fromAfter: num(moves.moves[0].waitFromAfter, 1), toBefore: num(moves.moves[0].waitToBefore, 1), toAfter: num(moves.moves[0].waitToAfter, 1) }) }}</p>
+            <div v-if="moves.moves.length" class="table-wrap">
+              <table class="dense-table moves">
+                <thead>
+                  <tr><th>{{ t('gov.simulator.colFromPlain') }}</th><th>{{ t('gov.simulator.colToPlain') }}</th><th class="num">{{ t('gov.simulator.colSharePlain') }}</th><th class="num">{{ t('gov.simulator.colSourceWait') }}</th><th class="num">{{ t('gov.simulator.colTargetWait') }}</th></tr>
+                </thead>
                 <tbody>
                   <tr v-for="m in moves.moves" :key="m.fromMo.moCode + m.toMo.moCode">
-                    <td class="clip" :title="m.fromMo.name">{{ shortOrgName(m.fromMo.name) }} <span class="muted">· {{ m.fromMo.moCode }}</span></td>
-                    <td class="clip" :title="m.toMo.name">{{ shortOrgName(m.toMo.name) }} <span class="muted">· {{ m.toMo.moCode }}</span></td>
+                    <td class="org" :title="m.fromMo.name">{{ shortOrgName(m.fromMo.name) }}</td>
+                    <td class="org" :title="m.toMo.name">{{ shortOrgName(m.toMo.name) }}</td>
                     <td class="num">{{ m.sharePct.toFixed(0) }} %</td>
-                    <td class="num">{{ days(m.waitFromBefore) }} → {{ days(m.waitFromAfter) }}</td>
-                    <td class="num">{{ days(m.waitToBefore) }} → {{ days(m.waitToAfter) }}</td>
-                    <td class="num" :class="m.waitFromAfter < m.waitFromBefore ? 'delta-down' : 'delta-up'">{{ signed(m.waitFromAfter - m.waitFromBefore, 0) }} {{ t('common.days') }}</td>
+                    <td class="num">{{ t('gov.simulator.waitChange', { before: num(m.waitFromBefore, 1), after: num(m.waitFromAfter, 1) }) }}</td>
+                    <td class="num">{{ t('gov.simulator.waitChange', { before: num(m.waitToBefore, 1), after: num(m.waitToAfter, 1) }) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <div class="save-row">
-              <Button :label="savedId ? t('gov.simulator.saved') : t('gov.simulator.saveScenario')" :disabled="!!savedId" :loading="saving" data-testid="scenario-save" @click="saveScenario" />
+              <Button :label="savedId ? t('gov.simulator.saved') : t('gov.simulator.saveScenario')" :icon="savedId ? 'pi pi-check' : 'pi pi-bookmark'" :disabled="!!savedId" :loading="saving" data-testid="scenario-save" @click="saveScenario" />
               <button type="button" class="link-arrow small" :disabled="!moves.moves.length" @click="exportCsv">{{ t('shell.exportCsv') }}</button>
-              <span class="caption">{{ t('gov.simulator.saveNote') }}</span>
             </div>
+            <p class="caption">{{ t('gov.simulator.saveNote') }}</p>
           </AppCard>
         </template>
       </div>
@@ -208,24 +263,46 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.split { grid-template-columns: minmax(300px, 1fr) 1.4fr; }
+.split { grid-template-columns: minmax(320px, 1fr) 1.4fr; }
 @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
 .levers { display: flex; flex-direction: column; gap: 12px; }
 .levers :deep(.run-btn) { width: 100%; }
+.card-lead { margin: -4px 0 8px; line-height: 1.5; }
+.form-col { display: flex; flex-direction: column; gap: 18px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > label { font-weight: var(--fw-bold); font-size: var(--dm-text-base); text-transform: none; letter-spacing: 0; color: var(--text); }
+.hint { font-size: var(--dm-text-sm); color: var(--text-secondary); line-height: 1.4; margin-top: -2px; }
 .col { display: flex; flex-direction: column; gap: var(--dm-space-4); min-width: 0; }
-.control-row { display: grid; grid-template-columns: 1fr 120px; gap: 10px; align-items: center; }
-.slider { margin: 0 6px; }
+.control-row { display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: center; }
+.slider { margin: 0 8px; }
 .control :deep(.num-input) { width: 100%; text-align: right; }
-.pair-block { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
-.pair { display: flex; flex-direction: column; gap: 4px; }
-.big { font-size: 28px; font-weight: var(--fw-extrabold); letter-spacing: -0.02em; line-height: 1; }
-.arrow { font-size: 1.6rem; color: var(--text-muted); }
-.delta-text { margin: 10px 0 0; font-size: var(--dm-text-md); font-weight: var(--fw-bold); }
-.mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
-.mini { background: var(--dm-surface-2); border-radius: var(--dm-radius-md); padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
-.mini-value { font-size: var(--dm-text-lg); font-weight: var(--fw-bold); }
-.assumptions { margin: 12px 0 0; padding-left: 18px; }
-.clip { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delta-text { margin: 14px 0 4px; font-size: var(--dm-text-md); font-weight: var(--fw-bold); }
+.chart-note { margin: 0 0 8px; }
+.fact-line { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-top: 1px solid var(--dm-hairline); border-bottom: 1px solid var(--dm-hairline); }
+.how { margin-top: 12px; }
+.how summary { cursor: pointer; font-weight: var(--fw-bold); padding: 6px 0; }
+.how p { margin: 6px 0 0; line-height: 1.5; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+.stat { border: 1px solid var(--dm-hairline); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.stat-after.good { border-color: color-mix(in srgb, var(--dm-ok) 45%, transparent); background: color-mix(in srgb, var(--dm-ok) 6%, transparent); }
+.stat-after.bad { border-color: color-mix(in srgb, var(--dm-danger) 45%, transparent); }
+.stat-label { font-size: var(--dm-text-sm); color: var(--text-secondary); }
+.stat-value { font-size: 30px; font-weight: var(--fw-extrabold); letter-spacing: -0.02em; line-height: 1.05; }
+.stat-value small { font-size: var(--dm-text-base); font-weight: 500; color: var(--text-secondary); }
+.stat-sub { font-size: var(--dm-text-sm); color: var(--text-secondary); }
+.bars { display: flex; flex-direction: column; gap: 12px; margin: 8px 0 6px; }
+.bar-row { display: grid; grid-template-columns: 70px minmax(0, 1fr) 80px; gap: 12px; align-items: center; }
+.bar-name { color: var(--text-secondary); }
+.bar-track { position: relative; height: 22px; background: var(--surface-muted); border-radius: 6px; }
+.bar { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; }
+.bar.before { background: var(--bar-neutral, #B4C0D8); }
+.bar.after { background: var(--dm-accent); }
+.bar-range { position: absolute; top: -4px; bottom: -4px; border-radius: 6px; background: color-mix(in srgb, var(--dm-accent) 22%, transparent); border: 1px dashed var(--dm-accent); box-sizing: border-box; z-index: 1; }
+.bar-value { text-align: right; font-weight: var(--fw-bold); }
+.how-list { margin: 8px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; line-height: 1.5; }
+.example { margin: 0 0 12px; padding: 10px 14px; border-left: 3px solid var(--dm-accent); background: var(--surface-muted); border-radius: 0 10px 10px 0; line-height: 1.5; }
+.moves .org { min-width: 180px; white-space: normal; line-height: 1.35; }
+@media (max-width: 700px) { .stats { grid-template-columns: 1fr; } }
 .save-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
 .link-arrow:disabled { opacity: 0.5; cursor: default; }
 </style>

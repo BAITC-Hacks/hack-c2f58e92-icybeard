@@ -36,12 +36,18 @@ const label = computed(() => (option: T) => (typeof props.optionLabel === 'funct
     filter
     auto-filter-focus
     class="search-select"
+    overlay-class="search-select-overlay"
   >
     <template #option="{ option }">
       <span class="option" :title="optionTitle ? optionTitle(option) : undefined">{{ label(option) }}</span>
     </template>
   </Select>
 </template>
+
+<style>
+/* выпадающий список не растягивается под самое длинное название: длинные строки переносятся */
+.search-select-overlay { max-width: min(520px, calc(100vw - 32px)); }
+</style>
 
 <style scoped>
 .search-select { width: 100%; }

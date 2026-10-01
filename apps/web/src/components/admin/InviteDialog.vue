@@ -98,15 +98,15 @@ async function send() {
     <form v-else class="form-col" novalidate @submit.prevent="send">
       <StateEmailOff :text="t('serviceStatus.notes.invite')" />
       <div class="field"><label for="i-name">{{ t('admin.invite.name') }}</label><InputText id="i-name" v-model="displayName" :invalid="touched && !!errors.displayName" data-testid="invite-name" /><span v-if="touched && errors.displayName" class="error">{{ errors.displayName }}</span></div>
-      <div class="field"><label for="i-email">{{ t('admin.invite.email') }}</label><InputText id="i-email" v-model="email" type="email" autocomplete="off" :invalid="touched && !!errors.email" data-testid="invite-email" /><span v-if="touched && errors.email" class="error">{{ errors.email }}</span></div>
-      <div class="field"><label for="i-role">{{ t('admin.users.colRole') }}</label><Select id="i-role" v-model="role" :options="roleOptions" option-label="label" option-value="value" data-testid="invite-role" /></div>
       <div v-if="withOrganization" class="field">
         <label for="i-org">{{ t('admin.users.colOrg') }}</label>
         <div v-if="scope === 'own'" class="fixed">{{ shortOrgName(refdata.organizationName(ownMoCode)) }} · {{ ownMoCode }}</div>
         <SearchSelect v-else v-model="moCode" :options="organizations" :option-label="orgLabel" option-value="moCode" :option-title="orgTitle" :placeholder="t('admin.users.pickOrg')" />
         <span v-if="touched && errors.moCode" class="error">{{ errors.moCode }}</span>
       </div>
-      <div class="field"><label for="i-region">{{ t('admin.users.colRegion') }}</label><Select id="i-region" v-model="regionKato" :options="regionOptions" option-label="label" option-value="value" show-clear filter :placeholder="t('admin.notSet')" /></div>
+      <div class="field"><label for="i-role">{{ t('admin.users.colRole') }}</label><Select id="i-role" v-model="role" :options="roleOptions" option-label="label" option-value="value" data-testid="invite-role" /><span class="caption">{{ t('admin.users.roleHint') }}</span></div>
+      <div class="field"><label for="i-email">{{ t('admin.invite.email') }}</label><InputText id="i-email" v-model="email" type="email" autocomplete="off" :invalid="touched && !!errors.email" data-testid="invite-email" /><span v-if="touched && errors.email" class="error">{{ errors.email }}</span></div>
+      <div class="field"><label for="i-region">{{ t('admin.users.colRegion') }}</label><Select id="i-region" v-model="regionKato" :options="regionOptions" option-label="label" option-value="value" show-clear filter :placeholder="t('admin.notSet')" /><span class="caption">{{ t('admin.users.regionHint') }}</span></div>
       <ErrorBox v-if="!(error instanceof ApiError && error.status === 422)" :error="error" />
       <button type="submit" hidden />
     </form>
@@ -123,5 +123,6 @@ async function send() {
 <style scoped>
 .result { display: flex; flex-direction: column; gap: 12px; }
 .result p { margin: 0; }
-.fixed { font-size: var(--dm-text-md); }
+.fixed { font-size: var(--dm-text-md); padding: 10px 14px; border-radius: 12px; background: var(--surface-muted); line-height: 1.4; }
+.field .caption { line-height: 1.4; }
 </style>
