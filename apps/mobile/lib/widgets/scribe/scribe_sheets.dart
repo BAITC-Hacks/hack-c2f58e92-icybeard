@@ -37,6 +37,7 @@ Future<bool> confirmScribeDiscard(BuildContext context) async {
   final colors = AppPalette.of(context);
   final confirmed = await showModalBottomSheet<bool>(
     context: context,
+    useRootNavigator: true,
     showDragHandle: true,
     isScrollControlled: true,
     useSafeArea: true,
@@ -75,6 +76,7 @@ Future<String?> _showTextSheet(
 }) =>
     showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true,
       showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,

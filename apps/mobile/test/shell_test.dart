@@ -39,6 +39,13 @@ Future<void> settle(WidgetTester tester) async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('tab root: the page list ends above the floating pill, so the last rows are never hidden under it', (tester) async {
+    await pumpApp(tester, roles: ['citizen']);
+    final pill = tester.getRect(find.byType(FloatingNav));
+    final list = tester.getRect(find.byType(ListView).first);
+    expect(list.bottom, lessThanOrEqualTo(pill.top + 0.5), reason: 'нижний отступ под пилюлю доходит до экрана через MediaQuery тела Scaffold');
+  });
+
   testWidgets('citizen shell: floating pill with three tabs, hidden on nested screens, tabs switch branches', (tester) async {
     final router = await pumpApp(tester, roles: ['citizen']);
     expect(find.byType(FloatingNav), findsOneWidget);

@@ -19,6 +19,7 @@ Future<String?> showCitizenSheet(
 }) =>
     showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,

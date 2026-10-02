@@ -49,11 +49,15 @@ class AppShell extends StatelessWidget {
       extendBody: true,
       // форма дерева не меняется при показе баннера — ветки shell'а не пересоздаются; под баннером верхний
       // системный отступ уже занят, экран его не повторяет
-      body: Column(
-        children: [
-          const EmailOutageBanner(),
-          Expanded(child: MediaQuery.removePadding(context: context, removeTop: banner, child: shell)),
-        ],
+      // Builder: нижний отступ под пилюлю (extendBody) есть только в MediaQuery тела Scaffold; с контекстом самого
+      // AppShell экраны его не получали, и последние строки списка прятались под пилюлей
+      body: Builder(
+        builder: (context) => Column(
+          children: [
+            const EmailOutageBanner(),
+            Expanded(child: MediaQuery.removePadding(context: context, removeTop: banner, child: shell)),
+          ],
+        ),
       ),
       bottomNavigationBar: atRoot
           ? FloatingNav(

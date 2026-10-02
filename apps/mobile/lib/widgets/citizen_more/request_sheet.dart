@@ -13,6 +13,7 @@ import '../picker_sheet.dart';
 /// листе и освобождается вместе с ним.
 Future<String?> showWaitRequestSheet(BuildContext context, Alternative alternative) => showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true,
       showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,
