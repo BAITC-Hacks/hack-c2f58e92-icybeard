@@ -33,6 +33,9 @@ from datetime import datetime, timedelta, timezone
 REALM = "darumen"
 WEB_CLIENT = "darumen-web"
 PASSWORD = "darumen"
+# политика паролей realm (12 символов, заглавная, строчная, цифра) не пропускает «darumen» через Admin API:
+# демо-пользователи импортированы с готовым хэшем, а созданным скриптом нужен пароль по политике
+TEST_PASSWORD = "Darumen-Test-1"
 ALMATY = timezone(timedelta(hours=5))
 # демо-врачи realm по больницам: для других больниц скрипт создаёт doctor_<код>
 KNOWN_DOCTORS = {"028B": "doctor1", "22GN": "doctor2"}
@@ -87,12 +90,15 @@ class Http:
             sys.exit(f"Keycloak admin не пустил ({status}): {data}. Проверьте --kc-admin (в dev-compose admin:admin)")
         return data["access_token"]
 
-    def user_token(self, username: str, password: str = PASSWORD) -> str:
-        status, data = self.call("POST", f"{self.keycloak}/realms/{REALM}/protocol/openid-connect/token",
-                                 form={"grant_type": "password", "client_id": WEB_CLIENT, "scope": "openid", "username": username, "password": password})
-        if status != 200 or not isinstance(data, dict):
-            sys.exit(f"не удалось войти как {username} ({status}): {data}")
-        return data["access_token"]
+    def user_token(self, username: str) -> str:
+        """Вход демо-паролем, а если он не подошёл — паролем пользователей, созданных этим скриптом."""
+        status, data = 0, None
+        for password in (PASSWORD, TEST_PASSWORD):
+            status, data = self.call("POST", f"{self.keycloak}/realms/{REALM}/protocol/openid-connect/token",
+                                     form={"grant_type": "password", "client_id": WEB_CLIENT, "scope": "openid", "username": username, "password": password})
+            if status == 200 and isinstance(data, dict):
+                return data["access_token"]
+        sys.exit(f"не удалось войти как {username} ({status}): {data}")
 
     def kc_find_user(self, admin: str, username: str) -> str | None:
         status, data = self.call("GET", f"{self.keycloak}/admin/realms/{REALM}/users?username={urllib.parse.quote(username)}&exact=true", token=admin)
@@ -109,7 +115,7 @@ class Http:
             "username": username, "enabled": True, "emailVerified": True, "firstName": first, "lastName": last,
             "email": f"{username}@darumen.local",
             "attributes": {k: [v] for k, v in attributes.items()},
-            "credentials": [{"type": "password", "value": PASSWORD, "temporary": False}],
+            "credentials": [{"type": "password", "value": TEST_PASSWORD, "temporary": False}],
         }
         status, data = self.call("POST", f"{self.keycloak}/admin/realms/{REALM}/users", token=admin, body=representation)
         if status not in (201, 409):
@@ -182,7 +188,7 @@ def main() -> None:
         alternatives = route.get("alternatives") or []
         personas.append({
             "username": username, "token": token, "ref": ref, "region": route["regionKato"],
-            "origin": route["organization"]["moCode"], "originName": route["organization"]["name"],
+            "origin": route["organization"]["moCode"], "originName": route["organization"].get("moName") or route["organization"]["moCode"],
             "target": alternatives[0]["mo"]["moCode"] if alternatives else None,
             "targetName": alternatives[0]["mo"]["name"] if alternatives else None,
             "status": (route.get("progress") or {}).get("status", "waiting"),
@@ -239,11 +245,11 @@ def main() -> None:
             report.append((who, f"ошибка на стадии «{STAGE_TITLES[stage]}»: {error}", stage))
 
     # 4. Итог
-    print("\nТестовые маршруты (пароль у всех пользователей: darumen)\n")
+    print(f"\nТестовые маршруты (пароль демо-пользователей: {PASSWORD}; созданных скриптом: {TEST_PASSWORD})\n")
     for who, outcome, _ in report:
         print(f"  • {who}\n      {outcome}")
     if created_citizens or created_doctors:
-        print("\nСозданы пользователи Keycloak:", ", ".join(created_citizens + created_doctors))
+        print(f"\nСозданы пользователи Keycloak (пароль {TEST_PASSWORD}):", ", ".join(created_citizens + created_doctors))
     print("\nГде смотреть:")
     print("  гражданин  — войти его логином → «Мой путь» (/me/route)")
     print("  врач пациента — /doctor/worklist (строка с флагом сигнала / статусом перевода) → карточка пациента")
