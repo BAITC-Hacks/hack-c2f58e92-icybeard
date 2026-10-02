@@ -1,5 +1,4 @@
 import 'package:darumen/api/models.dart';
-import 'package:darumen/config/env.dart';
 import 'package:darumen/l10n/strings.dart';
 import 'package:darumen/widgets/scribe/scribe_text.dart';
 import 'package:darumen/widgets/status_chip.dart';
@@ -123,10 +122,5 @@ void main() {
     expect(key(transcript: true), 'transcribed');
     expect(key(), 'ready');
     expect(key(session: false), isNull);
-  });
-
-  test('ссылка на памятку собирается из адреса веба и токена (решение Q-17)', () {
-    expect(scribeLeafletLink('abc123'), '${Env.webBase}/leaflet/abc123');
-    expect(scribeLeafletLink('a b/c'), '${Env.webBase}/leaflet/a%20b%2Fc');
   });
 }

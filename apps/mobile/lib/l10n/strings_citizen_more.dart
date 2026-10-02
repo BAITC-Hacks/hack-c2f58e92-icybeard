@@ -21,9 +21,6 @@ extension CitizenMoreStrings on S {
   String waitHeroNine(String days) => _t('9 из 10 пациентов ждут не больше $days дн.', '10 пациенттің 9-ы $days күннен ұзақ күтпейді');
   String waitHeroWithin30(String pct) => _t('$pct пациентов попадают в больницу в течение 30 дней.', 'Пациенттердің $pct 30 күн ішінде ауруханаға түседі.');
   String get waitEstimateNote => _t('Оценка по очередям I квартала 2025', '2025 ж. I тоқсан кезектері бойынша бағалау');
-
-  /// `shell.asOf` — «данные на {date}».
-  String waitAsOf(String date) => _t('данные на $date', 'деректер $date жағдай бойынша');
   String get waitFasterRegion => _t('Где быстрее в регионе', 'Өңірде қайда жылдамырақ');
   String get waitChangeProfileHint =>
       _t('По этому профилю в регионе нет данных, попробуйте другой профиль.', 'Бұл бейін бойынша өңірде деректер жоқ, басқа бейінді таңдап көріңіз.');

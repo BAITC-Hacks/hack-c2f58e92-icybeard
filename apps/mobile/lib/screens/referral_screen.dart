@@ -246,7 +246,7 @@ class _ReferralScreenState extends State<ReferralScreen> {
                   : Text(_recorded != null ? s.assistRecorded : s.assistSaveChoice),
             ),
       children: [
-        Text(p == null ? s.assistLead : '${s.assistLead} · ${s.assistAsOf(p.model.trainedThrough)}', style: Theme.of(context).textTheme.bodySmall),
+        Text(p == null ? s.assistLead : '${s.assistLead} · ${s.asOfLabel(p.model.trainedThrough)}', style: Theme.of(context).textTheme.bodySmall),
         if (_error != null) ErrorBox(error: _error, onRetry: _regions.isEmpty || _profiles.isEmpty ? _load : _predict),
         ReferralParamsCard(
           form: _form,

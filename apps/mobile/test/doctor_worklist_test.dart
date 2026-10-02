@@ -3,6 +3,7 @@ import 'package:darumen/widgets/bell_button.dart';
 import 'package:darumen/widgets/circle_button.dart';
 import 'package:darumen/widgets/route/priority_badge.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/harness.dart';
@@ -248,6 +249,8 @@ void main() {
     });
     await pumpScreen(tester, session, const WorklistScreen(), locale: 'kk', textScale: 1.3, size: phoneNarrow);
     expect(find.text('Пациенттер'), findsOneWidget);
+    final title = tester.renderObject<RenderParagraph>(find.text('Пациенттер'));
+    expect(title.getBoxesForSelection(const TextSelection(baseOffset: 0, extentOffset: 10)).map((box) => box.top.round()).toSet(), hasLength(1), reason: 'заголовок не рвётся посередине слова');
     expect(find.text('Бас тарту қаупі'), findsWidgets);
     expect(find.text('Келесі қадам: жылдамырағын ұсыну'), findsOneWidget);
     expect(tester.takeException(), isNull);

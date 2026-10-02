@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import '../../api/models.dart';
-import '../../config/env.dart';
 import '../../l10n/strings.dart';
 import '../status_chip.dart';
 
@@ -96,6 +95,3 @@ String? scribeStateKey({required bool approved, required bool recording, require
   if (hasTranscript) return 'transcribed';
   return hasSession ? 'ready' : null;
 }
-
-/// Ссылка на памятку для пациента — веб-страница без входа (решение Q-17): `{Env.webBase}/leaflet/{token}`.
-String scribeLeafletLink(String token) => '${Env.webBase}/leaflet/${Uri.encodeComponent(token)}';

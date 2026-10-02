@@ -37,6 +37,10 @@ String refusalWords(S s, double? p) => switch (refusalLevel(p)) {
       null => '—',
     };
 
+/// Риск отказа показывается красным: больше 20 %, как в вебе (`pRefusal > 0.2` на странице пациента и в ассистенте
+/// направления) — и процентом, и словами.
+bool refusalHigh(double p) => p > 0.2;
+
 /// Первая буква — заглавная, остальные как есть («риск отказа» → «Риск отказа»): так StatusChip показывает подписи
 /// словаря, которые хранятся строчными.
 String capitalizeFirst(String text) => text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';
@@ -82,12 +86,6 @@ String dateShort(String? iso) {
   return '${_two(local.day)}.${_two(local.month)}.${local.year}';
 }
 
-/// `dd.MM` — под точками степпера и в строках «дата назначена 31.03».
-String dayMonth(String? iso) {
-  final full = dateShort(iso);
-  return full.length == 10 ? full.substring(0, 5) : full;
-}
-
 String dateTimeShort(String? iso) {
   if (iso == null || iso.isEmpty) {
     return '—';
@@ -99,13 +97,8 @@ String dateTimeShort(String? iso) {
   return '${dateShort(iso)} ${_two(parsed.hour)}:${_two(parsed.minute)}';
 }
 
-/// Только время `HH:mm` — для строк журнала, сгруппированных по дням.
-String timeShort(String? iso) {
-  final parsed = iso == null ? null : DateTime.tryParse(iso)?.toLocal();
-  return parsed == null ? '—' : '${_two(parsed.hour)}:${_two(parsed.minute)}';
-}
-
-/// Локальная дата события (без времени) — ключ группировки «Сегодня · Вчера · 22 сентября».
+/// Локальная дата события без времени (полночь того дня) — для сравнения по дням, например возраста среза данных;
+/// дата без времени (`yyyy-MM-dd`) берётся как есть, момент переводится во время устройства.
 DateTime? localDay(String? iso) {
   if (iso == null || iso.isEmpty) {
     return null;

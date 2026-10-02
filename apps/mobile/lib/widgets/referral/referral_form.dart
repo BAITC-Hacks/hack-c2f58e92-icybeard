@@ -126,9 +126,6 @@ String? referralCompare(S s, double baselineDays, double otherDays) {
 /// Риск отказа: процент, а для больницы, которой не было в обучении модели, — словами (`refusalWords`).
 String referralRisk(S s, double pRefusal, {required bool inTraining}) => inTraining ? pct(pRefusal) : refusalWords(s, pRefusal);
 
-/// Риск выше 20 % веб показывает красным.
-bool referralRiskHigh(double pRefusal) => pRefusal > 0.2;
-
 /// Строки «Из чего сложился прогноз» (кит `forecastFactors`); пока направляющая организация не указана, строка
 /// same_mo говорит это прямо и подсказывает, где её указать (веб `doctor.referral.referringUnset*`).
 List<ForecastFactorView> referralFactors(S s, PredictResponse prediction, {String? profileName, required bool referringSet}) => [

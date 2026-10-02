@@ -112,13 +112,10 @@ void main() {
       expect(maskIin(null), '—');
     });
 
-    test('render dates, day-month, time and thousands', () {
+    test('render dates, the local day and thousands', () {
       expect(dateShort('2025-03-31'), '31.03.2025');
-      expect(dayMonth('2025-03-31'), '31.03');
-      expect(dayMonth(null), '—');
       expect(localDay('2025-03-31'), DateTime(2025, 3, 31));
       expect(localDay('bad'), isNull);
-      expect(timeShort(null), '—');
       expect(thousands(11330078), '11 330 078');
       expect(thousands(999), '999');
       expect(days(20.7), '21');
@@ -153,8 +150,7 @@ void main() {
       expect(daysWithUnit(null, S.of('ru')), '—');
     });
 
-    test('benchmark lines use «дн.», never «дней»', () {
-      expect(S.of('ru').benchmarkShort('21'), isNot(contains('дней')));
+    test('the benchmark line uses «дн.», never «дней»', () {
       expect(S.of('ru').benchmarkSentence('21'), 'Ориентир Минздрава РК — ждать не больше 21 дн.');
       expect(S.of('kk').benchmarkSentence('21'), 'ҚР Денсаулық сақтау министрлігінің бағдары — 21 күннен ұзақ күтпеу');
     });
@@ -197,6 +193,11 @@ void main() {
       expect(refusalWords(kk, 0.1), 'орташа шамада');
       expect(refusalWords(kk, 0.01), 'орташадан төмен');
       expect(refusalWords(ru, null), '—');
+    });
+
+    test('the risk turns red above 20 %, as on the web', () {
+      expect(refusalHigh(0.21), isTrue);
+      expect(refusalHigh(0.2), isFalse);
     });
   });
 

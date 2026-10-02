@@ -3,13 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../api/client.dart';
+import '../api/models.dart';
+import '../config/env.dart';
 import '../l10n/strings.dart';
 import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/app_theme.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_card.dart';
-import '../widgets/citizen/leaflet_api.dart';
 import '../widgets/citizen/leaflet_document.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/external_link.dart';
@@ -69,7 +70,7 @@ class _LeafletScreenState extends State<LeafletScreen> {
   Future<void> _copyLink() async {
     final copied = S.at(context).myLinkCopied;
     final messenger = ScaffoldMessenger.maybeOf(context);
-    await Clipboard.setData(ClipboardData(text: leafletWebLink(widget.token)));
+    await Clipboard.setData(ClipboardData(text: Env.leafletLink(widget.token)));
     messenger
       ?..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(copied)));
@@ -87,7 +88,7 @@ class _LeafletScreenState extends State<LeafletScreen> {
           token: widget.token,
           leaflet: leaflet,
           onCopy: _copyLink,
-          onOpen: () => openExternal(context, Uri.parse(leafletWebLink(widget.token))),
+          onOpen: () => openExternal(context, Uri.parse(Env.leafletLink(widget.token))),
         ),
         ...switch (_state) {
           Loading<PublicLeaflet>() => const [CardSkeleton(height: 280)],

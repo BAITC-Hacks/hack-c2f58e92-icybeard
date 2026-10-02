@@ -1,5 +1,4 @@
 import 'package:darumen/api/models.dart';
-import 'package:darumen/config/env.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -31,7 +30,7 @@ void main() {
     });
   });
 
-  group('ApproveResult (§2.2): the server no longer sends leafletUrl', () {
+  group('ApproveResult (§2.2): leafletToken, audioDeleted, consentId', () {
     test('parses the real new shape: leafletToken, audioDeleted, consentId', () {
       final r = ApproveResult.fromJson({'leafletToken': 'tok-1', 'audioDeleted': true, 'consentId': 'c-1'});
       expect(r.leafletToken, 'tok-1');
@@ -43,13 +42,6 @@ void main() {
       final r = ApproveResult.fromJson({'leafletToken': 'tok-2'});
       expect(r.audioDeleted, isTrue);
       expect(r.consentId, isNull);
-    });
-
-    test('leafletUrl (MOBILE-REFACTOR-SHIM) is the public web page built from the token, not a server field', () {
-      // старый сервер присылал относительный /scribe/leaflets/{token} — для QR он не годился и больше не читается
-      final r = ApproveResult.fromJson({'leafletToken': 'tok-3', 'leafletUrl': '/scribe/leaflets/tok-3'});
-      expect(r.leafletToken, 'tok-3');
-      expect(r.leafletUrl, '${Env.webBase}/leaflet/tok-3');
     });
   });
 

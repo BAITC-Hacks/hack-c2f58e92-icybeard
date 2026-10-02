@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 /// Словарь маршрута (strings_route.dart): каждая семья кодов — одна функция со switch и запасной подписью; тексты
 /// дословно из веб-словаря apps/web/src/i18n/{ru,kk}.ts (проверяется по самому файлу веба: строка с плейсхолдерами
 /// vue-i18n должна встречаться в нём в одинарных кавычках).
-const stageCodes = ['referral_issued', 'examination', 'waitlisted', 'transfer', 'date_assigned', 'hospitalized', 'refused'];
 const statuses = [
   'waiting',
   'kept',
@@ -56,34 +55,6 @@ String placeholders(String text, Map<int, String> names) =>
 
 void main() {
   group('этапы маршрута', () {
-    test('название этапа — route.stage.* веба для всех семи кодов, включая «Перевод»', () {
-      for (final code in stageCodes) {
-        expectWeb(ru.routeStageLabel(code), kazakh: false);
-        expectWeb(kk.routeStageLabel(code), kazakh: true);
-      }
-      expect(ru.routeStageLabel('transfer'), 'Перевод');
-      expect(kk.routeStageLabel('transfer'), 'Ауыстыру');
-      expect(ru.routeStageLabel('date_assigned'), 'Дата госпитализации назначена');
-    });
-
-    test('незнакомый код этапа — заголовок сервера, без него — сам код', () {
-      expect(ru.routeStageLabel('called', fallback: 'Вызов на госпитализацию'), 'Вызов на госпитализацию');
-      expect(ru.routeStageLabel('called'), 'called');
-      expect(ru.routeStageShort('called', fallback: 'Вызов'), 'Вызов');
-      expect(kk.routeStageShort('called'), 'called');
-    });
-
-    test('короткая подпись есть у всех семи кодов, «Перевод» — тем же словом, обследование не зовётся «Анализы»', () {
-      for (final code in stageCodes) {
-        expect(ru.routeStageShort(code), isNot(code));
-        expect(kk.routeStageShort(code), isNot(code));
-        expect(ru.routeStageShort(code).length, lessThanOrEqualTo(ru.routeStageLabel(code).length));
-      }
-      expect(ru.routeStageShort('transfer'), 'Перевод');
-      expect(kk.routeStageShort('transfer'), 'Ауыстыру');
-      expect(ru.routeStageShort('examination'), 'Обследование', reason: '«Анализы» — это раздел чек-листа, не этап');
-    });
-
     test('заголовок и счётчик этапов — route.stagesTitle / route.stagesCount', () {
       expectWeb(ru.routeStagesTitle, kazakh: false);
       expectWeb(kk.routeStagesTitle, kazakh: true);

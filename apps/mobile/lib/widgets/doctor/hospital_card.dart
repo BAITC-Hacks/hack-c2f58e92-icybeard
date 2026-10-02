@@ -13,9 +13,6 @@ import '../route/forecast_factors.dart';
 import '../status_chip.dart';
 import 'fact_grid.dart';
 
-/// Порог красного риска отказа, как на странице пациента в вебе (`refusalHigh`: больше 20 %).
-const refusalHighThreshold = 0.2;
-
 /// Карточка «Текущая больница» маршрута пациента (веб `hospital-card`): метка происхождения прогноза, сроки «половина
 /// пациентов ждёт не больше» и «9 из 10 …» с «≈», ожидаемая дата и риск отказа — процентом или словами (три полосы),
 /// если больницы не было в обучении модели, красным выше 20 %; «Что сделать» — полный следующий шаг и обоснование;
@@ -49,7 +46,7 @@ class CurrentHospitalCard extends StatelessWidget {
               RouteFact(
                 s.patientRouteRefusal,
                 doctor.refusalOrgInTraining ? pct(doctor.pRefusal) : refusalWords(s, doctor.pRefusal),
-                tone: doctor.pRefusal > refusalHighThreshold ? StatusTone.danger : null,
+                tone: refusalHigh(doctor.pRefusal) ? StatusTone.danger : null,
               ),
           ]),
           if (todo.isNotEmpty) ...[

@@ -22,7 +22,7 @@ class IncomingFilterBar extends StatelessWidget {
   final IncomingFilter filter;
   final ValueChanged<IncomingFilter> onChanged;
 
-  /// Лист этапов со счётчиками — общий [PickerSheet] без поиска, на корневом навигаторе (над пилюлей вкладок).
+  /// Лист этапов со счётчиками — общий [PickerSheet] без поиска.
   Future<void> _pickStage(BuildContext context) async {
     final s = S.at(context);
     final counts = incomingStageCounts(items);
@@ -30,14 +30,7 @@ class IncomingFilterBar extends StatelessWidget {
       PickerItem(_allStages, '${s.incomingStageLabel(_allStages)} · ${items.length}'),
       for (final stage in IncomingStage.values) PickerItem(stage.name, '${s.incomingStageLabel(stage.name)} · ${counts[stage]}'),
     ];
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => PickerSheet<String>(title: s.incomingStageField, items: options, selected: filter.stage?.name ?? _allStages, search: false),
-    );
+    final picked = await PickerSheet.show<String>(context, title: s.incomingStageField, items: options, selected: filter.stage?.name ?? _allStages, search: false);
     if (picked != null) {
       onChanged(filter.withStage(picked == _allStages ? null : IncomingStage.values.byName(picked)));
     }

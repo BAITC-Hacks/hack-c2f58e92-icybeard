@@ -95,9 +95,6 @@ class ApiException implements Exception {
   /// Первое сообщение для поля [name] (camelCase, как в API) или null, если для поля ошибок нет.
   String? fieldError(String name) => errors?[name]?.firstOrNull;
 
-  /// То же, что [fieldError].
-  String? field(String name) => fieldError(name);
-
   @override
   String toString() => detail == null ? title : '$title: $detail';
 }

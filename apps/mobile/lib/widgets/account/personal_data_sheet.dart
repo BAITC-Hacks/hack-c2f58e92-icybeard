@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/client.dart';
+import '../../api/models.dart';
 import '../../l10n/strings.dart';
 import '../../state/load_state.dart';
 import '../../state/session.dart';
@@ -14,7 +15,7 @@ import '../picker_sheet.dart';
 import '../skeleton.dart';
 import '../state_view.dart';
 import '../status_chip.dart';
-import 'account_api.dart';
+import 'profile_fields.dart';
 
 /// Лист «Личные данные» из профиля (веб `ProfileView.vue`, P-2…P-5): ФИО (и у сотрудника должность, специальность)
 /// только для чтения, телефон с проверкой «+7 и 10 цифр», рабочая почта со статусом подтверждения, часовой пояс.
@@ -23,6 +24,7 @@ import 'account_api.dart';
 Future<bool> showPersonalDataSheet(BuildContext context) async =>
     await showModalBottomSheet<bool>(
       context: context,
+      useRootNavigator: true,
       showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,

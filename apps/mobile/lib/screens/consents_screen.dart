@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../api/client.dart';
+import '../api/models.dart';
 import '../config/env.dart';
 import '../l10n/strings.dart';
 import '../state/load_state.dart';
 import '../state/session.dart';
-import '../widgets/account/account_api.dart';
 import '../widgets/account/consent_cards.dart';
 import '../widgets/api_error.dart';
 import '../widgets/external_link.dart';

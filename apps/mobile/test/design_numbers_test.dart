@@ -168,6 +168,17 @@ void main() {
       expect(lines, isNotEmpty);
     });
 
+    testWidgets('tone colours the value like KpiTile; without a tone the value keeps the style colour', (tester) async {
+      await tester.pumpWidget(host(const StatGrid(items: [
+        StatItem(label: 'Риск отказа в госпитализации', value: '29 %', tone: StatusTone.danger),
+        StatItem(label: 'За 30 дней', value: '54 %'),
+        StatItem(label: 'Половина ждёт не дольше', value: '≈ 4', unit: 'дн.', tone: StatusTone.ok),
+      ])));
+      expect(tester.widget<Text>(find.text('29 %')).style?.color, c.danger);
+      expect(tester.widget<Text>(find.text('54 %')).style?.color, c.ink);
+      expect(tester.widget<Text>(find.text('≈ 4 дн.')).style?.color, c.ok);
+    });
+
     testWidgets('kazakh stat grid at 1.3x does not overflow', (tester) async {
       await tester.pumpWidget(host(
         const StatGrid(items: [

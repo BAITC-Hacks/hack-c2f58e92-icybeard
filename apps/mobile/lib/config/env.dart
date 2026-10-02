@@ -45,6 +45,9 @@ class Env {
         'kc_action': action,
       });
 
+  /// Публичная страница памятки после приёма в веб-кабинете (без входа, решение Q-17): по ней же QR-код у врача.
+  static String leafletLink(String token) => '$webBase/leaflet/${Uri.encodeComponent(token)}';
+
   static String _trimSlash(String url) => url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 
   /// Регион по умолчанию для учётной записи без клейма region_kato: г. Алматы, как у демо-пользователей.

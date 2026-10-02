@@ -27,24 +27,6 @@ String? waitCompareText(S s, {required double? regionP50, required double p50}) 
 /// Число у больницы зелёное, только если там ждут меньше, чем в среднем по региону (на округлённых днях).
 bool waitIsFaster({required double? regionP50, required double p50}) => (roundedDaysDiff(regionP50, p50) ?? 0) > 0;
 
-/// Точка сезонности `GET /refdata/seasonality`: множитель месяца [month] (1…12) ряда [seriesId].
-class SeasonPoint {
-  const SeasonPoint({required this.seriesId, required this.month, required this.multiplier});
-
-  /// Ряд листа ожидания NHS RTT — единственный, по которому строится подсказка.
-  static const waitingListSeries = 'rtt_waiting_list';
-
-  final String seriesId;
-  final int month;
-  final double multiplier;
-
-  factory SeasonPoint.fromJson(Map<String, dynamic> json) => SeasonPoint(
-        seriesId: json['seriesId'] as String? ?? '',
-        month: (json['month'] as num?)?.toInt() ?? 0,
-        multiplier: (json['multiplier'] as num?)?.toDouble() ?? 0,
-      );
-}
-
 /// Сколько месяцев вперёд показывает сезонная подсказка.
 const _seasonalSteps = 3;
 

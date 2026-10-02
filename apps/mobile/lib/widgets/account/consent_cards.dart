@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/models.dart';
 import '../../l10n/strings.dart';
 import '../../state/load_state.dart';
 import '../../theme/app_theme.dart';
@@ -12,7 +13,6 @@ import '../picker_sheet.dart';
 import '../skeleton.dart';
 import '../state_view.dart';
 import '../status_chip.dart';
-import 'account_api.dart';
 
 /// Карточки экрана «Данные и согласия» (веб `ConsentsView.vue`, F16): согласия, журнал доступа к моим данным, «Мои
 /// данные». Ошибка загрузки карточки — компактное состояние W-States с «Повторить» вместо неё, пока грузится —
@@ -172,6 +172,7 @@ class MyDataCard extends StatelessWidget {
 Future<bool> confirmDeletion(BuildContext context) async {
   final confirmed = await showModalBottomSheet<bool>(
     context: context,
+    useRootNavigator: true,
     showDragHandle: true,
     isScrollControlled: true,
     useSafeArea: true,

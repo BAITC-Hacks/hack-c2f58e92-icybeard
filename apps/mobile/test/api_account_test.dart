@@ -1,11 +1,10 @@
 import 'package:darumen/api/client.dart';
-import 'package:darumen/widgets/account/account_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/harness.dart';
 
-/// Расширение `AccountApi` (`/me/consents`, `/me/access-log`, `/me/deletion-request`, `/me/profile`, входы из
-/// `/me/security`) и проверки телефона — над мок-бэкендом обвязки, с настоящими формами ответов API.
+/// Аккаунт в `ApiClient` (`/me/consents`, `/me/access-log`, `/me/deletion-request`, `/me/profile`, `/me/security`
+/// с последними входами и резервными кодами) — над мок-бэкендом обвязки, с настоящими формами ответов API.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -161,7 +160,7 @@ void main() {
     });
   });
 
-  group('security details', () {
+  group('security', () {
     test('GET /me/security gives the sessions and the recent sign-ins with recovery codes', () async {
       final (session, _) = await demoSession(DemoUser.citizen1, api: {
         'GET /me/security': {
@@ -178,9 +177,9 @@ void main() {
           ],
         },
       });
-      final details = await session.api.mySecurityDetails();
-      expect(details.info.otpConfigured, isTrue);
-      expect(details.info.sessions.single.current, isTrue);
+      final details = await session.api.mySecurity();
+      expect(details.otpConfigured, isTrue);
+      expect(details.sessions.single.current, isTrue);
       expect(details.recoveryCodes, isNull);
       expect(details.recentLogins, hasLength(2));
       expect(details.recentLogins.first.method, 'password');
@@ -192,44 +191,9 @@ void main() {
       final (session, _) = await demoSession(DemoUser.citizen1, api: {
         'GET /me/security': {'otpConfigured': false, 'recoveryCodes': ['a', 'b', 'c'], 'sessions': <Object?>[]},
       });
-      final details = await session.api.mySecurityDetails();
+      final details = await session.api.mySecurity();
       expect(details.recoveryCodes, hasLength(3));
       expect(details.recentLogins, isEmpty);
-    });
-  });
-
-  group('phone', () {
-    test('digits drop formatting and turn a leading 8 into 7', () {
-      expect(phoneDigits('+7 (701) 000-00-00'), '77010000000');
-      expect(phoneDigits('8 701 000 00 00'), '77010000000');
-      expect(phoneDigits(''), '');
-    });
-
-    test('a Kazakh number is +7 and 10 digits', () {
-      expect(isKzPhone('+7 701 000 00 00'), isTrue);
-      expect(isKzPhone('87010000000'), isTrue);
-      expect(isKzPhone('+7 701 000 00'), isFalse);
-      expect(isKzPhone('+1 701 000 00 00'), isFalse);
-      expect(isKzPhone('телефон'), isFalse);
-    });
-
-    test('the stored value is +digits or null for an empty field', () {
-      expect(normalizedPhone(' 8 701 000 00 00 '), '+77010000000');
-      expect(normalizedPhone('   '), isNull);
-    });
-
-    test('display form groups the digits; anything else stays as typed', () {
-      expect(formatKzPhone('+77010000000'), '+7 701 000 00 00');
-      expect(formatKzPhone('123'), '123');
-    });
-  });
-
-  group('time zones', () {
-    test('the web list of Kazakh time zones, Almaty first', () {
-      expect(kzTimeZones.first, 'Asia/Almaty');
-      expect(kzTimeZones, containsAll(['Asia/Qostanay', 'Asia/Oral']));
-      expect(timeZoneCity('Asia/Qostanay'), 'Qostanay');
-      expect(timeZoneCity('Europe/Moscow'), 'Europe/Moscow');
     });
   });
 }

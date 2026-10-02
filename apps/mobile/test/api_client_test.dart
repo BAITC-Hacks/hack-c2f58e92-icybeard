@@ -432,19 +432,6 @@ void main() {
       expect(segments.map((s) => s.text), ['Первая фраза.', 'Вторая.']);
     });
 
-    test('makeDraft posts an empty body and parses the sections', () async {
-      final log = RequestLog();
-      final draft = await log.client(body: const {
-        'sections': [
-          {'name': 'Жалобы', 'text': 'боль', 'spans': []},
-        ],
-        'leaflet': 'памятка',
-      }, status: 200).makeDraft('s-1');
-      expect(log.last.url.path, '/api/v1/scribe/sessions/s-1/draft');
-      expect(log.lastBody, isEmpty);
-      expect(draft.sections.single.name, 'Жалобы');
-    });
-
     test('scribeSession GETs the session by id', () async {
       final log = RequestLog();
       final state = await log.client(body: const {'sessionId': 's-1', 'language': 'ru', 'approved': false}, status: 200).scribeSession('s-1');
@@ -520,7 +507,7 @@ void main() {
       await api.organizations('75');
       await api.predict(const {'regionKato': '75'});
       await api.alternatives(const {'regionKato': '75'});
-      await api.index(profileCode: '381');
+      await api.regionIndex(profileCode: '381');
       await api.routeStandard();
       await api.nosologies();
       await api.mnn('n-1');

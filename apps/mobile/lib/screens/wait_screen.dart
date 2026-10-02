@@ -13,7 +13,6 @@ import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../widgets/api_error.dart';
 import '../widgets/citizen_more/request_sheet.dart';
-import '../widgets/citizen_more/wait_api.dart';
 import '../widgets/citizen_more/wait_cards.dart';
 import '../widgets/citizen_more/wait_logic.dart';
 import '../widgets/empty_state.dart';
@@ -152,7 +151,7 @@ class _WaitScreenState extends State<WaitScreen> {
       final results = await Future.wait<Object>([
         _api.predict(body),
         _api.alternatives({...body, 'includeNeighbors': _neighbours}),
-        _api.waitIndex(profileCode: profile),
+        _api.regionIndex(profileCode: profile),
       ]);
       await session.rememberProfile(profile);
       if (mounted && id == _runId) {

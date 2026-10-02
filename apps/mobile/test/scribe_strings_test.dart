@@ -136,7 +136,7 @@ void main() {
       for (final f in <String Function(S)>[
         (s) => s.assistTitle,
         (s) => s.assistLead,
-        (s) => s.assistAsOf('{date}'),
+        (s) => s.asOfLabel('{date}'),
         (s) => s.assistParams,
         (s) => s.assistRegion,
         (s) => s.assistPurpose,

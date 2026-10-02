@@ -39,9 +39,12 @@ class SheetHeader extends StatelessWidget {
 }
 
 /// Лист-пояснение: [SheetHeader] и содержимое с отступами `0 24 32` под ручкой листа (метка происхождения,
-/// полное имя организации, «Как считается»). Закрывается свайпом или тапом мимо.
-Future<void> showInfoSheet(BuildContext context, {required String title, String? subtitle, required Widget body}) => showModalBottomSheet<void>(
+/// полное имя организации, «Как считается»). Закрывается свайпом или тапом мимо. По умолчанию — на корневом
+/// навигаторе ([useRootNavigator]): лист накрывает плавающую пилюлю вкладок, а не уходит под неё.
+Future<void> showInfoSheet(BuildContext context, {required String title, String? subtitle, required Widget body, bool useRootNavigator = true}) =>
+    showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: useRootNavigator,
       showDragHandle: true,
       isScrollControlled: true,
       useSafeArea: true,
@@ -56,8 +59,9 @@ Future<void> showInfoSheet(BuildContext context, {required String title, String?
     );
 
 /// Нижний лист выбора с поиском — вместо DropdownButtonFormField для региона, профиля койки, организации,
-/// нозологии и МНН. Возвращает выбранное значение, null — закрыт без выбора. Выбранная опция — фон surface-hover,
-/// текст остаётся `--text` 800 и галочка accent (как выпадающий список веба).
+/// нозологии и МНН. [show] возвращает выбранное значение, null — закрыт без выбора; по умолчанию открывает лист на
+/// корневом навигаторе, над плавающей пилюлей вкладок. Выбранная опция — фон surface-hover, текст остаётся `--text`
+/// 800 и галочка accent (как выпадающий список веба).
 class PickerSheet<T> extends StatefulWidget {
   const PickerSheet({super.key, required this.title, required this.items, this.selected, this.search = true});
 
@@ -72,9 +76,11 @@ class PickerSheet<T> extends StatefulWidget {
     required List<PickerItem<T>> items,
     T? selected,
     bool search = true,
+    bool useRootNavigator = true,
   }) =>
       showModalBottomSheet<T>(
         context: context,
+        useRootNavigator: useRootNavigator,
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,

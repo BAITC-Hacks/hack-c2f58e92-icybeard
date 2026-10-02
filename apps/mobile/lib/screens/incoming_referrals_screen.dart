@@ -31,8 +31,9 @@ import '../widgets/state_view.dart';
 /// пациент соглашается → больница подтверждает приём с датой (до 30 дней) или отказывает с причиной → в день
 /// госпитализации отмечает приём или неявку (дату можно перенести) → выписывает с эпикризом.
 ///
-/// - Список `GET /journal/referrals/incoming?includeConfirmed=true` в серверном порядке (тяжёлые первыми); отбор —
-///   на телефоне: этап со счётчиками, «Только тяжёлые», поиск по рефу, отправителю и профилю.
+/// - Список `GET /journal/referrals/incoming?moCode={своя больница}&includeConfirmed=true` в серверном порядке
+///   (тяжёлые первыми); отбор — на телефоне: этап со счётчиками, «Только тяжёлые», поиск по рефу, отправителю и
+///   профилю.
 /// - Кнопки — только из `item.allowed` (и при `referral.confirm`). Каждое действие — лист; перед «Госпитализирован»
 ///   и «Не пришёл» — подтверждение (Q-13). Новый ключ идемпотентности на каждое нажатие; пока запрос в полёте, все
 ///   кнопки выключены. Успех → список перечитан, колокольчик обновлён (счётчик вкладки), тост веба. 409 и 404 → сначала
@@ -123,7 +124,8 @@ class _IncomingReferralsScreenState extends State<IncomingReferralsScreen> {
   /// карточки остаются на экране. Ответ устаревшего запроса отбрасывается.
   Future<void> _load({bool skeleton = false}) async {
     final session = context.read<Session>();
-    if (session.moCode == null) {
+    final moCode = session.moCode;
+    if (moCode == null) {
       return;
     }
     final generation = ++_generation;
@@ -131,7 +133,8 @@ class _IncomingReferralsScreenState extends State<IncomingReferralsScreen> {
       setState(() => _state = const Loading());
     }
     try {
-      final items = await session.api.incomingReferrals();
+      // своя больница — явно: при области `all` у worklist.view сервер без неё отвечает 422
+      final items = await session.api.incomingReferrals(moCode: moCode);
       if (mounted && generation == _generation) {
         setState(() {
           _state = Loaded(items);

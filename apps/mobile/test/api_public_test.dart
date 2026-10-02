@@ -1,15 +1,13 @@
 import 'dart:convert';
 
 import 'package:darumen/api/client.dart';
-import 'package:darumen/widgets/citizen_more/medicines_api.dart';
-import 'package:darumen/widgets/citizen_more/wait_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-/// Расширения справочников экранов гражданина второго ряда поверх `ApiClient` (без роутера и сессии):
-/// `POST /medicines/check` целиком (доля похожих МНН и другие МНН нозологии), `GET /index` с долей ожидавших дольше
-/// 30 дней и p90, `GET /refdata/seasonality`.
+/// Публичные эндпоинты экранов гражданина в `ApiClient` (без роутера и сессии): `POST /medicines/check` целиком (доля
+/// похожих МНН и другие МНН нозологии), `GET /index` с долей ожидавших дольше 30 дней и p90,
+/// `GET /refdata/seasonality`, текст памятки `GET /scribe/leaflets/{token}`.
 void main() {
   late List<http.Request> requests;
 
@@ -46,13 +44,13 @@ void main() {
   group('medicines check', () {
     test('POST /medicines/check gives the base response, the peer ratio and the other МНН', () async {
       final api = client((_) => check);
-      final result = await api.checkMedicineDetails(mnnId: '1201', nosologyId: '9', regionKato: '75');
+      final result = await api.checkMedicine(mnnId: '1201', nosologyId: '9', regionKato: '75');
       expect(requests.single.method, 'POST');
       expect(requests.single.url.path, '/api/v1/medicines/check');
       expect(jsonDecode(requests.single.body), {'mnnId': '1201', 'nosologyId': '9', 'regionKato': '75'});
-      expect(result.check.covered, isTrue);
-      expect(result.check.fillDaysP50, 4.2);
-      expect(result.peerRatio, 0.93);
+      expect(result.covered, isTrue);
+      expect(result.fillDaysP50, 4.2);
+      expect(result.shortage.peerRatio, 0.93);
       expect(result.alternatives.map((a) => a.mnnId), ['1203', '88']);
       expect(result.alternatives.first.name, 'МНН 1203');
       expect(result.alternatives.first.issued12m, 15234);
@@ -60,11 +58,11 @@ void main() {
 
     test('without the peer ratio and the list the extras are empty, the whole country sends no region', () async {
       final api = client((_) => {...check, 'shortage': {'flag': true, 'score': 2.1, 'basis': ''}, 'alternatives': null});
-      final result = await api.checkMedicineDetails(nosologyId: '9');
+      final result = await api.checkMedicine(nosologyId: '9');
       expect(jsonDecode(requests.single.body), {'mnnId': null, 'nosologyId': '9', 'regionKato': null});
-      expect(result.peerRatio, isNull);
+      expect(result.shortage.peerRatio, isNull);
       expect(result.alternatives, isEmpty);
-      expect(result.check.shortage.flag, isTrue);
+      expect(result.shortage.flag, isTrue);
     });
   });
 
@@ -76,7 +74,7 @@ void main() {
               {'regionKato': '71', 'name': 'г. Астана'},
             ],
           });
-      final items = await api.waitIndex(profileCode: '121');
+      final items = await api.regionIndex(profileCode: '121');
       expect(requests.single.url.queryParameters, {'profileCode': '121'});
       expect(items.first.shareOver30, 0.42);
       expect(items.first.p90Days, 98);
@@ -100,7 +98,22 @@ void main() {
 
     test('an error of the API is an ApiException', () async {
       final api = client((_) => http.Response(jsonEncode({'title': 'Not found'}), 404, headers: {'content-type': 'application/problem+json'}));
-      await expectLater(api.waitIndex(profileCode: '1'), throwsA(isA<ApiException>()));
+      await expectLater(api.regionIndex(profileCode: '1'), throwsA(isA<ApiException>()));
+    });
+  });
+
+  group('leaflet', () {
+    test('GET /scribe/leaflets/{token} escapes the token and parses the text; missing fields are empty', () async {
+      final api = client((_) => {'text': 'Что дальше', 'language': 'kk', 'approvedAt': '2026-10-01T09:30:00+00:00'});
+      final leaflet = await api.publicLeaflet('a/b');
+      expect(requests.single.method, 'GET');
+      expect(requests.single.url.path, '/api/v1/scribe/leaflets/a%2Fb');
+      expect(leaflet.text, 'Что дальше');
+      expect(leaflet.language, 'kk');
+      expect(leaflet.approvedAt, '2026-10-01T09:30:00+00:00');
+      final bare = await client((_) => {'text': 'x'}).publicLeaflet('t');
+      expect(bare.language, isEmpty);
+      expect(bare.approvedAt, isEmpty);
     });
   });
 }

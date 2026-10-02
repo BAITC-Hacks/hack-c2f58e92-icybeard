@@ -7,7 +7,6 @@ import '../../theme/tones.dart';
 import '../../theme/typography.dart';
 import '../format.dart';
 import '../status_chip.dart';
-import 'hospital_card.dart';
 
 /// Вариант перевода в карточке «Оставить или перевести»: больница, её прогноз (нет у больницы только из запроса
 /// пациента) и метка «просит пациент».
@@ -105,7 +104,7 @@ class DecisionOptionTile extends StatelessWidget {
                             const TextSpan(text: ' · '),
                             TextSpan(
                               text: s.patientRouteAltRefusal(pct(alt.pRefusal)),
-                              style: alt.pRefusal > refusalHighThreshold ? TextStyle(color: colors.danger) : null,
+                              style: refusalHigh(alt.pRefusal) ? TextStyle(color: colors.danger) : null,
                             ),
                           ],
                         ]),

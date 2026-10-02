@@ -1,7 +1,5 @@
-import '../config/env.dart';
-
-// Модели AI-скрайба (§3.10 контракта): согласие пациента на запись, сессия записи, стенограмма, черновик, утверждение
-// и состояние сервиса. Вынесены из models.dart, чтобы файлы оставались компактными; models.dart реэкспортирует этот
+// Модели AI-скрайба (§3.10 контракта): согласие пациента на запись, сессия записи, стенограмма, черновик, утверждение,
+// публичная памятка и состояние сервиса. Вынесены из models.dart, чтобы файлы оставались компактными; models.dart реэкспортирует этот
 // файл, импорты экранов не меняются. Словаря терминов клиники здесь нет: на телефоне он не редактируется (только веб).
 
 /// Начатая запись приёма (`POST /api/v1/scribe/sessions` → 201). Привязана к согласию пациента: consentId — его
@@ -60,8 +58,8 @@ class DraftSection {
       );
 }
 
-/// Черновик приёма от ИИ — внутри `GET /scribe/sessions/{id}` (и ответ `POST /scribe/sessions/{id}/draft`, который
-/// веб больше не вызывает: запись приёма — один раздел со стенограммой).
+/// Черновик приёма от ИИ внутри `GET /scribe/sessions/{id}`, если его составляли. Сам телефон черновик не заказывает:
+/// запись приёма — один раздел со стенограммой.
 class ScribeDraft {
   const ScribeDraft({required this.sections, required this.leaflet, this.model});
   final List<DraftSection> sections;
@@ -76,8 +74,8 @@ class ScribeDraft {
       );
 }
 
-/// Ответ `POST /scribe/sessions/{id}/approve` (§2.2): `{leafletToken, audioDeleted, consentId}`. Поля `leafletUrl`
-/// в ответе больше нет: ссылка для пациента собирается на экране как `'${Env.webBase}/leaflet/$leafletToken'`.
+/// Ответ `POST /scribe/sessions/{id}/approve` (§2.2): `{leafletToken, audioDeleted, consentId}`. Ссылка для пациента —
+/// `Env.leafletLink(leafletToken)`.
 class ApproveResult {
   const ApproveResult({required this.leafletToken, this.audioDeleted = true, this.consentId});
 
@@ -90,14 +88,31 @@ class ApproveResult {
   /// Согласие, по которому шла запись (теперь в статусе completed).
   final String? consentId;
 
-  /// MOBILE-REFACTOR-SHIM: только для старого экрана скрайба, который читает `result.leafletUrl`; сервер это поле
-  /// больше не присылает. Экран строит ссылку сам (`'${Env.webBase}/leaflet/$leafletToken'`), после чего этот геттер
-  /// удаляется.
-  String get leafletUrl => '${Env.webBase}/leaflet/$leafletToken';
   factory ApproveResult.fromJson(Map<String, dynamic> json) => ApproveResult(
         leafletToken: json['leafletToken'] as String? ?? '',
         audioDeleted: json['audioDeleted'] as bool? ?? true,
         consentId: json['consentId'] as String?,
+      );
+}
+
+/// Публичный текст памятки после приёма `GET /scribe/leaflets/{token}` (без проверки роли): `{text, language,
+/// approvedAt}`. Организации, врача и срока действия в ответе нет; неизвестный или удалённый токен — 404.
+class PublicLeaflet {
+  const PublicLeaflet({required this.text, this.language = '', this.approvedAt = ''});
+
+  /// Текст памятки: абзацы через пустую строку; строка с двоеточием или короткая заглавная — заголовок шага.
+  final String text;
+
+  /// Язык приёма: `ru` | `kk`; пусто — не прислан.
+  final String language;
+
+  /// ISO-штамп утверждения врачом; пусто — не прислан.
+  final String approvedAt;
+
+  factory PublicLeaflet.fromJson(Map<String, dynamic> json) => PublicLeaflet(
+        text: json['text'] as String? ?? '',
+        language: json['language'] as String? ?? '',
+        approvedAt: json['approvedAt'] as String? ?? '',
       );
 }
 
@@ -161,7 +176,7 @@ class ScribeConsent {
   /// Заполняется с началом записи (recording и дальше) — id для `GET /scribe/sessions/{id}`.
   final String? sessionId;
 
-  /// Токен памятки, когда status == completed: ссылка `'${Env.webBase}/leaflet/$leafletToken'`.
+  /// Токен памятки, когда status == completed: ссылка `Env.leafletLink(leafletToken)`.
   final String? leafletToken;
   final String? approvedAt;
 

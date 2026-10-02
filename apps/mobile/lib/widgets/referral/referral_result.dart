@@ -12,6 +12,7 @@ import '../inline_disclosure.dart';
 import '../kpi_tile.dart';
 import '../route/forecast_factors.dart';
 import '../skeleton.dart';
+import '../status_chip.dart';
 import 'referral_form.dart';
 
 /// Карточка «Прогноз для «{организация}»» (веб: третий раздел ассистента) — всегда для организации, выбранной в
@@ -48,7 +49,11 @@ class ReferralForecastCard extends StatelessWidget {
             StatItem(label: s.assistHalf, value: approxDays(p.p50Days), unit: s.daysUnit),
             StatItem(label: s.assistNinety, value: approxDays(p.p90Days), unit: s.daysUnit),
             StatItem(label: s.assistWithin30, value: pct(p.pWithin30Days)),
-            StatItem(label: s.assistRefusalRow, value: referralRisk(s, p.pRefusal, inTraining: p.refusalOrgInTraining)),
+            StatItem(
+              label: s.assistRefusalRow,
+              value: referralRisk(s, p.pRefusal, inTraining: p.refusalOrgInTraining),
+              tone: refusalHigh(p.pRefusal) ? StatusTone.danger : null,
+            ),
           ]),
           if (queue != null) ...[
             const SizedBox(height: AppSpacing.sm),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/models.dart';
 import '../../l10n/strings.dart';
 import '../../theme/tokens.dart';
 import '../../theme/tones.dart';
@@ -9,7 +10,6 @@ import '../format.dart';
 import '../inline_disclosure.dart';
 import '../origin_tag.dart';
 import '../status_chip.dart';
-import 'medicines_api.dart';
 
 /// Карточки результата «Проверка рецепта» (веб `MedicinesView.vue`, M-1…M-5): покрытие, сроки получения, дефицит и
 /// «Как считается» в одной карточке; ниже «Другие МНН при этой нозологии».
@@ -21,7 +21,7 @@ import 'medicines_api.dart';
 class MedicineResultCard extends StatelessWidget {
   const MedicineResultCard({super.key, required this.result, required this.title, this.nosologyId});
 
-  final MedicineCheck result;
+  final CheckResponse result;
 
   /// «МНН 1201» или «Нозология 9».
   final String title;
@@ -32,11 +32,9 @@ class MedicineResultCard extends StatelessWidget {
     final s = S.at(context);
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
-    final data = result.check;
-    final peer = result.peerRatio;
     final details = [
-      data.covered ? s.medCoveredBy(data.program ?? '') : s.medNotCoveredTitle,
-      if (data.category != null && data.category!.isNotEmpty) s.medCategory(data.category!),
+      result.covered ? s.medCoveredBy(result.program ?? '') : s.medNotCoveredTitle,
+      if (result.category != null && result.category!.isNotEmpty) s.medCategory(result.category!),
       if (nosologyId != null) s.medNosology(nosologyId!),
     ].join(' · ');
     return AppCard(
@@ -51,18 +49,18 @@ class MedicineResultCard extends StatelessWidget {
             runSpacing: AppSpacing.xs,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              StatusChip(data.covered ? s.medCovered : s.medNotCovered, tone: data.covered ? StatusTone.ok : StatusTone.warn),
-              OriginTag(originModelOrRule(data.fillDaysP50Model != null), note: s.medCoverageNote),
+              StatusChip(result.covered ? s.medCovered : s.medNotCovered, tone: result.covered ? StatusTone.ok : StatusTone.warn),
+              OriginTag(originModelOrRule(result.fillDaysP50Model != null), note: s.medCoverageNote),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(details, style: theme.textTheme.bodySmall?.merge(AppType.numeric)),
           const SizedBox(height: AppSpacing.xs),
-          ListRow(title: s.medMedian, trailing: RowValue(daysWithUnit(data.fillDaysP50, s), strong: true)),
-          ListRow(title: s.fillNine, trailing: RowValue(data.fillDaysP90 == null ? '—' : s.upToDays(days(data.fillDaysP90)), strong: true)),
-          _ShareRow(title: s.medWithin14, share: data.pFilled14d),
-          if (data.fillDaysP50Model != null) _ModelRow(days: daysWithUnit(data.fillDaysP50Model, s)),
-          _ShortageRow(flag: data.shortage.flag, peerRatio: peer),
+          ListRow(title: s.medMedian, trailing: RowValue(daysWithUnit(result.fillDaysP50, s), strong: true)),
+          ListRow(title: s.fillNine, trailing: RowValue(result.fillDaysP90 == null ? '—' : s.upToDays(days(result.fillDaysP90)), strong: true)),
+          _ShareRow(title: s.medWithin14, share: result.pFilled14d),
+          if (result.fillDaysP50Model != null) _ModelRow(days: daysWithUnit(result.fillDaysP50Model, s)),
+          _ShortageRow(flag: result.shortage.flag, peerRatio: result.shortage.peerRatio),
           InlineDisclosure(
             title: s.howCounted,
             style: DisclosureStyle.title,
@@ -71,11 +69,11 @@ class MedicineResultCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(s.medHowPlain(dateShort(data.model?.trainedThrough)), style: theme.textTheme.bodyMedium?.copyWith(height: 1.55)),
-                  if (data.basis.isNotEmpty) ...[const SizedBox(height: AppSpacing.sm), Text('• ${_sentence(s.medBasisFill, data.basis)}', style: theme.textTheme.bodySmall)],
-                  if (data.shortage.basis.isNotEmpty) ...[
+                  Text(s.medHowPlain(dateShort(result.model?.trainedThrough)), style: theme.textTheme.bodyMedium?.copyWith(height: 1.55)),
+                  if (result.basis.isNotEmpty) ...[const SizedBox(height: AppSpacing.sm), Text('• ${_sentence(s.medBasisFill, result.basis)}', style: theme.textTheme.bodySmall)],
+                  if (result.shortage.basis.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xs),
-                    Text('• ${_sentence(s.medBasisShortage, data.shortage.basis)}', style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
+                    Text('• ${_sentence(s.medBasisShortage, result.shortage.basis)}', style: theme.textTheme.bodySmall?.copyWith(color: colors.muted)),
                   ],
                 ],
               ),

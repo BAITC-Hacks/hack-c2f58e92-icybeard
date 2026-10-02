@@ -6,17 +6,28 @@ import 'package:darumen/widgets/notice_card.dart';
 import 'package:darumen/widgets/section.dart';
 import 'package:darumen/widgets/skeleton.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Widget app(Widget home, {String locale = 'ru', bool reduceMotion = false}) => MaterialApp(
+Widget app(Widget home, {String locale = 'ru', bool reduceMotion = false, double textScale = 1}) => MaterialApp(
       theme: AppTheme.light(),
       locale: Locale(locale),
       supportedLocales: const [Locale('ru'), Locale('kk')],
       localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
-      builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(disableAnimations: reduceMotion), child: child!),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(disableAnimations: reduceMotion, textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: home,
     );
+
+/// Сколько строк занял текст абзаца: число разных верхних краёв прямоугольников всего текста.
+int lineCount(RenderParagraph paragraph) => paragraph
+    .getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: paragraph.text.toPlainText().length))
+    .map((box) => box.top.round())
+    .toSet()
+    .length;
 
 Widget host(Widget child, {String locale = 'ru'}) => app(Scaffold(body: Center(child: SizedBox(width: 360, child: child))), locale: locale);
 
@@ -81,6 +92,8 @@ void main() {
       await tester.pumpWidget(host(Column(children: [ArrowLink('Посмотреть', onTap: () => taps++), const ArrowLink('Без действия'), const FieldLabel('Причина')])));
       expect(tester.widget<Text>(find.text('Посмотреть')).style?.color, c.link);
       expect(find.text('→'), findsNWidgets(2));
+      expect(tester.getSize(find.ancestor(of: find.text('Посмотреть'), matching: find.byType(InkWell))).height, greaterThanOrEqualTo(AppSizes.compact),
+          reason: 'цель нажатия не меньше 44');
       await tester.tap(find.text('Посмотреть'));
       expect(taps, 1);
       expect(find.text('ПРИЧИНА'), findsOneWidget);
@@ -128,6 +141,35 @@ void main() {
       expect(find.byType(BottomAction), findsOneWidget);
       final gap = tester.getTopLeft(find.text('второй')).dy - tester.getBottomLeft(find.text('первый')).dy;
       expect(gap, AppSpacing.md);
+    });
+
+    testWidgets('a one-word title next to the actions shrinks to fit instead of breaking inside the word (kk, 1.3×, 360 dp)', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      Widget page(String title) => app(
+            PageScaffold(
+              title: title,
+              showBack: false,
+              leading: const SizedBox(width: 40, height: 40),
+              actions: const [CircleIconButton(icon: Icons.tune, label: 'Сүзгі'), CircleIconButton(icon: Icons.notifications_none, label: 'Хабарламалар')],
+              children: const [Text('тело')],
+            ),
+            locale: 'kk',
+            textScale: 1.3,
+          );
+      await tester.pumpWidget(page('Пациенттер'));
+      final word = tester.renderObject<RenderParagraph>(find.text('Пациенттер'));
+      expect(lineCount(word), 1, reason: 'слово не рвётся посередине');
+      expect(word.didExceedMaxLines, isFalse);
+      expect(tester.widget<Text>(find.text('Пациенттер')).style!.fontSize, lessThan(24));
+
+      // тестовый шрифт рисует каждую букву квадратом в кегль: два коротких слова помещаются только по одному в строке
+      await tester.pumpWidget(page('Мой путь'));
+      final words = tester.renderObject<RenderParagraph>(find.text('Мой путь'));
+      expect(tester.widget<Text>(find.text('Мой путь')).style!.fontSize, 24, reason: 'каждое слово помещается — перенос между словами, кегль прежний');
+      expect(lineCount(words), 2);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('back button appears when the navigator can pop and pops the page', (tester) async {

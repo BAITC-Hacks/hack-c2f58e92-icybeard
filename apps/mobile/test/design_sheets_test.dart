@@ -63,6 +63,34 @@ void main() {
     expect(other.style?.fontWeight, isNot(FontWeight.w800));
   });
 
+  testWidgets('picker and info sheets open on the root navigator, above a nested one (the tab pill stays under them)', (tester) async {
+    final nested = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(host(SizedBox(
+      height: 600,
+      child: Navigator(
+        key: nested,
+        onGenerateRoute: (_) => MaterialPageRoute<void>(
+          builder: (context) => Column(children: [
+            TextButton(onPressed: () => PickerSheet.show<String>(context, title: 'Регион', items: regions), child: const Text('picker')),
+            TextButton(onPressed: () => showInfoSheet(context, title: 'Как считается', body: const Text('по правилу')), child: const Text('info')),
+          ]),
+        ),
+      ),
+    )));
+    final root = tester.state<NavigatorState>(find.byType(Navigator).first);
+    expect(root, isNot(nested.currentState));
+
+    await tester.tap(find.text('picker'));
+    await tester.pumpAndSettle();
+    expect(Navigator.of(tester.element(find.byType(PickerSheet<String>))), root);
+    await tester.tap(find.text('г. Астана'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('info'));
+    await tester.pumpAndSettle();
+    expect(Navigator.of(tester.element(find.text('по правилу'))), root);
+  });
+
   testWidgets('picker search: nothing found shows the empty line', (tester) async {
     await tester.pumpWidget(host(Builder(
       builder: (context) => TextButton(onPressed: () => PickerSheet.show<String>(context, title: 'Регион', items: regions), child: const Text('open')),

@@ -182,7 +182,8 @@ class RowValue extends StatelessWidget {
   }
 }
 
-/// Ссылка-действие 14.5/700 цвета `--link` со стрелкой «→» (ghost-ссылка components.md).
+/// Ссылка-действие 14.5/700 цвета `--link` со стрелкой «→» (ghost-ссылка components.md); с [onTap] — цель нажатия
+/// высотой не меньше 44.
 class ArrowLink extends StatelessWidget {
   const ArrowLink(this.text, {super.key, this.onTap});
 
@@ -204,7 +205,12 @@ class ArrowLink extends StatelessWidget {
     if (onTap == null) {
       return child;
     }
-    return InkWell(borderRadius: BorderRadius.circular(AppRadius.sm), onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs), child: child));
+    // цель нажатия не ниже 44 (`AppSizes.compact`), текст — по центру строки
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.sm),
+      onTap: onTap,
+      child: ConstrainedBox(constraints: const BoxConstraints(minHeight: AppSizes.compact), child: child),
+    );
   }
 }
 

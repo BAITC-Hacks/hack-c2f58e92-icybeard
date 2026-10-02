@@ -1,6 +1,5 @@
 import 'package:darumen/config/env.dart';
 import 'package:darumen/screens/leaflet_screen.dart';
-import 'package:darumen/widgets/citizen/leaflet_api.dart';
 import 'package:darumen/widgets/citizen/leaflet_document.dart';
 import 'package:darumen/widgets/state_view.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'support/harness.dart';
 
 /// Читалка памятки после приёма `/home/route/leaflet/:token`: публичный текст `GET /api/v1/scribe/leaflets/{token}`
-/// (в клиенте метода нет — расширение `LeafletApi`), разбор текста как в LeafletView.vue, просроченная ссылка,
+/// (`ApiClient.publicLeaflet`), разбор текста как в LeafletView.vue, просроченная ссылка,
 /// копирование ссылки на публичную страницу веба.
 const token = 'Xk2_aB9-qwertyF6A7B8C9';
 const leafletText = 'Принимайте капли два раза в день и приходите на осмотр через неделю.\n\n'
@@ -46,8 +45,9 @@ void main() {
       expect(doc.steps.single.body, 'ОДНА СТРОКА');
     });
 
-    test('the public link is the web base, /leaflet/ and the token (Q-17)', () {
-      expect(leafletWebLink(token), '${Env.webBase}/leaflet/$token');
+    test('the public link is the web base, /leaflet/ and the encoded token (Q-17), for the reader and the scribe alike', () {
+      expect(Env.leafletLink(token), '${Env.webBase}/leaflet/$token');
+      expect(Env.leafletLink('a b/c'), '${Env.webBase}/leaflet/a%20b%2Fc');
     });
   });
 

@@ -225,7 +225,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 padding: const EdgeInsets.only(right: AppSpacing.xs),
                                 child: TextButton(
                                   onPressed: () => setState(() => _showPassword = !_showPassword),
-                                  child: Text(_showPassword ? s.hidePassword : s.showPassword, style: theme.textTheme.titleSmall?.copyWith(fontSize: 13, color: colors.accentHover)),
+                                  child: Text(_showPassword ? s.hidePassword : s.showPassword, style: theme.textTheme.titleSmall?.copyWith(color: colors.accentHover)),
                                 ),
                               ),
                             ),
@@ -238,7 +238,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             spacing: AppSpacing.sm,
                             children: [
                               _RememberBox(value: _remember, label: s.rememberMe, onChanged: (v) => setState(() => _remember = v)),
-                              TextButton(onPressed: () => context.push('/login/forgot'), child: Text(s.forgotPassword, style: const TextStyle(fontSize: 14))),
+                              TextButton(onPressed: () => context.push('/login/forgot'), child: Text(s.forgotPassword)),
                             ],
                           ),
                           const SizedBox(height: AppSpacing.sm),
@@ -264,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(s.noAccount, style: theme.textTheme.bodySmall),
                       TextButton(
                         onPressed: () => openExternal(context, Uri.parse('${Env.webBase}/signup')),
-                        child: Text(s.registerOrganization, style: const TextStyle(fontSize: 14)),
+                        child: Text(s.registerOrganization),
                       ),
                     ],
                   ),
@@ -333,7 +333,7 @@ class _Heading extends StatelessWidget {
           const SizedBox(height: 6),
           Semantics(header: true, child: Text(s.loginTitle, style: theme.textTheme.headlineSmall)),
           const SizedBox(height: 6),
-          Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(fontSize: 13.5)),
+          Text(subtitle, style: theme.textTheme.bodySmall),
         ],
       ),
     );

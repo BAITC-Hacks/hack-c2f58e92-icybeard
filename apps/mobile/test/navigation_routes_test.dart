@@ -80,7 +80,7 @@ void main() {
     });
     await pumpRouterApp(tester, session, location: '/doctor/incoming', locale: 'kk', textScale: 1.3, size: phoneNarrow);
     final labels = tester.widget<FloatingNav>(find.byType(FloatingNav)).destinations.map((d) => d.label);
-    expect(labels, ['Науқастар', 'Кіріс', 'Шешімдер', 'Профиль']);
+    expect(labels, ['Пациенттер', 'Кіріс', 'Шешімдер', 'Профиль']);
     expect(find.text('Кіріс жолдамалар'), findsOneWidget);
     expect(find.descendant(of: find.byType(FloatingNav), matching: find.text('12')), findsOneWidget);
     expect(tester.takeException(), isNull, reason: 'без переполнения');

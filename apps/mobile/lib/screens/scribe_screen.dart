@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 
+import '../config/env.dart';
 import '../l10n/strings.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
@@ -40,8 +41,9 @@ import '../widgets/status_chip.dart';
 /// Ошибки — одним вызовом `showApiError`; согласие и сессию перечитывает ScribeFlow. Словаря терминов и загрузки
 /// аудиофайла на телефоне нет (только веб, §6.4).
 class ScribeScreen extends StatefulWidget {
-  const ScribeScreen({super.key, required String? patientRef}) : patientRef = patientRef ?? '';
+  const ScribeScreen({super.key, required this.patientRef});
 
+  /// Реф пациента из пути `/doctor/patients/:ref/scribe`.
   final String patientRef;
 
   @override
@@ -286,8 +288,8 @@ class _ScribeScreenState extends State<ScribeScreen> with WidgetsBindingObserver
           ForbiddenState(error: flow.consentsError)
         else if (result != null)
           ScribeResultCard(
-            link: scribeLeafletLink(result.leafletToken),
-            onCopy: () => _copy(scribeLeafletLink(result.leafletToken)),
+            link: Env.leafletLink(result.leafletToken),
+            onCopy: () => _copy(Env.leafletLink(result.leafletToken)),
             onOpenPatient: () => context.go('/doctor/patients/${Uri.encodeComponent(widget.patientRef)}'),
           )
         else if (flow.hasSession)

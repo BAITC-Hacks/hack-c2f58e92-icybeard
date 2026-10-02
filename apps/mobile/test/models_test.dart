@@ -32,8 +32,8 @@ void main() {
       'patientRef': 'SYN-75-028B-381-02', 'stage': 'ожидает', 'riskFlags': [], 'priority': 1,
       'nextAction': 'ждать вызова', 'explanation': '', 'moCode': '028B', 'profileCode': '381', 'daysWaiting': 3,
     }).nextActionCode, '');
-    expect(S.of('kk').nextActionText('wait_for_call', 'ждать вызова'), 'шақыруды күту');
-    expect(S.of('kk').nextActionText('', 'ждать вызова'), 'ждать вызова');
+    expect(S.of('kk').worklistNextFull('wait_for_call', fallback: 'ждать вызова'), 'шақыруды күту');
+    expect(S.of('kk').worklistNextFull('', fallback: 'ждать вызова'), 'ждать вызова');
     // открытый сигнал пациента в строке списка
     final signalled = WorklistItem.fromJson({
       'patientRef': 'SYN-75-028B-381-03', 'stage': 'ожидает', 'riskFlags': ['patient_signal'], 'priority': 15,

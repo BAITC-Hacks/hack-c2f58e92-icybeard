@@ -63,12 +63,7 @@ class KpiTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppPalette.of(context);
-    final valueColor = switch (tone) {
-      StatusTone.ok => colors.ok,
-      StatusTone.warn => colors.warn,
-      StatusTone.danger => colors.danger,
-      _ => null,
-    };
+    final valueColor = _valueColor(colors, tone);
     final valueRow = Row(
       crossAxisAlignment: CrossAxisAlignment.baseline,
       textBaseline: TextBaseline.alphabetic,
@@ -109,18 +104,27 @@ class KpiTile extends StatelessWidget {
   }
 }
 
-/// Показатель сетки [StatGrid]: подпись, значение и необязательная единица.
+/// Цвет значения показателя по тону: ok — зелёный, warn — янтарный, danger — красный; иначе — цвет стиля.
+Color? _valueColor(ColorTokens colors, StatusTone? tone) => switch (tone) {
+      StatusTone.ok => colors.ok,
+      StatusTone.warn => colors.warn,
+      StatusTone.danger => colors.danger,
+      _ => null,
+    };
+
+/// Показатель сетки [StatGrid]: подпись, значение и необязательная единица; [tone] красит значение, как у [KpiTile].
 class StatItem {
-  const StatItem({required this.label, required this.value, this.unit});
+  const StatItem({required this.label, required this.value, this.unit, this.tone});
 
   final String label;
   final String value;
   final String? unit;
+  final StatusTone? tone;
 }
 
 /// Сетка показателей без плиток (веб `.h-stats` на маршруте пациента и в ассистенте направления): подпись 12
-/// text-secondary над значением 19/800 с единицей 13.5/700; ячейки разделены линиями `--border-soft`, по [columns]
-/// в ряду (на телефоне — две). Для прогнозных чисел врача вместо ряда [KpiTile].
+/// text-secondary над значением 19/800 с единицей 13.5/700 (тон значения — у [StatItem]); ячейки разделены линиями
+/// `--border-soft`, по [columns] в ряду (на телефоне — две). Для прогнозных чисел врача вместо ряда [KpiTile].
 class StatGrid extends StatelessWidget {
   const StatGrid({super.key, required this.items, this.columns = 2});
 
@@ -150,7 +154,7 @@ class StatGrid extends StatelessWidget {
                     TextSpan(text: item.value),
                     if (item.unit != null) TextSpan(text: ' ${item.unit}', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700)),
                   ]),
-                  style: theme.textTheme.titleLarge?.merge(AppType.numeric),
+                  style: theme.textTheme.titleLarge?.copyWith(color: _valueColor(colors, item.tone)).merge(AppType.numeric),
                 ),
               ],
             ),

@@ -98,8 +98,8 @@ void main() {
       }
       expectWeb(placeholders(ru.worklistShown(7, 60), {'7': 'shown', '60': 'total'}), kazakh: false);
       expectWeb(placeholders(kk.worklistShown(7, 60), {'7': 'shown', '60': 'total'}), kazakh: true);
-      expectWeb(placeholders(ru.worklistAsOf('31.03.2025'), {'31.03.2025': 'date'}), kazakh: false);
-      expectWeb(placeholders(kk.worklistAsOf('31.03.2025'), {'31.03.2025': 'date'}), kazakh: true);
+      expectWeb(placeholders(ru.asOfLabel('31.03.2025'), {'31.03.2025': 'date'}), kazakh: false);
+      expectWeb(placeholders(kk.asOfLabel('31.03.2025'), {'31.03.2025': 'date'}), kazakh: true);
     });
   });
 
@@ -171,8 +171,6 @@ void main() {
       expectWeb(placeholders(kk.patientRouteTransferTo('NAME'), {'NAME': 'name'}), kazakh: true);
       expectWeb(placeholders(ru.patientRouteResponsible('NAME'), {'NAME': 'name'}), kazakh: false);
       expectWeb(placeholders(kk.patientRouteResponsible('NAME'), {'NAME': 'name'}), kazakh: true);
-      expectWeb(placeholders(ru.patientRouteSynthetic('31.03.2025'), {'31.03.2025': 'asOf'}), kazakh: false);
-      expectWeb(placeholders(kk.patientRouteSynthetic('31.03.2025'), {'31.03.2025': 'asOf'}), kazakh: true);
     });
 
     test('обязательное поле — «(обязательно)» после подписи', () {

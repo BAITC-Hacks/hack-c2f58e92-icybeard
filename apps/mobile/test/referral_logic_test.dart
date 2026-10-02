@@ -81,12 +81,10 @@ void main() {
     expect(referralCompare(ru, 12.2, 11.8), isNull);
   });
 
-  test('риск отказа: процент, а для больницы вне обучения — словами; опасный цвет выше 20 %', () {
+  test('риск отказа: процент, а для больницы вне обучения — словами', () {
     expect(referralRisk(ru, 0.29, inTraining: true), '29 %');
     expect(referralRisk(ru, 0.29, inTraining: false), 'выше среднего');
     expect(referralRisk(kk, 0.03, inTraining: false), 'орташадан төмен');
-    expect(referralRiskHigh(0.21), isTrue);
-    expect(referralRiskHigh(0.2), isFalse);
   });
 
   group('факторы прогноза', () {

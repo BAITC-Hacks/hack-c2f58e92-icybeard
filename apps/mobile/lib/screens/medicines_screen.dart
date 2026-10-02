@@ -8,7 +8,6 @@ import '../state/session.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_card.dart';
 import '../widgets/citizen_more/medicine_cards.dart';
-import '../widgets/citizen_more/medicines_api.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/error_box.dart';
 import '../widgets/format.dart';
@@ -32,7 +31,7 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
   List<Mnn> _mnns = const [];
   String? _nosologyId;
   String? _mnnId;
-  LoadState<MedicineCheck>? _state;
+  LoadState<CheckResponse>? _state;
   Object? _refdataError;
   int _checkId = 0;
   final _query = TextEditingController();
@@ -99,7 +98,7 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
     final id = ++_checkId;
     setState(() => _state = const Loading());
     try {
-      final result = await session.api.checkMedicineDetails(mnnId: _mnnId, nosologyId: _nosologyId, regionKato: session.region);
+      final result = await session.api.checkMedicine(mnnId: _mnnId, nosologyId: _nosologyId, regionKato: session.region);
       if (_nosologyId != null) {
         await session.rememberNosology(_nosologyId!);
       }
@@ -189,9 +188,9 @@ class _MedicinesScreenState extends State<MedicinesScreen> {
           EmptyState(icon: Icons.medication_outlined, title: s.medPickTitle)
         else
           switch (state) {
-            Loading<MedicineCheck>() => const Column(children: [CardSkeleton(height: 320), SizedBox(height: AppSpacing.md), CardSkeleton(height: 160)]),
-            Failed<MedicineCheck>(:final error) => ErrorBox(error: error, onRetry: _check),
-            Loaded<MedicineCheck>(:final data) => Column(
+            Loading<CheckResponse>() => const Column(children: [CardSkeleton(height: 320), SizedBox(height: AppSpacing.md), CardSkeleton(height: 160)]),
+            Failed<CheckResponse>(:final error) => ErrorBox(error: error, onRetry: _check),
+            Loaded<CheckResponse>(:final data) => Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   MedicineResultCard(result: data, title: _mnnId == null ? '${s.nosologyShort} ${_nosologyId ?? ''}' : s.mnnName(_mnnId!), nosologyId: _nosologyId),

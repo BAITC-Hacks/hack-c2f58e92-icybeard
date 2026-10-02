@@ -107,7 +107,7 @@ class _OtpScreenState extends State<OtpScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(s.otpBody, style: theme.textTheme.bodySmall?.copyWith(fontSize: 15)),
+              Text(s.otpBody, style: theme.textTheme.bodyLarge?.copyWith(color: colors.muted)),
               const SizedBox(height: AppSpacing.lg),
               OtpField(
                 controller: _code,

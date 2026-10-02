@@ -84,7 +84,7 @@ void main() {
       ((s) => s.myLeafletExpiredText, 'leaflet.expiredText'),
       ((s) => s.myCopyLink, 'shell.copyLink'),
       ((s) => s.myLinkCopied, 'shell.copied'),
-      ((s) => s.myFootnoteSynthetic('{asOf}'), 'route.synthetic'),
+      ((s) => s.routeSyntheticNote('{asOf}'), 'route.synthetic'),
       ((s) => s.myNeedsAnswer, 'bell.citizen.needsAction'),
     ];
     for (final (text, key) in pairs) {

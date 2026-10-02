@@ -8,7 +8,6 @@ import '../../theme/tones.dart';
 import '../app_card.dart';
 import '../format.dart';
 import '../status_chip.dart';
-import 'account_api.dart';
 
 /// Карточки экрана «Безопасность» (доска M-Account-Security, веб `SecurityView.vue`): вход (пароль, SMS,
 /// приложение-аутентификатор, резервные коды), устройства (сеансы) и последние входы. Действия — у экрана.
@@ -19,9 +18,9 @@ const _listPadding = EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg, AppSpacin
 /// аутентификатор — чип «настроено / не настроено» и «Настроить» или «Перенастроить» (оба — `CONFIGURE_TOTP` в
 /// браузере); резервные коды — «нет в системе входа» или «кодов: N».
 class SignInCard extends StatelessWidget {
-  const SignInCard({super.key, required this.details, required this.onChangePassword, required this.onConfigureOtp});
+  const SignInCard({super.key, required this.info, required this.onChangePassword, required this.onConfigureOtp});
 
-  final SecurityDetails details;
+  final SecurityInfo info;
   final VoidCallback onChangePassword;
   final VoidCallback onConfigureOtp;
 
@@ -29,9 +28,8 @@ class SignInCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = S.at(context);
     final colors = AppPalette.of(context);
-    final info = details.info;
     final age = info.passwordAgeDays(DateTime.now());
-    final codes = details.recoveryCodes;
+    final codes = info.recoveryCodes;
     Icon icon(IconData data) => Icon(data, size: 20, color: colors.ink);
     return AppCard(
       padding: _listPadding,

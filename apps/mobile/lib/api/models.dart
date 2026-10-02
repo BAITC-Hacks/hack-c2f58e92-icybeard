@@ -144,17 +144,48 @@ class Organization {
   factory Organization.fromJson(Map<String, dynamic> json) => Organization(moCode: json['moCode'] as String, name: json['name'] as String);
 }
 
-class IndexItem {
-  const IndexItem({required this.regionKato, required this.name, required this.indexValue, required this.rank});
+/// Строка индекса доступности (`GET /index?profileCode=`): место региона и из чего оно сложилось.
+class RegionIndex {
+  const RegionIndex({required this.regionKato, required this.name, required this.indexValue, required this.rank, this.shareOver30, this.p90Days});
+
   final String regionKato;
   final String name;
+
+  /// 0…100: 100 — регион, где ждут меньше всего.
   final double indexValue;
   final int rank;
-  factory IndexItem.fromJson(Map<String, dynamic> json) => IndexItem(
-        regionKato: json['regionKato'] as String,
-        name: json['name'] as String,
-        indexValue: (json['indexValue'] as num).toDouble(),
-        rank: (json['rank'] as num).toInt(),
+
+  /// Доля пациентов, ждавших дольше 30 дней (0…1).
+  final double? shareOver30;
+
+  /// Сколько ждали самые долгие 10 % пациентов, дн.
+  final double? p90Days;
+
+  factory RegionIndex.fromJson(Map<String, dynamic> json) => RegionIndex(
+        regionKato: json['regionKato'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        indexValue: (json['indexValue'] as num?)?.toDouble() ?? 0,
+        rank: (json['rank'] as num?)?.toInt() ?? 0,
+        shareOver30: (json['shareOver30'] as num?)?.toDouble(),
+        p90Days: (json['p90Days'] as num?)?.toDouble(),
+      );
+}
+
+/// Точка сезонности `GET /refdata/seasonality`: множитель месяца [month] (1…12) ряда [seriesId].
+class SeasonPoint {
+  const SeasonPoint({required this.seriesId, required this.month, required this.multiplier});
+
+  /// Ряд листа ожидания NHS RTT — единственный, по которому строится подсказка.
+  static const waitingListSeries = 'rtt_waiting_list';
+
+  final String seriesId;
+  final int month;
+  final double multiplier;
+
+  factory SeasonPoint.fromJson(Map<String, dynamic> json) => SeasonPoint(
+        seriesId: json['seriesId'] as String? ?? '',
+        month: (json['month'] as num?)?.toInt() ?? 0,
+        multiplier: (json['multiplier'] as num?)?.toDouble() ?? 0,
       );
 }
 
@@ -276,12 +307,36 @@ class WorklistResponse {
 }
 
 class Shortage {
-  const Shortage({required this.flag, required this.score, required this.basis});
+  const Shortage({required this.flag, required this.score, required this.basis, this.peerRatio});
   final bool flag;
   final double score;
   final String basis;
-  factory Shortage.fromJson(Map<String, dynamic> json) =>
-      Shortage(flag: json['flag'] as bool, score: (json['score'] as num).toDouble(), basis: json['basis'] as String? ?? '');
+
+  /// Доля обеспеченных рецептов у похожих МНН той же категории (0…1); null — похожих с данными нет.
+  final double? peerRatio;
+  factory Shortage.fromJson(Map<String, dynamic> json) => Shortage(
+        flag: json['flag'] as bool,
+        score: (json['score'] as num).toDouble(),
+        basis: json['basis'] as String? ?? '',
+        peerRatio: (json['peerRatio'] as num?)?.toDouble(),
+      );
+}
+
+/// МНН из «Другие МНН при этой нозологии» (`alternatives` проверки рецепта): тап выбирает его для проверки.
+class OtherMnn {
+  const OtherMnn({required this.mnnId, required this.name, required this.issued12m});
+
+  final String mnnId;
+  final String name;
+
+  /// Рецептов за 12 месяцев.
+  final int issued12m;
+
+  factory OtherMnn.fromJson(Map<String, dynamic> json) => OtherMnn(
+        mnnId: json['mnnId'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        issued12m: (json['issued12m'] as num?)?.toInt() ?? 0,
+      );
 }
 
 class CheckResponse {
@@ -296,6 +351,7 @@ class CheckResponse {
     required this.shortage,
     required this.basis,
     this.model,
+    this.alternatives = const [],
   });
   final bool covered;
   final String? program;
@@ -311,6 +367,9 @@ class CheckResponse {
   final Shortage shortage;
   final String basis;
   final ModelInfo? model;
+
+  /// Другие МНН той же нозологии по объёму рецептов; без id не попадают.
+  final List<OtherMnn> alternatives;
   factory CheckResponse.fromJson(Map<String, dynamic> json) => CheckResponse(
         covered: json['covered'] as bool,
         program: json['program'] as String?,
@@ -322,6 +381,10 @@ class CheckResponse {
         shortage: Shortage.fromJson(json['shortage'] as Map<String, dynamic>),
         basis: json['basis'] as String? ?? '',
         model: json['model'] == null ? null : ModelInfo.fromJson(json['model'] as Map<String, dynamic>),
+        alternatives: List.unmodifiable(switch (json['alternatives']) {
+          final List<dynamic> others => others.whereType<Map<String, dynamic>>().map(OtherMnn.fromJson).where((m) => m.mnnId.isNotEmpty),
+          _ => const <OtherMnn>[],
+        }),
       );
 }
 

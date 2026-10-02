@@ -11,9 +11,6 @@ extension DoctorStrings on S {
   String get worklistPatients => _t('Пациенты', 'Пациенттер');
   String get worklistSubtitle => _t('Плановая госпитализация', 'Жоспарлы емдеуге жатқызу');
   String get worklistSyntheticShort => _t('список синтетический, без персональных данных', 'тізім синтетикалық, дербес деректерсіз');
-
-  /// «данные на 31.03.2025» в подзаголовке (веб `shell.asOf`).
-  String worklistAsOf(String date) => _t('данные на $date', 'деректер $date жағдай бойынша');
   String get worklistNote => _t('Приоритеты рассчитаны моделью ожидания и риска отказа', 'Басымдықтар күту және бас тарту тәуекелі моделімен есептелген');
   String get worklistNoteFallback => _t(
         'Сервис моделей недоступен: приоритеты временно посчитаны по агрегатам витрины очереди, не моделью',
@@ -145,8 +142,6 @@ extension DoctorStrings on S {
   String get patientRouteWaiting => _t('Ждёт', 'Күтеді');
   String patientRouteDays(int days) => _t('$days дн.', '$days күн');
   String get patientRouteAsOfFact => _t('Данные на', 'Деректер күні');
-  String patientRouteSynthetic(String asOf) =>
-      _t('Синтетический маршрут на реальных очередях · данные на $asOf', 'Нақты кезектердегі синтетикалық маршрут · деректер $asOf жағдайы бойынша');
 
   // ---------- «Текущая больница» ----------
   String get patientRouteCurrentHospital => _t('Текущая больница', 'Қазіргі аурухана');

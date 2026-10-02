@@ -64,7 +64,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         setState(() {
           switch (e.status) {
             case 400 || 422:
-              _fieldError = e.field('email') ?? e.field('Email') ?? s.invalidEmail;
+              _fieldError = e.fieldError('email') ?? e.fieldError('Email') ?? s.invalidEmail;
             case 429:
               _fieldError = s.tooManyRequests;
             case 404 || 405 || 501:
@@ -103,7 +103,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(s.forgotBody, style: theme.textTheme.bodySmall?.copyWith(fontSize: 15)),
+              Text(s.forgotBody, style: theme.textTheme.bodyLarge?.copyWith(color: AppPalette.of(context).muted)),
               const SizedBox(height: AppSpacing.lg),
               FieldLabel(s.workEmail),
               TextField(
@@ -115,7 +115,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.send,
                 autofillHints: const [AutofillHints.email],
-                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+                style: theme.textTheme.bodyLarge,
                 onSubmitted: (_) => _submit(),
                 decoration: InputDecoration(errorText: _fieldError, errorMaxLines: 2),
               ),

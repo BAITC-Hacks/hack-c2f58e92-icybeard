@@ -105,7 +105,7 @@ GoRouter buildRouter(Session session) => GoRouter(
                     path: ':ref',
                     builder: (_, state) => PatientRouteScreen(patientRef: state.pathParameters['ref']!, preview: state.extra as WorklistItem?),
                     routes: [
-                      GoRoute(path: 'scribe', builder: (_, state) => ScribeScreen(patientRef: state.pathParameters['ref'])),
+                      GoRoute(path: 'scribe', builder: (_, state) => ScribeScreen(patientRef: state.pathParameters['ref']!)),
                     ],
                   ),
                 ],

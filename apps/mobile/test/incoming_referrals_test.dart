@@ -6,6 +6,7 @@ import 'package:darumen/widgets/route/route_journal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 
 import 'support/harness.dart';
 
@@ -131,7 +132,7 @@ void main() {
 
       final request = backend.calls('GET', '/journal/referrals/incoming').single;
       expect(request.url.queryParameters['includeConfirmed'], 'true', reason: 'как веб: подтверждённые тоже, отбор — фильтрами');
-      expect(request.url.queryParameters.containsKey('moCode'), isFalse, reason: 'своя больница — по учётной записи');
+      expect(request.url.queryParameters['moCode'], '22GN', reason: 'своя больница учётной записи — явно, верно для области own и all');
 
       final ids = ['d-sev', 'd-pend', 'd-sched', 'd-today', 'd-over', 'd-adm', 'd-wd', 'd-done'];
       final tops = [for (final id in ids) tester.getTopLeft(card(id)).dy];
@@ -157,6 +158,20 @@ void main() {
       expect(inCard('d-over', find.text('Кардиологические')), findsOneWidget);
       expect(inCard('d-done', find.text('Маршрут завершён · Выписан')), findsOneWidget);
       expect(find.textContaining('Подтвердить приём можно после согласия пациента'), findsOneWidget, reason: 'сноска веба');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('scope «all» (a database from before the narrowed worklist permission): the own hospital in the query, no 422', (tester) async {
+      final (session, backend) = await demoSession(DemoUser.doctor2, api: {
+        ...receivingApi(),
+        // так отвечает сервер врачу с областью all: без moCode — 422 «Нужна организация»
+        '/journal/referrals/incoming': (http.Request request) =>
+            request.url.queryParameters['moCode'] == '22GN' ? demoIncoming() : problem(422, 'Нужна организация'),
+      });
+      await pumpScreen(tester, session, const IncomingReferralsScreen(), size: tallPhone);
+      expect(backend.calls('GET', '/journal/referrals/incoming').single.url.queryParameters, containsPair('moCode', '22GN'));
+      expect(card('d-sev'), findsOneWidget);
+      expect(find.text('Нужна организация'), findsNothing);
       expect(tester.takeException(), isNull);
     });
 

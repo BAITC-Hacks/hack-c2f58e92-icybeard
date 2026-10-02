@@ -1,5 +1,6 @@
 import 'package:darumen/api/service_status.dart';
 import 'package:darumen/screens/profile_screen.dart';
+import 'package:darumen/widgets/account/profile_fields.dart';
 import 'package:darumen/state/service_status_notifier.dart';
 import 'package:darumen/widgets/app_card.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +11,8 @@ import 'support/harness.dart';
 
 /// Профиль (§7, IA 13.2) для обоих кабинетов: шапка с именем, ИИН маской и ролью; строки «Личные данные» (лист с
 /// телефоном и часовым поясом, `PUT /me/profile`), «Язык» (настройка устройства, решение Q11), «Регион» (только без
-/// клейма), «Уведомления», «Данные и согласия», «Безопасность», «Откуда берутся цифры», «Выйти».
+/// клейма), «Уведомления», «Данные и согласия», «Безопасность», «Откуда берутся цифры», «Выйти»; проверка телефона и
+/// список часовых поясов листа «Личные данные».
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -262,5 +264,40 @@ void main() {
     expect(find.text('УАҚЫТ БЕЛДЕУІ'), findsOneWidget);
     expect(find.text('Өзгерістерді сақтау'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  group('phone', () {
+    test('digits drop formatting and turn a leading 8 into 7', () {
+      expect(phoneDigits('+7 (701) 000-00-00'), '77010000000');
+      expect(phoneDigits('8 701 000 00 00'), '77010000000');
+      expect(phoneDigits(''), '');
+    });
+
+    test('a Kazakh number is +7 and 10 digits', () {
+      expect(isKzPhone('+7 701 000 00 00'), isTrue);
+      expect(isKzPhone('87010000000'), isTrue);
+      expect(isKzPhone('+7 701 000 00'), isFalse);
+      expect(isKzPhone('+1 701 000 00 00'), isFalse);
+      expect(isKzPhone('телефон'), isFalse);
+    });
+
+    test('the stored value is +digits or null for an empty field', () {
+      expect(normalizedPhone(' 8 701 000 00 00 '), '+77010000000');
+      expect(normalizedPhone('   '), isNull);
+    });
+
+    test('display form groups the digits; anything else stays as typed', () {
+      expect(formatKzPhone('+77010000000'), '+7 701 000 00 00');
+      expect(formatKzPhone('123'), '123');
+    });
+  });
+
+  group('time zones', () {
+    test('the web list of Kazakh time zones, Almaty first', () {
+      expect(kzTimeZones.first, 'Asia/Almaty');
+      expect(kzTimeZones, containsAll(['Asia/Qostanay', 'Asia/Oral']));
+      expect(timeZoneCity('Asia/Qostanay'), 'Qostanay');
+      expect(timeZoneCity('Europe/Moscow'), 'Europe/Moscow');
+    });
   });
 }

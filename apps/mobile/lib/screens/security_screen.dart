@@ -7,7 +7,6 @@ import '../l10n/strings.dart';
 import '../state/load_state.dart';
 import '../state/session.dart';
 import '../theme/tokens.dart';
-import '../widgets/account/account_api.dart';
 import '../widgets/account/security_cards.dart';
 import '../widgets/api_error.dart';
 import '../widgets/external_link.dart';
@@ -30,7 +29,7 @@ class SecurityScreen extends StatefulWidget {
 }
 
 class _SecurityScreenState extends State<SecurityScreen> {
-  LoadState<SecurityDetails> _state = const Loading();
+  LoadState<SecurityInfo> _state = const Loading();
   bool _busy = false;
 
   @override
@@ -42,7 +41,7 @@ class _SecurityScreenState extends State<SecurityScreen> {
   Future<void> _load() async {
     setState(() => _state = const Loading());
     try {
-      final details = await context.read<Session>().api.mySecurityDetails();
+      final details = await context.read<Session>().api.mySecurity();
       if (mounted) {
         setState(() => _state = Loaded(details));
       }
@@ -96,8 +95,8 @@ class _SecurityScreenState extends State<SecurityScreen> {
     final theme = Theme.of(context);
     final session = context.watch<Session>();
     final identity = [session.email ?? session.username, if (session.organizationName != null) '«${session.organizationName}»'].whereType<String>().join(' · ');
-    final details = switch (_state) { Loaded<SecurityDetails>(:final data) => data, _ => null };
-    final hasOthers = details?.info.sessions.any((d) => !d.current) ?? false;
+    final details = switch (_state) { Loaded<SecurityInfo>(:final data) => data, _ => null };
+    final hasOthers = details?.sessions.any((d) => !d.current) ?? false;
     return PageScaffold(
       title: s.securityTitle,
       onRefresh: _load,
@@ -105,20 +104,20 @@ class _SecurityScreenState extends State<SecurityScreen> {
       children: [
         if (identity.isNotEmpty) Text(identity, style: theme.textTheme.bodySmall),
         if (_busy) const LinearProgressIndicator(),
-        LoadStateView<SecurityDetails>(
+        LoadStateView<SecurityInfo>(
           state: _state,
           onRetry: _load,
           skeleton: const Column(children: [CardSkeleton(height: 200), SizedBox(height: AppSpacing.md), CardSkeleton(height: 180)]),
           builder: (_, data) => Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SignInCard(details: data, onChangePassword: () => _keycloak('UPDATE_PASSWORD'), onConfigureOtp: () => _keycloak('CONFIGURE_TOTP')),
+              SignInCard(info: data, onChangePassword: () => _keycloak('UPDATE_PASSWORD'), onConfigureOtp: () => _keycloak('CONFIGURE_TOTP')),
               const SizedBox(height: AppSpacing.md),
-              DevicesCard(sessions: data.info.sessions, busy: _busy, onEnd: _endSession),
+              DevicesCard(sessions: data.sessions, busy: _busy, onEnd: _endSession),
               const SizedBox(height: AppSpacing.md),
               RecentLoginsCard(logins: data.recentLogins),
               const SizedBox(height: AppSpacing.md),
-              Text('${data.info.otpConfigured ? s.otpOnNote : s.otpOffNote} ${s.securityBrowserNote}', style: theme.textTheme.labelSmall),
+              Text('${data.otpConfigured ? s.otpOnNote : s.otpOffNote} ${s.securityBrowserNote}', style: theme.textTheme.labelSmall),
             ],
           ),
         ),

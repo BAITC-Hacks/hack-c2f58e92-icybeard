@@ -64,7 +64,7 @@ class _RouteViewState extends State<RouteView> {
           key: _testsKey,
           controller: _testsOpen,
           title: s.checklistSection,
-          summary: s.routeChecklistSummary(route.expiredChecklistCount, route.validChecklistCount),
+          lead: s.routeChecklistSummary(route.expiredChecklistCount, route.validChecklistCount),
           origin: Origin.formula,
           child: ChecklistGroups(items: route.checklist, standard: route.standard),
         ),
@@ -74,7 +74,7 @@ class _RouteViewState extends State<RouteView> {
         if (route.history.isNotEmpty) ...[gap, PastReferralsSection(history: route.history)],
         const SizedBox(height: AppSpacing.lg),
         Text(
-          [if (route.basis.isNotEmpty) route.basis, s.myFootnoteSynthetic(routeDate(route.asOf)), s.stagesSource].join(' · '),
+          [if (route.basis.isNotEmpty) route.basis, s.routeSyntheticNote(routeDate(route.asOf)), s.stagesSource].join(' · '),
           style: Theme.of(context).textTheme.labelSmall,
         ),
       ],

@@ -1,17 +1,12 @@
 import 'package:darumen/api/models.dart';
-import 'package:darumen/l10n/strings.dart';
 import 'package:darumen/screens/vaccination_screen.dart';
 import 'package:darumen/theme/app_theme.dart';
-import 'package:darumen/widgets/checklist_tile.dart';
 import 'package:darumen/widgets/collapsible_section.dart';
-import 'package:darumen/widgets/day_groups.dart';
 import 'package:darumen/widgets/hero_number.dart';
 import 'package:darumen/widgets/kpi_tile.dart';
 import 'package:darumen/widgets/org_name.dart';
 import 'package:darumen/widgets/origin_tag.dart';
 import 'package:darumen/widgets/picker_sheet.dart';
-import 'package:darumen/widgets/route_timeline.dart';
-import 'package:darumen/widgets/stage_stepper.dart';
 import 'package:darumen/widgets/status_chip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -32,56 +27,13 @@ Widget host(Widget child, {String locale = 'ru', double textScale = 1.0, double 
       ),
     );
 
-const stages = [
-  RouteStage(code: 'referral_issued', order: 1, title: 'Направление выдано', date: '2025-02-06', status: 'done'),
-  RouteStage(code: 'examination', order: 2, title: 'Обследование', date: '2025-02-07', status: 'done'),
-  RouteStage(code: 'waitlisted', order: 3, title: 'Внесено в лист ожидания', date: '2025-02-07', status: 'current'),
-  RouteStage(code: 'date_assigned', order: 4, title: 'Дата госпитализации назначена', status: 'upcoming', norm: 'в течение 2 рабочих дней'),
-  RouteStage(code: 'hospitalized', order: 5, title: 'Госпитализация', status: 'upcoming'),
-];
-
-const kkStages = [
-  RouteStage(code: 'referral_issued', order: 1, title: 'Жолдама берілді', date: '2025-02-06', status: 'done'),
-  RouteStage(code: 'examination', order: 2, title: 'Тексеру', date: '2025-02-07', status: 'done'),
-  RouteStage(code: 'waitlisted', order: 3, title: 'Күту парағына енгізілді', date: '2025-02-07', status: 'current'),
-  RouteStage(code: 'date_assigned', order: 4, title: 'Емдеуге жатқызу күні белгіленді', status: 'upcoming', norm: 'тіркелгеннен кейін 2 жұмыс күні ішінде белгіленеді'),
-  RouteStage(code: 'hospitalized', order: 5, title: 'Емдеуге жатқызу', status: 'upcoming'),
-];
-
 const longOrg = 'Товарищество с ограниченной ответственностью "Достар Мед"';
 
 void main() {
-  testWidgets('timeline rows show short labels, dd.MM for passed stages, the norm for upcoming ones and a dash without it', (tester) async {
-    await tester.pumpWidget(host(const RouteTimeline(stages: stages)));
-    expect(find.text('Выдано'), findsOneWidget);
-    expect(find.text('06.02'), findsOneWidget);
-    expect(find.text('Лист ожидания'), findsOneWidget);
-    expect(find.text('в течение 2 рабочих дней'), findsOneWidget);
-    expect(find.text('—'), findsOneWidget);
-    expect(find.byType(StageMarker), findsNWidgets(3), reason: 'маркер у текущего и пустые круги у двух предстоящих');
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('stage stepper draws bars with one marker and labels first · current · last', (tester) async {
-    await tester.pumpWidget(host(const StageStepper(stages: stages)));
-    expect(find.byType(StageBar), findsNWidgets(4));
-    expect(find.byType(StageMarker), findsOneWidget);
-    expect(find.text('Выдано'), findsOneWidget);
-    expect(find.text('Лист ожидания'), findsOneWidget);
-    expect(find.text('Стационар'), findsOneWidget);
-    expect(find.text('Анализы'), findsNothing);
-    expect(tester.takeException(), isNull);
-    await tester.pumpWidget(host(const StageStepper(stages: stages, compact: true)));
-    expect(find.text('Выдано'), findsNothing);
-    expect(find.byType(StageMarker), findsOneWidget);
-  });
-
-  testWidgets('kazakh labels at 1.3x text scale do not overflow the new widgets', (tester) async {
+  testWidgets('kazakh labels at 1.3x text scale do not overflow the shared widgets', (tester) async {
     await tester.pumpWidget(host(
       Column(
         children: [
-          const StageStepper(stages: kkStages),
-          const RouteTimeline(stages: kkStages),
           const StatusChip('емдеуге жатқызуға дейін мерзімі өтеді', tone: StatusTone.warn),
           const Row(children: [Expanded(child: KpiTile(value: '106', label: '10-ның 9-ы одан артық күтпейді, күн', origin: Origin.ml))]),
           const CollapsibleSection(title: 'Талдаулар', summary: '7 мерзімі өтті, 3 жарамды', origin: Origin.formula, child: Text('мазмұны')),
@@ -95,7 +47,6 @@ void main() {
     ));
     expect(tester.takeException(), isNull);
     expect(find.text('модель болжамы'), findsNWidgets(2));
-    expect(find.text('Берілді'), findsNWidgets(2), reason: 'степпер и строка таймлайна');
   });
 
   testWidgets('collapsible section shows its summary and expands on tap without errors', (tester) async {
@@ -156,19 +107,6 @@ void main() {
     expect(find.textContaining('по истории очередей'), findsOneWidget);
   });
 
-  test('day groups label today, yesterday and older days in both languages', () {
-    final now = DateTime(2026, 9, 26, 12);
-    final ru = S.of('ru');
-    expect(dayHeading(DateTime(2026, 9, 26), ru, now: now), 'Сегодня');
-    expect(dayHeading(DateTime(2026, 9, 25), ru, now: now), 'Вчера');
-    expect(dayHeading(DateTime(2026, 9, 22), ru, now: now), '22 сентября');
-    expect(dayHeading(DateTime(2025, 2, 6), ru, now: now), '6 февраля 2025');
-    expect(dayHeading(DateTime(2026, 9, 22), S.of('kk'), now: now), '22 қыркүйек');
-    final groups = groupByDay(['2026-09-26T09:00:00+00:00', '2026-09-22', '2026-09-26T07:00:00+00:00', null], (x) => x, ru, now: now);
-    expect(groups.map((g) => g.label).toList(), ['Сегодня', '22 сентября', '—']);
-    expect(groups.first.items, hasLength(2));
-  });
-
   test('vaccines are grouped by code with years ascending and the latest last', () {
     final items = [
       for (final (year, pct) in [(2021, 86.0), (2019, 81.0), (2020, 86.0)])
@@ -179,14 +117,5 @@ void main() {
     expect(groups.map((g) => g.title).toList(), ['БЦЖ', 'корь, первая доза']);
     expect(groups.first.latest.year, 2021);
     expect(groups.first.previous.map((y) => y.year).toList(), [2019, 2020]);
-  });
-
-  testWidgets('checklist tile maps statuses to labels', (tester) async {
-    const expired = ChecklistItem(code: 'cbc', title: 'Общий анализ крови', validityDays: 14, validityLabel: '14 дней', doneAt: '2025-02-07', validUntil: '2025-02-21', status: 'expired');
-    const valid = ChecklistItem(code: 'hiv', title: 'Анализ на ВИЧ', validityDays: 180, validityLabel: '6 месяцев', doneAt: '2025-02-07', validUntil: '2025-08-06', status: 'valid');
-    await tester.pumpWidget(host(const Column(children: [ChecklistTile(expired), ChecklistTile(valid)])));
-    expect(find.text('Истёк'), findsOneWidget);
-    expect(find.text('Действует'), findsOneWidget);
-    expect(find.textContaining('до 21.02.2025'), findsOneWidget);
   });
 }

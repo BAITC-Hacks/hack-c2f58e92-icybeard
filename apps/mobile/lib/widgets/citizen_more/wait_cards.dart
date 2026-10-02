@@ -9,7 +9,6 @@ import '../format.dart';
 import '../hero_number.dart';
 import '../inline_disclosure.dart';
 import '../origin_tag.dart';
-import 'wait_api.dart';
 
 /// Карточки результата «Сколько ждут» (веб `WaitView.vue`): «В среднем по региону» и «Где быстрее в регионе» с
 /// раскрывашкой «Как считается».
@@ -65,7 +64,7 @@ class WaitAverageCard extends StatelessWidget {
               child: Text('${s.sourceLabel}: ${target.source}', style: theme.textTheme.labelSmall),
             ),
           ],
-          Text([s.waitEstimateNote, if (asOf.isNotEmpty) s.waitAsOf(dateShort(asOf))].join(' · '), style: theme.textTheme.labelSmall),
+          Text([s.waitEstimateNote, if (asOf.isNotEmpty) s.asOfLabel(dateShort(asOf))].join(' · '), style: theme.textTheme.labelSmall),
         ],
       ),
     );
@@ -129,7 +128,7 @@ class WaitFasterCard extends StatelessWidget {
               runSpacing: AppSpacing.xs,
               children: [
                 const OriginTag(Origin.formula),
-                if (asOf != null && asOf!.isNotEmpty) Text(s.waitAsOf(dateShort(asOf)), style: theme.textTheme.labelSmall),
+                if (asOf != null && asOf!.isNotEmpty) Text(s.asOfLabel(dateShort(asOf)), style: theme.textTheme.labelSmall),
               ],
             ),
           ),

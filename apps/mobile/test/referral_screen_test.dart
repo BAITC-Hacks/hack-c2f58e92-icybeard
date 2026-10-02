@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:darumen/api/almaty_time.dart';
 import 'package:darumen/l10n/strings.dart';
 import 'package:darumen/screens/referral_screen.dart';
+import 'package:darumen/theme/tokens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -141,6 +142,7 @@ void main() {
     expect(find.text('ПРОГНОЗ ДЛЯ «ГЛАЗНАЯ КЛИНИКА»'), findsOneWidget, reason: 'заголовок раздела — kicker прописными, как на вебе');
     expect(find.text('≈ 40 дн.'), findsOneWidget, reason: 'половина ждёт');
     expect(find.text('35 %'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('12 %')).style?.color, isNot(ColorTokens.light.danger), reason: 'риск 12 % — не красный');
     expect(find.text('В очереди 133 направлений, медианный возраст 21 дн., 2.4 госпитализаций в день.'), findsOneWidget);
     await tapText(tester, find.text(ru.factorsTitle));
     expect(find.text(ru.assistReferringUnset), findsOneWidget);
@@ -197,6 +199,7 @@ void main() {
     await reveal(tester, find.text(ru.assistUnseenOrgHint));
     expect(find.text(ru.assistUnseenOrgHint), findsOneWidget);
     expect(find.text('выше среднего'), findsOneWidget, reason: 'в четырёх числах — тоже словами');
+    expect(tester.widget<Text>(find.text('выше среднего')).style?.color, ColorTokens.light.danger, reason: 'риск выше 20 % — красный, как в вебе');
 
     await toTop(tester);
     await tapText(tester, find.text(ru.assistMore));

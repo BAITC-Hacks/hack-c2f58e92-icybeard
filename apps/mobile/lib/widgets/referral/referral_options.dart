@@ -68,7 +68,7 @@ class ReferralWhereCard extends StatelessWidget {
               name: shortOrgName(orgName),
               lines: [
                 TextSpan(text: '${form.moCode} · ${s.assistChosenByDoctor}${p.queue == null ? '' : ' · ${s.assistInQueue(p.queue!.len)}'} · '),
-                _risk(context, s.assistRefusal(referralRisk(s, p.pRefusal, inTraining: p.refusalOrgInTraining)), referralRiskHigh(p.pRefusal)),
+                _risk(context, s.assistRefusal(referralRisk(s, p.pRefusal, inTraining: p.refusalOrgInTraining)), refusalHigh(p.pRefusal)),
               ],
               days: p.p50Days,
               faster: false,
@@ -104,7 +104,7 @@ class ReferralWhereCard extends StatelessWidget {
         TextSpan(text: compare, style: faster ? TextStyle(color: AppTones.of(context).ok.fg) : null),
       ],
       const TextSpan(text: ' · '),
-      _risk(context, s.assistRefusal(pct(a.pRefusal)), referralRiskHigh(a.pRefusal)),
+      _risk(context, s.assistRefusal(pct(a.pRefusal)), refusalHigh(a.pRefusal)),
     ];
   }
 

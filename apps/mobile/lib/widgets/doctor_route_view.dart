@@ -105,7 +105,7 @@ class DoctorRouteView extends StatelessWidget {
         if (route.history.isNotEmpty) ...[gap, PastReferralsSection(history: route.history)],
         const SizedBox(height: AppSpacing.lg),
         Text(
-          [if (route.basis.trim().isNotEmpty) route.basis.trim(), s.patientRouteSynthetic(routeDate(route.asOf))].join(' · '),
+          [if (route.basis.trim().isNotEmpty) route.basis.trim(), s.routeSyntheticNote(routeDate(route.asOf))].join(' · '),
           style: theme.textTheme.labelSmall,
         ),
       ],

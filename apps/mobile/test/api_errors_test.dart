@@ -69,14 +69,6 @@ void main() {
       expect(e.retryAfterSeconds, isNull);
     });
 
-    test('field() is the same lookup as fieldError()', () {
-      final e = ApiException(422, 'Ошибка валидации', errors: {
-        'email': ['неверный адрес'],
-      });
-      expect(e.field('email'), e.fieldError('email'));
-      expect(e.field('missing'), isNull);
-    });
-
     test('toString concatenates title and detail, or just the title', () {
       expect(ApiException(409, 'Title only').toString(), 'Title only');
       expect(ApiException(409, 'Title', detail: 'Detail').toString(), 'Title: Detail');

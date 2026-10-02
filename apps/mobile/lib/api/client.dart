@@ -86,6 +86,13 @@ class ApiClient {
   static List<T> _list<T>(dynamic body, T Function(Map<String, dynamic> json) fromJson) =>
       List.unmodifiable((body as List<dynamic>).map((item) => fromJson(item as Map<String, dynamic>)));
 
+  /// Конверт `{items: […]}` с терпимым разбором → список моделей (неизменяемый): нет конверта или списка — пустой
+  /// список, элементы не-объекты пропускаются.
+  static List<T> _items<T>(Object? body, T Function(Map<String, dynamic> json) fromJson) {
+    final items = body is Map<String, dynamic> ? body['items'] : null;
+    return List.unmodifiable(items is List<dynamic> ? items.whereType<Map<String, dynamic>>().map(fromJson) : const []);
+  }
+
   // ---------- справочники, прогноз, лекарства ----------
   Future<List<Region>> regions() async =>
       ((await get('/api/v1/refdata/regions'))['items'] as List<dynamic>).map((r) => Region.fromJson(r as Map<String, dynamic>)).toList();
@@ -111,8 +118,11 @@ class ApiClient {
           .map((a) => Alternative.fromJson(a as Map<String, dynamic>))
           .toList();
 
-  Future<List<IndexItem>> index({String? profileCode}) async =>
-      ((await get('/api/v1/index', {'profileCode': profileCode}))['items'] as List<dynamic>).map((i) => IndexItem.fromJson(i as Map<String, dynamic>)).toList();
+  /// Индекс доступности по регионам `GET /index?profileCode=`; число строк — «из {total} регионов».
+  Future<List<RegionIndex>> regionIndex({required String profileCode}) async => _items(await get('/api/v1/index', {'profileCode': profileCode}), RegionIndex.fromJson);
+
+  /// Сезонность рядов NHS по месяцам `GET /refdata/seasonality`; подсказка «Сколько ждут» берёт ряд листа ожидания.
+  Future<List<SeasonPoint>> seasonality() async => _items(await get('/api/v1/refdata/seasonality'), SeasonPoint.fromJson);
 
   Future<RouteStandard> routeStandard() async => RouteStandard.fromJson(await get('/api/v1/refdata/route-standard') as Map<String, dynamic>);
 
@@ -122,6 +132,8 @@ class ApiClient {
   Future<List<Mnn>> mnn(String nosologyId) async =>
       ((await get('/api/v1/medicines/mnn', {'nosologyId': nosologyId, 'limit': '30'}))['items'] as List<dynamic>).map((m) => Mnn.fromJson(m as Map<String, dynamic>)).toList();
 
+  /// Проверка рецепта `POST /medicines/check`: МНН [mnnId] (или только нозология [nosologyId]) в регионе
+  /// [regionKato]; без региона — вся страна.
   Future<CheckResponse> checkMedicine({String? mnnId, String? nosologyId, String? regionKato}) async =>
       CheckResponse.fromJson(await post('/api/v1/medicines/check', {'mnnId': mnnId, 'nosologyId': nosologyId, 'regionKato': regionKato}) as Map<String, dynamic>);
 
@@ -320,23 +332,20 @@ class ApiClient {
   Future<ScribeCorrection> correctScribeTerms(String sessionId) async =>
       ScribeCorrection.fromJson(await post('${_sessionPath(sessionId)}/correct', const <String, Object?>{}) as Map<String, dynamic>);
 
-  /// Черновик по разделам от ИИ `POST /scribe/sessions/{id}/draft`. Веб этот шаг больше не использует.
-  Future<ScribeDraft> makeDraft(String sessionId) async =>
-      ScribeDraft.fromJson(await post('${_sessionPath(sessionId)}/draft', const <String, Object?>{}) as Map<String, dynamic>);
-
   /// Утвердить запись `POST /scribe/sessions/{id}/approve` → 200: аудио удаляется, памятка уходит пациенту;
-  /// ссылка для него — `'${Env.webBase}/leaflet/$leafletToken'`. Без Idempotency-Key.
+  /// ссылка для него — `Env.leafletLink(leafletToken)`. Без Idempotency-Key.
   Future<ApproveResult> approveScribe(String sessionId, List<DraftSection> sections, String leaflet) async => ApproveResult.fromJson(await post(
     '${_sessionPath(sessionId)}/approve',
     {'sections': [for (final s in sections) {'name': s.name, 'text': s.text}], 'patientLeaflet': leaflet},
   ) as Map<String, dynamic>);
 
-  /// MOBILE-REFACTOR-SHIM: прежняя отмена записи для старого экрана скрайба, у которого нет id согласия. Журнал о
-  /// ней не узнаёт — замена [discardScribeRecording]; удалить вместе со старым экраном.
-  Future<void> discardScribe(String sessionId) async => await delete(_sessionPath(sessionId));
-
   /// Состояние сервиса записи и модели распознавания `GET /scribe/health`.
   Future<ScribeHealth> scribeHealth() async => ScribeHealth.fromJson(await get('/api/v1/scribe/health') as Map<String, dynamic>);
+
+  /// Текст памятки после приёма `GET /scribe/leaflets/{token}` — публичный, без проверки роли; [token] —
+  /// `leafletToken` завершённой записи из [myScribe]. Неизвестный или удалённый токен — 404.
+  Future<PublicLeaflet> publicLeaflet(String token) async =>
+      PublicLeaflet.fromJson(await get('/api/v1/scribe/leaflets/${Uri.encodeComponent(token)}') as Map<String, dynamic>);
 
   String _sessionPath(String sessionId) => '/api/v1/scribe/sessions/${Uri.encodeComponent(sessionId)}';
 
@@ -347,6 +356,7 @@ class ApiClient {
   /// Кто вошёл: роли, разрешения `{code, scope}`, организация, ИИН маской.
   Future<Me> me() async => Me.fromJson(await get('/api/v1/me') as Map<String, dynamic>);
 
+  /// Пароль, второй фактор, сеансы, последние входы и резервные коды `GET /me/security`.
   Future<SecurityInfo> mySecurity() async => SecurityInfo.fromJson(await get('/api/v1/me/security') as Map<String, dynamic>);
 
   Future<void> endSession(String sessionId) async => await delete('/api/v1/me/sessions/${Uri.encodeComponent(sessionId)}');
@@ -359,6 +369,32 @@ class ApiClient {
   /// Сохраняет настройки целиком (события, тихие часы, дайджест) и возвращает то, что записал API.
   Future<NotificationSettings> saveNotifications(NotificationSettings settings) async =>
       NotificationSettings.fromJson(await put('/api/v1/me/notifications', settings.toJson()) as Map<String, dynamic>);
+
+  /// Мой профиль `GET /me/profile`: ФИО, должность и специальность (только чтение), телефон, язык, часовой пояс.
+  Future<AccountProfile> myProfile() async => AccountProfile.fromJson(await get('/api/v1/me/profile') as Map<String, dynamic>);
+
+  /// Сохранить профиль `PUT /me/profile`: сервер заменяет все три поля — телефон null стирает номер, язык и часовой
+  /// пояс обязательны.
+  Future<AccountProfile> saveProfile({required String? phone, required String language, required String timeZone}) async =>
+      AccountProfile.fromJson(await put('/api/v1/me/profile', {'phone': phone, 'language': language, 'timeZone': timeZone}) as Map<String, dynamic>);
+
+  /// Согласия аккаунта `GET /me/consents`: обязательное `forecasts`, `anonymized_stats`, `research_exports`.
+  Future<List<AccountConsent>> myConsents() async => _consents(await get('/api/v1/me/consents'));
+
+  /// Дать или отозвать согласие `PUT /me/consents/{code}` `{granted}` → весь список заново. Обязательное отозвать
+  /// нельзя: 422 с полем `granted`.
+  Future<List<AccountConsent>> setConsent(String code, {required bool granted}) async =>
+      _consents(await put('/api/v1/me/consents/${Uri.encodeComponent(code)}', {'granted': granted}));
+
+  static List<AccountConsent> _consents(Object? body) => List.unmodifiable(_items(body, AccountConsent.fromJson).where((c) => c.code.isNotEmpty));
+
+  /// Кто и что смотрел по мне `GET /me/access-log` — записи аудита других пользователей, до 100 строк.
+  Future<List<AccessLogEntry>> myAccessLog() async => _items(await get('/api/v1/me/access-log'), AccessLogEntry.fromJson);
+
+  /// Запросить удаление учётной записи `POST /me/deletion-request` `{}` → 202: запрос уходит администратору
+  /// организации. Один [idempotencyKey] на нажатие — повтор того же нажатия не выглядит вторым запросом.
+  Future<void> requestDeletion({required String idempotencyKey}) async =>
+      await post('/api/v1/me/deletion-request', const <String, Object?>{}, headers: {_idempotencyHeader: idempotencyKey});
 
   /// Какие внешние сервисы работают (почта, push, SMS, вход через eGov) — `GET /public/service-status`, без токена.
   /// Ошибка HTTP или сети — исключение: решение о фолбэке принимает `ServiceStatusNotifier`.

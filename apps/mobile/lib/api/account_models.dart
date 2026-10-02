@@ -1,7 +1,8 @@
 import '../state/permissions.dart';
 
-/// Модели аккаунта по docs/rbac.md («Я и мой аккаунт»): `GET /me`, `GET /me/security`. Разбор терпимый: поля,
-/// которых нет в ответе, остаются пустыми — экран показывает то, что пришло, и ничего не додумывает.
+/// Модели аккаунта по docs/rbac.md («Я и мой аккаунт»): `GET /me`, `/me/security`, `/me/notifications`, `/me/profile`,
+/// `/me/consents`, `/me/access-log`. Разбор терпимый: поля, которых нет в ответе, остаются пустыми или получают значение
+/// сервера по умолчанию — экран показывает то, что пришло, и ничего не додумывает.
 
 /// `GET /api/v1/me` — кто вошёл и что ему можно.
 class Me {
@@ -76,14 +77,27 @@ class DeviceSession {
       );
 }
 
-/// `GET /api/v1/me/security`: пароль, второй фактор и сеансы. SMS-шлюз не подключён, резервные коды — после интеграции.
+/// `GET /api/v1/me/security`: пароль, второй фактор, сеансы, последние входы и резервные коды. SMS-шлюз не подключён.
 class SecurityInfo {
-  const SecurityInfo({required this.otpConfigured, required this.smsAvailable, required this.sessions, this.passwordChangedAt});
+  const SecurityInfo({
+    required this.otpConfigured,
+    required this.smsAvailable,
+    required this.sessions,
+    this.passwordChangedAt,
+    this.recentLogins = const [],
+    this.recoveryCodes,
+  });
 
   final String? passwordChangedAt;
   final bool otpConfigured;
   final bool smsAvailable;
   final List<DeviceSession> sessions;
+
+  /// Последние входы в учётную запись в порядке сервера.
+  final List<LoginRecord> recentLogins;
+
+  /// Резервные коды входа; null — их нет в системе входа (сервер так и отвечает).
+  final List<String>? recoveryCodes;
 
   /// Сколько полных дней назад менялся пароль; null — дата неизвестна.
   int? passwordAgeDays(DateTime now) {
@@ -91,15 +105,38 @@ class SecurityInfo {
     return at == null ? null : now.difference(at.toLocal()).inDays;
   }
 
-  factory SecurityInfo.fromJson(Map<String, dynamic> json) => SecurityInfo(
-        passwordChangedAt: json['passwordChangedAt'] as String?,
-        otpConfigured: json['otpConfigured'] as bool? ?? false,
-        smsAvailable: json['smsAvailable'] as bool? ?? false,
-        sessions: ((json['sessions'] as List<dynamic>?) ?? const [])
-            .whereType<Map<String, dynamic>>()
-            .map(DeviceSession.fromJson)
-            .where((d) => d.id.isNotEmpty)
-            .toList(growable: false),
+  factory SecurityInfo.fromJson(Map<String, dynamic> json) {
+    final codes = json['recoveryCodes'];
+    return SecurityInfo(
+      passwordChangedAt: json['passwordChangedAt'] as String?,
+      otpConfigured: json['otpConfigured'] as bool? ?? false,
+      smsAvailable: json['smsAvailable'] as bool? ?? false,
+      sessions: ((json['sessions'] as List<dynamic>?) ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(DeviceSession.fromJson)
+          .where((d) => d.id.isNotEmpty)
+          .toList(growable: false),
+      recentLogins: List.unmodifiable(((json['recentLogins'] as List<dynamic>?) ?? const []).whereType<Map<String, dynamic>>().map(LoginRecord.fromJson)),
+      recoveryCodes: codes is List<dynamic> ? List.unmodifiable(codes.whereType<String>()) : null,
+    );
+  }
+}
+
+/// Вход в учётную запись (`recentLogins` в `/me/security`): `method` — `password`, `egov`, `otp` или провайдер как
+/// есть.
+class LoginRecord {
+  const LoginRecord({required this.at, required this.method, required this.success, this.ip});
+
+  final String at;
+  final String method;
+  final bool success;
+  final String? ip;
+
+  factory LoginRecord.fromJson(Map<String, dynamic> json) => LoginRecord(
+        at: json['at'] as String? ?? '',
+        method: json['method'] as String? ?? '',
+        success: json['success'] as bool? ?? false,
+        ip: json['ip'] as String?,
       );
 }
 
@@ -227,4 +264,116 @@ class NotificationSettings {
         'quietExceptRegulator': quietExceptRegulator,
         'digest': digest,
       };
+}
+
+/// Профиль аккаунта (`GET /me/profile`). Язык профиля мобилка не меняет (решение Q11: язык — настройка устройства) и
+/// отправляет его обратно как пришёл.
+class AccountProfile {
+  const AccountProfile({
+    required this.displayName,
+    required this.language,
+    required this.timeZone,
+    this.position,
+    this.specialty,
+    this.email,
+    this.phone,
+    this.moCode,
+    this.moName,
+    this.regionKato,
+    this.iinMasked,
+  });
+
+  /// Значения сервера по умолчанию (`AccountCatalog`): язык `ru`, часовой пояс `Asia/Almaty`.
+  static const defaultLanguage = 'ru';
+  static const defaultTimeZone = 'Asia/Almaty';
+
+  final String displayName;
+  final String? position;
+  final String? specialty;
+  final String? email;
+  final String? phone;
+  final String language;
+  final String timeZone;
+  final String? moCode;
+  final String? moName;
+  final String? regionKato;
+  final String? iinMasked;
+
+  /// Сотрудник организации: у него есть должность, специальность или больница (у гражданина их нет).
+  bool get hasJob => [position, specialty, moCode].any((v) => v != null && v.isNotEmpty);
+
+  factory AccountProfile.fromJson(Map<String, dynamic> json) => AccountProfile(
+        displayName: json['displayName'] as String? ?? '',
+        position: json['position'] as String?,
+        specialty: json['specialty'] as String?,
+        email: json['email'] as String?,
+        phone: json['phone'] as String?,
+        language: json['language'] as String? ?? defaultLanguage,
+        timeZone: json['timeZone'] as String? ?? defaultTimeZone,
+        moCode: json['moCode'] as String?,
+        moName: json['moName'] as String?,
+        regionKato: json['regionKato'] as String?,
+        iinMasked: json['iinMasked'] as String?,
+      );
+}
+
+/// Согласие аккаунта (`GET /me/consents`): название из каталога сервера на двух языках.
+class AccountConsent {
+  const AccountConsent({required this.code, required this.granted, this.required = false, this.titleRu, this.titleKk, this.updatedAt});
+
+  final String code;
+  final String? titleRu;
+  final String? titleKk;
+
+  /// Обязательное (`forecasts`): включено всегда, переключатель заблокирован.
+  final bool required;
+  final bool granted;
+
+  /// Когда пользователь менял согласие (момент ISO); null — не менял.
+  final String? updatedAt;
+
+  /// Название на языке [locale]; пустое казахское — русское, без названий — код.
+  String title(String locale) {
+    final kk = titleKk?.trim() ?? '';
+    final ru = titleRu?.trim() ?? '';
+    if (locale == 'kk' && kk.isNotEmpty) {
+      return kk;
+    }
+    return ru.isNotEmpty ? ru : code;
+  }
+
+  factory AccountConsent.fromJson(Map<String, dynamic> json) => AccountConsent(
+        code: json['code'] as String? ?? '',
+        titleRu: json['titleRu'] as String?,
+        titleKk: json['titleKk'] as String?,
+        required: json['required'] as bool? ?? false,
+        granted: json['granted'] as bool? ?? false,
+        updatedAt: json['updatedAt'] as String?,
+      );
+}
+
+/// Строка журнала доступа к моим данным (`GET /me/access-log`).
+class AccessLogEntry {
+  const AccessLogEntry({required this.at, required this.actor, required this.role, required this.method, required this.path, required this.status});
+
+  final String at;
+  final String actor;
+  final String role;
+  final String method;
+  final String path;
+
+  /// HTTP-код ответа на тот запрос.
+  final int status;
+
+  /// «Что смотрел»: метод и путь без `/api/v1`, как в вебе.
+  String get what => '$method ${path.replaceFirst(RegExp(r'^/api/v1'), '')}'.trim();
+
+  factory AccessLogEntry.fromJson(Map<String, dynamic> json) => AccessLogEntry(
+        at: json['at'] as String? ?? '',
+        actor: json['actor'] as String? ?? '',
+        role: json['role'] as String? ?? '',
+        method: json['method'] as String? ?? '',
+        path: json['path'] as String? ?? '',
+        status: (json['status'] as num?)?.toInt() ?? 0,
+      );
 }

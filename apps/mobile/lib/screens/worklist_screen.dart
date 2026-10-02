@@ -146,9 +146,15 @@ class _WorklistScreenState extends State<WorklistScreen> {
         _query.clear();
       });
 
-  void _open(WorklistItem item) => context.go('${WorklistScreen.path}/${Uri.encodeComponent(item.patientRef)}', extra: item);
+  void _open(WorklistItem item) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    context.go('${WorklistScreen.path}/${Uri.encodeComponent(item.patientRef)}', extra: item);
+  }
 
-  void _openAssistant() => context.push(WorklistScreen.assistantPath);
+  void _openAssistant() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    context.push(WorklistScreen.assistantPath);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -162,7 +168,7 @@ class _WorklistScreenState extends State<WorklistScreen> {
     final subtitle = [
       ?region,
       s.worklistSubtitle,
-      if (page != null && page.asOf.isNotEmpty && !stale) s.worklistAsOf(dateShort(page.asOf)),
+      if (page != null && page.asOf.isNotEmpty && !stale) s.asOfLabel(dateShort(page.asOf)),
       s.worklistSyntheticShort,
     ].join(' · ');
     return PageScaffold(
