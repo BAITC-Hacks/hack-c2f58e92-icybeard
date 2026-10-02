@@ -2,15 +2,17 @@ import { ref } from 'vue'
 import { ApiError } from '@/api/client'
 import { journal } from '@/api/endpoints'
 import type { IncomingReferral } from '@/api/types'
+import { useAuthStore } from '@/stores/auth'
 
 /** Входящие направления в свою организацию: список из /journal/referrals/incoming и действия принимающей больницы —
  * подтвердить с датой, отказать, перенести дату, отметить госпитализацию или неявку, выписать. Какие кнопки показать —
- * только из item.allowed (сервер считает по журналу и отклонит остальное 409). Для ролей без своей организации
- * (администратор системы, регулятор) больница задаётся через moCode — без него список не запрашивается
- * (сервер ответил бы 422 «нужна организация»). */
+ * только из item.allowed (сервер считает по журналу и отклонит остальное 409). Своя организация передаётся явно:
+ * при охвате all сервер без moCode отвечает 422 «нужна организация», при охвате own — принимает только её.
+ * Для ролей без своей организации (администратор системы, регулятор) больница задаётся через moCode. */
 export function useIncomingReferrals() {
+  const auth = useAuthStore()
   const items = ref<IncomingReferral[]>([])
-  /** Организация, чьи входящие смотрим: null — своя (клейм mo_code пользователя). */
+  /** Организация, выбранная из списка; null — своя (mo_code пользователя). */
   const moCode = ref<string | null>(null)
   const error = ref<unknown>(null)
   const loading = ref(false)
@@ -23,7 +25,7 @@ export function useIncomingReferrals() {
     loading.value = true
     error.value = null
     try {
-      items.value = await journal.referralsIncoming({ moCode: moCode.value || undefined, includeConfirmed: showConfirmed.value || undefined, severe: severeOnly.value || undefined })
+      items.value = await journal.referralsIncoming({ moCode: moCode.value || auth.moCode || undefined, includeConfirmed: showConfirmed.value || undefined, severe: severeOnly.value || undefined })
     } catch (e) {
       error.value = e
     } finally {
